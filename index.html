@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0d0d0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Nhóp Nhép</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+/* ─── Reset & Base ─── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0d0d0f;
+  --bg2:#18181c;
+  --bg3:#222228;
+  --surface:#1e1e24;
+  --border:rgba(255,255,255,.09);
+  --text:#f0f0f5;
+  --text2:rgba(240,240,245,.6);
+  --text3:rgba(240,240,245,.35);
+  --primary:#ff6b35;
+  --primary-dim:rgba(255,107,53,.18);
+  --primary-glow:rgba(255,107,53,.4);
+  --cat-restaurant:#ff6b35;
+  --cat-street:#ffb347;
+  --cat-snack:#ff4785;
+  --cat-cafe:#9b7fe8;
+  --radius:16px;
+  --sheet-radius:24px 24px 0 0;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+  --safe-top:env(safe-area-inset-top,0px);
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;font-size:15px;line-height:1.5}
+button{border:none;background:none;color:inherit;cursor:pointer;font:inherit}
+
+/* ─── Screens ─── */
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden;transition:transform .38s cubic-bezier(.32,1,.56,1),opacity .38s}
+.screen.hidden{transform:translateX(100%);pointer-events:none;opacity:0}
+.screen.slide-left{transform:translateX(-60%);pointer-events:none;opacity:0}
+
+/* ─── Top bar ─── */
+.topbar{
+  position:relative;z-index:10;display:flex;align-items:center;gap:.5rem;
+  padding:calc(var(--safe-top) + .75rem) 1rem .75rem;
+  background:linear-gradient(to bottom,rgba(13,13,15,.98) 80%,transparent);
+  flex-shrink:0;
+}
+.topbar-logo{font-size:1.25rem;font-weight:900;letter-spacing:-.5px}
+.topbar-logo span{color:var(--primary)}
+.topbar-sub{font-size:.72rem;color:var(--text2);font-weight:500;margin-left:.25rem;margin-top:2px}
+.topbar-spacer{flex:1}
+.icon-btn{
+  width:2.25rem;height:2.25rem;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--bg3);font-size:1rem;transition:transform .15s,background .15s;
+}
+.icon-btn:active{transform:scale(.88);background:var(--bg2)}
+
+/* ─── Home Screen ─── */
+#homeScreen{background:var(--bg)}
+#mainMap{position:absolute;inset:0;z-index:1}
+
+/* Map dark filter */
+.leaflet-tile-pane{filter:brightness(.75) saturate(.7) hue-rotate(10deg)}
+.leaflet-container{background:#0d0d0f}
+
+.home-topbar{
+  position:absolute;top:0;left:0;right:0;z-index:10;
+  padding:calc(var(--safe-top) + .75rem) 1rem .75rem;
+  display:flex;align-items:center;gap:.5rem;
+  background:linear-gradient(to bottom,rgba(13,13,15,.9) 60%,transparent);
+}
+
+/* Bottom sheet on home */
+#homeSheet{
+  position:absolute;bottom:0;left:0;right:0;z-index:10;
+  background:var(--bg2);border-radius:var(--sheet-radius);
+  padding:0 0 calc(var(--safe-bottom) + .5rem);
+  box-shadow:0 -4px 40px rgba(0,0,0,.6);
+}
+.sheet-handle{width:2.5rem;height:4px;background:var(--border);border-radius:2px;margin:10px auto 0}
+.sheet-body{padding:.75rem 1rem 1rem}
+
+/* Category chips */
+.cat-chips{display:flex;gap:.5rem;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.cat-chips::-webkit-scrollbar{display:none}
+.cat-chip{
+  display:flex;align-items:center;gap:.35rem;padding:.45rem .75rem;border-radius:2rem;
+  border:1.5px solid var(--border);font-size:.82rem;font-weight:600;white-space:nowrap;
+  transition:all .18s;flex-shrink:0;
+}
+.cat-chip.active{border-color:currentColor;background:rgba(255,255,255,.07)}
+.cat-chip[data-cat="restaurant"]{color:var(--cat-restaurant)}
+.cat-chip[data-cat="street"]{color:var(--cat-street)}
+.cat-chip[data-cat="snack"]{color:var(--cat-snack)}
+.cat-chip[data-cat="cafe"]{color:var(--cat-cafe)}
+
+/* Radius row */
+.row-label{font-size:.72rem;font-weight:700;color:var(--text3);letter-spacing:.6px;text-transform:uppercase;margin:.75rem 0 .4rem}
+.radius-chips{display:flex;gap:.5rem}
+.radius-chip{
+  flex:1;text-align:center;padding:.45rem 0;border-radius:2rem;font-size:.82rem;font-weight:700;
+  border:1.5px solid var(--border);color:var(--text2);transition:all .18s;
+}
+.radius-chip.active{border-color:var(--primary);color:var(--primary);background:var(--primary-dim)}
+
+/* Location row */
+.loc-row{display:flex;gap:.5rem;margin-top:.75rem}
+.loc-input{
+  flex:1;background:var(--bg3);border:1.5px solid var(--border);border-radius:12px;
+  padding:.55rem .85rem;font-size:.9rem;color:var(--text);outline:none;
+  transition:border-color .18s;
+}
+.loc-input:focus{border-color:var(--primary)}
+.loc-input::placeholder{color:var(--text3)}
+.loc-gps-btn{
+  width:2.6rem;height:2.6rem;border-radius:12px;background:var(--bg3);
+  border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;transition:all .18s;flex-shrink:0;
+}
+.loc-gps-btn.active{border-color:var(--primary);background:var(--primary-dim);color:var(--primary)}
+.loc-gps-btn:active{transform:scale(.9)}
+
+/* Scan button */
+.scan-btn{
+  width:100%;margin-top:.85rem;padding:.9rem;border-radius:var(--radius);
+  background:var(--primary);color:#fff;font-size:1rem;font-weight:800;
+  letter-spacing:.3px;transition:transform .15s,box-shadow .15s;
+  box-shadow:0 4px 20px var(--primary-glow);
+}
+.scan-btn:active{transform:scale(.97);box-shadow:0 2px 10px var(--primary-glow)}
+.scan-btn:disabled{opacity:.5;pointer-events:none}
+
+/* GPS pulse marker */
+.user-marker-inner{
+  width:16px;height:16px;border-radius:50%;background:var(--primary);
+  border:2.5px solid #fff;box-shadow:0 0 0 0 var(--primary-glow);
+  animation:gps-pulse 2s infinite;
+}
+@keyframes gps-pulse{
+  0%{box-shadow:0 0 0 0 rgba(255,107,53,.6)}
+  70%{box-shadow:0 0 0 12px rgba(255,107,53,0)}
+  100%{box-shadow:0 0 0 0 rgba(255,107,53,0)}
+}
+
+/* ─── Results Screen ─── */
+#resultsScreen{background:var(--bg);flex-direction:column}
+.results-topbar{
+  flex-shrink:0;display:flex;align-items:center;gap:.6rem;
+  padding:calc(var(--safe-top) + .75rem) 1rem .75rem;
+  background:var(--bg);border-bottom:1px solid var(--border);
+  position:relative;z-index:5;
+}
+.back-btn{
+  width:2.2rem;height:2.2rem;border-radius:50%;background:var(--bg3);
+  display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;
+}
+.back-btn:active{transform:scale(.88)}
+.results-title{font-size:1rem;font-weight:800;flex:1;min-width:0}
+.results-sub{font-size:.72rem;color:var(--text2);font-weight:500}
+.reshuffle-btn{
+  padding:.4rem .8rem;border-radius:2rem;background:var(--bg3);
+  font-size:.8rem;font-weight:700;color:var(--text2);flex-shrink:0;
+  transition:all .18s;
+}
+.reshuffle-btn:active{background:var(--bg2);transform:scale(.93)}
+
+/* Cat filter tabs */
+.cat-tabs{
+  flex-shrink:0;display:flex;gap:0;overflow-x:auto;scrollbar-width:none;
+  border-bottom:1px solid var(--border);background:var(--bg);
+  padding:0 .5rem;
+}
+.cat-tabs::-webkit-scrollbar{display:none}
+.cat-tab{
+  padding:.65rem .85rem;font-size:.82rem;font-weight:700;color:var(--text3);
+  white-space:nowrap;border-bottom:2.5px solid transparent;transition:all .18s;
+}
+.cat-tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+
+/* Restaurant grid */
+.restaurant-grid{
+  flex:1;overflow-y:auto;padding:.75rem;display:grid;
+  grid-template-columns:1fr 1fr;gap:.6rem;align-content:start;
+  padding-bottom:calc(var(--safe-bottom) + 5rem);
+}
+.restaurant-grid::-webkit-scrollbar{display:none}
+
+/* Restaurant card */
+.r-card{
+  background:var(--surface);border-radius:var(--radius);border:1.5px solid var(--border);
+  padding:.75rem;position:relative;overflow:hidden;cursor:pointer;
+  transition:border-color .18s,transform .18s,box-shadow .18s;
+  animation:card-in .35s ease both;
+}
+.r-card:active{transform:scale(.96)}
+.r-card.selected{border-color:var(--primary);background:rgba(255,107,53,.06)}
+.r-card.selected::after{
+  content:'✓';position:absolute;top:.5rem;right:.5rem;
+  width:1.4rem;height:1.4rem;border-radius:50%;
+  background:var(--primary);color:#fff;font-size:.7rem;font-weight:900;
+  display:flex;align-items:center;justify-content:center;line-height:1.4rem;text-align:center;
+}
+@keyframes card-in{
+  from{opacity:0;transform:translateY(12px) scale(.97)}
+  to{opacity:1;transform:none}
+}
+.r-cat-badge{
+  display:inline-flex;align-items:center;gap:.25rem;font-size:.68rem;font-weight:700;
+  padding:.18rem .5rem;border-radius:1rem;margin-bottom:.4rem;
+}
+.r-name{font-size:.9rem;font-weight:800;line-height:1.25;margin-bottom:.25rem}
+.r-price{font-size:.72rem;color:var(--text2);font-weight:600;margin-bottom:.35rem}
+.r-meta{display:flex;align-items:center;justify-content:space-between;margin-top:.35rem}
+.r-rating{font-size:.75rem;font-weight:700;color:#ffd700}
+.r-dist{font-size:.72rem;color:var(--text3);font-weight:600}
+.r-desc{font-size:.72rem;color:var(--text2);line-height:1.4;margin-top:.3rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* Sticky bottom action bar */
+.results-action{
+  position:absolute;bottom:0;left:0;right:0;z-index:5;
+  padding:.75rem 1rem calc(var(--safe-bottom) + .75rem);
+  background:linear-gradient(to top,var(--bg) 70%,transparent);
+}
+.action-btn{
+  width:100%;padding:.9rem;border-radius:var(--radius);
+  background:var(--primary);color:#fff;font-size:1rem;font-weight:800;
+  box-shadow:0 4px 20px var(--primary-glow);transition:all .18s;
+}
+.action-btn:active{transform:scale(.97)}
+.action-btn:disabled{opacity:.4;pointer-events:none;box-shadow:none}
+
+/* Empty state */
+.empty-state{
+  grid-column:1/-1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:3rem 1rem;gap:.75rem;color:var(--text3);
+}
+.empty-state .es-icon{font-size:3rem}
+.empty-state .es-msg{font-size:.9rem;font-weight:600;text-align:center}
+
+/* ─── Plan Screen ─── */
+#planScreen{background:var(--bg);flex-direction:column}
+.plan-topbar{
+  flex-shrink:0;display:flex;align-items:center;gap:.6rem;
+  padding:calc(var(--safe-top) + .75rem) 1rem .75rem;
+  background:var(--bg);border-bottom:1px solid var(--border);
+}
+.plan-title{font-size:1rem;font-weight:800;flex:1}
+
+/* Summary strip */
+.plan-summary{
+  flex-shrink:0;display:flex;align-items:center;gap:.5rem;overflow-x:auto;
+  padding:.6rem 1rem;background:var(--bg2);border-bottom:1px solid var(--border);
+  scrollbar-width:none;
+}
+.plan-summary::-webkit-scrollbar{display:none}
+.sum-chip{
+  display:flex;align-items:center;gap:.35rem;padding:.35rem .75rem;
+  border-radius:2rem;background:var(--bg3);font-size:.78rem;font-weight:700;
+  white-space:nowrap;flex-shrink:0;color:var(--text);
+}
+.sum-chip .sci{font-size:.9rem}
+
+/* Plan map */
+#planMap{flex-shrink:0;height:180px;background:var(--bg3)}
+
+/* Timeline */
+.timeline{flex:1;overflow-y:auto;padding:.75rem 1rem calc(var(--safe-bottom) + 1rem);scrollbar-width:none}
+.timeline::-webkit-scrollbar{display:none}
+
+.tl-item{display:flex;gap:.75rem;margin-bottom:.25rem}
+.tl-spine{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:2rem}
+.tl-dot{
+  width:2rem;height:2rem;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:.95rem;border:2px solid var(--border);background:var(--bg2);flex-shrink:0;
+}
+.tl-line{flex:1;width:2px;background:var(--border);margin:.25rem auto}
+.tl-content{flex:1;padding-bottom:.75rem}
+
+/* Travel leg */
+.tl-travel{display:flex;align-items:center;gap:.5rem;padding:.45rem .7rem;border-radius:10px;background:var(--bg2);margin-bottom:.25rem}
+.tl-travel-icon{font-size:1rem}
+.tl-travel-info{flex:1;min-width:0}
+.tl-travel-time{font-size:.82rem;font-weight:700;color:var(--text)}
+.tl-travel-dist{font-size:.72rem;color:var(--text2)}
+
+/* Stop card */
+.tl-stop{background:var(--surface);border-radius:var(--radius);border:1.5px solid var(--border);padding:.75rem;margin-bottom:.25rem}
+.tl-stop-header{display:flex;align-items:flex-start;gap:.6rem;margin-bottom:.35rem}
+.tl-stop-icon{font-size:1.4rem;flex-shrink:0}
+.tl-stop-info{flex:1;min-width:0}
+.tl-stop-name{font-size:.95rem;font-weight:800;margin-bottom:.15rem}
+.tl-stop-cat{font-size:.72rem;font-weight:700;opacity:.7}
+.tl-dwell{display:flex;align-items:center;gap:.5rem;margin-top:.5rem}
+.dwell-label{font-size:.75rem;color:var(--text2);font-weight:600}
+.dwell-adj{display:flex;align-items:center;gap:.4rem;margin-left:auto}
+.dwell-num{font-size:.85rem;font-weight:800;min-width:2rem;text-align:center}
+.dwell-btn{
+  width:1.8rem;height:1.8rem;border-radius:50%;background:var(--bg3);
+  font-size:1rem;display:flex;align-items:center;justify-content:center;
+  transition:all .15s;font-weight:700;
+}
+.dwell-btn:active{transform:scale(.85);background:var(--bg2)}
+
+/* Time label on stop */
+.tl-time{font-size:.72rem;font-weight:700;color:var(--primary);margin-top:.35rem}
+
+/* Start/End node */
+.tl-start{font-size:.78rem;font-weight:700;color:var(--text2);padding:.35rem 0}
+
+/* Toast */
+#toast{
+  position:fixed;bottom:calc(var(--safe-bottom) + 6rem);left:50%;transform:translateX(-50%) translateY(1rem);
+  background:rgba(30,30,36,.95);backdrop-filter:blur(10px);color:var(--text);
+  padding:.55rem 1.1rem;border-radius:2rem;font-size:.85rem;font-weight:600;
+  box-shadow:0 4px 20px rgba(0,0,0,.4);pointer-events:none;z-index:999;
+  opacity:0;transition:opacity .25s,transform .25s;white-space:nowrap;
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Loading indicator */
+.scanning-overlay{
+  position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(13,13,15,.85);backdrop-filter:blur(8px);gap:1rem;
+}
+.scanning-spinner{
+  width:48px;height:48px;border:3px solid var(--border);border-top-color:var(--primary);
+  border-radius:50%;animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.scanning-txt{font-size:.9rem;font-weight:700;color:var(--text2)}
+
+/* Leaflet marker overrides */
+.leaflet-marker-icon{transition:none!important}
+.r-map-marker{
+  width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:.9rem;border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5);
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     HOME SCREEN
+═══════════════════════════════════════════════ -->
+<div id="homeScreen" class="screen">
+  <div id="mainMap"></div>
+
+  <!-- Top bar -->
+  <div class="home-topbar">
+    <div>
+      <div class="topbar-logo">Nhóp <span>Nhép</span> 🍜</div>
+      <div class="topbar-sub">Chọn quán · Lên kế hoạch · Ăn thôi</div>
+    </div>
+    <div class="topbar-spacer"></div>
+  </div>
+
+  <!-- Bottom sheet -->
+  <div id="homeSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-body">
+
+      <!-- Categories -->
+      <div class="row-label">Tôi muốn ăn</div>
+      <div class="cat-chips" id="catChips">
+        <button class="cat-chip active" data-cat="restaurant">🍽️ Nhà hàng</button>
+        <button class="cat-chip active" data-cat="street">🍜 Vỉa hè</button>
+        <button class="cat-chip active" data-cat="snack">🧆 Ăn vặt</button>
+        <button class="cat-chip active" data-cat="cafe">☕ Cà phê</button>
+      </div>
+
+      <!-- Radius -->
+      <div class="row-label">Bán kính tìm kiếm</div>
+      <div class="radius-chips" id="radiusChips">
+        <button class="radius-chip" data-r="500">500m</button>
+        <button class="radius-chip active" data-r="1000">1 km</button>
+        <button class="radius-chip" data-r="2000">2 km</button>
+        <button class="radius-chip" data-r="5000">5 km</button>
+      </div>
+
+      <!-- Location -->
+      <div class="row-label">Điểm xuất phát</div>
+      <div class="loc-row">
+        <input id="locInput" class="loc-input" type="text" placeholder="Nhập địa chỉ hoặc dùng GPS…" autocomplete="off" spellcheck="false">
+        <button class="loc-gps-btn" id="gpsBtn" title="Lấy vị trí GPS">📍</button>
+      </div>
+
+      <!-- Scan CTA -->
+      <button class="scan-btn" id="scanBtn">🔍 Quét ngay!</button>
+
+    </div>
+  </div>
+
+  <!-- Scanning overlay (hidden) -->
+  <div class="scanning-overlay" id="scanOverlay" style="display:none">
+    <div class="scanning-spinner"></div>
+    <div class="scanning-txt">Đang tìm quán ngon gần đây…</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     RESULTS SCREEN
+═══════════════════════════════════════════════ -->
+<div id="resultsScreen" class="screen hidden">
+  <div class="results-topbar">
+    <button class="back-btn" id="resultsBack">←</button>
+    <div style="flex:1;min-width:0">
+      <div class="results-title" id="resultsTitle">Quán gần đây</div>
+      <div class="results-sub" id="resultsSub"></div>
+    </div>
+    <button class="reshuffle-btn" id="reshuffleBtn">🔀 Xáo lại</button>
+  </div>
+
+  <!-- Category filter tabs -->
+  <div class="cat-tabs" id="catTabs">
+    <button class="cat-tab active" data-filter="all">Tất cả</button>
+    <button class="cat-tab" data-filter="restaurant">🍽️ Nhà hàng</button>
+    <button class="cat-tab" data-filter="street">🍜 Vỉa hè</button>
+    <button class="cat-tab" data-filter="snack">🧆 Ăn vặt</button>
+    <button class="cat-tab" data-filter="cafe">☕ Cà phê</button>
+  </div>
+
+  <!-- Grid -->
+  <div class="restaurant-grid" id="restaurantGrid"></div>
+
+  <!-- Action bar -->
+  <div class="results-action">
+    <button class="action-btn" id="planBtn" disabled>Lên lịch</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     PLAN SCREEN
+═══════════════════════════════════════════════ -->
+<div id="planScreen" class="screen hidden">
+  <div class="plan-topbar">
+    <button class="back-btn" id="planBack">←</button>
+    <div class="plan-title">📋 Lịch trình hôm nay</div>
+  </div>
+
+  <!-- Summary strip -->
+  <div class="plan-summary" id="planSummary"></div>
+
+  <!-- Plan map -->
+  <div id="planMap"></div>
+
+  <!-- Timeline -->
+  <div class="timeline" id="timeline"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   DATA
+═══════════════════════════════════════════════ */
+const CATEGORIES = {
+  restaurant: { label:'Nhà hàng',  icon:'🍽️', color:'#ff6b35', dwell:60 },
+  street:     { label:'Vỉa hè',    icon:'🍜', color:'#ffb347', dwell:30 },
+  snack:      { label:'Ăn vặt',    icon:'🧆', color:'#ff4785', dwell:20 },
+  cafe:       { label:'Cà phê',    icon:'☕', color:'#9b7fe8', dwell:45 },
+};
+
+// Mock data — District 1 & surroundings, HCMC
+// Center ref: 10.7769° N, 106.7009° E
+const RESTAURANTS = [
+  // ── Nhà hàng ──
+  { id:1,  name:'Nhà Hàng Ngon',       cat:'restaurant', price:'150k–300k', lat:10.7769, lng:106.6903, rating:4.5, desc:'Đặc sản 3 miền, không gian biệt thự Pháp xưa' },
+  { id:2,  name:'Cục Gạch Quán',       cat:'restaurant', price:'200k–400k', lat:10.7720, lng:106.6850, rating:4.6, desc:'Ẩm thực Nam Bộ truyền thống, không gian retro' },
+  { id:3,  name:'The Racha Room',      cat:'restaurant', price:'300k–600k', lat:10.7790, lng:106.6962, rating:4.4, desc:'Thai fusion, view rooftop cực đẹp buổi tối' },
+  { id:4,  name:'Hẻm Quán',            cat:'restaurant', price:'120k–250k', lat:10.7745, lng:106.6875, rating:4.3, desc:'Cơm bình dân nâng cấp, menu xoay vòng theo ngày' },
+  { id:5,  name:"Pizza 4P's",          cat:'restaurant', price:'200k–450k', lat:10.7802, lng:106.6945, rating:4.7, desc:'Pizza lò củi thủ công, farm-to-table, booking trước' },
+  { id:6,  name:'Secret Garden',       cat:'restaurant', price:'250k–500k', lat:10.7755, lng:106.6935, rating:4.5, desc:'Sân thượng xanh mát, view nhìn ra phố đi bộ' },
+  // ── Vỉa hè / Bình dân ──
+  { id:7,  name:'Bún bò Huế Bà Khế',  cat:'street',     price:'40k–70k',  lat:10.7780, lng:106.6890, rating:4.5, desc:'Nước bún bò đỏ au, mở từ 6h sáng, đông khách nhất Q1' },
+  { id:8,  name:'Cơm tấm Thuận Kiều', cat:'street',     price:'35k–55k',  lat:10.7750, lng:106.6870, rating:4.4, desc:'Sườn nướng than hồng, bì chả, mỡ hành thơm lừng' },
+  { id:9,  name:'Bánh mì Huynh Hoa',  cat:'street',     price:'25k–45k',  lat:10.7700, lng:106.6820, rating:4.8, desc:'Bánh mì nổi tiếng nhất Sài Gòn, hàng dài cả con phố' },
+  { id:10, name:'Phở Thìn Lò Đúc',   cat:'street',     price:'50k–80k',  lat:10.7760, lng:106.6900, rating:4.6, desc:'Phở tái lăn trứ danh từ Hà Nội, sốt gừng đặc biệt' },
+  { id:11, name:'Hủ tiếu Nam Vang',   cat:'street',     price:'40k–65k',  lat:10.7735, lng:106.6862, rating:4.5, desc:'Hủ tiếu khô/nước, xương tủy hầm 12 tiếng mỗi sáng' },
+  { id:12, name:'Bò kho Lê Thị Riêng',cat:'street',     price:'45k–75k',  lat:10.7712, lng:106.6840, rating:4.4, desc:'Bò kho bánh mì, nước sốt sánh đặc, béo ngậy mà không ngán' },
+  // ── Ăn vặt / Ăn chơi ──
+  { id:13, name:'Bánh tráng trộn TĐ', cat:'snack',      price:'15k–30k',  lat:10.7810, lng:106.6940, rating:4.3, desc:'Nổi tiếng từ khuya 10pm–2am, giới trẻ check-in liên tục' },
+  { id:14, name:'Chè Hiển Khánh',     cat:'snack',      price:'20k–40k',  lat:10.7730, lng:106.6860, rating:4.5, desc:'Chè khúc bạch, thạch matcha, khoai môn sáp cực ngon' },
+  { id:15, name:'Nem nướng Ninh Hòa', cat:'snack',      price:'30k–50k',  lat:10.7770, lng:106.6910, rating:4.4, desc:'Nem cuộn bánh tráng, chấm tương đặc biệt theo công thức gia truyền' },
+  { id:16, name:'Xôi Gà Tâm',         cat:'snack',      price:'25k–45k',  lat:10.7725, lng:106.6852, rating:4.6, desc:'Xôi gà cắt cọng hành, gừng thơm, ăn no mà không ngán' },
+  { id:17, name:'Bánh cuốn Thanh Trì',cat:'snack',      price:'30k–55k',  lat:10.7755, lng:106.6885, rating:4.4, desc:'Bánh cuốn nhân thịt tôm, mộc nhĩ, nước chấm kiểu Hà Nội' },
+  { id:18, name:'Gỏi cuốn 3 Đình',    cat:'snack',      price:'20k–35k',  lat:10.7740, lng:106.6920, rating:4.3, desc:'Gỏi cuốn tôm thịt, chấm tương hoisin pha vừa miệng' },
+  // ── Cà phê / Nước uống ──
+  { id:19, name:'The Workshop Coffee', cat:'cafe',       price:'60k–120k', lat:10.7765, lng:106.6890, rating:4.7, desc:'Specialty coffee, không gian nhà kho vintage tầng 2' },
+  { id:20, name:'Cộng Cà Phê',         cat:'cafe',       price:'45k–75k',  lat:10.7740, lng:106.6865, rating:4.5, desc:'Phong cách Bắc Kỳ hoài cổ, cà phê dừa thơm mát' },
+  { id:21, name:'Phúc Long',           cat:'cafe',       price:'30k–55k',  lat:10.7758, lng:106.6895, rating:4.4, desc:'Trà sữa, matcha latte, thương hiệu trà nổi tiếng từ 1968' },
+  { id:22, name:'Koi Thé',             cat:'cafe',       price:'35k–65k',  lat:10.7782, lng:106.6925, rating:4.3, desc:'Trà sữa Đài Loan cao cấp, nhiều topping, xếp hàng đông' },
+  { id:23, name:'Giang Cà Phê',        cat:'cafe',       price:'25k–50k',  lat:10.7715, lng:106.6842, rating:4.6, desc:'Trứng cà phê kiểu Hà Nội, vỉa hè cổ kính mộc mạc' },
+  { id:24, name:'Shin Coffee',          cat:'cafe',       price:'40k–70k',  lat:10.7748, lng:106.6878, rating:4.5, desc:'Cà phê pour-over, view nhìn ra phố đi bộ Nguyễn Huệ' },
+];
+
+/* ═══════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════ */
+const State = {
+  userLat: null,
+  userLng: null,
+  radius: 1000,             // metres
+  activeCats: new Set(['restaurant','street','snack','cafe']),
+  filteredResults: [],      // restaurants in range
+  visibleResults: [],       // after category tab filter
+  selected: new Set(),      // selected restaurant ids
+  tabFilter: 'all',
+  itinerary: [],            // ordered stops with timing
+  dwellOverrides: {},       // id → custom minutes
+  gpsWatchId: null,
+  mainMap: null,
+  planMap: null,
+  userMarker: null,
+  radiusCircle: null,
+};
+
+/* ═══════════════════════════════════════════════
+   UTILS
+═══════════════════════════════════════════════ */
+// Haversine distance in metres
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const φ1 = lat1 * Math.PI/180, φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2-lat1)*Math.PI/180, Δλ = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+function fmtDist(m) {
+  return m < 1000 ? Math.round(m)+'m' : (m/1000).toFixed(1)+'km';
+}
+
+function fmtTime(min) {
+  if (min < 60) return min+'p';
+  return Math.floor(min/60)+'h'+(min%60?String(min%60).padStart(2,'0')+'p':'');
+}
+
+// Travel time: xe máy ~25km/h in city + 3 min overhead
+function travelMinutes(m) {
+  return Math.max(3, Math.round(m/1000/25*60) + 3);
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+let _toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+function addMinutes(baseDate, min) {
+  const d = new Date(baseDate);
+  d.setMinutes(d.getMinutes()+min);
+  return d;
+}
+
+function fmtClock(d) {
+  return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+}
+
+/* ═══════════════════════════════════════════════
+   MAP — HOME
+═══════════════════════════════════════════════ */
+const MapHome = {
+  init() {
+    // Default center: District 1, HCM
+    const lat = State.userLat || 10.7769;
+    const lng = State.userLng || 106.7009;
+    State.mainMap = L.map('mainMap', {
+      center:[lat,lng], zoom:15,
+      zoomControl:false, attributionControl:false,
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom:19,
+    }).addTo(State.mainMap);
+    this.setUserLocation(lat, lng);
+  },
+
+  setUserLocation(lat, lng) {
+    State.userLat = lat; State.userLng = lng;
+    State.mainMap.setView([lat, lng], 15);
+
+    // Remove old marker + circle
+    if (State.userMarker) State.userMarker.remove();
+    if (State.radiusCircle) State.radiusCircle.remove();
+
+    // User pulse marker
+    const icon = L.divIcon({
+      html:`<div class="user-marker-inner"></div>`,
+      iconSize:[16,16], iconAnchor:[8,8], className:''
+    });
+    State.userMarker = L.marker([lat,lng],{icon, zIndexOffset:1000}).addTo(State.mainMap);
+
+    // Radius circle
+    State.radiusCircle = L.circle([lat,lng], {
+      radius: State.radius,
+      color:'#ff6b35', fillColor:'#ff6b35', fillOpacity:.07, weight:1.5, opacity:.4,
+    }).addTo(State.mainMap);
+  },
+
+  updateRadius() {
+    if (!State.radiusCircle || !State.userLat) return;
+    State.radiusCircle.setRadius(State.radius);
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   GPS
+═══════════════════════════════════════════════ */
+const GPS = {
+  start() {
+    if (!navigator.geolocation) { showToast('⚠️ Trình duyệt không hỗ trợ GPS'); return; }
+    const btn = document.getElementById('gpsBtn');
+    btn.textContent = '⏳'; btn.classList.add('active');
+
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const {latitude:lat, longitude:lng} = pos.coords;
+        State.userLat = lat; State.userLng = lng;
+        MapHome.setUserLocation(lat, lng);
+        document.getElementById('locInput').value = `📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+        btn.textContent = '📍'; btn.classList.add('active');
+        showToast('✅ Đã lấy vị trí GPS');
+      },
+      err => {
+        btn.textContent = '📍'; btn.classList.remove('active');
+        showToast('⚠️ Không lấy được GPS — dùng địa chỉ thủ công');
+        console.warn('GPS error:', err);
+      },
+      { enableHighAccuracy:true, timeout:8000, maximumAge:30000 }
+    );
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   HOME SCREEN LOGIC
+═══════════════════════════════════════════════ */
+const HomeCtrl = {
+  init() {
+    // Category chips
+    document.getElementById('catChips').addEventListener('click', e => {
+      const chip = e.target.closest('.cat-chip');
+      if (!chip) return;
+      const cat = chip.dataset.cat;
+      if (State.activeCats.has(cat)) {
+        if (State.activeCats.size === 1) { showToast('Chọn ít nhất 1 loại nhé!'); return; }
+        State.activeCats.delete(cat);
+        chip.classList.remove('active');
+      } else {
+        State.activeCats.add(cat);
+        chip.classList.add('active');
+      }
+    });
+
+    // Radius chips
+    document.getElementById('radiusChips').addEventListener('click', e => {
+      const chip = e.target.closest('.radius-chip');
+      if (!chip) return;
+      document.querySelectorAll('.radius-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      State.radius = parseInt(chip.dataset.r);
+      MapHome.updateRadius();
+    });
+
+    // GPS button
+    document.getElementById('gpsBtn').addEventListener('click', () => GPS.start());
+
+    // Scan button
+    document.getElementById('scanBtn').addEventListener('click', () => this.scan());
+
+    // Keyboard Enter on loc input
+    document.getElementById('locInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') this.scan();
+    });
+  },
+
+  scan() {
+    if (!State.userLat) {
+      showToast('📍 Dùng GPS hoặc nhập địa chỉ trước nhé!');
+      return;
+    }
+
+    // Show scanning
+    const ov = document.getElementById('scanOverlay');
+    ov.style.display = 'flex';
+
+    setTimeout(() => {
+      ov.style.display = 'none';
+      this._doScan();
+    }, 900);
+  },
+
+  _doScan() {
+    const results = RESTAURANTS.filter(r => {
+      const dist = haversine(State.userLat, State.userLng, r.lat, r.lng);
+      return dist <= State.radius && State.activeCats.has(r.cat);
+    }).map(r => ({
+      ...r,
+      _dist: haversine(State.userLat, State.userLng, r.lat, r.lng),
+    }));
+
+    if (results.length === 0) {
+      showToast(`🤔 Không tìm thấy quán trong ${fmtDist(State.radius)}`);
+      return;
+    }
+
+    State.filteredResults = shuffle(results);
+    State.selected.clear();
+    State.tabFilter = 'all';
+    ResultsCtrl.show();
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   RESULTS SCREEN LOGIC
+═══════════════════════════════════════════════ */
+const ResultsCtrl = {
+  show() {
+    // Switch screens
+    document.getElementById('homeScreen').classList.add('slide-left');
+    document.getElementById('resultsScreen').classList.remove('hidden');
+
+    this._updateHeader();
+    this._setTabFilter('all');
+    this._render();
+  },
+
+  _updateHeader() {
+    const n = State.filteredResults.length;
+    document.getElementById('resultsTitle').textContent = `${n} quán gần đây`;
+    document.getElementById('resultsSub').textContent = `Trong bán kính ${fmtDist(State.radius)}`;
+  },
+
+  _setTabFilter(filter) {
+    State.tabFilter = filter;
+    document.querySelectorAll('.cat-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.filter === filter);
+    });
+    State.visibleResults = filter === 'all'
+      ? State.filteredResults
+      : State.filteredResults.filter(r => r.cat === filter);
+    this._render();
+  },
+
+  _render() {
+    const grid = document.getElementById('restaurantGrid');
+    const visible = State.visibleResults;
+
+    if (visible.length === 0) {
+      grid.innerHTML = `<div class="empty-state"><div class="es-icon">🍽️</div><div class="es-msg">Không có quán loại này<br>trong bán kính tìm kiếm</div></div>`;
+      return;
+    }
+
+    grid.innerHTML = visible.map((r, i) => {
+      const cat = CATEGORIES[r.cat];
+      const sel = State.selected.has(r.id);
+      const stars = '★'.repeat(Math.round(r.rating)) + '☆'.repeat(5-Math.round(r.rating));
+      return `<div class="r-card${sel?' selected':''}" data-id="${r.id}" style="animation-delay:${i*40}ms">
+        <div class="r-cat-badge" style="background:${cat.color}22;color:${cat.color}">${cat.icon} ${cat.label}</div>
+        <div class="r-name">${r.name}</div>
+        <div class="r-price">💰 ${r.price}</div>
+        <div class="r-desc">${r.desc}</div>
+        <div class="r-meta">
+          <span class="r-rating">${r.rating} ★</span>
+          <span class="r-dist">${fmtDist(r._dist)}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    this._updatePlanBtn();
+  },
+
+  _updatePlanBtn() {
+    const n = State.selected.size;
+    const btn = document.getElementById('planBtn');
+    btn.disabled = n === 0;
+    btn.textContent = n === 0 ? 'Lên lịch' : `📋 Lên lịch ${n} quán đã chọn`;
+  },
+
+  init() {
+    // Back
+    document.getElementById('resultsBack').addEventListener('click', () => {
+      document.getElementById('homeScreen').classList.remove('slide-left');
+      document.getElementById('resultsScreen').classList.add('hidden');
+    });
+
+    // Reshuffle
+    document.getElementById('reshuffleBtn').addEventListener('click', () => {
+      State.filteredResults = shuffle(State.filteredResults);
+      State.visibleResults = State.tabFilter === 'all'
+        ? State.filteredResults
+        : State.filteredResults.filter(r => r.cat === State.tabFilter);
+      this._render();
+      showToast('🔀 Đã xáo lại danh sách!');
+    });
+
+    // Cat tabs
+    document.getElementById('catTabs').addEventListener('click', e => {
+      const tab = e.target.closest('.cat-tab');
+      if (!tab) return;
+      this._setTabFilter(tab.dataset.filter);
+    });
+
+    // Card select
+    document.getElementById('restaurantGrid').addEventListener('click', e => {
+      const card = e.target.closest('.r-card');
+      if (!card) return;
+      const id = parseInt(card.dataset.id);
+      if (State.selected.has(id)) {
+        State.selected.delete(id);
+        card.classList.remove('selected');
+      } else {
+        if (State.selected.size >= 6) { showToast('Tối đa 6 quán mỗi chuyến nhé 😄'); return; }
+        State.selected.add(id);
+        card.classList.add('selected');
+      }
+      this._updatePlanBtn();
+    });
+
+    // Plan button
+    document.getElementById('planBtn').addEventListener('click', () => {
+      PlanCtrl.buildItinerary();
+      PlanCtrl.show();
+    });
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   PLAN / ITINERARY LOGIC
+═══════════════════════════════════════════════ */
+const PlanCtrl = {
+  // Greedy nearest-neighbor routing starting from user location
+  buildItinerary() {
+    const stops = RESTAURANTS
+      .filter(r => State.selected.has(r.id))
+      .map(r => ({ ...r, _dist: haversine(State.userLat, State.userLng, r.lat, r.lng) }));
+
+    // Greedy sort
+    let current = { lat: State.userLat, lng: State.userLng };
+    const ordered = [];
+    const remaining = [...stops];
+    while (remaining.length) {
+      let nearest = null, nearestDist = Infinity, nearestIdx = -1;
+      remaining.forEach((r, i) => {
+        const d = haversine(current.lat, current.lng, r.lat, r.lng);
+        if (d < nearestDist) { nearestDist = d; nearest = r; nearestIdx = i; }
+      });
+      ordered.push({ ...nearest, _legDist: nearestDist });
+      current = nearest;
+      remaining.splice(nearestIdx, 1);
+    }
+
+    // Build timed itinerary — start now (round to next 5 min)
+    let clock = new Date();
+    clock.setSeconds(0, 0);
+    const extra = (5 - clock.getMinutes()%5) % 5;
+    clock = addMinutes(clock, extra);
+
+    State.itinerary = ordered.map(stop => {
+      const travelMin = travelMinutes(stop._legDist);
+      const arrivalClock = addMinutes(clock, travelMin);
+      const dwell = State.dwellOverrides[stop.id] ?? CATEGORIES[stop.cat].dwell;
+      const departureClock = addMinutes(arrivalClock, dwell);
+
+      const entry = {
+        ...stop,
+        travelMin, arrivalClock: new Date(arrivalClock), departureClock: new Date(departureClock),
+        dwell,
+      };
+      clock = departureClock;
+      return entry;
+    });
+  },
+
+  show() {
+    document.getElementById('resultsScreen').classList.add('slide-left');
+    document.getElementById('planScreen').classList.remove('hidden');
+    this._renderSummary();
+    this._renderTimeline();
+    this._initPlanMap();
+  },
+
+  _renderSummary() {
+    const totalTravel = State.itinerary.reduce((s,x) => s+x.travelMin, 0);
+    const totalDwell  = State.itinerary.reduce((s,x) => s+x.dwell, 0);
+    const totalDist   = State.itinerary.reduce((s,x) => s+x._legDist, 0);
+    const endTime     = State.itinerary.length ? State.itinerary[State.itinerary.length-1].departureClock : new Date();
+    const startTime   = State.itinerary.length ? addMinutes(State.itinerary[0].arrivalClock, -State.itinerary[0].travelMin) : new Date();
+
+    document.getElementById('planSummary').innerHTML = `
+      <div class="sum-chip"><span class="sci">🏪</span>${State.itinerary.length} điểm dừng</div>
+      <div class="sum-chip"><span class="sci">🕐</span>${fmtClock(startTime)} → ${fmtClock(endTime)}</div>
+      <div class="sum-chip"><span class="sci">⏱</span>${fmtTime(totalTravel+totalDwell)}</div>
+      <div class="sum-chip"><span class="sci">📍</span>${fmtDist(totalDist)}</div>
+      <div class="sum-chip"><span class="sci">🛵</span>Xe máy</div>
+    `;
+  },
+
+  _renderTimeline() {
+    const tl = document.getElementById('timeline');
+    let html = '';
+
+    html += `<div class="tl-item">
+      <div class="tl-spine"><div class="tl-dot" style="background:rgba(255,107,53,.15);border-color:var(--primary);font-size:.8rem">📍</div><div class="tl-line"></div></div>
+      <div class="tl-content"><div class="tl-start">Xuất phát từ vị trí của bạn · ${fmtClock(addMinutes(State.itinerary[0].arrivalClock, -State.itinerary[0].travelMin))}</div></div>
+    </div>`;
+
+    State.itinerary.forEach((stop, i) => {
+      const cat = CATEGORIES[stop.cat];
+      const isLast = i === State.itinerary.length-1;
+
+      // Travel leg
+      html += `<div class="tl-item">
+        <div class="tl-spine"><div class="tl-dot" style="font-size:.8rem">🛵</div>${!isLast || true ? '<div class="tl-line"></div>' : ''}</div>
+        <div class="tl-content">
+          <div class="tl-travel">
+            <span class="tl-travel-icon">🛵</span>
+            <div class="tl-travel-info">
+              <div class="tl-travel-time">${stop.travelMin} phút di chuyển</div>
+              <div class="tl-travel-dist">${fmtDist(stop._legDist)} · xe máy</div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+      // Stop card
+      html += `<div class="tl-item">
+        <div class="tl-spine">
+          <div class="tl-dot" style="background:${cat.color}22;border-color:${cat.color}">${cat.icon}</div>
+          ${!isLast ? '<div class="tl-line"></div>' : ''}
+        </div>
+        <div class="tl-content">
+          <div class="tl-stop" data-idx="${i}">
+            <div class="tl-stop-header">
+              <div class="tl-stop-icon">${cat.icon}</div>
+              <div class="tl-stop-info">
+                <div class="tl-stop-name">${stop.name}</div>
+                <div class="tl-stop-cat" style="color:${cat.color}">${cat.label} · ${stop.price}</div>
+              </div>
+            </div>
+            <div class="tl-dwell">
+              <span class="dwell-label">⏱ Thời gian ở:</span>
+              <div class="dwell-adj">
+                <button class="dwell-btn" data-action="minus" data-idx="${i}">−</button>
+                <span class="dwell-num" id="dwell${i}">${stop.dwell}p</span>
+                <button class="dwell-btn" data-action="plus" data-idx="${i}">+</button>
+              </div>
+            </div>
+            <div class="tl-time" id="stopTime${i}">🕐 Đến ${fmtClock(stop.arrivalClock)} → Rời ${fmtClock(stop.departureClock)}</div>
+          </div>
+        </div>
+      </div>`;
+    });
+
+    // End node
+    if (State.itinerary.length) {
+      const last = State.itinerary[State.itinerary.length-1];
+      html += `<div class="tl-item">
+        <div class="tl-spine"><div class="tl-dot" style="background:rgba(255,200,0,.12);border-color:#ffd700;font-size:.8rem">🏁</div></div>
+        <div class="tl-content"><div class="tl-start" style="color:#ffd700">Kết thúc chuyến ăn · ${fmtClock(last.departureClock)}</div></div>
+      </div>`;
+    }
+
+    tl.innerHTML = html;
+
+    // Dwell adjust buttons
+    tl.addEventListener('click', e => {
+      const btn = e.target.closest('.dwell-btn');
+      if (!btn) return;
+      const idx = parseInt(btn.dataset.idx);
+      const action = btn.dataset.action;
+      const stop = State.itinerary[idx];
+      let dwell = stop.dwell + (action==='plus' ? 5 : -5);
+      dwell = Math.max(5, Math.min(180, dwell));
+      State.dwellOverrides[stop.id] = dwell;
+      stop.dwell = dwell;
+      // Recalculate from this stop onwards
+      let clock = stop.arrivalClock;
+      for (let i = idx; i < State.itinerary.length; i++) {
+        const s = State.itinerary[i];
+        s.arrivalClock = new Date(clock);
+        s.departureClock = addMinutes(clock, s.dwell);
+        clock = s.departureClock;
+        // Update DOM
+        const dwellEl = document.getElementById(`dwell${i}`);
+        const timeEl  = document.getElementById(`stopTime${i}`);
+        if (dwellEl) dwellEl.textContent = s.dwell+'p';
+        if (timeEl)  timeEl.textContent  = `🕐 Đến ${fmtClock(s.arrivalClock)} → Rời ${fmtClock(s.departureClock)}`;
+      }
+      this._renderSummary();
+    });
+  },
+
+  _initPlanMap() {
+    // Cleanup old map
+    if (State.planMap) { try { State.planMap.remove(); } catch(_){} State.planMap = null; }
+
+    const stops = State.itinerary;
+    if (!stops.length) return;
+
+    const lats = [State.userLat, ...stops.map(s => s.lat)];
+    const lngs = [State.userLng, ...stops.map(s => s.lng)];
+    const bounds = L.latLngBounds(lats.map((la,i) => [la, lngs[i]]));
+
+    State.planMap = L.map('planMap', {
+      zoomControl:false, attributionControl:false, dragging:false,
+      scrollWheelZoom:false, touchZoom:false,
+    });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(State.planMap);
+    State.planMap.fitBounds(bounds.pad(0.2));
+
+    // User marker
+    const userIcon = L.divIcon({
+      html:`<div class="user-marker-inner"></div>`,
+      iconSize:[16,16], iconAnchor:[8,8], className:''
+    });
+    L.marker([State.userLat, State.userLng], {icon:userIcon}).addTo(State.planMap);
+
+    // Route polyline
+    const coords = [[State.userLat, State.userLng], ...stops.map(s => [s.lat, s.lng])];
+    L.polyline(coords, {color:'#ff6b35', weight:3, opacity:.8, dashArray:'6,4'}).addTo(State.planMap);
+
+    // Stop markers
+    stops.forEach((s, i) => {
+      const cat = CATEGORIES[s.cat];
+      const icon = L.divIcon({
+        html:`<div class="r-map-marker" style="background:${cat.color};font-size:.75rem">${i+1}</div>`,
+        iconSize:[28,28], iconAnchor:[14,14], className:''
+      });
+      L.marker([s.lat, s.lng], {icon}).addTo(State.planMap);
+    });
+  },
+
+  init() {
+    document.getElementById('planBack').addEventListener('click', () => {
+      document.getElementById('resultsScreen').classList.remove('slide-left');
+      document.getElementById('planScreen').classList.add('hidden');
+    });
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════════ */
+function boot() {
+  MapHome.init();
+  HomeCtrl.init();
+  ResultsCtrl.init();
+  PlanCtrl.init();
+
+  // Try to get GPS on start silently
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      const {latitude:lat, longitude:lng} = pos.coords;
+      MapHome.setUserLocation(lat, lng);
+      document.getElementById('locInput').value = `📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      document.getElementById('gpsBtn').classList.add('active');
+    }, () => {
+      // Use default HCMC center — set userLat/Lng so scan works
+      State.userLat = 10.7769;
+      State.userLng = 106.7009;
+      document.getElementById('locInput').value = '📌 Quận 1, TP. Hồ Chí Minh (mẫu)';
+    }, { enableHighAccuracy:false, timeout:4000, maximumAge:60000 });
+  } else {
+    State.userLat = 10.7769;
+    State.userLng = 106.7009;
+    document.getElementById('locInput').value = '📌 Quận 1, TP. Hồ Chí Minh (mẫu)';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', boot);
+</script>
+</body>
+</html>
