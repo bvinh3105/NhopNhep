@@ -19,3 +19,6 @@ build/
 
 # Netlify
 .netlify/
+
+# POI raw dumps — only the compact poi.json is committed
+data/_*.json

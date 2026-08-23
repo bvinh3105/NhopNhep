@@ -1147,24 +1147,95 @@ function allRestaurants() {
 }
 
 /* ═══════════════════════════════════════════════
+   LOCAL POI BUNDLE — 7000+ quán HCMC+HN precomputed
+   Loads from same-origin JSON file · no API call · no CORS
+═══════════════════════════════════════════════ */
+const LocalPOI = {
+  _data: null,     // full array
+  _loading: null,  // in-flight promise
+
+  // Same short-key schema as data/_build.py output
+  CAT_LABELS: ['restaurant', 'street', 'snack', 'cafe'],
+  PRICE_LABELS: ['30k–70k', '80k–200k', '200k–500k'],
+
+  async load() {
+    if (this._data) return this._data;
+    if (this._loading) return this._loading;
+    this._loading = (async () => {
+      try {
+        const res = await fetch('./data/poi.json', { cache: 'force-cache' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const d = await res.json();
+        this._data = d.r || [];
+        console.log('[LocalPOI] loaded', this._data.length, 'items');
+        return this._data;
+      } catch (e) {
+        console.warn('[LocalPOI] load failed', e.message);
+        this._data = [];
+        return [];
+      }
+    })();
+    return this._loading;
+  },
+
+  // Expand a bundle entry to the full runtime shape used across the app
+  _expand(item) {
+    return {
+      id: item.i,
+      name: item.n,
+      cat: this.CAT_LABELS[item.c] || 'restaurant',
+      price: this.PRICE_LABELS[item.p] || '—',
+      lat: item.la,
+      lng: item.lo,
+      rating: 4.2,
+      desc: item.d || 'Quán từ OpenStreetMap',
+      _osm: true,
+      _local: true,
+    };
+  },
+
+  async fetchNear(lat, lng, radius) {
+    const all = await this.load();
+    if (!all.length) return [];
+    // Coarse bounding-box prefilter (~degree per 111km) before haversine
+    const dLat = radius / 111000 * 1.2;
+    const dLng = radius / (111000 * Math.cos(lat * Math.PI / 180)) * 1.2;
+    const latLo = lat - dLat, latHi = lat + dLat;
+    const lngLo = lng - dLng, lngHi = lng + dLng;
+
+    const hits = [];
+    for (let k = 0; k < all.length; k++) {
+      const it = all[k];
+      if (it.la < latLo || it.la > latHi || it.lo < lngLo || it.lo > lngHi) continue;
+      if (haversine(lat, lng, it.la, it.lo) <= radius) hits.push(this._expand(it));
+    }
+    return hits;
+  },
+};
+
+/* ═══════════════════════════════════════════════
    POI FETCHER — real restaurants from OpenStreetMap
    Uses Overpass API — free, no API key, ~24h fresh data
 ═══════════════════════════════════════════════ */
 const POI = {
   // Endpoint chosen dynamically:
   //  - Localhost dev: direct overpass-api.de (works from http://localhost)
-  //  - Netlify prod: Netlify Function proxy first, then _redirects proxy,
-  //    then direct as last resort
+  //  - Everywhere else: public CORS proxies + direct URL as last resort
+  //    (Netlify's redirect rules + functions aren't being applied on
+  //     this site's build config, so we rely on external proxies)
+  DIRECT: 'https://overpass-api.de/api/interpreter',
+
   get ENDPOINT() {
     const h = location.hostname;
-    return (h === 'localhost' || h === '127.0.0.1')
-      ? 'https://overpass-api.de/api/interpreter'
-      : '/.netlify/functions/overpass';
+    if (h === 'localhost' || h === '127.0.0.1') return this.DIRECT;
+    // Public CORS proxy — allorigins.win adds Access-Control-Allow-Origin: *
+    return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(this.DIRECT);
   },
   FALLBACKS: [
-    '/.netlify/functions/overpass',
-    '/api/overpass',
-    'https://overpass-api.de/api/interpreter',
+    '/.netlify/functions/overpass',                                            // if Netlify Function ever gets built
+    '/api/overpass',                                                           // if _redirects ever gets applied
+    'https://corsproxy.io/?url=' + encodeURIComponent('https://overpass-api.de/api/interpreter'),
+    'https://overpass-api.de/api/interpreter',                                 // direct (works from HTTP or if browser doesn't enforce CORS)
   ],
   _cache: new Map(),  // key → { ts, items }
   CACHE_TTL: 5 * 60 * 1000,
@@ -1658,9 +1729,13 @@ const HomeCtrl = {
 
   _updateBadge() {
     const badge = document.getElementById('scanCountBadge');
-    const total = allRestaurants().length;
-    const filtered = allRestaurants().filter(r => State.activeCats.has(r.cat)).length;
-    badge.textContent = `✦ ${filtered}/${total} quán`;
+    const localCount = LocalPOI._data ? LocalPOI._data.length : 0;
+    if (localCount > 0) {
+      badge.textContent = `✦ ${localCount.toLocaleString('vi')} quán`;
+    } else {
+      const total = allRestaurants().length;
+      badge.textContent = `✦ ${total} quán`;
+    }
   },
 
   _scanning: false,
@@ -1672,19 +1747,29 @@ const HomeCtrl = {
     const txt = ov.querySelector('.scanning-txt');
     ov.style.display = 'flex';
 
-    // Fetch real POIs from OSM only if user has "osm" source enabled
+    // Fetch quán if user has "osm" source enabled
     if (State.activeSrcs.has('osm')) {
-      if (txt) txt.textContent = 'Đang quét quán thật gần bạn…';
+      if (txt) txt.textContent = 'Đang quét quán gần bạn…';
+
+      // 1. Local bundle first — instant, no network, works offline
+      let items = [];
       try {
-        const osmItems = await POI.fetch(State.userLat, State.userLng, State.radius);
-        State.osmRestaurants = osmItems;
-        State.lastScanSource = osmItems.length > 0 ? 'osm' : 'mock';
-      } catch(e) {
-        console.warn('POI fetch failed', e);
-        State.osmRestaurants = [];
-        State.lastScanSource = 'mock';
-        showToast('⚠️ Không tải được OSM — dùng data khác tạm');
+        items = await LocalPOI.fetchNear(State.userLat, State.userLng, State.radius);
+      } catch(e) { console.warn('LocalPOI failed', e); }
+
+      // 2. If bundle returned very few results (user outside HCMC/HN?), try live Overpass
+      if (items.length < 8) {
+        if (txt) txt.textContent = 'Đang tải thêm quán từ OSM…';
+        try {
+          const liveItems = await POI.fetch(State.userLat, State.userLng, State.radius);
+          // Merge, dedup by id
+          const seen = new Set(items.map(x => x.id));
+          liveItems.forEach(x => { if (!seen.has(x.id)) { items.push(x); seen.add(x.id); } });
+        } catch(e) { console.warn('Live POI failed', e); }
       }
+
+      State.osmRestaurants = items;
+      State.lastScanSource = items.length > 0 ? 'osm' : 'mock';
     } else {
       State.osmRestaurants = [];
       State.lastScanSource = 'mock';
@@ -2287,6 +2372,10 @@ function boot() {
   PlanCtrl.init();
   ProfileCtrl.init();
   AddModal.init();
+
+  // Preload the local POI bundle in the background — first scan is then
+  // instantaneous. Silently swallows errors; scan retries if needed.
+  LocalPOI.load().then(() => HomeCtrl._updateBadge());
 
   // Fallback default location
   State.userLat = 10.7769;
