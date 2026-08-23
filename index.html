@@ -1173,13 +1173,16 @@ const POI = {
   },
 
   _query(lat, lng, radius) {
-    // Search for common food-related POIs
-    return `[out:json][timeout:20];
+    // Include both nodes (points) and ways (buildings tagged with amenity)
+    // `out center` gives ways a centroid coord we can plot
+    return `[out:json][timeout:25];
 (
-  node["amenity"~"^(restaurant|cafe|fast_food|food_court|ice_cream|bar|pub|bbq)$"](around:${radius},${lat},${lng});
-  node["shop"~"^(bakery|beverages|coffee|confectionery|pastry)$"](around:${radius},${lat},${lng});
+  node["amenity"~"^(restaurant|cafe|fast_food|food_court|ice_cream|bar|pub|bbq|biergarten|canteen)$"](around:${radius},${lat},${lng});
+  way["amenity"~"^(restaurant|cafe|fast_food|food_court|ice_cream|bar|pub|bbq|biergarten|canteen)$"](around:${radius},${lat},${lng});
+  node["shop"~"^(bakery|beverages|coffee|confectionery|pastry|deli|greengrocer|dairy)$"](around:${radius},${lat},${lng});
+  way["shop"~"^(bakery|beverages|coffee|confectionery|pastry|deli)$"](around:${radius},${lat},${lng});
 );
-out body 120;`;
+out center 200;`;
   },
 
   _mapCategory(tags) {
@@ -1221,18 +1224,31 @@ out body 120;`;
 
   _parse(elements) {
     const items = [];
+    const seenNames = new Set();  // Simple dedup for chain restaurants at same coord
     elements.forEach(e => {
-      if (e.type !== 'node' || !e.tags || !e.tags.name) return;
-      // Skip pure convenience stores & closed
+      if (!e.tags || !e.tags.name) return;
       if (e.tags['disused:amenity'] || e.tags['closed'] === 'yes') return;
 
+      // Nodes have lat/lon directly; ways/relations have .center from `out center`
+      const lat = e.lat ?? e.center?.lat;
+      const lng = e.lon ?? e.center?.lon;
+      if (lat == null || lng == null) return;
+
+      // Dedup on name+coord (2dp ~= 1km, avoid same chain multi-entry)
+      const key = e.tags.name + '_' + lat.toFixed(4) + '_' + lng.toFixed(4);
+      if (seenNames.has(key)) return;
+      seenNames.add(key);
+
+      // Namespace ID by type so node/way IDs don't collide (both are 32-bit big)
+      // node: 1e13 + id, way: 3e13 + id (still under Number.MAX_SAFE_INTEGER)
+      const typePrefix = e.type === 'node' ? 1e13 : (e.type === 'way' ? 3e13 : 5e13);
+
       items.push({
-        id: 1e13 + e.id,                    // Unique numeric ID, safe integer range
+        id: typePrefix + e.id,
         name: e.tags.name.slice(0, 60),
         cat: this._mapCategory(e.tags),
         price: this._guessPrice(e.tags),
-        lat: e.lat,
-        lng: e.lon,
+        lat, lng,
         rating: 4.2,                        // OSM has no rating — placeholder
         desc: this._buildDesc(e.tags),
         _osm: true,
