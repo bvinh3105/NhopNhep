@@ -1395,6 +1395,7 @@ const GPS = {
   _watchId: null,
   _tracking: false,
   _lastAccuracy: null,
+  _sessionFirstFix: false,  // set true at startTracking, false after first position
 
   isSecure() {
     return window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
@@ -1434,6 +1435,8 @@ const GPS = {
     btn.classList.remove('active');
     this.hint('🛰 Đang bật GPS…');
 
+    // Mark this session as pending its first fix — first position will re-center map
+    this._sessionFirstFix = true;
     this._watchId = navigator.geolocation.watchPosition(
       pos => this._onPosition(pos),
       err => this._onError(err),
@@ -1462,8 +1465,12 @@ const GPS = {
   _onPosition(pos) {
     const {latitude:lat, longitude:lng, accuracy} = pos.coords;
     this._lastAccuracy = accuracy;
-    const isFirst = State.userLat == null;
-    MapHome.setUserLocation(lat, lng, accuracy, { center: isFirst, tracking: true });
+    // First fix of this tracking session → re-center map to GPS location
+    // (fix: previously only centered on first-ever fix, so after boot's
+    //  HCMC default, a tap 📍 never moved map to user's real location)
+    const shouldCenter = this._sessionFirstFix;
+    this._sessionFirstFix = false;
+    MapHome.setUserLocation(lat, lng, accuracy, { center: shouldCenter, tracking: true });
     document.getElementById('locInput').value =
       `📍 ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
 
@@ -1480,7 +1487,7 @@ const GPS = {
     else { msg = `⚠️ Tín hiệu yếu · ±${Math.round(accuracy)}m — ra chỗ thoáng`; hintCls = 'warn'; }
     this.hint(msg, hintCls);
 
-    if (isFirst) showToast('✅ Đã bật GPS · theo dõi liên tục');
+    if (shouldCenter) showToast('✅ Đã bật GPS · theo dõi liên tục');
   },
 
   _onError(err) {
