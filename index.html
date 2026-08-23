@@ -198,6 +198,13 @@ input,textarea,select{font-family:var(--font-body)}
 .cat-chip[data-cat="street"].active{background:var(--accent);border-color:var(--accent-2);box-shadow:2px 2px 0 var(--accent-2)}
 .cat-chip[data-cat="snack"].active{background:var(--cat-snack);border-color:#A8365F;box-shadow:2px 2px 0 #A8365F}
 .cat-chip[data-cat="cafe"].active{background:var(--cat-cafe);border-color:#5A3B24;box-shadow:2px 2px 0 #5A3B24}
+.cat-chip[data-src="community"]{opacity:.55;position:relative}
+.cat-chip[data-src="community"]::after{
+  content:'sắp có';position:absolute;top:-8px;right:-4px;
+  font-family:var(--font-display);font-style:italic;font-size:.55rem;font-weight:800;
+  background:var(--accent);color:var(--white);padding:1px 6px;border-radius:8px;
+  border:1.5px solid var(--text);letter-spacing:.3px;
+}
 
 /* Radius chips */
 .radius-chips{display:flex;gap:.5rem}
@@ -768,6 +775,24 @@ input,textarea,select{font-family:var(--font-body)}
       <button class="radius-chip" data-r="5000">5 km</button>
     </div>
 
+    <!-- Nguồn dữ liệu -->
+    <div class="row-label">Nguồn dữ liệu</div>
+    <div class="cat-chips" id="srcChips">
+      <button class="cat-chip active" data-src="osm">🌐 Google Map / OSM</button>
+      <button class="cat-chip active" data-src="mine">⭐ Của tôi</button>
+      <button class="cat-chip" data-src="community" title="Đang phát triển">👥 Cộng đồng</button>
+      <button class="cat-chip active" data-src="seed">📌 Data mẫu</button>
+    </div>
+
+    <!-- Đánh giá tối thiểu -->
+    <div class="row-label">Đánh giá tối thiểu</div>
+    <div class="radius-chips" id="minRatingChips">
+      <button class="radius-chip active" data-rating="0">Tất cả</button>
+      <button class="radius-chip" data-rating="3.5">3.5★</button>
+      <button class="radius-chip" data-rating="4">4★</button>
+      <button class="radius-chip" data-rating="4.5">4.5★</button>
+    </div>
+
     <!-- Location -->
     <div class="row-label">Điểm xuất phát</div>
     <div class="loc-row">
@@ -1011,6 +1036,8 @@ const State = {
   userLat: null, userLng: null,
   radius: 1000,
   activeCats: new Set(['restaurant','street','snack','cafe']),
+  activeSrcs: new Set(['osm','mine','seed']),  // 'community' comes later
+  minRating: 0,
   filteredResults: [],
   visibleResults: [],
   selected: new Set(),
@@ -1548,10 +1575,39 @@ const HomeCtrl = {
     document.getElementById('radiusChips').addEventListener('click', e => {
       const chip = e.target.closest('.radius-chip');
       if (!chip) return;
-      document.querySelectorAll('.radius-chip').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('#radiusChips .radius-chip').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       State.radius = parseInt(chip.dataset.r);
       MapHome.updateRadius();
+    });
+
+    // Source chips (data source pre-filter)
+    document.getElementById('srcChips').addEventListener('click', e => {
+      const chip = e.target.closest('.cat-chip');
+      if (!chip) return;
+      const src = chip.dataset.src;
+      if (src === 'community') {
+        showToast('👥 Sắp có · cần backend cho ratings cộng đồng');
+        return;
+      }
+      if (State.activeSrcs.has(src)) {
+        if (State.activeSrcs.size === 1) { showToast('Chọn ít nhất 1 nguồn nhé!'); return; }
+        State.activeSrcs.delete(src);
+        chip.classList.remove('active');
+      } else {
+        State.activeSrcs.add(src);
+        chip.classList.add('active');
+      }
+      this._updateBadge();
+    });
+
+    // Min rating chips
+    document.getElementById('minRatingChips').addEventListener('click', e => {
+      const chip = e.target.closest('.radius-chip');
+      if (!chip) return;
+      document.querySelectorAll('#minRatingChips .radius-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      State.minRating = parseFloat(chip.dataset.rating);
     });
 
     document.getElementById('gpsBtn').addEventListener('click', () => GPS.toggle());
@@ -1578,21 +1634,23 @@ const HomeCtrl = {
     const ov = document.getElementById('scanOverlay');
     const txt = ov.querySelector('.scanning-txt');
     ov.style.display = 'flex';
-    if (txt) txt.textContent = 'Đang quét quán thật gần bạn…';
 
-    // Fetch real POIs from OSM
-    try {
-      const osmItems = await POI.fetch(State.userLat, State.userLng, State.radius);
-      State.osmRestaurants = osmItems;
-      State.lastScanSource = osmItems.length > 0 ? 'osm' : 'mock';
-      if (osmItems.length === 0) {
-        showToast('⚠️ OSM chưa có data khu vực này — dùng data mẫu tạm nhé');
+    // Fetch real POIs from OSM only if user has "osm" source enabled
+    if (State.activeSrcs.has('osm')) {
+      if (txt) txt.textContent = 'Đang quét quán thật gần bạn…';
+      try {
+        const osmItems = await POI.fetch(State.userLat, State.userLng, State.radius);
+        State.osmRestaurants = osmItems;
+        State.lastScanSource = osmItems.length > 0 ? 'osm' : 'mock';
+      } catch(e) {
+        console.warn('POI fetch failed', e);
+        State.osmRestaurants = [];
+        State.lastScanSource = 'mock';
+        showToast('⚠️ Không tải được OSM — dùng data khác tạm');
       }
-    } catch(e) {
-      console.warn('POI fetch failed', e);
+    } else {
       State.osmRestaurants = [];
       State.lastScanSource = 'mock';
-      showToast('⚠️ Không kết nối được OpenStreetMap — dùng data mẫu');
     }
 
     ov.style.display = 'none';
@@ -1600,25 +1658,38 @@ const HomeCtrl = {
     this._doScan();
   },
 
+  // Detect source of a restaurant by ID range
+  _srcOf(r) {
+    if (r.id >= 1e13) return 'osm';
+    if (r.id >= 1001) return 'mine';
+    return 'seed';
+  },
+
   _doScan() {
-    // Combine all sources
+    // Combine all sources, then filter by user's selections
     const pool = allRestaurants();
     const results = pool.filter(r => {
+      const src = this._srcOf(r);
+      if (!State.activeSrcs.has(src)) return false;
+      if (!State.activeCats.has(r.cat)) return false;
+      if (State.minRating > 0 && (r.rating || 0) < State.minRating) return false;
       const dist = haversine(State.userLat, State.userLng, r.lat, r.lng);
-      return dist <= State.radius && State.activeCats.has(r.cat);
-    }).map(r => ({
-      ...r,
-      _dist: haversine(State.userLat, State.userLng, r.lat, r.lng),
-    }));
+      if (dist > State.radius) return false;
+      r._dist = dist;
+      return true;
+    });
 
     if (results.length === 0) {
-      showToast(`🤔 Không tìm thấy quán trong ${fmtDist(State.radius)} · Thử tăng bán kính nhé`);
+      // Build a helpful hint depending on what's missing
+      let hint = 'Thử tăng bán kính hoặc chọn thêm nguồn dữ liệu';
+      if (!State.activeSrcs.has('osm')) hint = 'Bật 🌐 Google Map/OSM để tìm quán thật';
+      else if (State.minRating > 4) hint = 'Hạ đánh giá tối thiểu xuống';
+      showToast(`🤔 Không tìm thấy quán · ${hint}`);
       return;
     }
 
-    // Sort by distance first (nearest first) then shuffle within distance buckets
+    // Sort by distance, light shuffle for variety
     results.sort((a,b) => a._dist - b._dist);
-    // Light shuffle: swap 30% of items with neighbors for randomness
     for (let i = 0; i < results.length-1; i += 3) {
       if (Math.random() < 0.5) [results[i], results[i+1]] = [results[i+1], results[i]];
     }
