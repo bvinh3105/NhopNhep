@@ -36,9 +36,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 button{border:none;background:none;color:inherit;cursor:pointer;font:inherit}
 
 /* ─── Screens ─── */
-.screen{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden;transition:transform .38s cubic-bezier(.32,1,.56,1),opacity .38s}
-.screen.hidden{transform:translateX(100%);pointer-events:none;opacity:0}
-.screen.slide-left{transform:translateX(-60%);pointer-events:none;opacity:0}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden}
+.screen.hidden{display:none}
 
 /* ─── Top bar ─── */
 .topbar{
@@ -730,7 +729,7 @@ const HomeCtrl = {
 const ResultsCtrl = {
   show() {
     // Switch screens
-    document.getElementById('homeScreen').classList.add('slide-left');
+    document.getElementById('homeScreen').classList.add('hidden');
     document.getElementById('resultsScreen').classList.remove('hidden');
 
     this._updateHeader();
@@ -793,7 +792,7 @@ const ResultsCtrl = {
   init() {
     // Back
     document.getElementById('resultsBack').addEventListener('click', () => {
-      document.getElementById('homeScreen').classList.remove('slide-left');
+      document.getElementById('homeScreen').classList.remove('hidden');
       document.getElementById('resultsScreen').classList.add('hidden');
     });
 
@@ -886,7 +885,7 @@ const PlanCtrl = {
   },
 
   show() {
-    document.getElementById('resultsScreen').classList.add('slide-left');
+    document.getElementById('resultsScreen').classList.add('hidden');
     document.getElementById('planScreen').classList.remove('hidden');
     this._renderSummary();
     this._renderTimeline();
@@ -970,7 +969,7 @@ const PlanCtrl = {
       const last = State.itinerary[State.itinerary.length-1];
       html += `<div class="tl-item">
         <div class="tl-spine"><div class="tl-dot" style="background:rgba(255,200,0,.12);border-color:#ffd700;font-size:.8rem">🏁</div></div>
-        <div class="tl-content"><div class="tl-start" style="color:#ffd700">Kết thúc chuyến ăn · ${fmtClock(last.departureClock)}</div></div>
+        <div class="tl-content"><div class="tl-start" style="color:#ffd700" id="endTimeNode">Kết thúc chuyến ăn · ${fmtClock(last.departureClock)}</div></div>
       </div>`;
     }
 
@@ -987,18 +986,31 @@ const PlanCtrl = {
       dwell = Math.max(5, Math.min(180, dwell));
       State.dwellOverrides[stop.id] = dwell;
       stop.dwell = dwell;
-      // Recalculate from this stop onwards
-      let clock = stop.arrivalClock;
+      // Recalculate from this stop onwards (arrival of adjusted stop stays fixed)
+      let clock = stop.departureClock; // will be recalculated below
       for (let i = idx; i < State.itinerary.length; i++) {
         const s = State.itinerary[i];
-        s.arrivalClock = new Date(clock);
-        s.departureClock = addMinutes(clock, s.dwell);
-        clock = s.departureClock;
+        if (i === idx) {
+          // Only dwell changed — arrival stays same, recalc departure
+          s.departureClock = addMinutes(s.arrivalClock, s.dwell);
+          clock = s.departureClock;
+        } else {
+          // Add travel time then dwell
+          s.arrivalClock = addMinutes(clock, s.travelMin);
+          s.departureClock = addMinutes(s.arrivalClock, s.dwell);
+          clock = s.departureClock;
+        }
         // Update DOM
         const dwellEl = document.getElementById(`dwell${i}`);
         const timeEl  = document.getElementById(`stopTime${i}`);
         if (dwellEl) dwellEl.textContent = s.dwell+'p';
         if (timeEl)  timeEl.textContent  = `🕐 Đến ${fmtClock(s.arrivalClock)} → Rời ${fmtClock(s.departureClock)}`;
+      }
+      // Update end node
+      const endNode = document.getElementById('endTimeNode');
+      if (endNode) {
+        const last = State.itinerary[State.itinerary.length-1];
+        endNode.textContent = `Kết thúc chuyến ăn · ${fmtClock(last.departureClock)}`;
       }
       this._renderSummary();
     });
@@ -1046,7 +1058,7 @@ const PlanCtrl = {
 
   init() {
     document.getElementById('planBack').addEventListener('click', () => {
-      document.getElementById('resultsScreen').classList.remove('slide-left');
+      document.getElementById('resultsScreen').classList.remove('hidden');
       document.getElementById('planScreen').classList.add('hidden');
     });
   },
