@@ -14,6 +14,22 @@
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
+# Proxy Overpass API through same-origin path
+# - Fixes CORS (some browsers strip ACAO for OSM even though server sets *)
+# - Bypasses adblockers that block overpass-api.de directly
+[[redirects]]
+  from = "/api/overpass"
+  to = "https://overpass-api.de/api/interpreter"
+  status = 200
+  force = true
+
+# Proxy Wikimedia tiles as fallback (backup to CartoDB)
+[[redirects]]
+  from = "/tiles/wiki/*"
+  to = "https://maps.wikimedia.org/osm-intl/:splat"
+  status = 200
+  force = true
+
 [[redirects]]
   from = "/*"
   to = "/index.html"

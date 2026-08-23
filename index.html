@@ -1114,11 +1114,18 @@ function allRestaurants() {
    Uses Overpass API — free, no API key, ~24h fresh data
 ═══════════════════════════════════════════════ */
 const POI = {
-  // Only overpass-api.de reliably supports CORS from browsers.
-  // Kumi/OSM.ch mirrors either block CORS or return stale data.
-  ENDPOINT: 'https://overpass-api.de/api/interpreter',
+  // Endpoint chosen dynamically:
+  //  - On Netlify prod: same-origin proxy `/api/overpass` (avoids CORS + adblock)
+  //  - On localhost dev: direct overpass-api.de (no proxy available)
+  get ENDPOINT() {
+    const h = location.hostname;
+    return (h === 'localhost' || h === '127.0.0.1')
+      ? 'https://overpass-api.de/api/interpreter'
+      : '/api/overpass';
+  },
   FALLBACKS: [
-    'https://overpass-api.de/api/interpreter',   // retry primary once on 504
+    'https://overpass-api.de/api/interpreter',
+    '/api/overpass',
   ],
   _cache: new Map(),  // key → { ts, items }
   CACHE_TTL: 5 * 60 * 1000,
