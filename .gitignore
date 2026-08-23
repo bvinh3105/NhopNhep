@@ -1,0 +1,21 @@
+# Deps
+node_modules/
+
+# OS/Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Env
+.env
+.env.local
+
+# Build/cache
+dist/
+build/
+.cache/
+.parcel-cache/
+
+# Netlify
+.netlify/
