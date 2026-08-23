@@ -1152,17 +1152,19 @@ function allRestaurants() {
 ═══════════════════════════════════════════════ */
 const POI = {
   // Endpoint chosen dynamically:
-  //  - On Netlify prod: same-origin proxy `/api/overpass` (avoids CORS + adblock)
-  //  - On localhost dev: direct overpass-api.de (no proxy available)
+  //  - Localhost dev: direct overpass-api.de (works from http://localhost)
+  //  - Netlify prod: Netlify Function proxy first, then _redirects proxy,
+  //    then direct as last resort
   get ENDPOINT() {
     const h = location.hostname;
     return (h === 'localhost' || h === '127.0.0.1')
       ? 'https://overpass-api.de/api/interpreter'
-      : '/api/overpass';
+      : '/.netlify/functions/overpass';
   },
   FALLBACKS: [
-    'https://overpass-api.de/api/interpreter',
+    '/.netlify/functions/overpass',
     '/api/overpass',
+    'https://overpass-api.de/api/interpreter',
   ],
   _cache: new Map(),  // key → { ts, items }
   CACHE_TTL: 5 * 60 * 1000,
