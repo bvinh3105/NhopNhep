@@ -145,7 +145,8 @@ input,textarea,select{font-family:var(--font-body)}
 /* ═══════════════════════════════════════════════
    HOME (Nhóp Nhép tab)
 ═══════════════════════════════════════════════ */
-#homeScreen{background:var(--cream)}
+#homeScreen{background:var(--cream);overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+#homeScreen::-webkit-scrollbar{display:none}
 .home-hero{
   flex-shrink:0;padding:1rem 1.1rem .8rem;background:var(--cream);position:relative;z-index:5;
 }
@@ -162,7 +163,8 @@ input,textarea,select{font-family:var(--font-body)}
 
 #mainMapWrap{
   position:relative;margin:0 1.1rem;border-radius:var(--radius-lg);overflow:hidden;
-  border:2px solid var(--text);background:var(--cream-2);flex:1;min-height:200px;
+  border:2px solid var(--text);background:var(--cream-2);flex:0 0 auto;
+  height:min(38vh,260px);
   box-shadow:6px 6px 0 var(--primary-2);
 }
 #mainMap{position:absolute;inset:0}
@@ -182,6 +184,27 @@ input,textarea,select{font-family:var(--font-body)}
   margin:.7rem 0 .45rem;display:flex;align-items:center;gap:.4rem;
 }
 .row-label::before{content:'✦';font-style:normal}
+.row-label.mini{font-size:.68rem;margin:.55rem 0 .35rem;letter-spacing:.6px}
+.row-label.mini::before{content:'·'}
+
+/* Advanced filters toggle */
+.advanced-toggle{
+  width:100%;margin-top:.85rem;padding:.5rem .85rem;
+  background:transparent;border:1.5px dashed var(--text2);border-radius:12px;
+  color:var(--text2);font-family:var(--font-display);font-size:.8rem;font-weight:700;
+  display:flex;align-items:center;justify-content:space-between;
+  transition:all .18s;
+}
+.advanced-toggle em{font-style:italic;color:var(--primary)}
+.advanced-toggle .chevron{transition:transform .25s;color:var(--primary);font-size:.9rem}
+.advanced-toggle[aria-expanded="true"]{
+  border-color:var(--primary);color:var(--primary);background:var(--primary-tint);
+}
+.advanced-toggle[aria-expanded="true"] .chevron{transform:rotate(180deg)}
+.advanced-body{
+  overflow:hidden;max-height:0;transition:max-height .32s cubic-bezier(.4,0,.2,1);
+}
+.advanced-body.open{max-height:280px}
 
 /* Category chips */
 .cat-chips{display:flex;gap:.5rem;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
@@ -775,22 +798,26 @@ input,textarea,select{font-family:var(--font-body)}
       <button class="radius-chip" data-r="5000">5 km</button>
     </div>
 
-    <!-- Nguồn dữ liệu -->
-    <div class="row-label">Nguồn dữ liệu</div>
-    <div class="cat-chips" id="srcChips">
-      <button class="cat-chip active" data-src="osm">🌐 Google Map / OSM</button>
-      <button class="cat-chip active" data-src="mine">⭐ Của tôi</button>
-      <button class="cat-chip" data-src="community" title="Đang phát triển">👥 Cộng đồng</button>
-      <button class="cat-chip active" data-src="seed">📌 Data mẫu</button>
-    </div>
-
-    <!-- Đánh giá tối thiểu -->
-    <div class="row-label">Đánh giá tối thiểu</div>
-    <div class="radius-chips" id="minRatingChips">
-      <button class="radius-chip active" data-rating="0">Tất cả</button>
-      <button class="radius-chip" data-rating="3.5">3.5★</button>
-      <button class="radius-chip" data-rating="4">4★</button>
-      <button class="radius-chip" data-rating="4.5">4.5★</button>
+    <!-- Advanced filters — collapsed by default -->
+    <button class="advanced-toggle" id="advToggle" type="button" aria-expanded="false">
+      <span>⚙️ Bộ lọc <em>nâng cao</em></span>
+      <span class="chevron">▾</span>
+    </button>
+    <div class="advanced-body" id="advBody">
+      <div class="row-label mini">Nguồn dữ liệu</div>
+      <div class="cat-chips" id="srcChips">
+        <button class="cat-chip active" data-src="osm">🌐 Google/OSM</button>
+        <button class="cat-chip active" data-src="mine">⭐ Của tôi</button>
+        <button class="cat-chip" data-src="community">👥 Cộng đồng</button>
+        <button class="cat-chip active" data-src="seed">📌 Mẫu</button>
+      </div>
+      <div class="row-label mini">Đánh giá</div>
+      <div class="radius-chips" id="minRatingChips">
+        <button class="radius-chip active" data-rating="0">Tất cả</button>
+        <button class="radius-chip" data-rating="3.5">3.5★</button>
+        <button class="radius-chip" data-rating="4">4★</button>
+        <button class="radius-chip" data-rating="4.5">4.5★</button>
+      </div>
     </div>
 
     <!-- Location -->
@@ -826,23 +853,6 @@ input,textarea,select{font-family:var(--font-body)}
     <button class="cat-tab" data-filter="street">🍜 Vỉa hè</button>
     <button class="cat-tab" data-filter="snack">🧆 Ăn vặt</button>
     <button class="cat-tab" data-filter="cafe">☕ Cà phê</button>
-  </div>
-
-  <!-- Source filter row -->
-  <div class="filter-row">
-    <div class="filter-group" id="srcFilterGroup">
-      <span class="filter-label">Nguồn:</span>
-      <button class="mini-chip active" data-src="all">Tất cả</button>
-      <button class="mini-chip" data-src="osm">🌐 OSM</button>
-      <button class="mini-chip" data-src="mine">⭐ Của tôi</button>
-      <button class="mini-chip" data-src="seed">📌 Mẫu</button>
-    </div>
-    <div class="filter-group" id="ratingFilterGroup">
-      <span class="filter-label">Đánh giá ≥</span>
-      <button class="mini-chip active" data-rating="0">Tất cả</button>
-      <button class="mini-chip" data-rating="4">4★</button>
-      <button class="mini-chip" data-rating="4.5">4.5★</button>
-    </div>
   </div>
 
   <div class="restaurant-grid" id="restaurantGrid"></div>
@@ -1611,6 +1621,15 @@ const HomeCtrl = {
     });
 
     document.getElementById('gpsBtn').addEventListener('click', () => GPS.toggle());
+
+    // Advanced filters collapsible
+    const advBtn = document.getElementById('advToggle');
+    const advBody = document.getElementById('advBody');
+    advBtn.addEventListener('click', () => {
+      const isOpen = advBtn.getAttribute('aria-expanded') === 'true';
+      advBtn.setAttribute('aria-expanded', String(!isOpen));
+      advBody.classList.toggle('open', !isOpen);
+    });
     document.getElementById('scanBtn').addEventListener('click', () => this.scan());
     document.getElementById('locInput').addEventListener('keydown', e => {
       if (e.key === 'Enter') this.scan();
@@ -1708,11 +1727,6 @@ const ResultsCtrl = {
   show() {
     document.getElementById('homeScreen').classList.add('hidden');
     document.getElementById('resultsScreen').classList.remove('hidden');
-    // Reset secondary filters on fresh show
-    State.srcFilter = 'all';
-    State.ratingFilter = 0;
-    document.querySelectorAll('#srcFilterGroup .mini-chip').forEach(c => c.classList.toggle('active', c.dataset.src === 'all'));
-    document.querySelectorAll('#ratingFilterGroup .mini-chip').forEach(c => c.classList.toggle('active', c.dataset.rating === '0'));
     this._updateHeader();
     this._setTabFilter('all');
   },
@@ -1730,23 +1744,11 @@ const ResultsCtrl = {
     this._applyFilters();
   },
 
-  _srcOf(r) {
-    if (r.id >= 1e13) return 'osm';
-    if (r.id >= 1001) return 'mine';
-    return 'seed';
-  },
-
   _applyFilters() {
     const catF = State.tabFilter || 'all';
-    const srcF = State.srcFilter || 'all';
-    const ratingF = State.ratingFilter || 0;
-
-    State.visibleResults = State.filteredResults.filter(r => {
-      if (catF !== 'all' && r.cat !== catF) return false;
-      if (srcF !== 'all' && this._srcOf(r) !== srcF) return false;
-      if (ratingF > 0 && (r.rating || 0) < ratingF) return false;
-      return true;
-    });
+    State.visibleResults = catF === 'all'
+      ? State.filteredResults
+      : State.filteredResults.filter(r => r.cat === catF);
     this._render();
   },
   _render() {
@@ -1798,26 +1800,6 @@ const ResultsCtrl = {
       const tab = e.target.closest('.cat-tab');
       if (!tab) return;
       this._setTabFilter(tab.dataset.filter);
-    });
-
-    // Source filter
-    document.getElementById('srcFilterGroup').addEventListener('click', e => {
-      const chip = e.target.closest('.mini-chip');
-      if (!chip) return;
-      document.querySelectorAll('#srcFilterGroup .mini-chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      State.srcFilter = chip.dataset.src;
-      this._applyFilters();
-    });
-
-    // Rating filter
-    document.getElementById('ratingFilterGroup').addEventListener('click', e => {
-      const chip = e.target.closest('.mini-chip');
-      if (!chip) return;
-      document.querySelectorAll('#ratingFilterGroup .mini-chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      State.ratingFilter = parseFloat(chip.dataset.rating);
-      this._applyFilters();
     });
     document.getElementById('restaurantGrid').addEventListener('click', e => {
       const card = e.target.closest('.r-card');
