@@ -65,6 +65,16 @@
   --font-body:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 }
 html,body{height:100%;overflow:hidden;background:var(--cream);color:var(--text);font-family:var(--font-body);font-size:15px;line-height:1.5;font-weight:500;-webkit-font-smoothing:antialiased}
+
+/* Desktop / wide screen: center app in a phone-shaped column */
+@media (min-width:560px){
+  html{background:#2A1810;background-image:radial-gradient(circle at 20% 30%,#5F0F0F 0%,#2A1810 50%,#0A0603 100%)}
+  body{
+    max-width:440px;margin:0 auto;position:relative;background:var(--cream);
+    box-shadow:0 0 40px rgba(0,0,0,.6),0 0 0 1.5px var(--primary-2);
+    transform:translateZ(0); /* create containing block for position:fixed children */
+  }
+}
 button{border:none;background:none;color:inherit;cursor:pointer;font:inherit;font-weight:600}
 input,textarea,select{font-family:var(--font-body)}
 
@@ -339,6 +349,13 @@ input,textarea,select{font-family:var(--font-body)}
   display:flex;align-items:center;justify-content:center;font-size:.75rem;
   border:2px solid var(--text);
 }
+.r-card.osm-added::before{
+  content:'🌐';position:absolute;top:-6px;left:-6px;
+  width:1.4rem;height:1.4rem;border-radius:50%;background:#4CAF50;
+  display:flex;align-items:center;justify-content:center;font-size:.7rem;
+  border:2px solid var(--text);
+}
+.r-card.osm-added .r-rating{color:#2E7D32}
 @keyframes card-in{
   from{opacity:0;transform:translateY(12px) scale(.97)}
   to{opacity:1;transform:none}
@@ -971,6 +988,8 @@ const State = {
     trips: 0,
   },
   userRestaurants: [],  // user-added
+  osmRestaurants: [],   // fetched from OpenStreetMap
+  lastScanSource: 'mock', // 'osm' | 'mock' | 'mixed'
 };
 
 /* ═══════════════════════════════════════════════
@@ -1047,8 +1066,152 @@ function fmtClock(d) {
   return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
 }
 function allRestaurants() {
-  return [...SEED_RESTAURANTS, ...State.userRestaurants];
+  return [...SEED_RESTAURANTS, ...State.userRestaurants, ...State.osmRestaurants];
 }
+
+/* ═══════════════════════════════════════════════
+   POI FETCHER — real restaurants from OpenStreetMap
+   Uses Overpass API — free, no API key, ~24h fresh data
+═══════════════════════════════════════════════ */
+const POI = {
+  // Only overpass-api.de reliably supports CORS from browsers.
+  // Kumi/OSM.ch mirrors either block CORS or return stale data.
+  ENDPOINT: 'https://overpass-api.de/api/interpreter',
+  FALLBACKS: [
+    'https://overpass-api.de/api/interpreter',   // retry primary once on 504
+  ],
+  _cache: new Map(),  // key → { ts, items }
+  CACHE_TTL: 5 * 60 * 1000,
+
+  _cacheKey(lat, lng, radius) {
+    // Round to ~110m grid (3 decimals)
+    return `${lat.toFixed(3)}_${lng.toFixed(3)}_${radius}`;
+  },
+
+  _query(lat, lng, radius) {
+    // Search for common food-related POIs
+    return `[out:json][timeout:20];
+(
+  node["amenity"~"^(restaurant|cafe|fast_food|food_court|ice_cream|bar|pub|bbq)$"](around:${radius},${lat},${lng});
+  node["shop"~"^(bakery|beverages|coffee|confectionery|pastry)$"](around:${radius},${lat},${lng});
+);
+out body 120;`;
+  },
+
+  _mapCategory(tags) {
+    const a = (tags.amenity || '').toLowerCase();
+    const s = (tags.shop || '').toLowerCase();
+    const c = (tags.cuisine || '').toLowerCase();
+
+    if (a === 'cafe' || a === 'bar' || a === 'pub' || s === 'coffee') return 'cafe';
+    if (a === 'ice_cream' || a === 'food_court' || s === 'bakery' || s === 'confectionery' || s === 'pastry' || s === 'beverages') return 'snack';
+    if (a === 'fast_food') return 'street';
+    if (a === 'bbq') return 'street';
+    if (a === 'restaurant') {
+      // Vietnamese street-food style restaurants → "vỉa hè"
+      if (/vietnamese|noodle|pho|bun|rice|street/.test(c)) return 'street';
+      return 'restaurant';
+    }
+    return 'restaurant';
+  },
+
+  _guessPrice(tags) {
+    // OSM rarely has price info. Estimate by category and cuisine.
+    const cat = this._mapCategory(tags);
+    const c = (tags.cuisine || '').toLowerCase();
+    // Some heuristics
+    if (/luxury|fine_dining|steak|sushi|japanese|french|italian|western/.test(c)) return '200k–500k';
+    if (cat === 'cafe') return '30k–70k';
+    if (cat === 'snack') return '15k–40k';
+    if (cat === 'street') return '30k–70k';
+    return '80k–200k';
+  },
+
+  _buildDesc(tags) {
+    const parts = [];
+    if (tags.cuisine) parts.push('🍴 ' + tags.cuisine.replace(/;/g, ', ').replace(/_/g, ' '));
+    if (tags['opening_hours'] && tags['opening_hours'].length < 30) parts.push('⏰ ' + tags['opening_hours']);
+    if (tags.description && tags.description.length < 60) parts.push(tags.description);
+    return parts.length ? parts.join(' · ') : 'Quán từ OpenStreetMap · Data cộng đồng';
+  },
+
+  _parse(elements) {
+    const items = [];
+    elements.forEach(e => {
+      if (e.type !== 'node' || !e.tags || !e.tags.name) return;
+      // Skip pure convenience stores & closed
+      if (e.tags['disused:amenity'] || e.tags['closed'] === 'yes') return;
+
+      items.push({
+        id: 1e13 + e.id,                    // Unique numeric ID, safe integer range
+        name: e.tags.name.slice(0, 60),
+        cat: this._mapCategory(e.tags),
+        price: this._guessPrice(e.tags),
+        lat: e.lat,
+        lng: e.lon,
+        rating: 4.2,                        // OSM has no rating — placeholder
+        desc: this._buildDesc(e.tags),
+        _osm: true,
+      });
+    });
+    return items;
+  },
+
+  async _tryFetch(url, query, timeout=18000) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeout);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        body: 'data=' + encodeURIComponent(query),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        signal: ctrl.signal,
+      });
+      clearTimeout(t);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      return data.elements || [];
+    } catch (e) {
+      clearTimeout(t);
+      throw e;
+    }
+  },
+
+  async fetch(lat, lng, radius) {
+    // Cache check
+    const key = this._cacheKey(lat, lng, radius);
+    const cached = this._cache.get(key);
+    if (cached && (Date.now() - cached.ts) < this.CACHE_TTL) {
+      console.log('[POI] cache hit', key, cached.items.length);
+      return cached.items;
+    }
+
+    const query = this._query(lat, lng, radius);
+    const endpoints = [this.ENDPOINT, ...this.FALLBACKS];
+
+    for (let attempt = 0; attempt < endpoints.length; attempt++) {
+      const url = endpoints[attempt];
+      try {
+        if (attempt > 0) {
+          // Backoff before retry
+          await new Promise(r => setTimeout(r, 1200));
+        }
+        console.log('[POI] fetching', url, `attempt ${attempt+1}`);
+        const elements = await this._tryFetch(url, query);
+        const items = this._parse(elements);
+        if (items.length > 0) {
+          this._cache.set(key, { ts: Date.now(), items });
+          console.log('[POI] fetched', items.length);
+          return items;
+        }
+        console.warn('[POI] got 0 items, retrying…');
+      } catch (e) {
+        console.warn('[POI] fail on', url, e.message || e);
+      }
+    }
+    return [];
+  },
+};
 
 /* ═══════════════════════════════════════════════
    TAB NAVIGATION
@@ -1325,18 +1488,40 @@ const HomeCtrl = {
     badge.textContent = `✦ ${filtered}/${total} quán`;
   },
 
-  scan() {
+  _scanning: false,
+  async scan() {
+    if (this._scanning) return;
     if (!State.userLat) { showToast('📍 Dùng GPS hoặc nhập địa chỉ trước nhé!'); return; }
+    this._scanning = true;
     const ov = document.getElementById('scanOverlay');
+    const txt = ov.querySelector('.scanning-txt');
     ov.style.display = 'flex';
-    setTimeout(() => {
-      ov.style.display = 'none';
-      this._doScan();
-    }, 850);
+    if (txt) txt.textContent = 'Đang quét quán thật gần bạn…';
+
+    // Fetch real POIs from OSM
+    try {
+      const osmItems = await POI.fetch(State.userLat, State.userLng, State.radius);
+      State.osmRestaurants = osmItems;
+      State.lastScanSource = osmItems.length > 0 ? 'osm' : 'mock';
+      if (osmItems.length === 0) {
+        showToast('⚠️ OSM chưa có data khu vực này — dùng data mẫu tạm nhé');
+      }
+    } catch(e) {
+      console.warn('POI fetch failed', e);
+      State.osmRestaurants = [];
+      State.lastScanSource = 'mock';
+      showToast('⚠️ Không kết nối được OpenStreetMap — dùng data mẫu');
+    }
+
+    ov.style.display = 'none';
+    this._scanning = false;
+    this._doScan();
   },
 
   _doScan() {
-    const results = allRestaurants().filter(r => {
+    // Combine all sources
+    const pool = allRestaurants();
+    const results = pool.filter(r => {
       const dist = haversine(State.userLat, State.userLng, r.lat, r.lng);
       return dist <= State.radius && State.activeCats.has(r.cat);
     }).map(r => ({
@@ -1345,10 +1530,18 @@ const HomeCtrl = {
     }));
 
     if (results.length === 0) {
-      showToast(`🤔 Không tìm thấy quán trong ${fmtDist(State.radius)}`);
+      showToast(`🤔 Không tìm thấy quán trong ${fmtDist(State.radius)} · Thử tăng bán kính nhé`);
       return;
     }
-    State.filteredResults = shuffle(results);
+
+    // Sort by distance first (nearest first) then shuffle within distance buckets
+    results.sort((a,b) => a._dist - b._dist);
+    // Light shuffle: swap 30% of items with neighbors for randomness
+    for (let i = 0; i < results.length-1; i += 3) {
+      if (Math.random() < 0.5) [results[i], results[i+1]] = [results[i+1], results[i]];
+    }
+
+    State.filteredResults = results;
     State.selected.clear();
     State.tabFilter = 'all';
     ResultsCtrl.show();
@@ -1369,7 +1562,8 @@ const ResultsCtrl = {
   _updateHeader() {
     const n = State.filteredResults.length;
     document.getElementById('resultsTitle').textContent = `${n} quán gần đây`;
-    document.getElementById('resultsSub').textContent = `Trong bán kính ${fmtDist(State.radius)}`;
+    const src = State.lastScanSource === 'osm' ? '🌐 OpenStreetMap' : '📌 Dữ liệu mẫu';
+    document.getElementById('resultsSub').textContent = `${fmtDist(State.radius)} · ${src}`;
   },
   _setTabFilter(filter) {
     State.tabFilter = filter;
@@ -1391,14 +1585,18 @@ const ResultsCtrl = {
     grid.innerHTML = visible.map((r, i) => {
       const cat = CATEGORIES[r.cat];
       const sel = State.selected.has(r.id);
-      const userAdded = r.id > 1000; // user restaurants have id > 1000
-      return `<div class="r-card${sel?' selected':''}${userAdded?' user-added':''}" data-id="${r.id}" style="animation-delay:${i*35}ms">
+      const userAdded = r.id >= 1001 && r.id < 1e12;   // user restaurants: 1001+
+      const isOsm = r.id >= 1e13;                       // OSM items: 1e13+
+      const flagCls = userAdded ? ' user-added' : (isOsm ? ' osm-added' : '');
+      const priceLabel = r.price && r.price !== '—' ? `💰 ${r.price}` : '💰 —';
+      const ratingLabel = isOsm ? '🌐 OSM' : `${r.rating} ★`;
+      return `<div class="r-card${sel?' selected':''}${flagCls}" data-id="${r.id}" style="animation-delay:${Math.min(i,10)*30}ms">
         <div class="r-cat-badge" style="background:${cat.color}22;color:${cat.color}">${cat.icon} ${cat.label}</div>
         <div class="r-name">${r.name}</div>
-        <div class="r-price">💰 ${r.price}</div>
+        <div class="r-price">${priceLabel}</div>
         <div class="r-desc">${r.desc}</div>
         <div class="r-meta">
-          <span class="r-rating">${r.rating} ★</span>
+          <span class="r-rating">${ratingLabel}</span>
           <span class="r-dist">${fmtDist(r._dist)}</span>
         </div>
       </div>`;
