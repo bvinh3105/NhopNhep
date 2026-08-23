@@ -319,6 +319,30 @@ input,textarea,select{font-family:var(--font-body)}
 .cat-tab:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
 .cat-tab.active{background:var(--text);color:var(--cream)}
 
+/* Secondary filter row — source & rating */
+.filter-row{
+  flex-shrink:0;display:flex;flex-direction:column;gap:.4rem;
+  padding:.55rem 1.1rem;background:var(--paper);
+  border-bottom:2px solid var(--text);
+}
+.filter-group{
+  display:flex;align-items:center;gap:.35rem;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;
+}
+.filter-group::-webkit-scrollbar{display:none}
+.filter-label{
+  font-family:var(--font-display);font-style:italic;font-weight:800;
+  font-size:.7rem;color:var(--primary);letter-spacing:.5px;
+  flex-shrink:0;white-space:nowrap;padding-right:.15rem;
+}
+.mini-chip{
+  padding:.28rem .55rem;border-radius:16px;border:1.5px solid var(--text);
+  background:var(--white);color:var(--text);font-size:.72rem;font-weight:700;
+  white-space:nowrap;flex-shrink:0;transition:all .12s;
+  box-shadow:1.5px 1.5px 0 var(--text);
+}
+.mini-chip:active{transform:translate(1px,1px);box-shadow:.5px .5px 0 var(--text)}
+.mini-chip.active{background:var(--primary);color:var(--cream);border-color:var(--primary-2);box-shadow:1.5px 1.5px 0 var(--primary-2)}
+
 /* Restaurant grid */
 .restaurant-grid{
   flex:1;overflow-y:auto;padding:.8rem 1.1rem;display:grid;
@@ -683,8 +707,7 @@ input,textarea,select{font-family:var(--font-body)}
 }
 .leaflet-marker-icon{transition:none!important}
 
-/* Tile filter — softer warm */
-.leaflet-tile-pane{filter:sepia(.15) saturate(.85) brightness(1.02)}
+/* No global tile filter — CartoDB Voyager already warm */
 </style>
 </head>
 <body>
@@ -778,6 +801,23 @@ input,textarea,select{font-family:var(--font-body)}
     <button class="cat-tab" data-filter="street">🍜 Vỉa hè</button>
     <button class="cat-tab" data-filter="snack">🧆 Ăn vặt</button>
     <button class="cat-tab" data-filter="cafe">☕ Cà phê</button>
+  </div>
+
+  <!-- Source filter row -->
+  <div class="filter-row">
+    <div class="filter-group" id="srcFilterGroup">
+      <span class="filter-label">Nguồn:</span>
+      <button class="mini-chip active" data-src="all">Tất cả</button>
+      <button class="mini-chip" data-src="osm">🌐 OSM</button>
+      <button class="mini-chip" data-src="mine">⭐ Của tôi</button>
+      <button class="mini-chip" data-src="seed">📌 Mẫu</button>
+    </div>
+    <div class="filter-group" id="ratingFilterGroup">
+      <span class="filter-label">Đánh giá ≥</span>
+      <button class="mini-chip active" data-rating="0">Tất cả</button>
+      <button class="mini-chip" data-rating="4">4★</button>
+      <button class="mini-chip" data-rating="4.5">4.5★</button>
+    </div>
   </div>
 
   <div class="restaurant-grid" id="restaurantGrid"></div>
@@ -1250,6 +1290,36 @@ const TabNav = {
 };
 
 /* ═══════════════════════════════════════════════
+   TILE LAYER — CartoDB Voyager (warm, less blocked than OSM)
+   With fallback if primary blocked
+═══════════════════════════════════════════════ */
+const TileLayer = {
+  PRIMARY:  'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+  FALLBACK: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  SUBDOMAINS: 'abcd',
+
+  add(map) {
+    const layer = L.tileLayer(this.PRIMARY, {
+      maxZoom: 19,
+      subdomains: this.SUBDOMAINS,
+      attribution: '',
+      crossOrigin: true,
+    });
+    let failCount = 0;
+    layer.on('tileerror', () => {
+      failCount++;
+      if (failCount === 3 && !layer._switched) {
+        layer._switched = true;
+        console.warn('[Tiles] CartoDB blocked, falling back to OSM');
+        layer.setUrl(this.FALLBACK);
+      }
+    });
+    layer.addTo(map);
+    return layer;
+  },
+};
+
+/* ═══════════════════════════════════════════════
    MAP — HOME
 ═══════════════════════════════════════════════ */
 const MapHome = {
@@ -1260,9 +1330,7 @@ const MapHome = {
       center:[lat,lng], zoom:15,
       zoomControl:false, attributionControl:false,
     });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom:19,
-    }).addTo(State.mainMap);
+    TileLayer.add(State.mainMap);
     this.setUserLocation(lat, lng);
   },
   setUserLocation(lat, lng, accuracy=null, opts={}) {
@@ -1555,9 +1623,13 @@ const ResultsCtrl = {
   show() {
     document.getElementById('homeScreen').classList.add('hidden');
     document.getElementById('resultsScreen').classList.remove('hidden');
+    // Reset secondary filters on fresh show
+    State.srcFilter = 'all';
+    State.ratingFilter = 0;
+    document.querySelectorAll('#srcFilterGroup .mini-chip').forEach(c => c.classList.toggle('active', c.dataset.src === 'all'));
+    document.querySelectorAll('#ratingFilterGroup .mini-chip').forEach(c => c.classList.toggle('active', c.dataset.rating === '0'));
     this._updateHeader();
     this._setTabFilter('all');
-    this._render();
   },
   _updateHeader() {
     const n = State.filteredResults.length;
@@ -1570,9 +1642,26 @@ const ResultsCtrl = {
     document.querySelectorAll('.cat-tab').forEach(t => {
       t.classList.toggle('active', t.dataset.filter === filter);
     });
-    State.visibleResults = filter === 'all'
-      ? State.filteredResults
-      : State.filteredResults.filter(r => r.cat === filter);
+    this._applyFilters();
+  },
+
+  _srcOf(r) {
+    if (r.id >= 1e13) return 'osm';
+    if (r.id >= 1001) return 'mine';
+    return 'seed';
+  },
+
+  _applyFilters() {
+    const catF = State.tabFilter || 'all';
+    const srcF = State.srcFilter || 'all';
+    const ratingF = State.ratingFilter || 0;
+
+    State.visibleResults = State.filteredResults.filter(r => {
+      if (catF !== 'all' && r.cat !== catF) return false;
+      if (srcF !== 'all' && this._srcOf(r) !== srcF) return false;
+      if (ratingF > 0 && (r.rating || 0) < ratingF) return false;
+      return true;
+    });
     this._render();
   },
   _render() {
@@ -1617,16 +1706,33 @@ const ResultsCtrl = {
     });
     document.getElementById('reshuffleBtn').addEventListener('click', () => {
       State.filteredResults = shuffle(State.filteredResults);
-      State.visibleResults = State.tabFilter === 'all'
-        ? State.filteredResults
-        : State.filteredResults.filter(r => r.cat === State.tabFilter);
-      this._render();
+      this._applyFilters();
       showToast('🔀 Đã xáo lại danh sách!');
     });
     document.getElementById('catTabs').addEventListener('click', e => {
       const tab = e.target.closest('.cat-tab');
       if (!tab) return;
       this._setTabFilter(tab.dataset.filter);
+    });
+
+    // Source filter
+    document.getElementById('srcFilterGroup').addEventListener('click', e => {
+      const chip = e.target.closest('.mini-chip');
+      if (!chip) return;
+      document.querySelectorAll('#srcFilterGroup .mini-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      State.srcFilter = chip.dataset.src;
+      this._applyFilters();
+    });
+
+    // Rating filter
+    document.getElementById('ratingFilterGroup').addEventListener('click', e => {
+      const chip = e.target.closest('.mini-chip');
+      if (!chip) return;
+      document.querySelectorAll('#ratingFilterGroup .mini-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      State.ratingFilter = parseFloat(chip.dataset.rating);
+      this._applyFilters();
     });
     document.getElementById('restaurantGrid').addEventListener('click', e => {
       const card = e.target.closest('.r-card');
@@ -1835,7 +1941,7 @@ const PlanCtrl = {
       zoomControl:false, attributionControl:false, dragging:false,
       scrollWheelZoom:false, touchZoom:false,
     });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(State.planMap);
+    TileLayer.add(State.planMap);
     State.planMap.fitBounds(bounds.pad(0.2));
 
     const userIcon = L.divIcon({
@@ -2031,7 +2137,7 @@ const AddModal = {
       center:[lat,lng], zoom:15,
       zoomControl:false, attributionControl:false,
     });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(State.pickerMap);
+    TileLayer.add(State.pickerMap);
 
     // Initial marker
     this._setMarker(lat, lng);
