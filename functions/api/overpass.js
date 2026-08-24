@@ -6,13 +6,22 @@
 // Result is cached at the edge for 5 minutes, so nearby scans by
 // other users hit the CDN and skip the upstream fetch entirely.
 
+// All three mirrors carry the full planet.osm dataset. Never add
+// region-scoped mirrors (e.g. overpass.osm.ch is Switzerland-only —
+// it returns "elements": [] for queries outside CH and wins the race
+// because it responds fastest). Verified working 2026-08-24:
+//   overpass-api.de ~2s · z.overpass-api.de ~2s · mail.ru ~4s
+// Known bad right now: kumi.systems (12s+ timeout), private.coffee (dead).
 const MIRRORS = [
   'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://overpass.osm.ch/api/interpreter',
+  'https://z.overpass-api.de/api/interpreter',
+  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
 ];
 
-const PER_MIRROR_TIMEOUT_MS = 8000;
+const PER_MIRROR_TIMEOUT_MS = 12000;
+// Overpass mirrors reject requests without a User-Agent (returns 406).
+// Cloudflare Workers' fetch() doesn't set one by default.
+const UA = 'NhopNhep/1.0 (+https://nhopnhep.pages.dev)';
 const EDGE_CACHE_TTL = 300;
 
 const cors = {
@@ -74,7 +83,13 @@ export async function onRequest(context) {
     const timer = setTimeout(() => ctrl.abort(), PER_MIRROR_TIMEOUT_MS);
     return fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': UA,
+        // Do NOT send Accept — Overpass serves text/plain and 406s any
+        // Accept that doesn't include text/*. */* also works, but the
+        // safest option is to omit the header entirely.
+      },
       body,
       signal: ctrl.signal,
     }).then(async res => {
@@ -92,7 +107,7 @@ export async function onRequest(context) {
   });
 
   try {
-    const winner = await Promise.any(attempts);
+    const winner = await raceForNonEmpty(attempts);
     const resp = new Response(winner.text, {
       status: 200,
       headers: {
@@ -100,10 +115,10 @@ export async function onRequest(context) {
         'Content-Type': winner.contentType,
         'X-Overpass-Mirror': winner.url,
         'X-Cache': 'MISS',
+        'X-Element-Count': String(countElements(winner.text)),
         'Cache-Control': `public, max-age=${EDGE_CACHE_TTL}`,
       },
     });
-    // Store a clone in the edge cache
     context.waitUntil(cache.put(cacheKey, resp.clone()));
     return resp;
   } catch (e) {
@@ -113,6 +128,46 @@ export async function onRequest(context) {
       { status: 502, headers: { ...cors, 'Content-Type': 'application/json' } },
     );
   }
+}
+
+// Count top-level elements in an Overpass response. Cheap regex — the
+// real parse happens on the client. Just enough to prefer non-empty.
+function countElements(text) {
+  const idx = text.indexOf('"elements"');
+  if (idx < 0) return 0;
+  const after = text.slice(idx);
+  // { blocks inside the elements array — each element is an object
+  const matches = after.match(/\{\s*"type"/g);
+  return matches ? matches.length : 0;
+}
+
+// Prefer any response with elements. Fall back to the fastest response
+// (even if empty) if all mirrors return empty; reject only when every
+// mirror errors out. Non-empty short-circuits — we don't wait for the rest.
+function raceForNonEmpty(promises) {
+  return new Promise((resolve, reject) => {
+    let remaining = promises.length;
+    let fallback = null;
+    const errors = [];
+    promises.forEach(p => {
+      p.then(result => {
+        remaining--;
+        if (countElements(result.text) > 0) {
+          resolve(result);
+        } else {
+          if (!fallback) fallback = result;
+          if (remaining === 0) resolve(fallback);
+        }
+      }).catch(e => {
+        remaining--;
+        errors.push(e);
+        if (remaining === 0) {
+          if (fallback) resolve(fallback);
+          else reject({ errors });
+        }
+      });
+    });
+  });
 }
 
 async function sha1(str) {
