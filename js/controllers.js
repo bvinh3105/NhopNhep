@@ -189,7 +189,9 @@ const HomeCtrl = {
 
     if (State.activeSrcs.has('osm')) {
       const activeCats = [...State.activeCats];
-      const useGemini = Gemini.isConfigured();
+      const useGemini = typeof Gemini !== 'undefined' &&
+        typeof Gemini.isConfigured === 'function' &&
+        Gemini.isConfigured();
 
       // Animated status while waiting
       const statusMsgs = useGemini
