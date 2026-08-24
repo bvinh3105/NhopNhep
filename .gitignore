@@ -25,3 +25,6 @@ data/_*.json
 
 # Temp update scripts (one-off patches, not part of source)
 update_*.js
+
+# Cloudflare wrangler local cache
+.wrangler/

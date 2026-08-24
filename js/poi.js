@@ -182,7 +182,10 @@ out center 200;`;
       console.log('[POI] fetched', items.length, 'items');
       return items;
     } catch (e) {
-      console.error('[POI] All endpoints failed:', e);
+      const detail = e.errors
+        ? e.errors.map((x, i) => `${endpoints[i].url} → ${x?.message || x}`).join('\n  ')
+        : (e?.message || e);
+      console.error('[POI] All endpoints failed:\n  ' + detail);
       return [];
     }
   },

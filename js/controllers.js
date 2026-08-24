@@ -766,6 +766,15 @@ const ProfileCtrl = {
       AddModal.open();
     });
 
+    // Stat cards — clickable overview shortcuts
+    document.querySelectorAll('.stat-card[data-stat]').forEach(card => {
+      const handle = () => this._onStatClick(card.dataset.stat);
+      card.addEventListener('click', handle);
+      card.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handle(); }
+      });
+    });
+
     // Export / Import
     document.getElementById('exportDataBtn').addEventListener('click', () => {
       Storage.exportJSON();
@@ -802,6 +811,35 @@ const ProfileCtrl = {
     const catPrefs = [...State.profile.prefs].filter(p => CATEGORIES[p]);
     const fav = catPrefs[0] ? CATEGORIES[catPrefs[0]].icon : '🍽️';
     document.getElementById('statFav').textContent = fav;
+  },
+
+  _onStatClick(stat) {
+    if (stat === 'myR') {
+      const n = State.userRestaurants.length;
+      if (n === 0) {
+        showToast('Chưa có quán nào — nhấn "＋ Thêm quán" ở dưới');
+        document.getElementById('addRestaurantBtn')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        showToast(`⭐ Bạn có ${n} quán`);
+        document.getElementById('myRestaurantList')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    } else if (stat === 'trips') {
+      const n = State.profile.trips;
+      if (n === 0) {
+        showToast('🍜 Chưa có chuyến nào. Quét quán rồi "Lên lịch" để tạo chuyến đầu tiên!');
+      } else {
+        showToast(`🎉 Bạn đã lên lịch ${n} chuyến ăn`);
+      }
+    } else if (stat === 'fav') {
+      const catPrefs = [...State.profile.prefs].filter(p => CATEGORIES[p]);
+      if (catPrefs.length === 0) {
+        showToast('Chọn loại quán bạn thích ở dưới nhé 👇');
+      } else {
+        const labels = catPrefs.map(p => CATEGORIES[p].label).join(', ');
+        showToast(`🍽️ Bạn hay thích: ${labels}`);
+      }
+      document.getElementById('prefChips')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   },
 
   _renderMyRestaurants() {
