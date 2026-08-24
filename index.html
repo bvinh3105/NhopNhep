@@ -98,9 +98,12 @@
 
     <!-- Location -->
     <div class="row-label">Điểm xuất phát</div>
-    <div class="loc-row">
-      <input id="locInput" class="loc-input" type="text" placeholder="Nhập địa chỉ hoặc dùng GPS…" autocomplete="off" spellcheck="false">
-      <button class="loc-gps-btn" id="gpsBtn" title="Bật GPS · nhấn giữ để tracking liên tục">📍</button>
+    <div class="loc-row-wrap">
+      <div class="loc-row">
+        <input id="locInput" class="loc-input" type="text" placeholder="Gõ địa chỉ, tên đường, quán… hoặc dùng GPS" autocomplete="off" spellcheck="false">
+        <button class="loc-gps-btn" id="gpsBtn" title="Bật GPS · nhấn giữ để tracking liên tục">📍</button>
+      </div>
+      <div class="geocode-suggest" id="locSuggest"></div>
     </div>
     <div class="gps-hint" id="gpsHint"></div>
 
@@ -271,9 +274,14 @@
     </div>
 
     <div class="form-group">
-      <label class="form-label">Vị trí trên bản đồ</label>
-      <div id="pickerMap"></div>
-      <div class="picker-hint">🖱️ Nhấn vào bản đồ để chọn vị trí quán</div>
+      <label class="form-label">Vị trí quán</label>
+      <div class="loc-row-wrap">
+        <input class="form-input" id="fLocSearch" type="text"
+          placeholder="Gõ địa chỉ quán… VD: 16 Trần Hưng Đạo" autocomplete="off" spellcheck="false">
+        <div class="geocode-suggest" id="fLocSuggest"></div>
+      </div>
+      <div id="pickerMap" style="margin-top:.55rem"></div>
+      <div class="picker-hint">🖱️ Gõ địa chỉ ở trên · hoặc nhấn trực tiếp lên bản đồ</div>
     </div>
 
     <div class="form-actions">
@@ -292,6 +300,8 @@
 <script src="js/utils.js"></script>
 <script src="js/state.js"></script>
 <script src="js/poi.js"></script>
+<script src="js/geocoder.js"></script>
+<script src="js/gemini.js"></script>
 <script src="js/map.js"></script>
 <script src="js/gps.js"></script>
 <script src="js/controllers.js"></script>

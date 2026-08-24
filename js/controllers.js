@@ -68,41 +68,56 @@ const HomeCtrl = {
     });
 
     document.getElementById('scanBtn').addEventListener('click', () => this.scan());
-    
-    // Geocoding on Enter
-    document.getElementById('locInput').addEventListener('keydown', async (e) => {
-      if (e.key === 'Enter') {
-        const query = e.target.value.trim();
-        if (!query) { this.scan(); return; }
-        
-        // Use Nominatim Geocoding API
-        try {
-          showToast('Đang tìm vị trí...');
-          const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
-          const res = await fetch(url);
-          const data = await res.json();
-          if (data && data.length > 0) {
-            const lat = parseFloat(data[0].lat);
-            const lng = parseFloat(data[0].lon);
-            const shortName = data[0].display_name.split(',')[0]; // get street or place name
-            
-            MapHome.setUserLocation(lat, lng, null, { center: true });
-            document.getElementById('locInput').value = `📍 ${shortName}`;
-            showToast(`✅ Đã xác nhận vị trí: ${shortName}`);
-            
-            // Proceed to scan with new location
-            this.scan();
-          } else {
-            showToast('❌ Không tìm thấy địa chỉ này. Hãy thử nhập rõ hơn!');
-          }
-        } catch(err) {
-          console.error(err);
-          showToast('❌ Lỗi khi tìm địa chỉ!');
-        }
-      }
-    });
+
+    // Address autocomplete for "Điểm xuất phát"
+    this._initLocInput();
 
     this._updateBadge();
+  },
+
+  // Debounced address suggestions dropdown for the "Điểm xuất phát" field.
+  // Selecting a suggestion re-centers the map so the user can see exactly
+  // where the scan will happen before pressing Quét.
+  _initLocInput() {
+    const input = document.getElementById('locInput');
+    const suggest = document.getElementById('locSuggest');
+    if (!input || !suggest) return;
+
+    const pick = (r) => {
+      MapHome.setUserLocation(r.lat, r.lng, null, { center: true });
+      input.value = r.name;
+      Geocoder.hide(suggest);
+      showToast(`📍 ${r.sub}`);
+    };
+
+    input.addEventListener('input', (e) => {
+      const q = e.target.value.trim();
+      if (q.length < 3) { Geocoder.hide(suggest); return; }
+      Geocoder.showLoading(suggest);
+      Geocoder.onInput('locInput', q, 450, (results) => {
+        Geocoder.renderSuggestions(suggest, results, pick);
+      });
+    });
+
+    // Enter picks the first suggestion, or triggers a scan if nothing typed
+    input.addEventListener('keydown', async (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const q = input.value.trim();
+      if (!q) { this.scan(); return; }
+      Geocoder.showLoading(suggest);
+      const results = await Geocoder.search(q);
+      if (results.length) { pick(results[0]); }
+      else { Geocoder.renderSuggestions(suggest, [], pick); }
+    });
+
+    // Click outside dismisses the dropdown
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.loc-row-wrap')) Geocoder.hide(suggest);
+    });
+    input.addEventListener('focus', () => {
+      if (input.value.trim().length >= 3) suggest.classList.add('show');
+    });
   },
 
   _updateBadge() {
@@ -115,35 +130,59 @@ const HomeCtrl = {
   async scan() {
     if (this._scanning) return;
     if (!State.userLat) { showToast('📍 Dùng GPS hoặc nhập địa chỉ (nhấn Enter) trước nhé!'); return; }
-    
+
     this._scanning = true;
     const ov = document.getElementById('scanOverlay');
     const txt = ov.querySelector('.scanning-txt');
     ov.style.display = 'flex';
 
-    // Fetch quán from Overpass API
+    let items = [];
+    let source = 'none';
+
     if (State.activeSrcs.has('osm')) {
-      if (txt) txt.textContent = 'Đang quét quán gần bạn…';
-      try {
-        const items = await POI.fetch(State.userLat, State.userLng, State.radius);
-        State.osmRestaurants = items;
-        State.lastScanSource = items.length > 0 ? 'osm' : 'none';
-      } catch(e) {
-        console.warn('POI fetch failed', e);
-        State.osmRestaurants = [];
-        State.lastScanSource = 'none';
+      // 1. Gemini first — grounded on Google Search gives real Vietnamese
+      //    Google Maps data (name, coord, rating, hours), which OSM often
+      //    lacks in less-mapped districts. Ask only for the requested cats.
+      if (Gemini.isConfigured()) {
+        if (txt) txt.textContent = '✨ Gemini đang tìm quán quanh bạn…';
+        try {
+          const activeCats = [...State.activeCats];
+          const geminiItems = await Gemini.findQuan(
+            State.userLat, State.userLng, State.radius,
+            { categories: activeCats, limit: 30 }
+          );
+          if (geminiItems.length) {
+            items = geminiItems;
+            source = 'gemini';
+          }
+        } catch(e) {
+          console.warn('[Gemini] search failed', e.message);
+          if (txt) txt.textContent = '⚠️ Gemini lỗi · fallback OSM…';
+        }
       }
-    } else {
-      State.osmRestaurants = [];
-      State.lastScanSource = 'none';
+
+      // 2. Fallback to Overpass OSM if Gemini yielded nothing
+      if (!items.length) {
+        if (txt) txt.textContent = 'Đang quét OSM quanh bạn…';
+        try {
+          const osmItems = await POI.fetch(State.userLat, State.userLng, State.radius);
+          items = osmItems;
+          source = osmItems.length ? 'osm' : 'none';
+        } catch(e) {
+          console.warn('POI fetch failed', e);
+        }
+      }
     }
 
+    State.osmRestaurants = items;
+    State.lastScanSource = source;
     ov.style.display = 'none';
     this._scanning = false;
     this._doScan();
   },
 
   _srcOf(r) {
+    if (r._gemini) return 'osm';   // treat gemini as part of "osm" source bucket
     if (r.id >= 1e13) return 'osm';
     return 'mine';
   },
@@ -200,7 +239,10 @@ const ResultsCtrl = {
   _updateHeader() {
     const n = State.filteredResults.length;
     document.getElementById('resultsTitle').textContent = `${n} quán gần đây`;
-    document.getElementById('resultsSub').textContent = `${fmtDist(State.radius)} · 🌐 OpenStreetMap`;
+    const src = State.lastScanSource === 'gemini' ? '✨ Google Maps (Gemini)'
+      : State.lastScanSource === 'osm' ? '🌐 OpenStreetMap'
+      : '📌 Chưa quét';
+    document.getElementById('resultsSub').textContent = `${fmtDist(State.radius)} · ${src}`;
   },
   _setTabFilter(filter) {
     State.tabFilter = filter;
@@ -251,10 +293,11 @@ const ResultsCtrl = {
       const cat = CATEGORIES[r.cat];
       const sel = State.selected.has(r.id);
       const userAdded = r.id >= 1001 && r.id < 1e12;
-      const isOsm = r.id >= 1e13;
-      const flagCls = userAdded ? ' user-added' : (isOsm ? ' osm-added' : '');
+      const isGemini = !!r._gemini;
+      const isOsm = r.id >= 1e13 && !isGemini;
+      const flagCls = userAdded ? ' user-added' : (isGemini ? ' gemini-added' : (isOsm ? ' osm-added' : ''));
       const priceLabel = r.price && r.price !== '—' ? `💰 ${r.price}` : '💰 —';
-      const ratingLabel = isOsm ? '🌐 OSM' : `${r.rating} ★`;
+      const ratingLabel = isGemini ? `${r.rating.toFixed(1)} ★` : (isOsm ? '🌐 OSM' : `${r.rating} ★`);
       const hoursBadge = this._renderHoursBadge(r);
       return `<div class="r-card${sel?' selected':''}${flagCls}" data-id="${r.id}" style="animation-delay:${Math.min(i,10)*30}ms">
         <div class="r-cat-badge" style="background:${cat.color}22;color:${cat.color}">${cat.icon} ${cat.label}</div>
@@ -683,6 +726,60 @@ const AddModal = {
       if (e.target.id === 'addModal') this.close();
     });
     document.getElementById('fSave').addEventListener('click', () => this._save());
+
+    // Address autocomplete inside the modal
+    this._initLocSearch();
+  },
+
+  // Debounced address suggestions for the modal address input.
+  // Selecting a suggestion drops the picker marker at that spot and pans
+  // the picker map — user can still tap the map for fine adjustment.
+  _initLocSearch() {
+    const input = document.getElementById('fLocSearch');
+    const suggest = document.getElementById('fLocSuggest');
+    if (!input || !suggest) return;
+
+    const pick = (r) => {
+      this._pickedLat = r.lat;
+      this._pickedLng = r.lng;
+      // Update marker + map view
+      if (State.pickerMap) {
+        State.pickerMap.setView([r.lat, r.lng], 17);
+        this._setMarker(r.lat, r.lng);
+      }
+      // Prefill name if the input's blank — most convenient
+      const nameInput = document.getElementById('fName');
+      if (nameInput && !nameInput.value.trim()) nameInput.value = r.name;
+      input.value = r.name;
+      Geocoder.hide(suggest);
+    };
+
+    input.addEventListener('input', (e) => {
+      const q = e.target.value.trim();
+      if (q.length < 3) { Geocoder.hide(suggest); return; }
+      Geocoder.showLoading(suggest);
+      Geocoder.onInput('fLocSearch', q, 450, (results) => {
+        Geocoder.renderSuggestions(suggest, results, pick);
+      });
+    });
+
+    input.addEventListener('keydown', async (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const q = input.value.trim();
+      if (!q) return;
+      Geocoder.showLoading(suggest);
+      const results = await Geocoder.search(q);
+      if (results.length) pick(results[0]);
+      else Geocoder.renderSuggestions(suggest, [], pick);
+    });
+
+    // Dismiss dropdown on outside click
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#fLocSearch') && !e.target.closest('#fLocSuggest')) {
+        Geocoder.hide(suggest);
+      }
+    });
   },
 
   open() {
@@ -691,6 +788,10 @@ const AddModal = {
     document.getElementById('fName').value = '';
     document.getElementById('fPrice').value = '';
     document.getElementById('fDesc').value = '';
+    const fLoc = document.getElementById('fLocSearch');
+    if (fLoc) fLoc.value = '';
+    const fLocSug = document.getElementById('fLocSuggest');
+    if (fLocSug) Geocoder.hide(fLocSug);
     this._selectedCat = 'restaurant';
     document.querySelectorAll('.cat-pick-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.cat === 'restaurant');
