@@ -24,7 +24,7 @@ const POI = {
   },
 
   _query(lat, lng, radius) {
-    return `[out:json][timeout:25];
+    return `[out:json][timeout:10];
 (
   node["amenity"~"^(restaurant|cafe|fast_food|food_court|ice_cream|bar|pub|bbq|biergarten|canteen)$"](around:${radius},${lat},${lng});
   way["amenity"~"^(restaurant|cafe|fast_food|food_court|ice_cream|bar|pub|bbq|biergarten|canteen)$"](around:${radius},${lat},${lng});
@@ -130,25 +130,49 @@ out center 200;`;
     const query = this._query(lat, lng, radius);
     const endpoints = [this.ENDPOINT, ...this.FALLBACKS];
 
-    for (let attempt = 0; attempt < endpoints.length; attempt++) {
-      const url = endpoints[attempt];
-      try {
-        if (attempt > 0) {
-          await new Promise(r => setTimeout(r, 1200));
-        }
-        console.log('[POI] fetching', url, `attempt ${attempt+1}`);
-        const elements = await this._tryFetch(url, query);
-        const items = this._parse(elements);
-        if (items.length > 0) {
-          this._cache.set(key, { ts: Date.now(), items });
-          console.log('[POI] fetched', items.length);
-          return items;
-        }
-        console.warn('[POI] got 0 items, retrying…');
-      } catch (e) {
-        console.warn('[POI] fail on', url, e.message || e);
-      }
+    console.log('[POI] fetching concurrently from', endpoints.length, 'endpoints...');
+    
+    // Promise.any takes the first successful response and aborts the others
+    const abortControllers = endpoints.map(() => new AbortController());
+    
+    const promises = endpoints.map((url, i) => {
+       return new Promise(async (resolve, reject) => {
+         try {
+           const res = await fetch(url, {
+             method: 'POST',
+             body: 'data=' + encodeURIComponent(query),
+             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+             signal: abortControllers[i].signal
+           });
+           if (!res.ok) throw new Error('HTTP ' + res.status);
+           const data = await res.json();
+           if (data.elements) {
+             resolve({ url, elements: data.elements, index: i });
+           } else {
+             reject('No elements');
+           }
+         } catch(e) {
+           reject(e);
+         }
+       });
+    });
+
+    try {
+      const fastest = await Promise.any(promises);
+      console.log('[POI] fastest response from:', fastest.url);
+      
+      // Abort all others
+      abortControllers.forEach((ctrl, i) => {
+        if (i !== fastest.index) ctrl.abort();
+      });
+
+      const items = this._parse(fastest.elements);
+      this._cache.set(key, { ts: Date.now(), items });
+      console.log('[POI] fetched', items.length);
+      return items;
+    } catch (e) {
+      console.error('[POI] All endpoints failed!', e);
+      return [];
     }
-    return [];
   },
 };

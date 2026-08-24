@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════
+﻿/* ═══════════════════════════════════════════════
    DESIGN TOKENS — Warm cream + tomato red
 ═══════════════════════════════════════════════ */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -692,7 +692,8 @@ input,textarea,select{font-family:var(--font-body)}
 .cat-pick-btn[data-cat="snack"].active{background:var(--cat-snack);border-color:#A8365F;box-shadow:2px 2px 0 #A8365F}
 .cat-pick-btn[data-cat="cafe"].active{background:var(--cat-cafe);border-color:#5A3B24;box-shadow:2px 2px 0 #5A3B24}
 
-#pickerMap{
+#pickerMap { background: #e5e3df url("data:image/svg+xml,%3Csvg width='20' height='20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 0L0 20M0 0L20 20' stroke='%23d3d1cc' stroke-width='1' opacity='0.5'/%3E%3C/svg%3E");
+
   height:160px;border-radius:14px;overflow:hidden;border:2px solid var(--text);
   box-shadow:2px 2px 0 var(--text);cursor:crosshair;background:var(--cream-2);
 }
@@ -749,3 +750,20 @@ input,textarea,select{font-family:var(--font-body)}
   font-family:var(--font-display);
 }
 .leaflet-marker-icon{transition:none!important}
+
+.r-img-wrap {
+  width: 100%;
+  height: 140px;
+  border-bottom: 2px solid var(--text);
+  overflow: hidden;
+  background: var(--cream-2);
+}
+.r-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.restaurant-card {
+  overflow: hidden; /* Fix corners */
+}

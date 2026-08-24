@@ -815,6 +815,46 @@ const AddModal = {
     document.getElementById('addModal').addEventListener('click', e => {
       if (e.target.id === 'addModal') this.close();
     });
+    
+    let tempImageBase64 = null;
+    const fImage = document.getElementById('fImage');
+    const fImagePreview = document.getElementById('fImagePreview');
+    const previewImg = fImagePreview ? fImagePreview.querySelector('img') : null;
+
+    if (fImage) {
+      fImage.addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (!file) {
+          tempImageBase64 = null;
+          if (fImagePreview) fImagePreview.style.display = 'none';
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = ev => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_DIM = 600;
+            let w = img.width, h = img.height;
+            if (w > MAX_DIM || h > MAX_DIM) {
+              if (w > h) { h = h * (MAX_DIM / w); w = MAX_DIM; }
+              else { w = w * (MAX_DIM / h); h = MAX_DIM; }
+            }
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            tempImageBase64 = canvas.toDataURL('image/jpeg', 0.8);
+            if (previewImg) {
+              previewImg.src = tempImageBase64;
+              fImagePreview.style.display = 'block';
+            }
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
     document.getElementById('fSave').addEventListener('click', () => this._save());
 
     // Address autocomplete inside the modal

@@ -1,60 +1,65 @@
 /* ═══════════════════════════════════════════════
-   GEOCODER — address → coords via Nominatim (free, no key)
-   Debounces user input, caches results, biases to Vietnam.
+   GEOCODER — address -> coords via Photon (Komoot)
+   Faster and much better at fuzzy searching (like "cầu giấy")
 ═══════════════════════════════════════════════ */
 const Geocoder = {
-  ENDPOINT: 'https://nominatim.openstreetmap.org/search',
+  ENDPOINT: 'https://photon.komoot.io/api/',
   _cache: new Map(),
   _debounceTimers: new Map(),
 
   async search(q) {
     q = q.trim();
-    if (q.length < 3) return [];
+    if (q.length < 2) return [];
     const key = q.toLowerCase();
     if (this._cache.has(key)) return this._cache.get(key);
 
-    // Nominatim treats commas as structured-query separators which breaks
-    // Vietnamese inputs like "cầu giấy, hà nội". Replace with space.
-    const cleanQ = q.replace(/,\s*/g, ' ').trim();
-
-    const results = await this._fetch(cleanQ, true);
-    // If countrycodes=vn yields nothing, retry without — handles edge cases
-    // where Nominatim's VN index doesn't cover the exact phrasing.
-    const final = results.length ? results : await this._fetch(cleanQ, false);
-    this._cache.set(key, final);
-    return final;
+    const results = await this._fetch(q);
+    this._cache.set(key, results);
+    return results;
   },
 
-  async _fetch(q, vnOnly = true) {
+  async _fetch(q) {
     const params = new URLSearchParams({
-      q,
-      format: 'json',
+      q: q,
       limit: '6',
-      'accept-language': 'vi',
-      addressdetails: '1',
+      lang: 'default', // Photon mostly uses default local names (Vietnamese)
     });
-    if (vnOnly) params.set('countrycodes', 'vn');
+    // Bias towards Vietnam (lat, lon, zoom scale roughly)
+    params.set('lon', '106.0');
+    params.set('lat', '16.0');
+    
+    // Add location bias to speed up VN results if we want, but simple q is fine
+    // Or we can just append "Việt Nam" if user didn't type it to restrict results
+    let searchQuery = q;
+    if (!/vietnam|việt nam|vn/i.test(q)) {
+       searchQuery = q + ', Việt Nam';
+    }
+    params.set('q', searchQuery);
 
     try {
-      const res = await fetch(`${this.ENDPOINT}?${params}`, {
-        headers: { 'Accept': 'application/json' },
-      });
+      const res = await fetch(`${this.ENDPOINT}?${params}`);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
-      return (data || []).map(x => {
-        const a = x.address || {};
+      
+      if (!data.features) return [];
+
+      return data.features.map(f => {
+        const p = f.properties;
+        const coords = f.geometry.coordinates; // [lon, lat]
+        
         const parts = [
-          a.road || a.pedestrian || a.footway,
-          a.neighbourhood || a.suburb || a.quarter,
-          a.city_district || a.district || a.city || a.town || a.province,
+          p.housenumber,
+          p.street,
+          p.district || p.locality,
+          p.city || p.county,
+          p.state
         ].filter(Boolean);
-        const disp = x.display_name || '';
+
         return {
-          lat: parseFloat(x.lat),
-          lng: parseFloat(x.lon),
-          name: (x.name || parts[0] || disp.split(',')[0]).trim(),
-          sub: parts.join(' · ') || disp,
-          fullAddress: disp,
+          lat: coords[1],
+          lng: coords[0],
+          name: p.name || parts[0] || 'Địa điểm không tên',
+          sub: parts.join(' · ') || (p.country || ''),
         };
       });
     } catch (e) {
@@ -63,8 +68,6 @@ const Geocoder = {
     }
   },
 
-  // Debounced input handler. `id` scopes the timer so multiple inputs
-  // don't step on each other (home + modal have independent timers).
   onInput(id, q, delay, callback) {
     clearTimeout(this._debounceTimers.get(id));
     this._debounceTimers.set(id, setTimeout(async () => {
@@ -73,17 +76,25 @@ const Geocoder = {
     }, delay));
   },
 
-  // UI helper — render a suggestion list into a container element.
-  //   suggestEl: <div class="geocode-suggest"> element
-  //   results:   array from search()
-  //   onPick:    (result) => void; called when user taps a row
   renderSuggestions(suggestEl, results, onPick) {
     if (!results.length) {
-      suggestEl.innerHTML = '<div class="go-empty">Không tìm thấy · thử gõ chi tiết hơn</div>';
+      suggestEl.innerHTML = '<div class="go-empty">Không tìm thấy · thử gõ tên đường, quận...</div>';
       suggestEl.classList.add('show');
       return;
     }
-    suggestEl.innerHTML = results.map((r, i) => `
+    
+    // Deduplicate identical names+subs
+    const unique = [];
+    const seen = new Set();
+    for (const r of results) {
+       const k = r.name + '|' + r.sub;
+       if (!seen.has(k)) {
+          seen.add(k);
+          unique.push(r);
+       }
+    }
+
+    suggestEl.innerHTML = unique.map((r, i) => `
       <div class="go-item" data-idx="${i}">
         <div class="go-primary">📍 ${r.name}</div>
         <div class="go-sub">${r.sub}</div>
@@ -94,13 +105,13 @@ const Geocoder = {
     suggestEl.querySelectorAll('.go-item').forEach(el => {
       el.addEventListener('click', () => {
         const idx = parseInt(el.dataset.idx);
-        onPick(results[idx]);
+        onPick(unique[idx]);
       });
     });
   },
 
   showLoading(suggestEl) {
-    suggestEl.innerHTML = '<div class="go-loading">🔍 Đang tìm địa chỉ…</div>';
+    suggestEl.innerHTML = '<div class="go-loading">📍 Đang tìm địa chỉ...</div>';
     suggestEl.classList.add('show');
   },
 
