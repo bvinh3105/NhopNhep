@@ -101,6 +101,7 @@ const MapHome = {
         State.radiusCircle = L.circle([lat,lng], {
           radius: State.radius, color:'#B92626', fillColor:'#B92626',
           fillOpacity:.08, weight:2, opacity:.5, dashArray:'6,4',
+          interactive: false,  // don't capture pointer/touch events → map pans freely
         }).addTo(State.mainMap);
       } else {
         State.radiusCircle.setLatLng([lat, lng]);
@@ -110,6 +111,7 @@ const MapHome = {
           State.accuracyCircle = L.circle([lat,lng], {
             radius: accuracy, color:'#4CAF50', fillColor:'#4CAF50',
             fillOpacity:.10, weight:1.5, opacity:.5,
+            interactive: false,
           }).addTo(State.mainMap);
         } else {
           State.accuracyCircle.setLatLng([lat, lng]).setRadius(accuracy);
