@@ -435,7 +435,7 @@ input,textarea,select{font-family:var(--font-body)}
   border:2px solid var(--text);box-shadow:4px 4px 0 var(--text);transition:all .12s;
 }
 .action-btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--text)}
-.action-btn:disabled{opacity:.4;pointer-events:none;box-shadow:2px 2px 0 var(--text)}
+.action-btn:disabled{opacity:.65;pointer-events:none;box-shadow:2px 2px 0 var(--text)}
 
 .empty-state{
   grid-column:1/-1;display:flex;flex-direction:column;align-items:center;
