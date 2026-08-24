@@ -4,17 +4,10 @@
 ═══════════════════════════════════════════════ */
 const POI = {
   DIRECT: 'https://overpass-api.de/api/interpreter',
-
-  get ENDPOINT() {
-    const h = location.hostname;
-    if (h === 'localhost' || h === '127.0.0.1') return this.DIRECT;
-    return 'https://api.allorigins.win/raw?url=' + encodeURIComponent(this.DIRECT);
-  },
-  FALLBACKS: [
-    '/.netlify/functions/overpass',
-    '/api/overpass',
-    'https://corsproxy.io/?url=' + encodeURIComponent('https://overpass-api.de/api/interpreter'),
-    'https://overpass-api.de/api/interpreter',
+  // CORS-enabled Overpass mirrors (support POST with data= body)
+  MIRRORS: [
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
   ],
   _cache: new Map(),
   CACHE_TTL: 5 * 60 * 1000,
@@ -128,34 +121,53 @@ out center 200;`;
     }
 
     const query = this._query(lat, lng, radius);
-    const endpoints = [this.ENDPOINT, ...this.FALLBACKS];
+    const queryParam = 'data=' + encodeURIComponent(query);
+    const directGetUrl = this.DIRECT + '?' + queryParam;
+    const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
-    console.log('[POI] fetching concurrently from', endpoints.length, 'endpoints...');
-    
-    // Promise.any takes the first successful response and aborts the others
+    // ── Build endpoint list ───────────────────────────────────────────────
+    // Each entry: { url, method, body? }
+    // Overpass supports GET (?data=...) and POST (body=data=...)
+    // allorigins.win proxies GET → use GET format so allorigins forwards correctly
+    const endpoints = [];
+
+    if (isLocal) {
+      // Localhost: POST directly (no CORS issue, no proxy needed)
+      endpoints.push({ url: this.DIRECT, method: 'POST', body: queryParam });
+    } else {
+      // Production: allorigins proxies a GET request — pass full overpass GET URL
+      const alloriginsUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directGetUrl);
+      endpoints.push({ url: alloriginsUrl, method: 'GET' });
+    }
+
+    // CORS-enabled Overpass mirrors as fallbacks (POST supported)
+    this.MIRRORS.forEach(mirror => {
+      endpoints.push({ url: mirror, method: 'POST', body: queryParam });
+    });
+
+    console.log('[POI] fetching concurrently from', endpoints.length, 'endpoints…');
+
     const abortControllers = endpoints.map(() => new AbortController());
-    
-    const promises = endpoints.map((url, i) => {
+    const promises = endpoints.map((ep, i) => {
       return new Promise(async (resolve, reject) => {
-        // Per-endpoint timeout: 8s — prevents a single slow endpoint from stalling the race
         const timeout = setTimeout(() => {
           abortControllers[i].abort();
-          reject(new Error(`timeout: ${url}`));
+          reject(new Error('timeout: ' + ep.url));
         }, 8000);
         try {
-          const res = await fetch(url, {
-            method: 'POST',
-            body: 'data=' + encodeURIComponent(query),
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            signal: abortControllers[i].signal,
-          });
+          const fetchOpts = { method: ep.method, signal: abortControllers[i].signal };
+          if (ep.body) {
+            fetchOpts.body = ep.body;
+            fetchOpts.headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+          }
+          const res = await fetch(ep.url, fetchOpts);
           clearTimeout(timeout);
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
           if (data.elements && data.elements.length > 0) {
-            resolve({ url, elements: data.elements, index: i });
+            resolve({ url: ep.url, elements: data.elements, index: i });
           } else {
-            reject(new Error('No elements'));
+            reject(new Error('No elements from ' + ep.url));
           }
         } catch (e) {
           clearTimeout(timeout);
@@ -166,19 +178,14 @@ out center 200;`;
 
     try {
       const fastest = await Promise.any(promises);
-      console.log('[POI] fastest response from:', fastest.url);
-      
-      // Abort all others
-      abortControllers.forEach((ctrl, i) => {
-        if (i !== fastest.index) ctrl.abort();
-      });
-
+      console.log('[POI] winner:', fastest.url);
+      abortControllers.forEach((ctrl, i) => { if (i !== fastest.index) ctrl.abort(); });
       const items = this._parse(fastest.elements);
       this._cache.set(key, { ts: Date.now(), items });
-      console.log('[POI] fetched', items.length);
+      console.log('[POI] fetched', items.length, 'items');
       return items;
     } catch (e) {
-      console.error('[POI] All endpoints failed!', e);
+      console.error('[POI] All endpoints failed:', e);
       return [];
     }
   },
