@@ -1,8 +1,4 @@
-# Same-origin proxy to Overpass API (fixes CORS + adblockers)
-/api/overpass  https://overpass-api.de/api/interpreter  200!
-
-# Wikimedia tile fallback
-/tiles/wiki/*  https://maps.wikimedia.org/osm-intl/:splat  200!
-
-# SPA fallback (must come last)
+# SPA fallback (Cloudflare Pages + Netlify both honor this syntax).
+# The /api/overpass route is served by functions/api/overpass.js on
+# Cloudflare Pages and by netlify.toml -> functions/overpass on Netlify.
 /*  /index.html  200

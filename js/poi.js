@@ -4,9 +4,11 @@
 ═══════════════════════════════════════════════ */
 const POI = {
   DIRECT: 'https://overpass-api.de/api/interpreter',
-  // Same-origin Netlify Function — no CORS, no adblocker; server-side
-  // retries multiple Overpass mirrors internally.
-  NETLIFY_FN: '/.netlify/functions/overpass',
+  // Same-origin edge function — no CORS, no adblocker; races multiple
+  // Overpass mirrors server-side and caches the result at the CDN.
+  // Works on Cloudflare Pages (functions/api/overpass.js) and Netlify
+  // (netlify.toml redirects /api/overpass to the Netlify function).
+  PROXY: '/api/overpass',
   _cache: new Map(),
   CACHE_TTL: 5 * 60 * 1000,
 
@@ -133,7 +135,7 @@ out center 200;`;
     if (isLocal) {
       endpoints.push({ url: this.DIRECT, method: 'POST', body: queryParam });
     } else {
-      endpoints.push({ url: this.NETLIFY_FN, method: 'POST', body: queryParam });
+      endpoints.push({ url: this.PROXY, method: 'POST', body: queryParam });
     }
 
     // Public CORS proxy — GET-only, forwards to overpass-api.de

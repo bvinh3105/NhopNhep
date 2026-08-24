@@ -1,0 +1,11 @@
+# Cloudflare Pages honors this file. Netlify uses netlify.toml [[headers]]
+# instead (both hosts can safely see both files).
+
+/*
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(self), camera=(), microphone=()
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
