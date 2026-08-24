@@ -10,6 +10,7 @@ function boot() {
   PlanCtrl.init();
   ProfileCtrl.init();
   AddModal.init();
+  DetailModal.init();
 
   // Fallback default location — Hoàn Kiếm, Hà Nội
   State.userLat = 21.0285;

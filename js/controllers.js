@@ -816,8 +816,11 @@ const ProfileCtrl = {
     }
     list.innerHTML = State.userRestaurants.map(r => {
       const cat = CATEGORIES[r.cat];
-      return `<div class="my-r-card" data-id="${r.id}" role="button" tabindex="0" title="Nhấn để mở Google Maps">
-        <div class="my-r-icon" style="background:${cat.color}22;color:${cat.color}">${cat.icon}</div>
+      const thumb = r.image
+        ? `<div class="my-r-icon" style="background-image:url('${r.image}');background-size:cover;background-position:center"></div>`
+        : `<div class="my-r-icon" style="background:${cat.color}22;color:${cat.color}">${cat.icon}</div>`;
+      return `<div class="my-r-card" data-id="${r.id}" role="button" tabindex="0" title="Nhấn để xem chi tiết">
+        ${thumb}
         <div class="my-r-info">
           <div class="my-r-name">${r.name}</div>
           <div class="my-r-meta">${cat.label} · 💰 ${r.price}</div>
@@ -848,12 +851,7 @@ const ProfileCtrl = {
       card.addEventListener('click', () => {
         const id = parseInt(card.dataset.id);
         const r = State.userRestaurants.find(x => x.id === id);
-        if (!r || r.lat == null || r.lng == null) {
-          showToast('Quán chưa có vị trí trên bản đồ');
-          return;
-        }
-        const url = `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`;
-        window.open(url, '_blank', 'noopener');
+        if (r) DetailModal.open(r);
       });
     });
   },
@@ -1039,6 +1037,10 @@ const AddModal = {
     if (!this._pickedLat) { showToast('⚠️ Chọn vị trí trên bản đồ!'); return; }
 
     const newId = 1001 + State.userRestaurants.length + Math.floor(Math.random()*1000);
+    const previewImg = document.querySelector('#fImagePreview img');
+    const image = (previewImg && document.getElementById('fImagePreview').style.display !== 'none')
+      ? previewImg.src
+      : null;
     State.userRestaurants.push({
       id: newId,
       name,
@@ -1049,6 +1051,7 @@ const AddModal = {
       lng: this._pickedLng,
       rating: 5.0,
       hours: '',
+      image,
     });
     Storage.save();
 
@@ -1057,5 +1060,64 @@ const AddModal = {
     HomeCtrl._updateBadge();
     showToast(`✅ Đã thêm "${name}"`);
     this.close();
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   RESTAURANT DETAIL MODAL — read-only view of a saved quán
+═══════════════════════════════════════════════ */
+const DetailModal = {
+  _current: null,
+
+  init() {
+    document.getElementById('detailClose').addEventListener('click', () => this.close());
+    document.getElementById('detailModal').addEventListener('click', e => {
+      if (e.target.id === 'detailModal') this.close();
+    });
+    document.getElementById('detailMaps').addEventListener('click', () => {
+      const r = this._current;
+      if (!r || r.lat == null || r.lng == null) {
+        showToast('Quán chưa có vị trí trên bản đồ');
+        return;
+      }
+      const url = `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`;
+      window.open(url, '_blank', 'noopener');
+    });
+  },
+
+  open(r) {
+    this._current = r;
+    const cat = CATEGORIES[r.cat] || { label: '—', color: '#888', icon: '🍽️' };
+    const body = document.getElementById('detailBody');
+    const imgHtml = r.image
+      ? `<div class="r-img-wrap"><img src="${r.image}" alt="${r.name}"></div>`
+      : '';
+    const coordsHtml = (r.lat != null && r.lng != null)
+      ? `<div class="detail-coords">📍 ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}</div>`
+      : '';
+    const escName = (r.name || '').replace(/</g, '&lt;');
+    const escDesc = (r.desc || 'Không có mô tả').replace(/</g, '&lt;');
+    const escPrice = (r.price || '—').replace(/</g, '&lt;');
+
+    body.innerHTML = `
+      ${imgHtml}
+      <div class="detail-cat-wrap">
+        <span class="detail-cat" style="color:${cat.color};background:${cat.color}18">${cat.icon} ${cat.label}</span>
+      </div>
+      <div class="detail-name">${escName}</div>
+      <div class="detail-meta">
+        <span>💰 ${escPrice}</span>
+        <span>⭐ ${(r.rating ?? 5).toFixed(1)}</span>
+        ${r.hours ? `<span>🕒 ${r.hours}</span>` : ''}
+      </div>
+      <div class="detail-desc">${escDesc}</div>
+      ${coordsHtml}
+    `;
+    document.getElementById('detailModal').classList.add('show');
+  },
+
+  close() {
+    document.getElementById('detailModal').classList.remove('show');
+    this._current = null;
   },
 };

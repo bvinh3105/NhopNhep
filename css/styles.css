@@ -771,3 +771,39 @@ input,textarea,select{font-family:var(--font-body)}
 .restaurant-card {
   overflow: hidden; /* Fix corners */
 }
+
+/* Restaurant detail modal — read-only view of a saved quán */
+.detail-sheet .r-img-wrap{
+  margin:-1rem -1.1rem 1rem;
+  border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+  border-bottom:2px solid var(--text);
+  height:180px;
+}
+.detail-cat{
+  display:inline-flex;align-items:center;gap:.35rem;
+  padding:.3rem .7rem;border-radius:20px;font-size:.75rem;font-weight:800;
+  border:2px solid currentColor;margin:0 auto .5rem;
+}
+.detail-cat-wrap{text-align:center}
+.detail-name{
+  font-family:var(--font-display);font-size:1.6rem;font-weight:900;
+  color:var(--text);text-align:center;line-height:1.15;
+  margin:0 0 .6rem;letter-spacing:-.3px;
+}
+.detail-meta{
+  display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;
+  margin-bottom:1rem;
+}
+.detail-meta span{
+  background:var(--cream-2);border:2px solid var(--text);border-radius:20px;
+  padding:.35rem .75rem;font-size:.78rem;font-weight:700;color:var(--text);
+}
+.detail-desc{
+  background:var(--cream-2);border:2px solid var(--text);border-radius:14px;
+  padding:.8rem .9rem;font-size:.9rem;line-height:1.5;color:var(--text);
+  margin-bottom:.4rem;font-weight:500;
+}
+.detail-coords{
+  font-size:.72rem;color:var(--text2);text-align:center;
+  margin-top:.5rem;font-weight:600;font-style:italic;
+}
