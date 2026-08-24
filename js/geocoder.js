@@ -105,7 +105,11 @@ const Geocoder = {
 
   renderSuggestions(suggestEl, results, onPick) {
     if (!results.length) {
-      suggestEl.innerHTML = '<div class="go-empty">Không tìm thấy · thử gõ tên đường, quận...</div>';
+      suggestEl.innerHTML = `
+        <div class="go-empty">
+          Không tìm thấy · thử gõ ngắn hơn ("tên phố, quận") ·
+          hoặc nhấn map dưới đây để chọn tay
+        </div>`;
       suggestEl.classList.add('show');
       return;
     }

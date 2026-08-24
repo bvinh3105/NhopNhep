@@ -1190,38 +1190,52 @@ const AddModal = {
     let locSource = lat != null ? 'picked' : 'none';
 
     // No coords yet, but user typed something in the address field →
-    // auto-geocode it so they don't need to tap the map.
+    // auto-geocode it. Many personal picks don't exist on OSM as
+    // named nodes (small stall, home-based kitchen, brand-new spot),
+    // so we try progressively shorter query variants: full text, then
+    // "street, district", then "district", then "city". The nearest
+    // hit within a reasonable radius wins.
     if (lat == null && addressText.length >= 3) {
       const saveBtn = document.getElementById('fSave');
       const originalText = saveBtn.textContent;
       saveBtn.disabled = true;
       saveBtn.textContent = '🌐 Đang tra vị trí…';
       try {
-        const results = await Geocoder.search(addressText, {
-          nearLat: State.userLat,
-          nearLng: State.userLng,
-        });
-        if (results && results.length > 0) {
-          const top = results[0];
-          // If the top result is far from where the user is (>30km),
-          // it's likely a wrong name-match. Ask before blindly saving.
-          const distKm = top._distKm;
-          const suspicious = distKm != null && distKm > 30;
-          if (suspicious) {
-            const ok = confirm(
-              `Địa chỉ "${top.name}${top.sub ? ' · ' + top.sub : ''}" cách ` +
-              `${Math.round(distKm)}km — có đúng không?\n\n` +
-              `OK để lưu vị trí đó. Cancel để lưu không kèm map (tự chỉnh sau).`
-            );
-            if (ok) {
-              lat = top.lat; lng = top.lng; locSource = 'geocoded';
-            } else {
-              locSource = 'none';
-            }
-          } else {
-            lat = top.lat; lng = top.lng; locSource = 'geocoded';
-          }
+        const bias = { nearLat: State.userLat, nearLng: State.userLng };
+        const CLOSE_KM = 20;   // "definitely the right area"
+        const FAR_KM = 60;     // > this → almost certainly a wrong match
+
+        // Build the query ladder: full → strip leading parts one by one.
+        const parts = addressText.split(',').map(p => p.trim()).filter(Boolean);
+        const queries = [addressText];
+        for (let i = 1; i < parts.length; i++) {
+          queries.push(parts.slice(i).join(', '));
         }
+
+        let best = null;
+        for (const q of queries) {
+          const results = await Geocoder.search(q, bias);
+          if (!results || !results.length) continue;
+          const top = results[0]; // Geocoder already sorted by distance
+          const d = top._distKm ?? Infinity;
+          if (!best || d < best.dist) best = { top, dist: d, q };
+          if (d <= CLOSE_KM) break; // close enough — stop peeling
+        }
+
+        if (best && best.dist <= CLOSE_KM) {
+          lat = best.top.lat; lng = best.top.lng;
+          locSource = best.q === addressText ? 'geocoded' : 'approximate';
+        } else if (best && best.dist <= FAR_KM) {
+          const ok = confirm(
+            `Không tìm thấy chính xác. Chọn vị trí gần đúng:\n` +
+            `"${best.top.name}${best.top.sub ? ' · ' + best.top.sub : ''}" ` +
+            `(cách ${Math.round(best.dist)}km)?\n\n` +
+            `OK để dùng. Cancel để lưu không kèm map — nhấn map trong lần chỉnh sau.`
+          );
+          if (ok) { lat = best.top.lat; lng = best.top.lng; locSource = 'approximate'; }
+        }
+        // else: nothing usable — leave lat/lng null, user gets the
+        // "chưa gắn vị trí" toast and can tap map on next edit.
       } catch (e) {
         console.warn('[Save] geocode error:', e);
       } finally {
@@ -1261,10 +1275,12 @@ const AddModal = {
 
     if (locSource === 'geocoded') {
       showToast(`✅ Đã thêm "${name}" · tự tìm vị trí`);
+    } else if (locSource === 'approximate') {
+      showToast(`✅ Đã thêm "${name}" · vị trí gần đúng`);
     } else if (locSource === 'picked') {
       showToast(`✅ Đã thêm "${name}"`);
     } else {
-      showToast(`✅ Lưu "${name}" · chưa gắn vị trí trên map`);
+      showToast(`✅ Lưu "${name}" · chưa gắn vị trí — nhấn map để chỉnh`);
     }
     this.close();
   },
