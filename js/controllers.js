@@ -685,8 +685,10 @@ const PlanCtrl = {
       color: '#B92626', weight: 3, opacity: .55, dashArray: '7,5',
     }).addTo(State.planMap);
 
-    // Overlay controls: zoom + fit-bounds button
+    // Overlay controls: zoom + fit + locate + fullscreen
     const wrap = document.getElementById('planMapWrap');
+    wrap.classList.remove('fullscreen'); // start collapsed on every rebuild
+    PlanCtrl._stopLiveTracking(); // clean up any previous watch
     let ctrl = wrap.querySelector('.pmap-controls');
     if (ctrl) ctrl.remove();
     ctrl = document.createElement('div');
@@ -695,11 +697,15 @@ const PlanCtrl = {
       <button class="pmap-btn" id="pmapZoomIn" title="Phóng to">＋</button>
       <button class="pmap-btn" id="pmapZoomOut" title="Thu nhỏ">－</button>
       <button class="pmap-btn pmap-fit" id="pmapFit" title="Xem toàn lộ trình">⤢</button>
+      <button class="pmap-btn pmap-locate" id="pmapLocate" title="Vị trí của tôi (realtime)">📍</button>
+      <button class="pmap-btn pmap-fs" id="pmapFs" title="Toàn màn hình">⛶</button>
     `;
     wrap.appendChild(ctrl);
     document.getElementById('pmapZoomIn').addEventListener('click', () => State.planMap.zoomIn());
     document.getElementById('pmapZoomOut').addEventListener('click', () => State.planMap.zoomOut());
     document.getElementById('pmapFit').addEventListener('click', () => State.planMap.fitBounds(bounds.pad(0.25)));
+    document.getElementById('pmapLocate').addEventListener('click', () => PlanCtrl._centerOnMe());
+    document.getElementById('pmapFs').addEventListener('click', () => PlanCtrl._toggleFullscreen());
 
     // Fetch real road route from OSRM (free, no key needed)
     // Coords format: lng,lat;lng,lat;...
@@ -722,9 +728,103 @@ const PlanCtrl = {
 
   init() {
     document.getElementById('planBack').addEventListener('click', () => {
+      this._stopLiveTracking();
+      document.getElementById('planMapWrap')?.classList.remove('fullscreen');
       document.getElementById('resultsScreen').classList.remove('hidden');
       document.getElementById('planScreen').classList.add('hidden');
     });
+    // Esc exits fullscreen
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        const wrap = document.getElementById('planMapWrap');
+        if (wrap?.classList.contains('fullscreen')) this._toggleFullscreen();
+      }
+    });
+  },
+
+  // ── Fullscreen + live tracking ────────────────────────────────────────
+  _watchId: null,
+  _liveMarker: null,
+  _liveCircle: null,
+
+  _toggleFullscreen() {
+    const wrap = document.getElementById('planMapWrap');
+    if (!wrap || !State.planMap) return;
+    const btn = document.getElementById('pmapFs');
+    const isFs = wrap.classList.toggle('fullscreen');
+    if (btn) {
+      btn.textContent = isFs ? '✕' : '⛶';
+      btn.title = isFs ? 'Thoát toàn màn hình (Esc)' : 'Toàn màn hình';
+    }
+    // Leaflet needs to recompute size after the container resizes
+    setTimeout(() => State.planMap.invalidateSize(), 260);
+    if (isFs) {
+      this._startLiveTracking();
+      showToast('🛰 Đang theo dõi vị trí realtime');
+    } else {
+      this._stopLiveTracking();
+    }
+  },
+
+  _centerOnMe() {
+    if (!State.planMap) return;
+    // If we already have a fix, jump there immediately.
+    if (State.userLat != null && State.userLng != null) {
+      State.planMap.setView([State.userLat, State.userLng], 17);
+    }
+    // Kick off (or refresh) the live watch — user asking to be located
+    // is a signal they want continuous updates.
+    this._startLiveTracking();
+    document.getElementById('pmapLocate')?.classList.add('tracking');
+  },
+
+  _startLiveTracking() {
+    if (this._watchId != null) return;
+    if (!navigator.geolocation) { showToast('⚠️ Trình duyệt không hỗ trợ GPS'); return; }
+    this._watchId = navigator.geolocation.watchPosition(
+      pos => this._onLiveFix(pos),
+      err => {
+        const msgs = {1: '🚫 Bạn từ chối vị trí', 2: '⚠️ Không lấy được vị trí', 3: '⏱ GPS timeout'};
+        showToast(msgs[err.code] || '⚠️ Lỗi GPS');
+        this._stopLiveTracking();
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
+    );
+  },
+
+  _stopLiveTracking() {
+    if (this._watchId != null) {
+      try { navigator.geolocation.clearWatch(this._watchId); } catch (_) {}
+      this._watchId = null;
+    }
+    if (this._liveMarker) { try { this._liveMarker.remove(); } catch (_) {} this._liveMarker = null; }
+    if (this._liveCircle) { try { this._liveCircle.remove(); } catch (_) {} this._liveCircle = null; }
+    document.getElementById('pmapLocate')?.classList.remove('tracking');
+  },
+
+  _onLiveFix(pos) {
+    const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+    State.userLat = lat; State.userLng = lng;
+    if (!State.planMap) return;
+    if (!this._liveMarker) {
+      const icon = L.divIcon({
+        html: '<div class="user-marker-inner tracking"></div>',
+        iconSize: [18, 18], iconAnchor: [9, 9], className: '',
+      });
+      this._liveMarker = L.marker([lat, lng], { icon, zIndexOffset: 2000 }).addTo(State.planMap);
+    } else {
+      this._liveMarker.setLatLng([lat, lng]);
+    }
+    if (accuracy > 0) {
+      if (!this._liveCircle) {
+        this._liveCircle = L.circle([lat, lng], {
+          radius: accuracy, color: '#4CAF50', fillColor: '#4CAF50',
+          fillOpacity: .12, weight: 1.5, opacity: .55, interactive: false,
+        }).addTo(State.planMap);
+      } else {
+        this._liveCircle.setLatLng([lat, lng]).setRadius(accuracy);
+      }
+    }
   },
 };
 
