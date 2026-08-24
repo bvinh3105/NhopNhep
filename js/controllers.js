@@ -568,34 +568,73 @@ const PlanCtrl = {
     if (State.planMap) { try { State.planMap.remove(); } catch(_){} State.planMap = null; }
     const stops = State.itinerary;
     if (!stops.length) return;
-    const lats = [State.userLat, ...stops.map(s => s.lat)];
-    const lngs = [State.userLng, ...stops.map(s => s.lng)];
-    const bounds = L.latLngBounds(lats.map((la,i) => [la, lngs[i]]));
 
+    const allPts = [[State.userLat, State.userLng], ...stops.map(s => [s.lat, s.lng])];
+    const bounds = L.latLngBounds(allPts);
+
+    // Interactive map — user can pan/zoom to inspect the route
     State.planMap = L.map('planMap', {
-      zoomControl:false, attributionControl:false, dragging:false,
-      scrollWheelZoom:false, touchZoom:false,
+      zoomControl: false, attributionControl: false,
+      dragging: true, scrollWheelZoom: true, touchZoom: true, doubleClickZoom: true,
     });
     TileLayer.add(State.planMap);
-    State.planMap.fitBounds(bounds.pad(0.2));
+    State.planMap.fitBounds(bounds.pad(0.25));
 
-    const userIcon = L.divIcon({
-      html:`<div class="user-marker-inner"></div>`,
-      iconSize:[18,18], iconAnchor:[9,9], className:''
+    // Start marker
+    const startIcon = L.divIcon({
+      html: `<div class="user-marker-inner"></div>`,
+      iconSize: [18,18], iconAnchor: [9,9], className: '',
     });
-    L.marker([State.userLat, State.userLng], {icon:userIcon}).addTo(State.planMap);
+    L.marker([State.userLat, State.userLng], { icon: startIcon }).addTo(State.planMap);
 
-    const coords = [[State.userLat, State.userLng], ...stops.map(s => [s.lat, s.lng])];
-    L.polyline(coords, {color:'#B92626', weight:3.5, opacity:.85, dashArray:'6,4'}).addTo(State.planMap);
-
+    // Numbered stop markers
     stops.forEach((s, i) => {
       const cat = CATEGORIES[s.cat];
       const icon = L.divIcon({
-        html:`<div class="r-map-marker" style="background:${cat.color}">${i+1}</div>`,
-        iconSize:[32,32], iconAnchor:[16,16], className:''
+        html: `<div class="r-map-marker" style="background:${cat.color}">${i+1}</div>`,
+        iconSize: [32,32], iconAnchor: [16,16], className: '',
       });
-      L.marker([s.lat, s.lng], {icon}).addTo(State.planMap);
+      L.marker([s.lat, s.lng], { icon }).addTo(State.planMap);
     });
+
+    // Draw straight-line fallback immediately so map isn't empty while routing loads
+    const fallbackLine = L.polyline(allPts, {
+      color: '#B92626', weight: 3, opacity: .55, dashArray: '7,5',
+    }).addTo(State.planMap);
+
+    // Overlay controls: zoom + fit-bounds button
+    const wrap = document.getElementById('planMapWrap');
+    let ctrl = wrap.querySelector('.pmap-controls');
+    if (ctrl) ctrl.remove();
+    ctrl = document.createElement('div');
+    ctrl.className = 'pmap-controls';
+    ctrl.innerHTML = `
+      <button class="pmap-btn" id="pmapZoomIn" title="Phóng to">＋</button>
+      <button class="pmap-btn" id="pmapZoomOut" title="Thu nhỏ">－</button>
+      <button class="pmap-btn pmap-fit" id="pmapFit" title="Xem toàn lộ trình">⤢</button>
+    `;
+    wrap.appendChild(ctrl);
+    document.getElementById('pmapZoomIn').addEventListener('click', () => State.planMap.zoomIn());
+    document.getElementById('pmapZoomOut').addEventListener('click', () => State.planMap.zoomOut());
+    document.getElementById('pmapFit').addEventListener('click', () => State.planMap.fitBounds(bounds.pad(0.25)));
+
+    // Fetch real road route from OSRM (free, no key needed)
+    // Coords format: lng,lat;lng,lat;...
+    const osrmCoords = allPts.map(([la, lo]) => `${lo},${la}`).join(';');
+    fetch(`https://router.project-osrm.org/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson`)
+      .then(r => r.json())
+      .then(data => {
+        const geom = data.routes?.[0]?.geometry;
+        if (!geom) return;
+        // Remove fallback dashed line, draw real road route
+        fallbackLine.remove();
+        L.geoJSON(geom, {
+          style: { color: '#B92626', weight: 4.5, opacity: .9, lineJoin: 'round', lineCap: 'round' },
+        }).addTo(State.planMap);
+      })
+      .catch(() => {
+        // Keep the fallback dashed line — no-op on error
+      });
   },
 
   init() {

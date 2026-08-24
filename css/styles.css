@@ -470,10 +470,23 @@ input,textarea,select{font-family:var(--font-body)}
 .sum-chip .sci{font-size:.9rem}
 
 #planMapWrap{
-  flex-shrink:0;height:180px;margin:.8rem 1.1rem;border-radius:var(--radius);overflow:hidden;
+  flex-shrink:0;height:240px;margin:.8rem 1.1rem;border-radius:var(--radius);overflow:hidden;
   border:2px solid var(--text);box-shadow:4px 4px 0 var(--primary-2);position:relative;
 }
 #planMap{position:absolute;inset:0;background:var(--cream-2)}
+
+/* Plan map overlay controls */
+.pmap-controls{
+  position:absolute;top:.5rem;right:.5rem;z-index:500;display:flex;flex-direction:column;gap:.3rem;
+}
+.pmap-btn{
+  width:34px;height:34px;border-radius:10px;
+  background:var(--white);border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
+  font-size:1.1rem;font-weight:900;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .1s;color:var(--text);font-family:var(--font-body);
+}
+.pmap-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.pmap-fit{font-size:.75rem;letter-spacing:-.5px}
 
 .timeline{flex:1;overflow-y:auto;padding:.5rem 1.1rem calc(var(--safe-bottom) + 1rem);scrollbar-width:none}
 .timeline::-webkit-scrollbar{display:none}
