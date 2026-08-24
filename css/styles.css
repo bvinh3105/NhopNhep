@@ -113,6 +113,12 @@ input,textarea,select{font-family:var(--font-body)}
   color:var(--primary);letter-spacing:-1px;
 }
 .hero-title em{font-style:italic;color:var(--accent);font-weight:900}
+.hero-tagline{
+  font-family:var(--font-display);font-style:italic;font-weight:700;
+  font-size:.85rem;color:var(--primary);margin-top:.2rem;
+  letter-spacing:.2px;line-height:1;
+}
+.hero-tagline em{font-style:italic;color:var(--accent);font-weight:800}
 
 /* ═══════════════════════════════════════════════
    HOME (Nhóp Nhép tab)
@@ -820,7 +826,16 @@ input,textarea,select{font-family:var(--font-body)}
   padding:.8rem .9rem;font-size:.9rem;line-height:1.5;color:var(--text);
   margin-bottom:.4rem;font-weight:500;
 }
+.detail-address{
+  background:var(--paper);border:1.5px dashed var(--text2);border-radius:12px;
+  padding:.6rem .8rem;font-size:.82rem;line-height:1.4;color:var(--text);
+  font-weight:600;margin:.4rem 0;
+}
 .detail-coords{
   font-size:.72rem;color:var(--text2);text-align:center;
   margin-top:.5rem;font-weight:600;font-style:italic;
+}
+.detail-coords.warn{
+  color:#B92626;background:#F7D6BB;padding:.5rem;border-radius:10px;
+  font-style:normal;font-weight:700;
 }

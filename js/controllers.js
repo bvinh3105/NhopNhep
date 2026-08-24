@@ -1127,8 +1127,15 @@ const AddModal = {
     document.querySelectorAll('.cat-pick-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.cat === 'restaurant');
     });
-    this._pickedLat = State.userLat || 10.7769;
-    this._pickedLng = State.userLng || 106.7009;
+    // Start with NO location picked. User picks by:
+    //  1) selecting a suggestion from the address search
+    //  2) tapping the picker map
+    //  3) leaving text in the address input — we auto-geocode it on save
+    // The map centers on a default view but drops no marker until the
+    // user actually chooses somewhere.
+    this._pickedLat = null;
+    this._pickedLng = null;
+    this._pickerCenter = [State.userLat || 21.0285, State.userLng || 105.8542];
     setTimeout(() => this._initPickerMap(), 250);
   },
 
@@ -1141,15 +1148,15 @@ const AddModal = {
 
   _initPickerMap() {
     if (State.pickerMap) { try { State.pickerMap.remove(); } catch(_){} State.pickerMap = null; }
-    const lat = this._pickedLat, lng = this._pickedLng;
+    if (State.pickerMarker) { try { State.pickerMarker.remove(); } catch(_){} State.pickerMarker = null; }
     State.pickerMap = L.map('pickerMap', {
-      center:[lat,lng], zoom:15,
-      zoomControl:false, attributionControl:false,
+      center: this._pickerCenter, zoom: 15,
+      zoomControl: false, attributionControl: false,
     });
     TileLayer.add(State.pickerMap);
-    this._setMarker(lat, lng);
+    // No marker on open — dropped only when the user picks or clicks.
     State.pickerMap.on('click', e => {
-      const {lat, lng} = e.latlng;
+      const { lat, lng } = e.latlng;
       this._pickedLat = lat;
       this._pickedLng = lng;
       this._setMarker(lat, lng);
@@ -1166,27 +1173,59 @@ const AddModal = {
     State.pickerMarker = L.marker([lat,lng],{icon}).addTo(State.pickerMap);
   },
 
-  _save() {
+  async _save() {
     const name = document.getElementById('fName').value.trim();
+    if (!name) { showToast('⚠️ Nhập tên quán trước nhé!'); return; }
+
     const price = document.getElementById('fPrice').value.trim() || '—';
     const desc = document.getElementById('fDesc').value.trim();
+    const addressText = (document.getElementById('fLocSearch')?.value || '').trim();
 
-    if (!name) { showToast('⚠️ Nhập tên quán trước nhé!'); return; }
-    if (!this._pickedLat) { showToast('⚠️ Chọn vị trí trên bản đồ!'); return; }
+    let lat = this._pickedLat;
+    let lng = this._pickedLng;
+    let locSource = lat != null ? 'picked' : 'none';
 
-    const newId = 1001 + State.userRestaurants.length + Math.floor(Math.random()*1000);
+    // No coords yet, but user typed something in the address field →
+    // auto-geocode it so they don't need to tap the map.
+    if (lat == null && addressText.length >= 3) {
+      const saveBtn = document.getElementById('fSave');
+      const originalText = saveBtn.textContent;
+      saveBtn.disabled = true;
+      saveBtn.textContent = '🌐 Đang tra vị trí…';
+      try {
+        const results = await Geocoder.search(addressText);
+        if (results && results.length > 0) {
+          lat = results[0].lat;
+          lng = results[0].lng;
+          locSource = 'geocoded';
+        }
+      } catch (e) {
+        console.warn('[Save] geocode error:', e);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalText;
+      }
+    }
+
+    // Still no coords → allow save as a "memory only" entry. Google Maps
+    // link and route features won't work, but the user's note is kept.
+    const hasCoords = lat != null && lng != null;
+
+    const newId = 1001 + State.userRestaurants.length + Math.floor(Math.random() * 1000);
     const previewImg = document.querySelector('#fImagePreview img');
     const image = (previewImg && document.getElementById('fImagePreview').style.display !== 'none')
       ? previewImg.src
       : null;
+
     State.userRestaurants.push({
       id: newId,
       name,
       cat: this._selectedCat,
       price,
       desc: desc || 'Quán do bạn thêm ⭐',
-      lat: this._pickedLat,
-      lng: this._pickedLng,
+      address: addressText || null,
+      lat: hasCoords ? lat : null,
+      lng: hasCoords ? lng : null,
       rating: 5.0,
       hours: '',
       image,
@@ -1196,7 +1235,14 @@ const AddModal = {
     ProfileCtrl._renderMyRestaurants();
     ProfileCtrl._renderStats();
     HomeCtrl._updateBadge();
-    showToast(`✅ Đã thêm "${name}"`);
+
+    if (locSource === 'geocoded') {
+      showToast(`✅ Đã thêm "${name}" · tự tìm vị trí`);
+    } else if (locSource === 'picked') {
+      showToast(`✅ Đã thêm "${name}"`);
+    } else {
+      showToast(`✅ Lưu "${name}" · chưa gắn vị trí trên map`);
+    }
     this.close();
   },
 };
@@ -1227,30 +1273,41 @@ const DetailModal = {
     this._current = r;
     const cat = CATEGORIES[r.cat] || { label: '—', color: '#888', icon: '🍽️' };
     const body = document.getElementById('detailBody');
+    const escape = (s) => String(s || '').replace(/[&<>"']/g, c => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
     const imgHtml = r.image
-      ? `<div class="r-img-wrap"><img src="${r.image}" alt="${r.name}"></div>`
+      ? `<div class="r-img-wrap"><img src="${r.image}" alt="${escape(r.name)}"></div>`
+      : '';
+    const addressHtml = r.address
+      ? `<div class="detail-address">🏠 ${escape(r.address)}</div>`
       : '';
     const coordsHtml = (r.lat != null && r.lng != null)
       ? `<div class="detail-coords">📍 ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}</div>`
-      : '';
-    const escName = (r.name || '').replace(/</g, '&lt;');
-    const escDesc = (r.desc || 'Không có mô tả').replace(/</g, '&lt;');
-    const escPrice = (r.price || '—').replace(/</g, '&lt;');
+      : `<div class="detail-coords warn">⚠️ Chưa có vị trí trên map · chỉnh sửa hoặc thêm mới để gắn vị trí</div>`;
 
     body.innerHTML = `
       ${imgHtml}
       <div class="detail-cat-wrap">
-        <span class="detail-cat" style="color:${cat.color};background:${cat.color}18">${cat.icon} ${cat.label}</span>
+        <span class="detail-cat" style="color:${cat.color};background:${cat.color}18">${cat.icon} ${escape(cat.label)}</span>
       </div>
-      <div class="detail-name">${escName}</div>
+      <div class="detail-name">${escape(r.name)}</div>
       <div class="detail-meta">
-        <span>💰 ${escPrice}</span>
+        <span>💰 ${escape(r.price || '—')}</span>
         <span>⭐ ${(r.rating ?? 5).toFixed(1)}</span>
-        ${r.hours ? `<span>🕒 ${r.hours}</span>` : ''}
+        ${r.hours ? `<span>🕒 ${escape(r.hours)}</span>` : ''}
       </div>
-      <div class="detail-desc">${escDesc}</div>
+      <div class="detail-desc">${escape(r.desc || 'Không có mô tả')}</div>
+      ${addressHtml}
       ${coordsHtml}
     `;
+    // Disable Google Maps button when no coords
+    const mapsBtn = document.getElementById('detailMaps');
+    if (mapsBtn) {
+      const hasCoords = r.lat != null && r.lng != null;
+      mapsBtn.disabled = !hasCoords;
+      mapsBtn.style.opacity = hasCoords ? '' : '.5';
+    }
     document.getElementById('detailModal').classList.add('show');
   },
 
