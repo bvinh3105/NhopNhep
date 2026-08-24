@@ -7,29 +7,48 @@ const Geocoder = {
   _cache: new Map(),
   _debounceTimers: new Map(),
 
-  async search(q) {
+  // Haversine distance in km between two lat/lng pairs.
+  _distKm(lat1, lng1, lat2, lng2) {
+    const R = 6371, toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
+  },
+
+  // Optional opts: { nearLat, nearLng } — bias results to a point AND
+  // reorder them client-side by distance to it, so a Bắc Ninh result
+  // never beats a Hoàn Kiếm one when the user is in Hoàn Kiếm.
+  async search(q, opts = {}) {
     q = q.trim();
     if (q.length < 2) return [];
-    const key = q.toLowerCase();
+    const keyParts = [q.toLowerCase()];
+    if (opts.nearLat != null && opts.nearLng != null) {
+      keyParts.push(opts.nearLat.toFixed(2), opts.nearLng.toFixed(2));
+    }
+    const key = keyParts.join('|');
     if (this._cache.has(key)) return this._cache.get(key);
 
-    const results = await this._fetch(q);
+    const results = await this._fetch(q, opts);
     this._cache.set(key, results);
     return results;
   },
 
-  async _fetch(q) {
+  async _fetch(q, opts = {}) {
     const params = new URLSearchParams({
       q: q,
-      limit: '6',
+      limit: '8',
       lang: 'default', // Photon mostly uses default local names (Vietnamese)
     });
-    // Bias towards Vietnam (lat, lon, zoom scale roughly)
-    params.set('lon', '106.0');
-    params.set('lat', '16.0');
-    
-    // Add location bias to speed up VN results if we want, but simple q is fine
-    // Or we can just append "Việt Nam" if user didn't type it to restrict results
+    // Bias the upstream search to the caller's reference point when
+    // provided; otherwise fall back to center-of-VN so unrelated
+    // countries never bubble up.
+    const biasLat = opts.nearLat != null ? opts.nearLat : 16.0;
+    const biasLng = opts.nearLng != null ? opts.nearLng : 106.0;
+    params.set('lat', String(biasLat));
+    params.set('lon', String(biasLng));
+
     let searchQuery = q;
     if (!/vietnam|việt nam|vn/i.test(q)) {
        searchQuery = q + ', Việt Nam';
@@ -40,21 +59,17 @@ const Geocoder = {
       const res = await fetch(`${this.ENDPOINT}?${params}`);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
-      
       if (!data.features) return [];
 
-      return data.features.map(f => {
+      let results = data.features.map(f => {
         const p = f.properties;
         const coords = f.geometry.coordinates; // [lon, lat]
-        
         const parts = [
-          p.housenumber,
-          p.street,
+          p.housenumber, p.street,
           p.district || p.locality,
           p.city || p.county,
-          p.state
+          p.state,
         ].filter(Boolean);
-
         return {
           lat: coords[1],
           lng: coords[0],
@@ -62,16 +77,28 @@ const Geocoder = {
           sub: parts.join(' · ') || (p.country || ''),
         };
       });
+
+      // Reorder by real distance to the bias point — Photon's own
+      // ranking sometimes puts far results first when the query text
+      // matches an unrelated place name (e.g. "giao" → "Giao hàng
+      // Bắc Ninh" beating "Hoàn Kiếm" in Hà Nội).
+      if (opts.nearLat != null && opts.nearLng != null) {
+        results.forEach(r => {
+          r._distKm = this._distKm(r.lat, r.lng, opts.nearLat, opts.nearLng);
+        });
+        results.sort((a, b) => a._distKm - b._distKm);
+      }
+      return results;
     } catch (e) {
       console.warn('[Geocode] failed', e.message);
       return [];
     }
   },
 
-  onInput(id, q, delay, callback) {
+  onInput(id, q, delay, callback, opts) {
     clearTimeout(this._debounceTimers.get(id));
     this._debounceTimers.set(id, setTimeout(async () => {
-      const results = await this.search(q);
+      const results = await this.search(q, opts);
       callback(results);
     }, delay));
   },

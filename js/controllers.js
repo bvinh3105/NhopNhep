@@ -90,13 +90,15 @@ const HomeCtrl = {
       showToast(`📍 ${r.sub}`);
     };
 
+    const bias = () => ({ nearLat: State.userLat, nearLng: State.userLng });
+
     input.addEventListener('input', (e) => {
       const q = e.target.value.trim();
       if (q.length < 3) { Geocoder.hide(suggest); return; }
       Geocoder.showLoading(suggest);
       Geocoder.onInput('locInput', q, 450, (results) => {
         Geocoder.renderSuggestions(suggest, results, pick);
-      });
+      }, bias());
     });
 
     // Enter picks the first suggestion, or triggers a scan if nothing typed
@@ -106,7 +108,7 @@ const HomeCtrl = {
       const q = input.value.trim();
       if (!q) { this.scan(); return; }
       Geocoder.showLoading(suggest);
-      const results = await Geocoder.search(q);
+      const results = await Geocoder.search(q, bias());
       if (results.length) { pick(results[0]); }
       else { Geocoder.renderSuggestions(suggest, [], pick); }
     });
@@ -150,7 +152,7 @@ const HomeCtrl = {
     if (isDefault || !State.userLat) {
       if (typedQ.length >= 3) {
         showToast('🔍 Đang tìm vị trí…', 1500);
-        const results = await Geocoder.search(typedQ.replace(/^📌\s*/, ''));
+        const results = await Geocoder.search(typedQ.replace(/^📌\s*/, ''), { nearLat: State.userLat, nearLng: State.userLng });
         if (results.length) {
           MapHome.setUserLocation(results[0].lat, results[0].lng, null, { center: true });
           if (locInput) locInput.value = results[0].name;
@@ -1085,13 +1087,15 @@ const AddModal = {
       Geocoder.hide(suggest);
     };
 
+    const bias = () => ({ nearLat: State.userLat, nearLng: State.userLng });
+
     input.addEventListener('input', (e) => {
       const q = e.target.value.trim();
       if (q.length < 3) { Geocoder.hide(suggest); return; }
       Geocoder.showLoading(suggest);
       Geocoder.onInput('fLocSearch', q, 450, (results) => {
         Geocoder.renderSuggestions(suggest, results, pick);
-      });
+      }, bias());
     });
 
     input.addEventListener('keydown', async (e) => {
@@ -1100,7 +1104,7 @@ const AddModal = {
       const q = input.value.trim();
       if (!q) return;
       Geocoder.showLoading(suggest);
-      const results = await Geocoder.search(q);
+      const results = await Geocoder.search(q, bias());
       if (results.length) pick(results[0]);
       else Geocoder.renderSuggestions(suggest, [], pick);
     });
@@ -1193,11 +1197,30 @@ const AddModal = {
       saveBtn.disabled = true;
       saveBtn.textContent = '🌐 Đang tra vị trí…';
       try {
-        const results = await Geocoder.search(addressText);
+        const results = await Geocoder.search(addressText, {
+          nearLat: State.userLat,
+          nearLng: State.userLng,
+        });
         if (results && results.length > 0) {
-          lat = results[0].lat;
-          lng = results[0].lng;
-          locSource = 'geocoded';
+          const top = results[0];
+          // If the top result is far from where the user is (>30km),
+          // it's likely a wrong name-match. Ask before blindly saving.
+          const distKm = top._distKm;
+          const suspicious = distKm != null && distKm > 30;
+          if (suspicious) {
+            const ok = confirm(
+              `Địa chỉ "${top.name}${top.sub ? ' · ' + top.sub : ''}" cách ` +
+              `${Math.round(distKm)}km — có đúng không?\n\n` +
+              `OK để lưu vị trí đó. Cancel để lưu không kèm map (tự chỉnh sau).`
+            );
+            if (ok) {
+              lat = top.lat; lng = top.lng; locSource = 'geocoded';
+            } else {
+              locSource = 'none';
+            }
+          } else {
+            lat = top.lat; lng = top.lng; locSource = 'geocoded';
+          }
         }
       } catch (e) {
         console.warn('[Save] geocode error:', e);
