@@ -364,12 +364,23 @@ input,textarea,select{font-family:var(--font-body)}
 }
 .r-card:active{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--text)}
 .r-card.selected{background:var(--primary-tint);border-color:var(--primary);box-shadow:3px 3px 0 var(--primary-2)}
-.r-card.selected::after{
-  content:'✓';position:absolute;top:-8px;right:-8px;
-  width:1.8rem;height:1.8rem;border-radius:50%;
-  background:var(--primary);color:var(--cream);font-size:.85rem;font-weight:900;
+
+/* Tick corner — clickable, independent of card body.
+   Empty when unselected (outlined box); filled ✓ when selected. */
+.r-check{
+  position:absolute;top:-8px;right:-8px;z-index:3;
+  width:1.9rem;height:1.9rem;border-radius:50%;
+  background:var(--white);color:transparent;
+  font-size:.9rem;font-weight:900;line-height:1;
   display:flex;align-items:center;justify-content:center;
   border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
+  cursor:pointer;transition:all .12s;padding:0;
+}
+.r-check:hover{background:var(--cream-2)}
+.r-check:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.r-card.selected .r-check{
+  background:var(--primary);color:var(--cream);
+  box-shadow:2px 2px 0 var(--text);
 }
 .r-card.user-added::before{
   content:'⭐';position:absolute;top:-6px;left:-6px;

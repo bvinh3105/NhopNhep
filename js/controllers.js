@@ -392,7 +392,8 @@ const ResultsCtrl = {
       const priceLabel = r.price && r.price !== '—' ? `💰 ${r.price}` : '💰 —';
       const ratingLabel = isGemini ? `${r.rating.toFixed(1)} ★` : (isOsm ? '🌐 OSM' : `${r.rating} ★`);
       const hoursBadge = this._renderHoursBadge(r);
-      return `<div class="r-card${sel?' selected':''}${flagCls}" data-id="${r.id}" style="animation-delay:${Math.min(i,10)*30}ms">
+      return `<div class="r-card${sel?' selected':''}${flagCls}" data-id="${r.id}" style="animation-delay:${Math.min(i,10)*30}ms" role="button" tabindex="0" title="Nhấn để xem chi tiết">
+        <button class="r-check" data-id="${r.id}" title="Chọn để thêm vào lịch trình" aria-label="Chọn" aria-pressed="${sel?'true':'false'}">✓</button>
         <div class="r-cat-badge" style="background:${cat.color}22;color:${cat.color}">${cat.icon} ${cat.label}</div>
         <div class="r-name">${r.name}</div>
         ${hoursBadge}
@@ -402,10 +403,6 @@ const ResultsCtrl = {
           <span class="r-rating">${ratingLabel}</span>
           <span class="r-dist">${fmtDist(r._dist)}</span>
         </div>
-        <a href="https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}" 
-           target="_blank" class="r-gmaps-link" onclick="event.stopPropagation()">
-           🗺️ Mở Google Maps
-        </a>
       </div>`;
     }).join('');
     this._updatePlanBtn();
@@ -447,15 +444,39 @@ const ResultsCtrl = {
       const card = e.target.closest('.r-card');
       if (!card) return;
       const id = parseInt(card.dataset.id);
-      if (State.selected.has(id)) {
-        State.selected.delete(id);
-        card.classList.remove('selected');
-      } else {
-        if (State.selected.size >= 6) { showToast('Tối đa 6 quán mỗi chuyến 😄'); return; }
-        State.selected.add(id);
-        card.classList.add('selected');
+      const check = e.target.closest('.r-check');
+
+      if (check) {
+        // Tick corner → toggle selection (independent of the card body)
+        e.stopPropagation();
+        const nowSelected = !State.selected.has(id);
+        if (nowSelected) {
+          if (State.selected.size >= 6) { showToast('Tối đa 6 quán mỗi chuyến 😄'); return; }
+          State.selected.add(id);
+          card.classList.add('selected');
+        } else {
+          State.selected.delete(id);
+          card.classList.remove('selected');
+        }
+        check.setAttribute('aria-pressed', nowSelected ? 'true' : 'false');
+        this._updatePlanBtn();
+        return;
       }
-      this._updatePlanBtn();
+
+      // Card body → open detail modal
+      const r = State.filteredResults.find(x => x.id === id)
+        || (Array.isArray(State.results) ? State.results.find(x => x.id === id) : null);
+      if (r) DetailModal.open(r);
+    });
+
+    document.getElementById('restaurantGrid').addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const card = e.target.closest('.r-card');
+      if (!card || e.target.closest('.r-check')) return;
+      e.preventDefault();
+      const id = parseInt(card.dataset.id);
+      const r = State.filteredResults.find(x => x.id === id);
+      if (r) DetailModal.open(r);
     });
     document.getElementById('planBtn').addEventListener('click', () => {
       PlanCtrl.buildItinerary();
