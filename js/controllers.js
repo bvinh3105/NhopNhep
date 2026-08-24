@@ -127,29 +127,54 @@ const HomeCtrl = {
   },
 
   _scanning: false,
+  _scanCache: new Map(),   // { key → { items, source, ts } }
+  _SCAN_TTL: 10 * 60 * 1000, // 10 min
+
+  _cacheKey() {
+    const cats = [...State.activeCats].sort().join(',');
+    return `${State.userLat.toFixed(3)}_${State.userLng.toFixed(3)}_${State.radius}_${cats}`;
+  },
+
   async scan() {
     if (this._scanning) return;
 
-    // If no location set yet, try to geocode whatever the user typed.
-    // This lets users type an address then tap Quét without pressing Enter.
-    if (!State.userLat) {
-      const locInput = document.getElementById('locInput');
-      const q = locInput ? locInput.value.trim() : '';
-      if (q.length >= 3) {
+    // Auto-geocode typed address if location not explicitly set
+    const locInput = document.getElementById('locInput');
+    const typedQ = locInput ? locInput.value.trim() : '';
+    // Consider "default HCMC" as unset — check if it's still the boot placeholder
+    const isDefault = locInput && locInput.value.startsWith('📌');
+    if (isDefault && typedQ.length < 3) {
+      showToast('📍 Gõ địa chỉ hoặc bật GPS trước nhé!');
+      return;
+    }
+    if (isDefault || !State.userLat) {
+      if (typedQ.length >= 3) {
         showToast('🔍 Đang tìm vị trí…', 1500);
-        const results = await Geocoder.search(q);
+        const results = await Geocoder.search(typedQ.replace(/^📌\s*/, ''));
         if (results.length) {
           MapHome.setUserLocation(results[0].lat, results[0].lng, null, { center: true });
           if (locInput) locInput.value = results[0].name;
           Geocoder.hide(document.getElementById('locSuggest'));
         }
       }
-      if (!State.userLat) {
+      if (!State.userLat || isDefault) {
         showToast('📍 Dùng GPS hoặc nhập địa chỉ (nhấn Enter) trước nhé!');
         return;
       }
     }
 
+    // ── Cache hit → instant ──────────────────────────────────────────────
+    const ck = this._cacheKey();
+    const hit = this._scanCache.get(ck);
+    if (hit && Date.now() - hit.ts < this._SCAN_TTL) {
+      State.osmRestaurants = hit.items;
+      State.lastScanSource = hit.source;
+      this._doScan();
+      showToast('⚡ Từ cache · bấm 🔀 để quét lại', 1800);
+      return;
+    }
+
+    // ── Fresh scan ───────────────────────────────────────────────────────
     this._scanning = true;
     const ov = document.getElementById('scanOverlay');
     const txt = ov.querySelector('.scanning-txt');
@@ -159,39 +184,35 @@ const HomeCtrl = {
     let source = 'none';
 
     if (State.activeSrcs.has('osm')) {
-      // 1. Gemini first — grounded on Google Search gives real Vietnamese
-      //    Google Maps data (name, coord, rating, hours), which OSM often
-      //    lacks in less-mapped districts. Ask only for the requested cats.
+      // 1. Gemini (grounded Google Search) — ask for fewer results to be faster
       if (Gemini.isConfigured()) {
-        if (txt) txt.textContent = '✨ Gemini đang tìm quán quanh bạn…';
+        if (txt) txt.textContent = '✨ Gemini đang tìm quán…';
         try {
           const activeCats = [...State.activeCats];
           const geminiItems = await Gemini.findQuan(
             State.userLat, State.userLng, State.radius,
-            { categories: activeCats, limit: 30 }
+            { categories: activeCats, limit: 20 }   // 30→20, faster response
           );
-          if (geminiItems.length) {
-            items = geminiItems;
-            source = 'gemini';
-          }
+          if (geminiItems.length) { items = geminiItems; source = 'gemini'; }
         } catch(e) {
           console.warn('[Gemini] search failed', e.message);
-          if (txt) txt.textContent = '⚠️ Gemini lỗi · fallback OSM…';
+          if (txt) txt.textContent = '⚠️ Gemini lỗi · thử OSM…';
         }
       }
 
-      // 2. Fallback to Overpass OSM if Gemini yielded nothing
+      // 2. Overpass OSM fallback
       if (!items.length) {
         if (txt) txt.textContent = 'Đang quét OSM quanh bạn…';
         try {
           const osmItems = await POI.fetch(State.userLat, State.userLng, State.radius);
           items = osmItems;
           source = osmItems.length ? 'osm' : 'none';
-        } catch(e) {
-          console.warn('POI fetch failed', e);
-        }
+        } catch(e) { console.warn('POI fetch failed', e); }
       }
     }
+
+    // Cache the result (even empty — so we don't hammer API on bad area)
+    if (items.length) this._scanCache.set(ck, { items, source, ts: Date.now() });
 
     State.osmRestaurants = items;
     State.lastScanSource = source;
@@ -349,9 +370,20 @@ const ResultsCtrl = {
       setTimeout(() => State.mainMap?.invalidateSize(), 60);
     });
     document.getElementById('reshuffleBtn').addEventListener('click', () => {
+      // Long-press / second tap within 600ms → clear cache and force re-scan
+      const now = Date.now();
+      if (now - (this._lastShuffle || 0) < 600) {
+        HomeCtrl._scanCache.delete(HomeCtrl._cacheKey());
+        document.getElementById('resultsScreen').classList.add('hidden');
+        document.getElementById('homeScreen').classList.remove('hidden');
+        showToast('🔄 Đang quét lại từ API…');
+        setTimeout(() => HomeCtrl.scan(), 200);
+        return;
+      }
+      this._lastShuffle = now;
       State.filteredResults = shuffle(State.filteredResults);
       this._applyFilters();
-      showToast('🔀 Đã xáo lại danh sách!');
+      showToast('🔀 Xáo lại · nhấn lại nhanh để quét mới');
     });
     document.getElementById('catTabs').addEventListener('click', e => {
       const tab = e.target.closest('.cat-tab');
