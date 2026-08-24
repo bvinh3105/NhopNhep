@@ -1,36 +1,34 @@
 /* ═══════════════════════════════════════════════
    GEMINI AI INTEGRATION
-   API key: stored in localStorage (user's own key).
-   Built-in fallback key (fragmented to avoid GitHub scanner).
+   Two paths, chosen at call time:
+     1) User set their own key in localStorage — call Google directly.
+        Their key, their quota. We never touch it.
+     2) No user key — call the /api/gemini Pages Function, which signs
+        the request server-side with the shared GEMINI_API_KEY env var.
+        The client never sees the shared key.
 ═══════════════════════════════════════════════ */
-const _kfrag = ['AQ.Ab8R', 'N6I9_rCZ1O', 'd9Ca5NdKs2', 'kFhjNzyxeT', 'Lvm2jM59Eu', 'dYKjwQ'];
-
 const Gemini = {
-  MODEL: 'gemini-flash-latest', // stable alias — auto-tracks latest working Flash model
-  BASE_URL: 'https://generativelanguage.googleapis.com/v1beta/models',
+  MODEL: 'gemini-flash-latest', // stable alias — auto-tracks latest Flash
+  DIRECT_BASE: 'https://generativelanguage.googleapis.com/v1beta/models',
+  PROXY_URL: '/api/gemini',
 
-  get apiKey() {
-    // Prefer user-saved key; fall back to built-in
-    return localStorage.getItem('gemini_api_key') || _kfrag.join('');
+  get userKey() {
+    return localStorage.getItem('gemini_api_key') || '';
   },
-  set apiKey(val) {
+  set userKey(val) {
     localStorage.setItem('gemini_api_key', val);
   },
   clearKey() {
     localStorage.removeItem('gemini_api_key');
   },
 
-  isConfigured() {
-    return this.apiKey && this.apiKey.length > 20;
-  },
+  // Always configured now — the server-side proxy is the fallback,
+  // so scan() should never refuse to try. Kept for backwards-compat
+  // with existing callers.
+  isConfigured() { return true; },
 
-  // Base fetch — supports grounding (google_search) and JSON mode
-  // opts.timeout: AbortController timeout in ms (default 12s)
+  // Route requests: user key -> direct; otherwise -> proxy.
   async _call(prompt, opts = {}) {
-    if (!this.isConfigured()) throw new Error('Gemini API key chưa cấu hình');
-    const url = `${this.BASE_URL}/${this.MODEL}:generateContent?key=${this.apiKey}`;
-
-    // Hard timeout — grounded search can hang indefinitely
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), opts.timeout ?? 12000);
 
@@ -47,18 +45,28 @@ const Gemini = {
     if (opts.grounded) {
       body.tools = [{ google_search: {} }];
     }
+
+    const useDirect = !!this.userKey;
+    const url = useDirect
+      ? `${this.DIRECT_BASE}/${this.MODEL}:generateContent?key=${encodeURIComponent(this.userKey)}`
+      : this.PROXY_URL;
+    const upstreamBody = useDirect
+      ? body
+      : { model: this.MODEL, ...body };
+
     try {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(upstreamBody),
         signal: ctrl.signal,
       });
       clearTimeout(timer);
       if (!res.ok) {
-        if (res.status === 400 || res.status === 403) {
+        // Bad user key — drop it so next call uses the proxy
+        if (useDirect && (res.status === 400 || res.status === 403)) {
           this.clearKey();
-          throw new Error(`Gemini ${res.status}: key lỗi, đã xoá`);
+          throw new Error(`Gemini ${res.status}: key lỗi, đã xoá — thử lại`);
         }
         const errText = await res.text().catch(() => '');
         throw new Error(`Gemini ${res.status}: ${errText.slice(0, 200)}`);
