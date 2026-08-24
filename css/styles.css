@@ -117,7 +117,7 @@ input,textarea,select{font-family:var(--font-body)}
 /* ═══════════════════════════════════════════════
    HOME (Nhóp Nhép tab)
 ═══════════════════════════════════════════════ */
-#homeScreen{background:var(--cream);overflow-y:auto;overflow-x:hidden;scrollbar-width:none}
+#homeScreen{background:var(--cream);overflow-y:auto;scrollbar-width:none}
 #homeScreen::-webkit-scrollbar{display:none}
 .home-hero{
   flex-shrink:0;padding:1rem 1.1rem .8rem;background:var(--cream);position:relative;z-index:5;
@@ -217,7 +217,10 @@ input,textarea,select{font-family:var(--font-body)}
 
 /* Geocode suggestion dropdown — used on home input + modal address input */
 .geocode-suggest{
-  position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:250;
+  /* position:fixed makes it escape any overflow:hidden/auto parent (homeSheet,
+     homeScreen, modal sheets). JS sets --go-left/--go-top/--go-width via
+     updatePosition(). Fallback: absolute for browsers that somehow miss JS. */
+  position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:9999;
   background:var(--white);border:2px solid var(--text);border-radius:14px;
   box-shadow:4px 4px 0 var(--primary-2);overflow:hidden;
   max-height:280px;overflow-y:auto;display:none;

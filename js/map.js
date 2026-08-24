@@ -66,14 +66,16 @@ const MapHome = {
   _markers: [], // to store restaurant markers
 
   init() {
-    const lat = State.userLat || 10.7769;
-    const lng = State.userLng || 106.7009;
+    // Use HCMC as visual default but do NOT set State.userLat so scan()
+    // knows the user hasn't chosen a real location yet (null = not set).
+    const defLat = 10.7769, defLng = 106.7009;
     State.mainMap = L.map('mainMap', {
-      center:[lat,lng], zoom:15,
-      zoomControl:false, attributionControl:false,
+      center: [defLat, defLng], zoom: 15,
+      zoomControl: false, attributionControl: false,
     });
     TileLayer.add(State.mainMap);
-    this.setUserLocation(lat, lng);
+    // Only show user marker if we already have a real GPS/address fix
+    if (State.userLat) this.setUserLocation(State.userLat, State.userLng);
   },
   
   setUserLocation(lat, lng, accuracy=null, opts={}) {

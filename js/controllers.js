@@ -129,7 +129,26 @@ const HomeCtrl = {
   _scanning: false,
   async scan() {
     if (this._scanning) return;
-    if (!State.userLat) { showToast('📍 Dùng GPS hoặc nhập địa chỉ (nhấn Enter) trước nhé!'); return; }
+
+    // If no location set yet, try to geocode whatever the user typed.
+    // This lets users type an address then tap Quét without pressing Enter.
+    if (!State.userLat) {
+      const locInput = document.getElementById('locInput');
+      const q = locInput ? locInput.value.trim() : '';
+      if (q.length >= 3) {
+        showToast('🔍 Đang tìm vị trí…', 1500);
+        const results = await Geocoder.search(q);
+        if (results.length) {
+          MapHome.setUserLocation(results[0].lat, results[0].lng, null, { center: true });
+          if (locInput) locInput.value = results[0].name;
+          Geocoder.hide(document.getElementById('locSuggest'));
+        }
+      }
+      if (!State.userLat) {
+        showToast('📍 Dùng GPS hoặc nhập địa chỉ (nhấn Enter) trước nhé!');
+        return;
+      }
+    }
 
     this._scanning = true;
     const ov = document.getElementById('scanOverlay');
