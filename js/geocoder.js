@@ -113,6 +113,44 @@ const Geocoder = {
     }
   },
 
+  // Reverse geocode — coords -> human-readable Vietnamese address.
+  // Uses Photon's /reverse endpoint (same host as forward search).
+  // Returns a string like "10 Phố Hàng Giấy, Hoàn Kiếm, Hà Nội" or
+  // null on failure. Cached in-memory per rounded (5-decimal) coord.
+  async reverse(lat, lng) {
+    if (lat == null || lng == null) return null;
+    const key = `rev|${lat.toFixed(5)}|${lng.toFixed(5)}`;
+    if (this._cache.has(key)) return this._cache.get(key);
+    const url = 'https://photon.komoot.io/reverse?' + new URLSearchParams({
+      lat: String(lat), lon: String(lng), lang: 'default',
+    });
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const f = data.features && data.features[0];
+      if (!f) { this._cache.set(key, null); return null; }
+      const p = f.properties || {};
+      // Vietnamese address format: "39 Phố Tuệ Tĩnh, Hai Bà Trưng, Hà Nội"
+      // — number + street go together, then district and city are
+      // comma-separated. Locality (ward) is often too granular; use
+      // it only if district is missing.
+      const streetLine = [p.housenumber, p.street].filter(Boolean).join(' ');
+      const parts = [
+        streetLine,
+        p.district || p.locality,
+        p.city || p.county,
+      ].filter(Boolean);
+      const address = parts.length ? parts.join(', ')
+        : (p.name || p.state || null);
+      this._cache.set(key, address);
+      return address;
+    } catch (e) {
+      console.warn('[Reverse geocode] failed', e.message);
+      return null;
+    }
+  },
+
   onInput(id, q, delay, callback, opts) {
     clearTimeout(this._debounceTimers.get(id));
     this._debounceTimers.set(id, setTimeout(async () => {

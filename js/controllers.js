@@ -1348,12 +1348,24 @@ const DetailModal = {
     const imgHtml = r.image
       ? `<div class="r-img-wrap"><img src="${r.image}" alt="${escape(r.name)}"></div>`
       : '';
-    const addressHtml = r.address
-      ? `<div class="detail-address">🏠 ${escape(r.address)}</div>`
-      : '';
-    const coordsHtml = (r.lat != null && r.lng != null)
-      ? `<div class="detail-coords">📍 ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}</div>`
-      : `<div class="detail-coords warn">⚠️ Chưa có vị trí trên map · chỉnh sửa hoặc thêm mới để gắn vị trí</div>`;
+
+    const hasCoords = r.lat != null && r.lng != null;
+    // Preferred display: real address text. Priority:
+    //   1) r.address    — what the user typed when adding the place
+    //   2) r._resolvedAddress — cached reverse-geocode from earlier open
+    //   3) placeholder → fire off a reverse-geocode async, swap in when it lands
+    const knownAddress = r.address || r._resolvedAddress || null;
+    let addressHtml = '';
+    if (knownAddress) {
+      addressHtml = `<div class="detail-address">🏠 ${escape(knownAddress)}</div>`;
+    } else if (hasCoords) {
+      addressHtml = `<div class="detail-address" id="_detailAddrPending">🏠 <em style="opacity:.6">Đang tra địa chỉ…</em></div>`;
+    }
+    // Coords line — only shown as a small hint when we don't yet have a
+    // human address (so the user isn't staring at raw numbers when we do).
+    const coordsHtml = !hasCoords
+      ? `<div class="detail-coords warn">⚠️ Chưa có vị trí trên map · chỉnh sửa hoặc thêm mới để gắn vị trí</div>`
+      : (knownAddress ? '' : `<div class="detail-coords">📍 ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}</div>`);
 
     body.innerHTML = `
       ${imgHtml}
@@ -1373,11 +1385,32 @@ const DetailModal = {
     // Disable Google Maps button when no coords
     const mapsBtn = document.getElementById('detailMaps');
     if (mapsBtn) {
-      const hasCoords = r.lat != null && r.lng != null;
       mapsBtn.disabled = !hasCoords;
       mapsBtn.style.opacity = hasCoords ? '' : '.5';
     }
     document.getElementById('detailModal').classList.add('show');
+
+    // Kick off reverse geocode if we don't have a real address yet.
+    // If the user closes the modal or opens a different place before
+    // the network settles, drop the result silently.
+    if (!knownAddress && hasCoords) {
+      Geocoder.reverse(r.lat, r.lng).then(addr => {
+        if (this._current !== r) return;
+        const pending = document.getElementById('_detailAddrPending');
+        if (!pending) return;
+        if (addr) {
+          r._resolvedAddress = addr;
+          pending.innerHTML = `🏠 ${escape(addr)}`;
+          pending.removeAttribute('id');
+        } else {
+          // No address found — remove the placeholder; coords line stays.
+          pending.remove();
+        }
+      }).catch(() => {
+        const pending = document.getElementById('_detailAddrPending');
+        if (pending) pending.remove();
+      });
+    }
   },
 
   close() {
