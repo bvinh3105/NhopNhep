@@ -66,9 +66,9 @@ const MapHome = {
   _markers: [], // to store restaurant markers
 
   init() {
-    // Use HCMC as visual default but do NOT set State.userLat so scan()
+    // Use Hà Nội as visual default but do NOT set State.userLat so scan()
     // knows the user hasn't chosen a real location yet (null = not set).
-    const defLat = 10.7769, defLng = 106.7009;
+    const defLat = 21.0285, defLng = 105.8542;
     State.mainMap = L.map('mainMap', {
       center: [defLat, defLng], zoom: 15,
       zoomControl: false, attributionControl: false,

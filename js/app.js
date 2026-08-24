@@ -11,10 +11,10 @@ function boot() {
   ProfileCtrl.init();
   AddModal.init();
 
-  // Fallback default location
-  State.userLat = 10.7769;
-  State.userLng = 106.7009;
-  document.getElementById('locInput').value = '📌 Quận 1, TP. Hồ Chí Minh (mẫu)';
+  // Fallback default location — Hoàn Kiếm, Hà Nội
+  State.userLat = 21.0285;
+  State.userLng = 105.8542;
+  document.getElementById('locInput').value = '📌 Hoàn Kiếm, Hà Nội (mẫu)';
   MapHome.setUserLocation(State.userLat, State.userLng, null, { center:true });
 
   // Silent GPS attempt if the context is secure
