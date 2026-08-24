@@ -7,6 +7,19 @@ const Geocoder = {
   _cache: new Map(),
   _debounceTimers: new Map(),
 
+  // True for street / house / district / city results — the kinds of
+  // hits a caller looking for an ADDRESS wants. Filters out random
+  // landmarks (tourism), shops, restaurants, monuments etc.
+  isAddressType(r) {
+    const t = (r._type || '').toLowerCase();
+    const k = (r._osmKey || '').toLowerCase();
+    if (['house', 'street', 'district', 'city', 'locality',
+         'suburb', 'hamlet', 'village', 'state', 'county',
+         'postcode'].includes(t)) return true;
+    if (k === 'highway' || k === 'place') return true;
+    return false;
+  },
+
   // Haversine distance in km between two lat/lng pairs.
   _distKm(lat1, lng1, lat2, lng2) {
     const R = 6371, toRad = d => d * Math.PI / 180;
@@ -75,6 +88,11 @@ const Geocoder = {
           lng: coords[0],
           name: p.name || parts[0] || 'Địa điểm không tên',
           sub: parts.join(' · ') || (p.country || ''),
+          // Photon classification kept so callers can filter POIs out
+          // when they wanted an address, not a landmark or shop.
+          _type: p.type || '',
+          _osmKey: p.osm_key || '',
+          _osmValue: p.osm_value || '',
         };
       });
 

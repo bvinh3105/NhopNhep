@@ -1105,7 +1105,11 @@ const AddModal = {
       if (!q) return;
       Geocoder.showLoading(suggest);
       const results = await Geocoder.search(q, bias());
-      if (results.length) pick(results[0]);
+      // Prefer address-shaped hits so Enter doesn't land on a nearby
+      // landmark POI when the user typed an address.
+      const addressFirst = results.filter(r => Geocoder.isAddressType(r));
+      const pool = addressFirst.length ? addressFirst : results;
+      if (pool.length) pick(pool[0]);
       else Geocoder.renderSuggestions(suggest, [], pick);
     });
 
@@ -1216,7 +1220,12 @@ const AddModal = {
         for (const q of queries) {
           const results = await Geocoder.search(q, bias);
           if (!results || !results.length) continue;
-          const top = results[0]; // Geocoder already sorted by distance
+          // Address field: reject landmarks/POIs — a user typing
+          // "10 phố X quận Y" wants that street/district, not the
+          // nearest tourist monument.
+          const addressOnly = results.filter(r => Geocoder.isAddressType(r));
+          if (!addressOnly.length) continue;
+          const top = addressOnly[0]; // Geocoder already sorted by distance
           const d = top._distKm ?? Infinity;
           if (!best || d < best.dist) best = { top, dist: d, q };
           if (d <= CLOSE_KM) break; // close enough — stop peeling
