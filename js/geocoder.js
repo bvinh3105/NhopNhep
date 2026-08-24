@@ -13,14 +13,27 @@ const Geocoder = {
     const key = q.toLowerCase();
     if (this._cache.has(key)) return this._cache.get(key);
 
+    // Nominatim treats commas as structured-query separators which breaks
+    // Vietnamese inputs like "cầu giấy, hà nội". Replace with space.
+    const cleanQ = q.replace(/,\s*/g, ' ').trim();
+
+    const results = await this._fetch(cleanQ, true);
+    // If countrycodes=vn yields nothing, retry without — handles edge cases
+    // where Nominatim's VN index doesn't cover the exact phrasing.
+    const final = results.length ? results : await this._fetch(cleanQ, false);
+    this._cache.set(key, final);
+    return final;
+  },
+
+  async _fetch(q, vnOnly = true) {
     const params = new URLSearchParams({
       q,
       format: 'json',
       limit: '6',
       'accept-language': 'vi',
-      countrycodes: 'vn',
       addressdetails: '1',
     });
+    if (vnOnly) params.set('countrycodes', 'vn');
 
     try {
       const res = await fetch(`${this.ENDPOINT}?${params}`, {
@@ -28,24 +41,22 @@ const Geocoder = {
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
-      const results = (data || []).map(x => {
+      return (data || []).map(x => {
         const a = x.address || {};
-        // Build a compact sub-line: road · district · city
         const parts = [
           a.road || a.pedestrian || a.footway,
           a.neighbourhood || a.suburb || a.quarter,
           a.city_district || a.district || a.city || a.town || a.province,
         ].filter(Boolean);
+        const disp = x.display_name || '';
         return {
           lat: parseFloat(x.lat),
           lng: parseFloat(x.lon),
-          name: (x.name || parts[0] || x.display_name.split(',')[0]).trim(),
-          sub: parts.join(' · ') || x.display_name,
-          fullAddress: x.display_name,
+          name: (x.name || parts[0] || disp.split(',')[0]).trim(),
+          sub: parts.join(' · ') || disp,
+          fullAddress: disp,
         };
       });
-      this._cache.set(key, results);
-      return results;
     } catch (e) {
       console.warn('[Geocode] failed', e.message);
       return [];
