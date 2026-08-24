@@ -136,25 +136,32 @@ out center 200;`;
     const abortControllers = endpoints.map(() => new AbortController());
     
     const promises = endpoints.map((url, i) => {
-       return new Promise(async (resolve, reject) => {
-         try {
-           const res = await fetch(url, {
-             method: 'POST',
-             body: 'data=' + encodeURIComponent(query),
-             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-             signal: abortControllers[i].signal
-           });
-           if (!res.ok) throw new Error('HTTP ' + res.status);
-           const data = await res.json();
-           if (data.elements) {
-             resolve({ url, elements: data.elements, index: i });
-           } else {
-             reject('No elements');
-           }
-         } catch(e) {
-           reject(e);
-         }
-       });
+      return new Promise(async (resolve, reject) => {
+        // Per-endpoint timeout: 8s — prevents a single slow endpoint from stalling the race
+        const timeout = setTimeout(() => {
+          abortControllers[i].abort();
+          reject(new Error(`timeout: ${url}`));
+        }, 8000);
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            body: 'data=' + encodeURIComponent(query),
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            signal: abortControllers[i].signal,
+          });
+          clearTimeout(timeout);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const data = await res.json();
+          if (data.elements && data.elements.length > 0) {
+            resolve({ url, elements: data.elements, index: i });
+          } else {
+            reject(new Error('No elements'));
+          }
+        } catch (e) {
+          clearTimeout(timeout);
+          reject(e);
+        }
+      });
     });
 
     try {

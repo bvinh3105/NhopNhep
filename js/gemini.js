@@ -25,9 +25,15 @@ const Gemini = {
   },
 
   // Base fetch — supports grounding (google_search) and JSON mode
+  // opts.timeout: AbortController timeout in ms (default 12s)
   async _call(prompt, opts = {}) {
     if (!this.isConfigured()) throw new Error('Gemini API key chưa cấu hình');
     const url = `${this.BASE_URL}/${this.MODEL}:generateContent?key=${this.apiKey}`;
+
+    // Hard timeout — grounded search can hang indefinitely
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), opts.timeout ?? 12000);
+
     const body = {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
@@ -41,23 +47,31 @@ const Gemini = {
     if (opts.grounded) {
       body.tools = [{ google_search: {} }];
     }
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      if (res.status === 400 || res.status === 403) {
-        this.clearKey();
-        throw new Error(`Gemini ${res.status}: key lỗi, đã xoá`);
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) {
+        if (res.status === 400 || res.status === 403) {
+          this.clearKey();
+          throw new Error(`Gemini ${res.status}: key lỗi, đã xoá`);
+        }
+        const errText = await res.text().catch(() => '');
+        throw new Error(`Gemini ${res.status}: ${errText.slice(0, 200)}`);
       }
-      const errText = await res.text().catch(() => '');
-      throw new Error(`Gemini ${res.status}: ${errText.slice(0, 200)}`);
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error('Gemini trả về rỗng');
+      return text;
+    } catch (e) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') throw new Error('Gemini timeout (>12s)');
+      throw e;
     }
-    const data = await res.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error('Gemini trả về rỗng');
-    return text;
   },
 
   // ── Tìm quán gần vị trí (dùng trong scan) ─────────────────────────────

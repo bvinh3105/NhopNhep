@@ -180,44 +180,93 @@ const HomeCtrl = {
     const txt = ov.querySelector('.scanning-txt');
     ov.style.display = 'flex';
 
+    const setTxt = (msg) => { if (txt) txt.textContent = msg; };
+    const sub = document.getElementById('scanSub');
+    const setSubTxt = (msg) => { if (sub) sub.textContent = msg; };
+
     let items = [];
     let source = 'none';
 
     if (State.activeSrcs.has('osm')) {
-      // 1. Gemini (grounded Google Search) — ask for fewer results to be faster
-      if (Gemini.isConfigured()) {
-        if (txt) txt.textContent = '✨ Gemini đang tìm quán…';
-        try {
-          const activeCats = [...State.activeCats];
-          const geminiItems = await Gemini.findQuan(
-            State.userLat, State.userLng, State.radius,
-            { categories: activeCats, limit: 20 }   // 30→20, faster response
-          );
-          if (geminiItems.length) { items = geminiItems; source = 'gemini'; }
-        } catch(e) {
-          console.warn('[Gemini] search failed', e.message);
-          if (txt) txt.textContent = '⚠️ Gemini lỗi · thử OSM…';
-        }
-      }
+      const activeCats = [...State.activeCats];
+      const useGemini = Gemini.isConfigured();
 
-      // 2. Overpass OSM fallback
-      if (!items.length) {
-        if (txt) txt.textContent = 'Đang quét OSM quanh bạn…';
-        try {
-          const osmItems = await POI.fetch(State.userLat, State.userLng, State.radius);
-          items = osmItems;
-          source = osmItems.length ? 'osm' : 'none';
-        } catch(e) { console.warn('POI fetch failed', e); }
-      }
+      // Animated status while waiting
+      const statusMsgs = useGemini
+        ? ['✨ Gemini + 🗺️ OSM đang tìm song song…', '🔍 Đang tìm quán gần bạn…', '✨ Hỏi Gemini AI…', '🗺️ Quét bản đồ…', '⏳ Sắp có kết quả rồi…']
+        : ['🗺️ OSM đang quét quanh bạn…', '🔍 Đang tìm quán…', '⏳ Sắp xong rồi…'];
+      let msgIdx = 0;
+      setTxt(statusMsgs[0]);
+      const statusTick = setInterval(() => {
+        msgIdx = (msgIdx + 1) % statusMsgs.length;
+        setTxt(statusMsgs[msgIdx]);
+      }, 3000);
+
+      // Elapsed timer — shows user it's actively working (not frozen)
+      const scanStart = performance.now();
+      const elapsedTick = setInterval(() => {
+        const s = Math.floor((performance.now() - scanStart) / 1000);
+        setSubTxt(`⏱ ${s}s · tối đa 20s`);
+      }, 1000);
+      setSubTxt('⏱ 0s · tối đa 20s');
+
+      // ── Gemini + OSM chạy SONG SONG; lấy kết quả nào về trước ──────────
+      const geminiP = useGemini
+        ? Gemini.findQuan(State.userLat, State.userLng, State.radius,
+            { categories: activeCats, limit: 20 })
+            .catch(e => { console.warn('[Gemini]', e.message); return []; })
+        : Promise.resolve([]);
+
+      const osmP = POI.fetch(State.userLat, State.userLng, State.radius)
+        .catch(e => { console.warn('[OSM]', e.message); return []; });
+
+      // Race: hiển thị ngay khi có kết quả; hard cap 20s
+      const raceResult = await new Promise(resolve => {
+        let done = false;
+        let finished = 0;
+        const total = useGemini ? 2 : 1;
+
+        const finish = (it, src) => {
+          finished++;
+          if (done) return;
+          if (it.length) {
+            done = true;
+            resolve({ items: it, source: src });
+          } else if (finished >= total) {
+            done = true;
+            resolve({ items: [], source: 'none' });
+          }
+        };
+
+        geminiP.then(r => finish(r, 'gemini'));
+        osmP.then(r => finish(r, 'osm'));
+
+        // Hard 20s total cap
+        setTimeout(() => {
+          if (!done) { done = true; resolve({ items: [], source: 'none' }); }
+        }, 20000);
+      });
+
+      clearInterval(statusTick);
+      clearInterval(elapsedTick);
+      items = raceResult.items;
+      source = raceResult.source;
     }
 
-    // Cache the result (even empty — so we don't hammer API on bad area)
+    // Cache the result
     if (items.length) this._scanCache.set(ck, { items, source, ts: Date.now() });
 
     State.osmRestaurants = items;
     State.lastScanSource = source;
     ov.style.display = 'none';
     this._scanning = false;
+
+    // ── Toast kết quả ───────────────────────────────────────────────────
+    if (items.length) {
+      const srcLabel = source === 'gemini' ? '✨ Gemini' : '🗺️ OSM';
+      showToast(`✅ Tìm thấy ${items.length} quán (${srcLabel})`, 2200);
+    }
+
     this._doScan();
   },
 
