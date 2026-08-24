@@ -6,7 +6,7 @@
 const _kfrag = ['AQ.Ab8R', 'N6I9_rCZ1O', 'd9Ca5NdKs2', 'kFhjNzyxeT', 'Lvm2jM59Eu', 'dYKjwQ'];
 
 const Gemini = {
-  MODEL: 'gemini-2.0-flash',   // fast, good for POI + suggestions
+  MODEL: 'gemini-flash-latest', // stable alias — auto-tracks latest working Flash model
   BASE_URL: 'https://generativelanguage.googleapis.com/v1beta/models',
 
   get apiKey() {

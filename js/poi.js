@@ -4,11 +4,9 @@
 ═══════════════════════════════════════════════ */
 const POI = {
   DIRECT: 'https://overpass-api.de/api/interpreter',
-  // CORS-enabled Overpass mirrors (support POST with data= body)
-  MIRRORS: [
-    'https://overpass.kumi.systems/api/interpreter',
-    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-  ],
+  // Same-origin Netlify Function — no CORS, no adblocker; server-side
+  // retries multiple Overpass mirrors internally.
+  NETLIFY_FN: '/.netlify/functions/overpass',
   _cache: new Map(),
   CACHE_TTL: 5 * 60 * 1000,
 
@@ -126,24 +124,21 @@ out center 200;`;
     const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 
     // ── Build endpoint list ───────────────────────────────────────────────
-    // Each entry: { url, method, body? }
-    // Overpass supports GET (?data=...) and POST (body=data=...)
-    // allorigins.win proxies GET → use GET format so allorigins forwards correctly
+    // On production: Netlify Function first (same-origin, no CORS, retries
+    // multiple Overpass mirrors server-side), allorigins as backup.
+    // On localhost: direct Overpass, then allorigins.
+    // Overpass API supports GET (?data=...) and POST (body=data=...).
     const endpoints = [];
 
     if (isLocal) {
-      // Localhost: POST directly (no CORS issue, no proxy needed)
       endpoints.push({ url: this.DIRECT, method: 'POST', body: queryParam });
     } else {
-      // Production: allorigins proxies a GET request — pass full overpass GET URL
-      const alloriginsUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directGetUrl);
-      endpoints.push({ url: alloriginsUrl, method: 'GET' });
+      endpoints.push({ url: this.NETLIFY_FN, method: 'POST', body: queryParam });
     }
 
-    // CORS-enabled Overpass mirrors as fallbacks (POST supported)
-    this.MIRRORS.forEach(mirror => {
-      endpoints.push({ url: mirror, method: 'POST', body: queryParam });
-    });
+    // Public CORS proxy — GET-only, forwards to overpass-api.de
+    const alloriginsUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directGetUrl);
+    endpoints.push({ url: alloriginsUrl, method: 'GET' });
 
     console.log('[POI] fetching concurrently from', endpoints.length, 'endpoints…');
 

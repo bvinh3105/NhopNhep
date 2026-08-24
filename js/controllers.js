@@ -816,7 +816,7 @@ const ProfileCtrl = {
     }
     list.innerHTML = State.userRestaurants.map(r => {
       const cat = CATEGORIES[r.cat];
-      return `<div class="my-r-card">
+      return `<div class="my-r-card" data-id="${r.id}" role="button" tabindex="0" title="Nhấn để mở Google Maps">
         <div class="my-r-icon" style="background:${cat.color}22;color:${cat.color}">${cat.icon}</div>
         <div class="my-r-info">
           <div class="my-r-name">${r.name}</div>
@@ -828,7 +828,8 @@ const ProfileCtrl = {
     }).join('');
 
     list.querySelectorAll('.my-r-del').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const id = parseInt(btn.dataset.id);
         const r = State.userRestaurants.find(x => x.id === id);
         if (!r) return;
@@ -840,6 +841,19 @@ const ProfileCtrl = {
           HomeCtrl._updateBadge();
           showToast('🗑 Đã xoá quán');
         }
+      });
+    });
+
+    list.querySelectorAll('.my-r-card').forEach(card => {
+      card.addEventListener('click', () => {
+        const id = parseInt(card.dataset.id);
+        const r = State.userRestaurants.find(x => x.id === id);
+        if (!r || r.lat == null || r.lng == null) {
+          showToast('Quán chưa có vị trí trên bản đồ');
+          return;
+        }
+        const url = `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`;
+        window.open(url, '_blank', 'noopener');
       });
     });
   },
