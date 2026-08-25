@@ -885,11 +885,15 @@ body.map-full .tabbar{transform:translateY(105%)}
 .list-modal-body .r-grid{
   display:grid;grid-template-columns:1fr 1fr;gap:.55rem;padding:.35rem .15rem;
 }
-.list-modal-body .r-card{overflow:hidden}
+/* NOTE: keep overflow visible so the ⭐/🌐/✨ corner badges on
+   .r-card.user-added / .osm-added / .gemini-added aren't clipped.
+   The image is instead given its own top-corner radius that lines
+   up with the card's outer rounding. */
 .list-modal-body .r-img-mini{
-  width:100%;height:80px;object-fit:cover;display:block;
-  border-radius:8px;margin:-.75rem -.75rem .5rem;
-  width:calc(100% + 1.5rem);
+  display:block;object-fit:cover;
+  height:80px;width:calc(100% + 1.5rem);
+  margin:-.75rem -.75rem .55rem;
+  border-radius:12px 12px 0 0;
   border-bottom:2px solid var(--text);
 }
 
