@@ -730,6 +730,25 @@ const PlanCtrl = {
     document.getElementById('pmapLocate').addEventListener('click', () => PlanCtrl._centerOnMe());
     document.getElementById('pmapFs').addEventListener('click', () => PlanCtrl._toggleFullscreen());
 
+    // Primary "Bắt đầu" navigation button — only visible in fullscreen.
+    // Cute Google-Maps-style pill with a rounded navigation arrow.
+    const oldStart = wrap.querySelector('.pmap-start-btn');
+    if (oldStart) oldStart.remove();
+    const startBtn = document.createElement('button');
+    startBtn.className = 'pmap-start-btn';
+    startBtn.id = 'pmapStart';
+    startBtn.type = 'button';
+    startBtn.setAttribute('aria-label', 'Bắt đầu dẫn đường');
+    startBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" aria-hidden="true">
+        <path d="M12 3.2c-.5 0-1 .3-1.2.85L4 20.2c-.35.85.55 1.65 1.35 1.2L12 17.7l6.65 3.7c.8.45 1.7-.35 1.35-1.2L13.2 4.05C13 3.5 12.5 3.2 12 3.2Z"
+              fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+      </svg>
+      <span>Bắt đầu</span>
+    `;
+    wrap.appendChild(startBtn);
+    startBtn.addEventListener('click', () => PlanCtrl._startNav());
+
     // Fetch real road route from OSRM (free, no key needed)
     // Coords format: lng,lat;lng,lat;...
     const osrmCoords = allPts.map(([la, lo]) => `${lo},${la}`).join(';');
@@ -799,6 +818,58 @@ const PlanCtrl = {
     // is a signal they want continuous updates.
     this._startLiveTracking();
     document.getElementById('pmapLocate')?.classList.add('tracking');
+  },
+
+  // Google-Maps-style "Bắt đầu": start live GPS, zoom to user, and tell
+  // them how far the nearest planned stop is so they know where they're
+  // heading. Idempotent — pressing again just re-centers.
+  _startNav() {
+    if (!State.planMap) return;
+    // Make sure we're in fullscreen so the map is actually usable
+    const wrap = document.getElementById('planMapWrap');
+    if (wrap && !wrap.classList.contains('fullscreen')) this._toggleFullscreen();
+    this._startLiveTracking();
+
+    if (State.userLat == null || State.userLng == null) {
+      showToast('🛰 Đang lấy GPS, đợi vài giây…');
+      return;
+    }
+    State.planMap.setView([State.userLat, State.userLng], 17);
+
+    // Find the nearest planned stop, hint the distance in the toast so
+    // the user has a target as they set off.
+    const stops = State.selected instanceof Set
+      ? [...State.selected].map(id =>
+          (State.results || []).find(r => r.id === id) ||
+          (State.userRestaurants || []).find(r => r.id === id)
+        ).filter(s => s && s.lat != null && s.lng != null)
+      : [];
+    if (stops.length) {
+      let nearest = null, minD = Infinity;
+      for (const s of stops) {
+        const d = this._haversineKm(State.userLat, State.userLng, s.lat, s.lng);
+        if (d < minD) { minD = d; nearest = s; }
+      }
+      if (nearest) {
+        const label = minD < 1
+          ? `${Math.round(minD * 1000)}m`
+          : `${minD.toFixed(1)}km`;
+        showToast(`🧭 Đi tới ${nearest.name} · còn ${label}`);
+      } else {
+        showToast('🧭 Đi theo dấu chấm xanh nhé!');
+      }
+    } else {
+      showToast('🧭 Đi theo dấu chấm xanh nhé!');
+    }
+  },
+
+  _haversineKm(lat1, lng1, lat2, lng2) {
+    const R = 6371, toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(a));
   },
 
   _startLiveTracking() {
