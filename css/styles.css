@@ -73,6 +73,7 @@ input,textarea,select{font-family:var(--font-body)}
   padding:calc(var(--safe-top) + 6px) 0 6px;overflow:hidden;font-family:var(--font-display);
   font-weight:800;font-size:.72rem;letter-spacing:2px;
   border-bottom:1.5px solid var(--primary-2);
+  transition:transform .32s cubic-bezier(.32,1,.56,1);
 }
 .ribbon-track{display:flex;gap:1.5rem;white-space:nowrap;animation:marquee 24s linear infinite;padding-left:1.5rem}
 .ribbon-track span{display:inline-flex;align-items:center;gap:1.5rem;font-style:italic}
@@ -89,6 +90,7 @@ input,textarea,select{font-family:var(--font-body)}
   position:fixed;bottom:0;left:0;right:0;height:var(--tab-h);z-index:100;
   background:var(--white);border-top:1.5px solid var(--line);
   display:flex;padding-bottom:var(--safe-bottom);
+  transition:transform .32s cubic-bezier(.32,1,.56,1);
   box-shadow:0 -4px 24px rgba(42,24,16,.06);
 }
 .tab-btn{
@@ -184,8 +186,18 @@ input,textarea,select{font-family:var(--font-body)}
 .advanced-body.open{max-height:280px}
 
 /* Category chips */
-.cat-chips{display:flex;gap:.5rem;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+.cat-chips{
+  display:flex;gap:.5rem;flex-wrap:nowrap;overflow-x:auto;
+  padding:0 1.25rem 2px 0;scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+  /* Right-edge fade — signals "there's more, keep scrolling" without
+     stealing focus. Falls off the last chip once you've reached the
+     end, matching iOS-style overflow scroll. */
+  -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+          mask-image:linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+}
 .cat-chips::-webkit-scrollbar{display:none}
+.cat-chips.at-end{-webkit-mask-image:none;mask-image:none}
 .cat-chip{
   display:flex;align-items:center;gap:.3rem;padding:.5rem .85rem;border-radius:24px;
   border:2px solid var(--text);background:var(--white);color:var(--text);
@@ -336,10 +348,14 @@ input,textarea,select{font-family:var(--font-body)}
 /* Cat filter tabs */
 .cat-tabs{
   flex-shrink:0;display:flex;gap:.4rem;overflow-x:auto;scrollbar-width:none;
-  background:var(--cream);padding:.65rem 1.1rem;
+  background:var(--cream);padding:.65rem 1.6rem .65rem 1.1rem;
   border-bottom:2px solid var(--text);
+  -webkit-overflow-scrolling:touch;
+  -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+          mask-image:linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
 }
 .cat-tabs::-webkit-scrollbar{display:none}
+.cat-tabs.at-end{-webkit-mask-image:none;mask-image:none}
 .cat-tab{
   padding:.4rem .8rem;font-size:.78rem;font-weight:700;color:var(--text);white-space:nowrap;
   border:2px solid var(--text);border-radius:20px;background:var(--white);
@@ -475,9 +491,18 @@ input,textarea,select{font-family:var(--font-body)}
 .plan-summary{
   flex-shrink:0;display:flex;align-items:center;gap:.45rem;overflow-x:auto;
   padding:.7rem 1.1rem;background:var(--paper);border-bottom:2px solid var(--text);
-  scrollbar-width:none;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;
+  scroll-snap-type:x proximity;
+  /* Fade the right edge so the "there's more to scroll" hint is
+     visible without stealing focus from the primary content */
+  -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
+          mask-image:linear-gradient(to right, #000 calc(100% - 28px), transparent 100%);
 }
 .plan-summary::-webkit-scrollbar{display:none}
+/* Drop the mask once the user has scrolled to the very end — nothing
+   left to hint at, so no need to fade the last chip's border */
+.plan-summary.at-end{-webkit-mask-image:none;mask-image:none}
+.sum-chip{scroll-snap-align:start}
 .sum-chip{
   display:flex;align-items:center;gap:.35rem;padding:.4rem .75rem;
   border-radius:24px;background:var(--white);
@@ -506,12 +531,16 @@ input,textarea,select{font-family:var(--font-body)}
 .pmap-fit{font-size:.75rem;letter-spacing:-.5px}
 .pmap-btn.pmap-locate.tracking{background:var(--primary);color:var(--cream);border-color:var(--text)}
 
-/* Fullscreen map — covers everything but the security shield */
+/* Fullscreen map — covers everything but the security shield.
+   The <body>.map-full companion class slides the ribbon and tabbar
+   out of view so the map really owns the whole viewport. */
 #planMapWrap.fullscreen{
   position:fixed;inset:0;z-index:1500;
   margin:0;border-radius:0;border:none;box-shadow:none;
   height:100vh !important;height:100dvh !important;
 }
+body.map-full .ribbon{transform:translateY(-105%)}
+body.map-full .tabbar{transform:translateY(105%)}
 #planMapWrap.fullscreen .pmap-controls{
   top:calc(env(safe-area-inset-top, 0px) + .8rem);
   right:.8rem;
@@ -839,6 +868,77 @@ input,textarea,select{font-family:var(--font-body)}
 .restaurant-card {
   overflow: hidden; /* Fix corners */
 }
+
+/* Full-list modals (my quán / trip history) — bigger height cap so
+   the whole scroll area is comfortable, and a body region that scrolls
+   inside the sheet instead of pushing the close button off screen. */
+.list-sheet{max-height:88vh;max-height:88dvh}
+.list-modal-body{
+  max-height:60vh;max-height:60dvh;overflow-y:auto;
+  padding:.4rem 0 .8rem;margin:.4rem -.15rem 0;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;
+}
+.list-modal-body::-webkit-scrollbar{display:none}
+
+/* My-quán card grid — same visual language as the results screen,
+   without the checkbox (these are already yours, not being picked). */
+.list-modal-body .r-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:.55rem;padding:.35rem .15rem;
+}
+.list-modal-body .r-card{overflow:hidden}
+.list-modal-body .r-img-mini{
+  width:100%;height:80px;object-fit:cover;display:block;
+  border-radius:8px;margin:-.75rem -.75rem .5rem;
+  width:calc(100% + 1.5rem);
+  border-bottom:2px solid var(--text);
+}
+
+/* Trip-history stack — each trip is a labeled section, each stop is a
+   flat name+address bar (no card decoration, just a strip). */
+.trip-item{
+  padding:.4rem .15rem;
+  border-bottom:2px dashed var(--line);
+}
+.trip-item:last-child{border-bottom:none}
+.trip-date{
+  font-family:var(--font-display);font-size:.82rem;font-weight:800;
+  color:var(--primary);font-style:italic;letter-spacing:.3px;
+  padding:.35rem .55rem;margin-bottom:.4rem;
+}
+.trip-stop-box{
+  display:flex;align-items:center;gap:.55rem;
+  padding:.55rem .75rem;margin-bottom:.4rem;
+  background:var(--white);border:2px solid var(--text);border-radius:12px;
+  box-shadow:2px 2px 0 var(--text);cursor:pointer;
+  transition:transform .12s,box-shadow .12s;
+}
+.trip-stop-box:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.trip-stop-box:last-child{margin-bottom:.15rem}
+.trip-stop-idx{
+  flex-shrink:0;width:1.6rem;height:1.6rem;border-radius:50%;
+  background:var(--primary);color:var(--cream);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-display);font-weight:900;font-size:.85rem;
+  border:1.5px solid var(--text);
+}
+.trip-stop-info{flex:1;min-width:0}
+.trip-stop-name{
+  font-family:var(--font-display);font-weight:900;font-size:.9rem;
+  color:var(--text);line-height:1.15;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.trip-stop-addr{
+  font-size:.7rem;color:var(--text2);font-weight:600;margin-top:.1rem;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+/* Empty state inside modals */
+.list-empty{
+  text-align:center;padding:2rem .5rem 1rem;color:var(--text2);
+}
+.list-empty-icon{font-size:2.4rem;margin-bottom:.4rem}
+.list-empty-msg{font-family:var(--font-display);font-weight:800;font-size:1rem;color:var(--text)}
+.list-empty-sub{font-size:.8rem;margin-top:.3rem;font-weight:600}
 
 /* Restaurant detail modal — read-only view of a saved quán */
 .detail-sheet .r-img-wrap{

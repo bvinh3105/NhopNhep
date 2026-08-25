@@ -23,6 +23,7 @@ const State = {
     avatar: '🍜',
     prefs: new Set(),
     trips: 0,
+    tripHistory: [], // [{ id, at, stops: [{ id, name, cat, price, address, lat, lng }] }]
   },
   userRestaurants: [],  // user-added
   osmRestaurants: [],   // fetched from OpenStreetMap
@@ -41,6 +42,7 @@ const Storage = {
         avatar: State.profile.avatar,
         prefs: [...State.profile.prefs],
         trips: State.profile.trips,
+        tripHistory: State.profile.tripHistory || [],
       },
       userRestaurants: State.userRestaurants,
     };
@@ -56,6 +58,7 @@ const Storage = {
         State.profile.avatar = data.profile.avatar || '🍜';
         State.profile.prefs = new Set(data.profile.prefs || []);
         State.profile.trips = data.profile.trips || 0;
+        State.profile.tripHistory = Array.isArray(data.profile.tripHistory) ? data.profile.tripHistory : [];
       }
       State.userRestaurants = data.userRestaurants || [];
     } catch(e) { console.warn(e); }

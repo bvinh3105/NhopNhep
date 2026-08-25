@@ -529,7 +529,30 @@ const PlanCtrl = {
       return entry;
     });
 
-    State.profile.trips++;
+    // Log trip to history so the profile's CHUYẾN ĂN stat can show
+    // where the user has been. Skip if this is identical to the most
+    // recent trip within the last 5 minutes (e.g. reshuffle click).
+    const trip = {
+      id: Date.now(),
+      at: new Date().toISOString(),
+      stops: State.itinerary.map(s => ({
+        id: s.id, name: s.name, cat: s.cat, price: s.price,
+        address: s.address || null, lat: s.lat, lng: s.lng,
+      })),
+    };
+    const history = State.profile.tripHistory || (State.profile.tripHistory = []);
+    const last = history[0];
+    const FIVE_MIN = 5 * 60 * 1000;
+    const sameStops = last
+      && (Date.now() - new Date(last.at).getTime() < FIVE_MIN)
+      && last.stops.length === trip.stops.length
+      && last.stops.every((s, i) => s.id === trip.stops[i].id);
+    if (!sameStops) {
+      history.unshift(trip);
+      // Cap at 50 most-recent so localStorage doesn't grow forever
+      if (history.length > 50) history.length = 50;
+      State.profile.trips = history.length;
+    }
     Storage.save();
   },
 
@@ -794,12 +817,18 @@ const PlanCtrl = {
     if (!wrap || !State.planMap) return;
     const btn = document.getElementById('pmapFs');
     const isFs = wrap.classList.toggle('fullscreen');
+    // Slide the marquee ribbon and bottom tab bar out of view so the
+    // map has the whole viewport. The class hook on <body> is what
+    // the CSS transform rules key off of.
+    document.body.classList.toggle('map-full', isFs);
     if (btn) {
       btn.textContent = isFs ? '✕' : '⛶';
       btn.title = isFs ? 'Thoát toàn màn hình (Esc)' : 'Toàn màn hình';
     }
-    // Leaflet needs to recompute size after the container resizes
-    setTimeout(() => State.planMap.invalidateSize(), 260);
+    // Leaflet needs to recompute size after the container resizes;
+    // wait past the ribbon/tabbar slide (0.32s) before invalidating
+    // so the map fills the newly-freed pixels in one pass.
+    setTimeout(() => State.planMap.invalidateSize(), 340);
     if (isFs) {
       this._startLiveTracking();
       showToast('🛰 Đang theo dõi vị trí realtime');
@@ -1009,21 +1038,9 @@ const ProfileCtrl = {
 
   _onStatClick(stat) {
     if (stat === 'myR') {
-      const n = State.userRestaurants.length;
-      if (n === 0) {
-        showToast('Chưa có quán nào — nhấn "＋ Thêm quán" ở dưới');
-        document.getElementById('addRestaurantBtn')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } else {
-        showToast(`⭐ Bạn có ${n} quán`);
-        document.getElementById('myRestaurantList')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      HistoryModal.openMyQuan();
     } else if (stat === 'trips') {
-      const n = State.profile.trips;
-      if (n === 0) {
-        showToast('🍜 Chưa có chuyến nào. Quét quán rồi "Lên lịch" để tạo chuyến đầu tiên!');
-      } else {
-        showToast(`🎉 Bạn đã lên lịch ${n} chuyến ăn`);
-      }
+      HistoryModal.openTrips();
     } else if (stat === 'fav') {
       const catPrefs = [...State.profile.prefs].filter(p => CATEGORIES[p]);
       if (catPrefs.length === 0) {
@@ -1487,5 +1504,124 @@ const DetailModal = {
   close() {
     document.getElementById('detailModal').classList.remove('show');
     this._current = null;
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   HISTORY MODAL — profile stats: quán list + trip log
+═══════════════════════════════════════════════ */
+const HistoryModal = {
+  _esc(s) {
+    return String(s || '').replace(/[&<>"']/g, c => (
+      { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]
+    ));
+  },
+
+  init() {
+    const myModal = document.getElementById('myQuanModal');
+    const tripsModal = document.getElementById('tripsModal');
+    document.getElementById('myQuanClose').addEventListener('click', () => this._close(myModal));
+    document.getElementById('tripsClose').addEventListener('click', () => this._close(tripsModal));
+    myModal.addEventListener('click', e => { if (e.target === myModal) this._close(myModal); });
+    tripsModal.addEventListener('click', e => { if (e.target === tripsModal) this._close(tripsModal); });
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      if (myModal.classList.contains('show')) this._close(myModal);
+      if (tripsModal.classList.contains('show')) this._close(tripsModal);
+    });
+  },
+
+  _close(el) { el.classList.remove('show'); },
+
+  // ── Quán của tôi — grid of r-card-style tiles (same look as scan results)
+  openMyQuan() {
+    const list = State.userRestaurants || [];
+    document.getElementById('myQuanCount').textContent = `${list.length} quán`;
+    const body = document.getElementById('myQuanBody');
+    if (list.length === 0) {
+      body.innerHTML = `
+        <div class="list-empty">
+          <div class="list-empty-icon">📝</div>
+          <div class="list-empty-msg">Chưa có quán nào</div>
+          <div class="list-empty-sub">Nhấn "＋ Thêm quán" để thêm quán đầu tiên</div>
+        </div>`;
+    } else {
+      const esc = this._esc;
+      body.innerHTML = `<div class="r-grid">${list.map(r => {
+        const cat = CATEGORIES[r.cat] || { label: '—', color: '#888', icon: '🍽️' };
+        const img = r.image ? `<img class="r-img-mini" src="${r.image}" alt="${esc(r.name)}">` : '';
+        return `<div class="r-card user-added" data-id="${r.id}" role="button" tabindex="0" title="Xem chi tiết">
+          ${img}
+          <div class="r-cat-badge" style="background:${cat.color}22;color:${cat.color}">${cat.icon} ${esc(cat.label)}</div>
+          <div class="r-name">${esc(r.name)}</div>
+          <div class="r-price">💰 ${esc(r.price || '—')}</div>
+          <div class="r-desc">${esc(r.desc || '')}</div>
+        </div>`;
+      }).join('')}</div>`;
+      body.querySelectorAll('.r-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const id = parseInt(card.dataset.id);
+          const r = State.userRestaurants.find(x => x.id === id);
+          if (r) DetailModal.open(r);
+        });
+      });
+    }
+    document.getElementById('myQuanModal').classList.add('show');
+  },
+
+  // ── Lịch sử chuyến ăn — flat name+address bars per stop
+  openTrips() {
+    const trips = State.profile.tripHistory || [];
+    document.getElementById('tripsCount').textContent = `${trips.length} chuyến`;
+    const body = document.getElementById('tripsBody');
+    if (trips.length === 0) {
+      body.innerHTML = `
+        <div class="list-empty">
+          <div class="list-empty-icon">🍜</div>
+          <div class="list-empty-msg">Chưa có chuyến nào</div>
+          <div class="list-empty-sub">Quét quán → chọn vài chỗ → nhấn "Lên lịch" để tạo chuyến đầu tiên</div>
+        </div>`;
+    } else {
+      const esc = this._esc;
+      body.innerHTML = trips.map(trip => {
+        const d = new Date(trip.at);
+        const dateLabel = this._formatDate(d);
+        const stopsHtml = trip.stops.map((s, i) => `
+          <div class="trip-stop-box" data-id="${s.id}">
+            <div class="trip-stop-idx">${i + 1}</div>
+            <div class="trip-stop-info">
+              <div class="trip-stop-name">${esc(s.name)}</div>
+              <div class="trip-stop-addr">${esc(s.address || (s.lat != null ? `📍 ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}` : 'Chưa có địa chỉ'))}</div>
+            </div>
+          </div>`).join('');
+        return `
+          <div class="trip-item">
+            <div class="trip-date">📅 ${dateLabel} · ${trip.stops.length} điểm</div>
+            ${stopsHtml}
+          </div>`;
+      }).join('');
+      // Tap a stop → open its detail (works even if it's an OSM/Gemini
+      // stop we no longer have full state for — we saved enough on the
+      // trip itself to render the modal).
+      body.querySelectorAll('.trip-stop-box').forEach(el => {
+        el.addEventListener('click', () => {
+          const id = parseInt(el.dataset.id);
+          const stop = trips.flatMap(t => t.stops).find(s => s.id === id);
+          if (stop) DetailModal.open(stop);
+        });
+      });
+    }
+    document.getElementById('tripsModal').classList.add('show');
+  },
+
+  _formatDate(d) {
+    const now = new Date();
+    const sameDay = d.toDateString() === now.toDateString();
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+    const isYesterday = d.toDateString() === yesterday.toDateString();
+    const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    if (sameDay) return `Hôm nay ${time}`;
+    if (isYesterday) return `Hôm qua ${time}`;
+    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${time}`;
   },
 };
