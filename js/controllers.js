@@ -69,6 +69,9 @@ const HomeCtrl = {
 
     document.getElementById('scanBtn').addEventListener('click', () => this.scan());
 
+    // Dish search — free-text input + shortcut chips
+    this._initDishSearch();
+
     // Address autocomplete for "Điểm xuất phát"
     this._initLocInput();
 
@@ -280,8 +283,67 @@ const HomeCtrl = {
     return 'mine';
   },
 
+  // Accent-insensitive Vietnamese matcher — "pho" matches "Phở",
+  // "banh mi" matches "Bánh mì", "trasua" matches "Trà sữa". Splits
+  // on whitespace so word order doesn't matter and every word must
+  // appear somewhere in the haystack.
+  _dishMatches(r, needleTokens) {
+    if (!needleTokens.length) return true;
+    const hay = this._strip(`${r.name || ''} ${r.desc || ''} ${r.cuisine || ''}`);
+    return needleTokens.every(t => hay.includes(t));
+  },
+  _strip(s) {
+    return (s || '').normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+      .toLowerCase();
+  },
+
+  _initDishSearch() {
+    const input = document.getElementById('dishInput');
+    const clear = document.getElementById('dishClearBtn');
+    const chipsEl = document.getElementById('dishChips');
+    if (!input || !chipsEl) return;
+
+    const syncChips = () => {
+      const active = this._strip(State.activeDish);
+      chipsEl.querySelectorAll('.cat-chip').forEach(c => {
+        c.classList.toggle('active', active && this._strip(c.dataset.dish) === active);
+      });
+      clear.style.display = State.activeDish ? '' : 'none';
+    };
+
+    input.addEventListener('input', () => {
+      State.activeDish = input.value.trim();
+      syncChips();
+    });
+
+    clear.addEventListener('click', () => {
+      input.value = '';
+      State.activeDish = '';
+      syncChips();
+      showToast('🍽️ Đã xoá bộ lọc món');
+    });
+
+    chipsEl.addEventListener('click', (e) => {
+      const chip = e.target.closest('.cat-chip');
+      if (!chip) return;
+      const dish = chip.dataset.dish || '';
+      // Toggle off if already active
+      if (this._strip(State.activeDish) === this._strip(dish)) {
+        input.value = '';
+        State.activeDish = '';
+      } else {
+        input.value = dish;
+        State.activeDish = dish;
+      }
+      syncChips();
+    });
+  },
+
   _doScan() {
     const pool = allRestaurants();
+    const dishTokens = this._strip(State.activeDish).split(/\s+/).filter(Boolean);
     const results = pool.filter(r => {
       const src = this._srcOf(r);
       if (!State.activeSrcs.has(src)) return false;
@@ -290,12 +352,14 @@ const HomeCtrl = {
       const dist = haversine(State.userLat, State.userLng, r.lat, r.lng);
       if (dist > State.radius) return false;
       r._dist = dist;
+      if (dishTokens.length && !this._dishMatches(r, dishTokens)) return false;
       return true;
     });
 
     if (results.length === 0) {
       let hint = 'Thử tăng bán kính hoặc bật GPS ở vị trí khác';
       if (!State.activeSrcs.has('osm')) hint = 'Bật 🌐 OpenStreetMap để tìm quán';
+      else if (State.activeDish) hint = `Không có quán "${State.activeDish}" — bỏ lọc món hoặc thử món khác`;
       showToast(`🤔 Không tìm thấy quán · ${hint}`);
       // Clear markers if no results
       MapHome.showRestaurants([]);

@@ -7,6 +7,7 @@ const State = {
   radius: 1000,
   activeCats: new Set(['restaurant','street','snack','cafe']),
   activeSrcs: new Set(['osm','mine']),
+  activeDish: '',    // free-text dish filter: "phở", "bún chả", "trà sữa"…
   minRating: 0,
   filteredResults: [],
   visibleResults: [],
