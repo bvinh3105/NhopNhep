@@ -207,14 +207,23 @@ input,textarea,select{font-family:var(--font-body)}
 }
 .advanced-toggle[aria-expanded="true"] .chevron{transform:rotate(180deg)}
 .advanced-body{
-  overflow:hidden;max-height:0;transition:max-height .32s cubic-bezier(.4,0,.2,1);
+  overflow:hidden;max-height:0;
+  transition:max-height .32s cubic-bezier(.4,0,.2,1),overflow 0s;
 }
-.advanced-body.open{max-height:280px}
+/* Once expanded, let chip bounces spill out instead of being clipped.
+   overflow flips to visible only AFTER the expand finishes (0s .32s). */
+.advanced-body.open{
+  max-height:300px;overflow:visible;
+  transition:max-height .32s cubic-bezier(.4,0,.2,1),overflow 0s .32s;
+}
 
 /* Category chips */
 .cat-chips{
   display:flex;gap:.5rem;flex-wrap:nowrap;overflow-x:auto;
-  padding:0 1.25rem 2px 0;scrollbar-width:none;
+  /* Vertical + small left padding gives chips room to bounce (scale pop)
+     without the scroll box clipping their edges. Negative margin keeps
+     the row's outer size unchanged. */
+  padding:6px 1.25rem 6px 4px;margin:-6px 0 -4px -4px;scrollbar-width:none;
   -webkit-overflow-scrolling:touch;
   /* Right-edge fade — signals "there's more, keep scrolling" without
      stealing focus. Falls off the last chip once you've reached the
