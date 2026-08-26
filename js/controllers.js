@@ -218,7 +218,6 @@ const HomeCtrl = {
       }, 1000);
       setSubTxt('⏱ 0s · tối đa 20s');
 
-      // ── Gemini + OSM chạy SONG SONG; lấy kết quả nào về trước ──────────
       const dishQuery = (State.activeDish || '').trim();
       const geminiP = useGemini
         ? Gemini.findQuan(State.userLat, State.userLng, State.radius,
@@ -229,32 +228,36 @@ const HomeCtrl = {
       const osmP = POI.fetch(State.userLat, State.userLng, State.radius)
         .catch(e => { console.warn('[OSM]', e.message); return []; });
 
-      // Race: hiển thị ngay khi có kết quả; hard cap 20s
-      const raceResult = await new Promise(resolve => {
-        let done = false;
-        let finished = 0;
-        const total = useGemini ? 2 : 1;
-
-        const finish = (it, src) => {
-          finished++;
-          if (done) return;
-          if (it.length) {
-            done = true;
-            resolve({ items: it, source: src });
-          } else if (finished >= total) {
-            done = true;
-            resolve({ items: [], source: 'none' });
-          }
-        };
-
-        geminiP.then(r => finish(r, 'gemini'));
-        osmP.then(r => finish(r, 'osm'));
-
-        // Hard 20s total cap
-        setTimeout(() => {
-          if (!done) { done = true; resolve({ items: [], source: 'none' }); }
-        }, 20000);
-      });
+      let raceResult;
+      if (dishQuery && useGemini) {
+        // ── DISH SEARCH: only Gemini understands a specific dish. OSM
+        //    returns generic nearby quán and would win the race with
+        //    useless results, so we WAIT for Gemini and only fall back
+        //    to OSM if Gemini comes back empty. ─────────────────────────
+        const g = await geminiP;
+        if (g.length) {
+          raceResult = { items: g, source: 'gemini' };
+        } else {
+          const o = await osmP;
+          raceResult = { items: o, source: o.length ? 'osm' : 'none' };
+        }
+      } else {
+        // ── GENERAL SEARCH: race both, first non-empty wins (fastest UX)
+        raceResult = await new Promise(resolve => {
+          let done = false;
+          let finished = 0;
+          const total = useGemini ? 2 : 1;
+          const finish = (it, src) => {
+            finished++;
+            if (done) return;
+            if (it.length) { done = true; resolve({ items: it, source: src }); }
+            else if (finished >= total) { done = true; resolve({ items: [], source: 'none' }); }
+          };
+          geminiP.then(r => finish(r, 'gemini'));
+          osmP.then(r => finish(r, 'osm'));
+          setTimeout(() => { if (!done) { done = true; resolve({ items: [], source: 'none' }); } }, 20000);
+        });
+      }
 
       clearInterval(statusTick);
       clearInterval(elapsedTick);
