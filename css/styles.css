@@ -45,6 +45,12 @@
 
   --font-display:'Fraunces',Georgia,serif;
   --font-body:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+
+  /* Motion — iOS-style easing curves */
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);   /* overshoot bounce */
+  --ease-out:cubic-bezier(.16,1,.3,1);          /* soft deceleration */
+  --ease-ios:cubic-bezier(.32,.72,0,1);         /* snappy iOS default */
+  --press:.94;                                   /* tap scale-down */
 }
 html,body{height:100%;overflow:hidden;background:var(--cream);color:var(--text);font-family:var(--font-body);font-size:15px;line-height:1.5;font-weight:500;-webkit-font-smoothing:antialiased}
 
@@ -1029,4 +1035,78 @@ body.map-full .tabbar{transform:translateY(105%)}
   font-size:.72rem;line-height:1.4;color:var(--text2);
   opacity:.7;font-style:italic;font-weight:500;
   margin:.35rem 0 .1rem;padding:0 .2rem;
+}
+
+/* ═══════════════════════════════════════════════
+   iOS-STYLE MOTION POLISH
+   Springy easing, tactile scale-press, hover lift.
+   Layered on top of the brutalist look — the offset
+   shadow presses stay, but now with a soft squish.
+═══════════════════════════════════════════════ */
+
+/* Smooth, spring-eased transitions on every interactive control */
+.tab-btn,.dish-chip,.cat-chip,.radius-chip,.loc-gps-btn,.scan-btn,
+.back-btn,.reshuffle-btn,.cat-tab,.r-card,.r-check,.r-gmaps-link,
+.action-btn,.pmap-btn,.dwell-btn,.data-btn,.ai-key-toggle,.pref-chip,
+.stat-card,.add-btn,.avatar,.go-item,.cat-pick-btn{
+  transition:transform .26s var(--ease-out),
+             box-shadow .26s var(--ease-out),
+             background-color .2s var(--ease-ios),
+             color .2s var(--ease-ios),
+             border-color .2s var(--ease-ios),
+             opacity .2s var(--ease-ios) !important;
+  -webkit-user-select:none;user-select:none;touch-action:manipulation;
+}
+
+/* Tactile squish on press — combine the brutalist offset with a scale.
+   The spring return gives that iOS "pop back" feel. */
+.scan-btn:active,.action-btn:active{transform:translate(2px,2px) scale(.97) !important}
+.cat-chip:active,.radius-chip:active,.cat-tab:active,.back-btn:active,
+.reshuffle-btn:active,.loc-gps-btn:active,.data-btn:active,
+.ai-key-toggle:active,.pmap-btn:active,.r-check:active{
+  transform:translate(1px,1px) scale(.95) !important;
+}
+.r-card:active{transform:translate(1px,1px) scale(.985) !important}
+.tab-btn:active{transform:scale(.9) !important}
+.pref-chip:active,.cat-pick-btn:active,.dish-chip:active,.go-item:active{transform:scale(.93) !important}
+.stat-card:active{transform:scale(.95) !important}
+.avatar:active{transform:scale(.9) !important}
+.dwell-btn:active{transform:scale(.85) !important}
+
+/* Release spring — when NOT pressed, elements bounce back with overshoot */
+.cat-chip,.radius-chip,.cat-tab,.pref-chip,.dish-chip,.stat-card,
+.tab-btn,.r-check,.dwell-btn,.avatar,.cat-pick-btn{
+  transition-timing-function:var(--ease-spring) !important;
+}
+
+/* Chip activation — springy scale pop when toggled on */
+@keyframes chip-pop{0%{transform:scale(1)}45%{transform:scale(1.08)}100%{transform:scale(1)}}
+.cat-chip.active,.radius-chip.active,.pref-chip.active,
+.cat-tab.active,.src-chip.active,.dish-chip.active{
+  animation:chip-pop .34s var(--ease-spring);
+}
+
+/* Desktop hover lift — only on real pointers (never on touch) */
+@media (hover:hover) and (pointer:fine){
+  .scan-btn:hover,.action-btn:hover{transform:translateY(-2px)}
+  .cat-chip:hover,.radius-chip:hover,.cat-tab:hover,.data-btn:hover,
+  .reshuffle-btn:hover,.back-btn:hover,.pref-chip:hover,.stat-card:hover,
+  .pmap-btn:hover,.ai-key-toggle:hover,.loc-gps-btn:hover{transform:translateY(-1.5px)}
+  .r-card:hover{transform:translateY(-3px);box-shadow:5px 6px 0 var(--text)}
+  .tab-btn:hover .tab-ico{transform:scale(1.12)}
+  .r-gmaps-link:hover{transform:scale(1.03)}
+  .avatar:hover{transform:scale(1.06) rotate(-4deg)}
+}
+
+/* Icon micro-motion — checkmark springs in when selected */
+@keyframes check-pop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+.r-card.selected .r-check{animation:check-pop .32s var(--ease-spring)}
+
+/* GPS button pulse feels alive on press */
+.loc-gps-btn:active{transform:scale(.9) !important}
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;
+    transition-duration:.05ms !important}
 }
