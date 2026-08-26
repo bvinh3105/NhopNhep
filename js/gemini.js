@@ -132,18 +132,25 @@ Trả về JSON THUẦN (không markdown, không giải thích):
 
 Quy tắc: lat/lng phải chính xác trong bán kính. rating từ 3.5 đến 5.0. Chỉ trả JSON array.`;
 
-    const text = await this._call(prompt, {
-      wantJson: true, temperature: 0.4, maxTokens: 4096, timeout: 15000,
-    });
+    const callOpts = { wantJson: true, temperature: 0.4, maxTokens: 4096, timeout: 15000 };
 
-    let clean = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+    // Try once, retry once on transient failure (429 rate-limit, network
+    // blip, timeout, empty). Rapid successive scans can hit a brief limit.
     let arr;
-    try { arr = JSON.parse(clean); }
-    catch (e) {
-      console.warn('[Gemini] JSON parse fail:', clean.slice(0, 300));
-      throw new Error('Gemini trả JSON hỏng');
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const text = await this._call(prompt, callOpts);
+        const clean = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+        const parsed = JSON.parse(clean);
+        if (!Array.isArray(parsed)) throw new Error('Gemini không trả mảng');
+        arr = parsed;
+        break;
+      } catch (e) {
+        console.warn(`[Gemini] attempt ${attempt} failed:`, e.message);
+        if (attempt === 2) throw e;
+        await new Promise(r => setTimeout(r, 700));   // brief backoff, then retry
+      }
     }
-    if (!Array.isArray(arr)) throw new Error('Gemini không trả mảng');
 
     return arr
       .filter(x => x?.name && typeof x.lat === 'number' && typeof x.lng === 'number')
