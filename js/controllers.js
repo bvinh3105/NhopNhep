@@ -137,7 +137,8 @@ const HomeCtrl = {
 
   _cacheKey() {
     const cats = [...State.activeCats].sort().join(',');
-    return `${State.userLat.toFixed(3)}_${State.userLng.toFixed(3)}_${State.radius}_${cats}`;
+    const dish = (State.activeDish || '').trim().toLowerCase();
+    return `${State.userLat.toFixed(3)}_${State.userLng.toFixed(3)}_${State.radius}_${cats}_${dish}`;
   },
 
   async scan() {
@@ -218,9 +219,10 @@ const HomeCtrl = {
       setSubTxt('⏱ 0s · tối đa 20s');
 
       // ── Gemini + OSM chạy SONG SONG; lấy kết quả nào về trước ──────────
+      const dishQuery = (State.activeDish || '').trim();
       const geminiP = useGemini
         ? Gemini.findQuan(State.userLat, State.userLng, State.radius,
-            { categories: activeCats, limit: 20 })
+            { categories: activeCats, limit: 20, dish: dishQuery })
             .catch(e => { console.warn('[Gemini]', e.message); return []; })
         : Promise.resolve([]);
 
@@ -363,7 +365,7 @@ const HomeCtrl = {
       const dist = haversine(State.userLat, State.userLng, r.lat, r.lng);
       if (dist > State.radius) return false;
       r._dist = dist;
-      if (dishTokens.length && !this._dishMatches(r, dishTokens)) return false;
+      if (dishTokens.length && !r._gemini && !this._dishMatches(r, dishTokens)) return false;
       return true;
     });
 

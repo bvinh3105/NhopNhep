@@ -142,6 +142,10 @@ out center 200;`;
     const alloriginsUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(directGetUrl);
     endpoints.push({ url: alloriginsUrl, method: 'GET' });
 
+    // CORS-enabled Overpass mirrors (POST) — last-resort fallback
+    endpoints.push({ url: 'https://overpass.kumi.systems/api/interpreter', method: 'POST', body: queryParam });
+    endpoints.push({ url: 'https://overpass.osm.ch/api/interpreter', method: 'POST', body: queryParam });
+
     console.log('[POI] fetching concurrently from', endpoints.length, 'endpoints…');
 
     const abortControllers = endpoints.map(() => new AbortController());

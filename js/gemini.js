@@ -89,8 +89,13 @@ const Gemini = {
       : 'Nhà hàng, vỉa hè, ăn vặt, cà phê';
     const radiusKm = (radius / 1000).toFixed(1);
 
+    const dishHint = opts.dish
+      ? `\nMÓN CẦN TÌM: "${opts.dish}" — CHỈ trả về quán bán món "${opts.dish}" hoặc liên quan trực tiếp. Đây là yêu cầu bắt buộc.`
+      : '';
+
     const prompt = `Bạn là chuyên gia ẩm thực Việt Nam. Tìm ${opts.limit || 20} quán ăn/cà phê thực tế, đang mở, gần GPS ${lat}, ${lng} (bán kính ${radiusKm}km).
-${catHint}. Ưu tiên quán nổi tiếng, review tốt trên Google Maps.
+${catHint}.${dishHint}
+Ưu tiên quán nổi tiếng, review tốt trên Google Maps.
 
 Trả về JSON THUẦN (không markdown fence):
 [{"name":"...","cat":"restaurant|street|snack|cafe","price":"VD: 40k-80k","lat":21.xxx,"lng":105.xxx,"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]
