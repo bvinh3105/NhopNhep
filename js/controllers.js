@@ -302,16 +302,23 @@ const HomeCtrl = {
   _initDishSearch() {
     const input = document.getElementById('dishInput');
     const clear = document.getElementById('dishClearBtn');
-    const chipsEl = document.getElementById('dishChips');
-    if (!input || !chipsEl) return;
+    const suggest = document.getElementById('dishSuggest');
+    if (!input || !suggest) return;
 
     const syncChips = () => {
       const active = this._strip(State.activeDish);
-      chipsEl.querySelectorAll('.cat-chip').forEach(c => {
+      suggest.querySelectorAll('.dish-chip').forEach(c => {
         c.classList.toggle('active', active && this._strip(c.dataset.dish) === active);
       });
       clear.style.display = State.activeDish ? '' : 'none';
     };
+
+    // Show suggestions when the input is focused, hide on blur with a
+    // small delay so tapping a chip has time to register.
+    input.addEventListener('focus', () => suggest.classList.add('show'));
+    input.addEventListener('blur', () => {
+      setTimeout(() => suggest.classList.remove('show'), 180);
+    });
 
     input.addEventListener('input', () => {
       State.activeDish = input.value.trim();
@@ -323,13 +330,16 @@ const HomeCtrl = {
       State.activeDish = '';
       syncChips();
       showToast('🍽️ Đã xoá bộ lọc món');
+      input.focus();
     });
 
-    chipsEl.addEventListener('click', (e) => {
-      const chip = e.target.closest('.cat-chip');
+    // mousedown fires BEFORE blur so the input blur handler doesn't
+    // race the click and close the dropdown before we can react.
+    suggest.addEventListener('mousedown', (e) => {
+      const chip = e.target.closest('.dish-chip');
       if (!chip) return;
+      e.preventDefault();
       const dish = chip.dataset.dish || '';
-      // Toggle off if already active
       if (this._strip(State.activeDish) === this._strip(dish)) {
         input.value = '';
         State.activeDish = '';
@@ -338,6 +348,7 @@ const HomeCtrl = {
         State.activeDish = dish;
       }
       syncChips();
+      input.blur();
     });
   },
 

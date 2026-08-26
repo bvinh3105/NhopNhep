@@ -69,27 +69,27 @@
       <button class="cat-chip active" data-cat="cafe">☕ Cà phê</button>
     </div>
 
-    <!-- Dish search -->
-    <div class="row-label">Tìm <em>món</em></div>
+    <!-- Dish search — compact input; chip gợi ý hiện khi focus -->
+    <div class="row-label mini">Tìm <em>món</em> · tuỳ chọn</div>
     <div class="loc-row-wrap">
       <div class="loc-row">
-        <input id="dishInput" class="loc-input" type="text" placeholder="VD: phở, bún chả, trà sữa… bỏ trống = mọi món" autocomplete="off" spellcheck="false" maxlength="40">
+        <input id="dishInput" class="loc-input" type="text" placeholder="VD: phở, bánh mì… (bỏ trống = mọi món)" autocomplete="off" spellcheck="false" maxlength="40">
         <button class="loc-gps-btn" id="dishClearBtn" title="Xoá bộ lọc món" style="display:none">✕</button>
       </div>
-    </div>
-    <div class="cat-chips" id="dishChips">
-      <button class="cat-chip" data-dish="phở">🍜 Phở</button>
-      <button class="cat-chip" data-dish="bún">🍲 Bún</button>
-      <button class="cat-chip" data-dish="bánh mì">🥖 Bánh mì</button>
-      <button class="cat-chip" data-dish="cơm">🍚 Cơm</button>
-      <button class="cat-chip" data-dish="nướng">🍢 Nướng</button>
-      <button class="cat-chip" data-dish="lẩu">🥘 Lẩu</button>
-      <button class="cat-chip" data-dish="trà sữa">🧋 Trà sữa</button>
-      <button class="cat-chip" data-dish="cà phê">☕ Cà phê</button>
-      <button class="cat-chip" data-dish="pizza">🍕 Pizza</button>
-      <button class="cat-chip" data-dish="sushi">🍣 Sushi</button>
-      <button class="cat-chip" data-dish="chè">🍧 Chè</button>
-      <button class="cat-chip" data-dish="kem">🍦 Kem</button>
+      <div class="dish-suggest" id="dishSuggest">
+        <button class="dish-chip" data-dish="phở">🍜 Phở</button>
+        <button class="dish-chip" data-dish="bún">🍲 Bún</button>
+        <button class="dish-chip" data-dish="bánh mì">🥖 Bánh mì</button>
+        <button class="dish-chip" data-dish="cơm">🍚 Cơm</button>
+        <button class="dish-chip" data-dish="nướng">🍢 Nướng</button>
+        <button class="dish-chip" data-dish="lẩu">🥘 Lẩu</button>
+        <button class="dish-chip" data-dish="trà sữa">🧋 Trà sữa</button>
+        <button class="dish-chip" data-dish="cà phê">☕ Cà phê</button>
+        <button class="dish-chip" data-dish="pizza">🍕 Pizza</button>
+        <button class="dish-chip" data-dish="sushi">🍣 Sushi</button>
+        <button class="dish-chip" data-dish="chè">🍧 Chè</button>
+        <button class="dish-chip" data-dish="kem">🍦 Kem</button>
+      </div>
     </div>
 
     <!-- Radius -->
@@ -377,16 +377,16 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2426"></script>
-<script src="js/utils.js?v=2426"></script>
-<script src="js/state.js?v=2426"></script>
-<script src="js/poi.js?v=2426"></script>
-<script src="js/geocoder.js?v=2426"></script>
-<script src="js/gemini.js?v=2426"></script>
-<script src="js/map.js?v=2426"></script>
-<script src="js/gps.js?v=2426"></script>
-<script src="js/controllers.js?v=2426"></script>
-<script src="js/app.js?v=2426"></script>
+<script src="js/security.js?v=2427"></script>
+<script src="js/utils.js?v=2427"></script>
+<script src="js/state.js?v=2427"></script>
+<script src="js/poi.js?v=2427"></script>
+<script src="js/geocoder.js?v=2427"></script>
+<script src="js/gemini.js?v=2427"></script>
+<script src="js/map.js?v=2427"></script>
+<script src="js/gps.js?v=2427"></script>
+<script src="js/controllers.js?v=2427"></script>
+<script src="js/app.js?v=2427"></script>
 
 </body>
 </html>
