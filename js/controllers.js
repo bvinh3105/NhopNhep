@@ -369,12 +369,27 @@ const HomeCtrl = {
       return true;
     });
 
+    if (results.length === 0 && dishTokens.length && pool.length > 0) {
+      // Dish filter eliminated everything — fallback: show all nearby results
+      const fallback = pool.filter(r => {
+        if (!State.activeSrcs.has(this._srcOf(r))) return false;
+        if (!State.activeCats.has(r.cat)) return false;
+        const dist = haversine(State.userLat, State.userLng, r.lat, r.lng);
+        if (dist > State.radius) return false;
+        r._dist = dist;
+        return true;
+      });
+      if (fallback.length) {
+        showToast(`🔍 Không tìm thấy "${State.activeDish}" cụ thể · hiện ${fallback.length} quán gần đây`, 3000);
+        results.push(...fallback);
+      }
+    }
+
     if (results.length === 0) {
       let hint = 'Thử tăng bán kính hoặc bật GPS ở vị trí khác';
       if (!State.activeSrcs.has('osm')) hint = 'Bật 🌐 OpenStreetMap để tìm quán';
-      else if (State.activeDish) hint = `Không có quán "${State.activeDish}" — bỏ lọc món hoặc thử món khác`;
+      else if (State.activeDish) hint = `Không có quán "${State.activeDish}" — thử nhập Gemini API key ở Cá nhân`;
       showToast(`🤔 Không tìm thấy quán · ${hint}`);
-      // Clear markers if no results
       MapHome.showRestaurants([]);
       return;
     }

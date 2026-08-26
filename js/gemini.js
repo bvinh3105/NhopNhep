@@ -27,11 +27,8 @@ const Gemini = {
   // with existing callers.
   isConfigured() { return true; },
 
-  // Route requests: user key -> direct; otherwise -> proxy.
+  // Route: user key → direct Google API; no key → proxy; proxy fail → prompt for key.
   async _call(prompt, opts = {}) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), opts.timeout ?? 12000);
-
     const body = {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
       generationConfig: {
@@ -46,39 +43,65 @@ const Gemini = {
       body.tools = [{ google_search: {} }];
     }
 
-    const useDirect = !!this.userKey;
-    const url = useDirect
-      ? `${this.DIRECT_BASE}/${this.MODEL}:generateContent?key=${encodeURIComponent(this.userKey)}`
-      : this.PROXY_URL;
-    const upstreamBody = useDirect
-      ? body
-      : { model: this.MODEL, ...body };
+    // Try direct first if user has a key
+    if (this.userKey) {
+      const result = await this._fetch(
+        `${this.DIRECT_BASE}/${this.MODEL}:generateContent?key=${encodeURIComponent(this.userKey)}`,
+        body, opts
+      );
+      if (result.ok) return result.text;
+      if (result.status === 400 || result.status === 403) {
+        this.clearKey();
+        console.warn('[Gemini] user key invalid, cleared');
+      }
+    }
 
+    // Try proxy
+    const proxyResult = await this._fetch(this.PROXY_URL, { model: this.MODEL, ...body }, opts);
+    if (proxyResult.ok) return proxyResult.text;
+
+    // Proxy failed — prompt user for their own key
+    if (!this.userKey) {
+      const key = prompt('🔑 Nhập Gemini API key (lấy tại aistudio.google.com/apikey):');
+      if (key?.trim()) {
+        this.userKey = key.trim();
+        const retryResult = await this._fetch(
+          `${this.DIRECT_BASE}/${this.MODEL}:generateContent?key=${encodeURIComponent(this.userKey)}`,
+          body, opts
+        );
+        if (retryResult.ok) return retryResult.text;
+        if (retryResult.status === 400 || retryResult.status === 403) {
+          this.clearKey();
+        }
+        throw new Error(`Gemini ${retryResult.status}: key lỗi`);
+      }
+    }
+
+    throw new Error(`Gemini ${proxyResult.status}: proxy lỗi`);
+  },
+
+  async _fetch(url, body, opts = {}) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), opts.timeout ?? 12000);
     try {
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(upstreamBody),
+        body: JSON.stringify(body),
         signal: ctrl.signal,
       });
       clearTimeout(timer);
       if (!res.ok) {
-        // Bad user key — drop it so next call uses the proxy
-        if (useDirect && (res.status === 400 || res.status === 403)) {
-          this.clearKey();
-          throw new Error(`Gemini ${res.status}: key lỗi, đã xoá — thử lại`);
-        }
-        const errText = await res.text().catch(() => '');
-        throw new Error(`Gemini ${res.status}: ${errText.slice(0, 200)}`);
+        return { ok: false, status: res.status };
       }
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) throw new Error('Gemini trả về rỗng');
-      return text;
+      if (!text) return { ok: false, status: 'empty' };
+      return { ok: true, text };
     } catch (e) {
       clearTimeout(timer);
-      if (e.name === 'AbortError') throw new Error('Gemini timeout (>12s)');
-      throw e;
+      if (e.name === 'AbortError') return { ok: false, status: 'timeout' };
+      return { ok: false, status: e.message };
     }
   },
 
