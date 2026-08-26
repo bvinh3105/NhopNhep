@@ -1025,3 +1025,8 @@ body.map-full .tabbar{transform:translateY(105%)}
   color:#B92626;background:#F7D6BB;padding:.5rem;border-radius:10px;
   font-style:normal;font-weight:700;
 }
+.detail-demo-note{
+  font-size:.72rem;line-height:1.4;color:var(--text2);
+  opacity:.7;font-style:italic;font-weight:500;
+  margin:.35rem 0 .1rem;padding:0 .2rem;
+}

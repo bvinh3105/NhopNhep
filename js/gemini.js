@@ -133,10 +133,9 @@ Người dùng đang tìm: "${q}" — gần toạ độ GPS ${lat}, ${lng} (tron
 
 Xác định "${q}" là TÊN MÓN hay TÊN QUÁN cụ thể:
 - Nếu là TÊN MÓN (vd: bánh canh, phở, bún đậu) → trả các quán bán món đó.
-- Nếu là TÊN QUÁN / THƯƠNG HIỆU (vd: Brave Coffee Brewers, Highlands) → kết quả ĐẦU TIÊN BẮT BUỘC có "name" GIỮ NGUYÊN CHÍNH XÁC = "${q}" (KHÔNG đổi thành tên na ná như "Brave Roastery" hay "Brave Coffee & Tea"). Sau đó mới liệt kê chi nhánh/quán tương tự nếu có.
+- Nếu là TÊN QUÁN / THƯƠNG HIỆU (kể cả gõ tắt/viết thường, vd "brave", "highlands") → kết quả ĐẦU TIÊN phải là quán CÓ THẬT khớp nhất, với "name" là TÊN ĐẦY ĐỦ CHÍNH THỨC ĐÚNG như trên Google Maps (vd gõ "brave" → name "Brave Coffee Brewers"; gõ "highlands" → "Highlands Coffee"). Viết hoa đúng chuẩn, KHÔNG để nguyên chữ người dùng gõ, KHÔNG bịa quán khác tên na ná (vd KHÔNG trả "Brave Roastery" khi họ tìm Brave Coffee Brewers).
 
-⛔ TUYỆT ĐỐI KHÔNG bịa tên gần giống. Nếu không chắc quán "${q}" tồn tại, vẫn trả 1 kết quả với name = "${q}" đúng nguyên văn để người dùng tự kiểm tra trên Google Maps.
-Trả tối đa ${opts.limit || 20} kết quả, khớp nhất với "${q}" xếp trước.
+Sau kết quả đầu, mới liệt kê chi nhánh / quán liên quan. Trả tối đa ${opts.limit || 20} kết quả, khớp nhất xếp trước. Nếu không có quán nào khớp, trả [].
 
 Trả về JSON THUẦN (không markdown, không giải thích):
 [{"name":"tên quán","address":"địa chỉ đường + phường/quận nếu biết","cat":"restaurant|street|snack|cafe","price":"VD: 40k-80k","lat":${lat},"lng":${lng},"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]

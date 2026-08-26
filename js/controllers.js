@@ -1603,12 +1603,14 @@ const DetailModal = {
     // Gemini coords are unreliable, so we DON'T reverse-geocode them (it
     // would show a confidently-wrong street) — the "Google Maps" button
     // searches by name for the authoritative location instead.
+    // Demo disclaimer — shown for AI results whose address may be off.
+    const demoNote = `<div class="detail-demo-note"><em>Ứng dụng đang trong giai đoạn demo nên có thể ghi sai địa chỉ — bấm 🗺️ Google Maps để xem địa chỉ &amp; chỉ đường chính xác.</em></div>`;
     let addressHtml = '';
     if (isGemini) {
-      // Gemini's address/coords are unreliable (often the wrong district),
-      // so don't display a specific street — steer the user to the
-      // name-based Google Maps button for the authoritative address.
-      addressHtml = `<div class="detail-address" style="opacity:.9">📍 <em>Bấm 🗺️ Google Maps để xem địa chỉ &amp; chỉ đường chính xác</em></div>`;
+      // Show Gemini's (approximate) address like before, plus a clear
+      // demo disclaimer steering the user to Google Maps for the exact one.
+      if (r.address) addressHtml = `<div class="detail-address">🏠 ${escape(r.address)}</div>`;
+      addressHtml += demoNote;
     } else if (r.address || r._resolvedAddress) {
       addressHtml = `<div class="detail-address">🏠 ${escape(r.address || r._resolvedAddress)}</div>`;
     } else if (hasCoords) {
