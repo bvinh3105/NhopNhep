@@ -23,24 +23,34 @@ function haversine(lat1, lng1, lat2, lng2) {
 
 function fmtDist(m) { return m < 1000 ? Math.round(m)+'m' : (m/1000).toFixed(1)+'km'; }
 
-// Google Maps link for a place. Gemini's coordinates are unreliable
-// (often km off), so for AI/OSM results we search by NAME centered near
-// the approximate coords — Google finds the real listing (accurate
-// address + directions). User-added places with a real address search by
-// that. Only fall back to raw coords when there's nothing else.
+// Google Maps link for a place. Gemini's coordinates AND its address are
+// both unreliable (often the wrong district), so for AI results we search
+// by NAME ONLY, centered on the USER's real location — Google then
+// resolves the real listing near the user. For accurate sources (OSM /
+// user-added) we can trust the place's own coords and address.
 function gmapsUrl(r) {
   const name = (r && r.name) ? String(r.name).trim() : '';
+  const uLat = (typeof State !== 'undefined' && typeof State.userLat === 'number') ? State.userLat : null;
+  const uLng = (typeof State !== 'undefined' && typeof State.userLng === 'number') ? State.userLng : null;
+
+  // Trustworthy map center: never Gemini's coords.
+  let cLat = null, cLng = null;
+  if (r && r._gemini) {
+    cLat = uLat; cLng = uLng;                       // AI → center on the user
+  } else if (typeof r?.lat === 'number') {
+    cLat = r.lat; cLng = r.lng;                      // OSM/user → own coords
+  } else { cLat = uLat; cLng = uLng; }
+
   if (name) {
     let q = name;
-    if (r.address) q += ' ' + r.address;
-    // Bias the search to the right area using the (approximate) coords.
-    if (typeof r.lat === 'number' && typeof r.lng === 'number') {
-      return `https://www.google.com/maps/search/${encodeURIComponent(q)}/@${r.lat},${r.lng},15z`;
+    if (!r._gemini && r.address) q += ' ' + r.address;   // only trust real addresses
+    if (typeof cLat === 'number') {
+      return `https://www.google.com/maps/search/${encodeURIComponent(q)}/@${cLat},${cLng},15z`;
     }
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
   }
-  if (typeof r?.lat === 'number' && typeof r?.lng === 'number') {
-    return `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`;
+  if (typeof cLat === 'number') {
+    return `https://www.google.com/maps/search/?api=1&query=${cLat},${cLng}`;
   }
   return 'https://www.google.com/maps';
 }

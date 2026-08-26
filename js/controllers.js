@@ -1605,12 +1605,10 @@ const DetailModal = {
     // searches by name for the authoritative location instead.
     let addressHtml = '';
     if (isGemini) {
-      // Gemini's address/coords are approximate — show the hint but label
-      // it, and steer the user to the (name-based) Google Maps button.
-      const hint = r.address
-        ? `📍 <em>${escape(r.address)}</em> <span style="opacity:.7">· gần đúng, bấm 🗺️ để xem chính xác</span>`
-        : `📍 <em>Vị trí gần đúng · bấm 🗺️ Google Maps để xem địa chỉ chính xác</em>`;
-      addressHtml = `<div class="detail-address" style="opacity:.9">${hint}</div>`;
+      // Gemini's address/coords are unreliable (often the wrong district),
+      // so don't display a specific street — steer the user to the
+      // name-based Google Maps button for the authoritative address.
+      addressHtml = `<div class="detail-address" style="opacity:.9">📍 <em>Bấm 🗺️ Google Maps để xem địa chỉ &amp; chỉ đường chính xác</em></div>`;
     } else if (r.address || r._resolvedAddress) {
       addressHtml = `<div class="detail-address">🏠 ${escape(r.address || r._resolvedAddress)}</div>`;
     } else if (hasCoords) {
