@@ -274,6 +274,14 @@ const HomeCtrl = {
     if (items.length) {
       const srcLabel = source === 'gemini' ? '✨ Gemini' : '🗺️ OSM';
       showToast(`✅ Tìm thấy ${items.length} quán (${srcLabel})`, 2200);
+    } else if (State.activeSrcs.has('osm')) {
+      // Nothing came back from either source
+      const geminiOn = typeof Gemini !== 'undefined' && Gemini.isConfigured();
+      if (!geminiOn) {
+        showToast('🔑 Chưa có Gemini key · vào Cá nhân thêm key để tìm quán thông minh', 4000);
+      } else {
+        showToast('😕 Không tìm thấy quán · thử tăng bán kính hoặc đổi vị trí', 3500);
+      }
     }
 
     this._doScan();
@@ -1108,6 +1116,56 @@ const ProfileCtrl = {
       reader.readAsText(file);
       e.target.value = '';
     });
+
+    // ── Gemini API key ────────────────────────────────────────────────
+    const keyInput = document.getElementById('geminiKeyInput');
+    const keyToggle = document.getElementById('geminiKeyToggle');
+    const keySave = document.getElementById('geminiKeySave');
+    const keyClear = document.getElementById('geminiKeyClear');
+
+    if (keyToggle && keyInput) {
+      keyToggle.addEventListener('click', () => {
+        keyInput.type = keyInput.type === 'password' ? 'text' : 'password';
+      });
+    }
+    if (keySave && keyInput) {
+      keySave.addEventListener('click', () => {
+        const v = keyInput.value.trim();
+        if (!v) { showToast('⚠️ Dán API key trước nhé!'); return; }
+        if (v.length < 20) { showToast('⚠️ Key không hợp lệ (quá ngắn)'); return; }
+        Gemini.userKey = v;
+        keyInput.value = '';
+        HomeCtrl._scanCache?.clear?.();
+        this._renderAiStatus();
+        showToast('✅ Đã lưu key riêng · quét lại để dùng');
+      });
+    }
+    if (keyClear) {
+      keyClear.addEventListener('click', () => {
+        Gemini.clearKey();
+        if (keyInput) keyInput.value = '';
+        HomeCtrl._scanCache?.clear?.();
+        this._renderAiStatus();
+        showToast('↺ Đã chuyển về key mặc định');
+      });
+    }
+  },
+
+  _renderAiStatus() {
+    const el = document.getElementById('aiStatus');
+    if (!el) return;
+    const custom = Gemini.usingCustomKey();
+    const hasDefault = !!Gemini.defaultKey;
+    if (custom) {
+      el.textContent = '● Key riêng';
+      el.style.color = '#2e9e5b';
+    } else if (hasDefault) {
+      el.textContent = '● Key mặc định';
+      el.style.color = '#B92626';
+    } else {
+      el.textContent = '● Chưa có key';
+      el.style.color = '#999';
+    }
   },
 
   render() {
@@ -1118,6 +1176,7 @@ const ProfileCtrl = {
     });
     this._renderStats();
     this._renderMyRestaurants();
+    this._renderAiStatus();
   },
 
   _renderStats() {

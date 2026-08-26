@@ -248,6 +248,24 @@
       <input type="file" id="importFileInput" accept=".json">
     </div>
 
+    <!-- AI / Gemini key -->
+    <div class="profile-section">
+      <div class="psec-head">
+        <div class="psec-title">Gemini <em>AI</em></div>
+        <span class="ai-status" id="aiStatus">●</span>
+      </div>
+      <p class="ai-hint">Tìm quán thông minh bằng AI. Mặc định đã có key dùng chung — bạn có thể dùng key riêng để không giới hạn lượt.</p>
+      <div class="ai-key-row">
+        <input class="form-input" id="geminiKeyInput" type="password" placeholder="Dán API key của bạn (tùy chọn)…" autocomplete="off" spellcheck="false">
+        <button class="ai-key-toggle" id="geminiKeyToggle" title="Hiện/ẩn key" type="button">👁</button>
+      </div>
+      <div class="ai-key-actions">
+        <button class="data-btn" id="geminiKeySave">💾 Lưu key</button>
+        <button class="data-btn import" id="geminiKeyClear">↺ Dùng key mặc định</button>
+      </div>
+      <a class="ai-getkey" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Lấy key miễn phí tại Google AI Studio →</a>
+    </div>
+
   </div>
 </div>
 
@@ -377,16 +395,16 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2430"></script>
-<script src="js/utils.js?v=2430"></script>
-<script src="js/state.js?v=2430"></script>
-<script src="js/poi.js?v=2430"></script>
-<script src="js/geocoder.js?v=2430"></script>
-<script src="js/gemini.js?v=2430"></script>
-<script src="js/map.js?v=2430"></script>
-<script src="js/gps.js?v=2430"></script>
-<script src="js/controllers.js?v=2430"></script>
-<script src="js/app.js?v=2430"></script>
+<script src="js/security.js?v=2431"></script>
+<script src="js/utils.js?v=2431"></script>
+<script src="js/state.js?v=2431"></script>
+<script src="js/poi.js?v=2431"></script>
+<script src="js/geocoder.js?v=2431"></script>
+<script src="js/gemini.js?v=2431"></script>
+<script src="js/map.js?v=2431"></script>
+<script src="js/gps.js?v=2431"></script>
+<script src="js/controllers.js?v=2431"></script>
+<script src="js/app.js?v=2431"></script>
 
 </body>
 </html>

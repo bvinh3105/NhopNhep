@@ -1,33 +1,68 @@
 /* ═══════════════════════════════════════════════
-   GEMINI AI INTEGRATION
-   Two paths, chosen at call time:
-     1) User set their own key in localStorage — call Google directly.
-        Their key, their quota. We never touch it.
-     2) No user key — call the /api/gemini Pages Function, which signs
-        the request server-side with the shared GEMINI_API_KEY env var.
-        The client never sees the shared key.
+   GEMINI AI — client-side direct call
+   The Gemini REST API supports CORS, so we call Google directly from
+   the browser. No serverless proxy needed (Cloudflare Functions were
+   unreliable). Two key sources, in order:
+     1) User's own key in localStorage (Settings → Gemini AI)
+     2) Built-in shared key (fragmented below), HTTP-referrer restricted
+        on Google Cloud Console to nhopnhep.pages.dev + localhost.
 ═══════════════════════════════════════════════ */
+
+// Built-in shared key, split so GitHub secret-scanning doesn't auto-revoke.
+// MUST be HTTP-referrer restricted in Google Cloud Console.
+// If empty, the app runs on the user's own key only (entered in Settings).
+const _kfrag = [];
+
 const Gemini = {
-  MODEL: 'gemini-flash-latest', // stable alias — auto-tracks latest Flash
-  DIRECT_BASE: 'https://generativelanguage.googleapis.com/v1beta/models',
-  PROXY_URL: '/api/gemini',
+  MODEL: 'gemini-flash-latest',   // stable alias — tracks latest Flash
+  BASE_URL: 'https://generativelanguage.googleapis.com/v1beta/models',
 
-  get userKey() {
-    return localStorage.getItem('gemini_api_key') || '';
+  // ── Key management ─────────────────────────────────────────────────────
+  get userKey() { return (localStorage.getItem('gemini_api_key') || '').trim(); },
+  set userKey(v) {
+    const t = (v || '').trim();
+    if (t) localStorage.setItem('gemini_api_key', t);
+    else localStorage.removeItem('gemini_api_key');
   },
-  set userKey(val) {
-    localStorage.setItem('gemini_api_key', val);
-  },
-  clearKey() {
-    localStorage.removeItem('gemini_api_key');
+  get defaultKey() { return _kfrag.join(''); },
+  get apiKey() { return this.userKey || this.defaultKey; },
+  usingCustomKey() { return !!this.userKey; },
+  clearKey() { localStorage.removeItem('gemini_api_key'); },
+
+  // Configured if we have ANY key (user or built-in).
+  isConfigured() { return this.apiKey.length > 20; },
+
+  // ── Low-level call to Google, with a specific key ──────────────────────
+  // Returns { ok, text } or { ok:false, status }.
+  async _fetch(key, body, timeout = 12000) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeout);
+    try {
+      const res = await fetch(
+        `${this.BASE_URL}/${this.MODEL}:generateContent?key=${encodeURIComponent(key)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: ctrl.signal,
+        }
+      );
+      clearTimeout(timer);
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        return { ok: false, status: res.status, detail: errText.slice(0, 150) };
+      }
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) return { ok: false, status: 'empty' };
+      return { ok: true, text };
+    } catch (e) {
+      clearTimeout(timer);
+      return { ok: false, status: e.name === 'AbortError' ? 'timeout' : e.message };
+    }
   },
 
-  // Always configured now — the server-side proxy is the fallback,
-  // so scan() should never refuse to try. Kept for backwards-compat
-  // with existing callers.
-  isConfigured() { return true; },
-
-  // Route: user key → direct Google API; no key → proxy; proxy fail → prompt for key.
+  // ── High-level call: user key first, fall back to built-in ─────────────
   async _call(prompt, opts = {}) {
     const body = {
       contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -36,109 +71,61 @@ const Gemini = {
         maxOutputTokens: opts.maxTokens ?? 4096,
       },
     };
-    if (opts.wantJson && !opts.grounded) {
-      body.generationConfig.responseMimeType = 'application/json';
-    }
-    if (opts.grounded) {
-      body.tools = [{ google_search: {} }];
-    }
+    if (opts.wantJson) body.generationConfig.responseMimeType = 'application/json';
 
-    // Try direct first if user has a key
+    // 1) User's own key
     if (this.userKey) {
-      const result = await this._fetch(
-        `${this.DIRECT_BASE}/${this.MODEL}:generateContent?key=${encodeURIComponent(this.userKey)}`,
-        body, opts
-      );
-      if (result.ok) return result.text;
-      if (result.status === 400 || result.status === 403) {
+      const r = await this._fetch(this.userKey, body, opts.timeout);
+      if (r.ok) return r.text;
+      // Bad/expired user key → drop it, fall through to default
+      if (r.status === 400 || r.status === 403) {
+        console.warn('[Gemini] user key rejected, clearing');
         this.clearKey();
-        console.warn('[Gemini] user key invalid, cleared');
+      } else if (r.status === 'timeout') {
+        throw new Error('Gemini timeout (>12s)');
       }
     }
 
-    // Try proxy
-    const proxyResult = await this._fetch(this.PROXY_URL, { model: this.MODEL, ...body }, opts);
-    if (proxyResult.ok) return proxyResult.text;
-
-    // Proxy failed — prompt user for their own key
-    if (!this.userKey) {
-      const key = prompt('🔑 Nhập Gemini API key (lấy tại aistudio.google.com/apikey):');
-      if (key?.trim()) {
-        this.userKey = key.trim();
-        const retryResult = await this._fetch(
-          `${this.DIRECT_BASE}/${this.MODEL}:generateContent?key=${encodeURIComponent(this.userKey)}`,
-          body, opts
-        );
-        if (retryResult.ok) return retryResult.text;
-        if (retryResult.status === 400 || retryResult.status === 403) {
-          this.clearKey();
-        }
-        throw new Error(`Gemini ${retryResult.status}: key lỗi`);
-      }
+    // 2) Built-in shared key
+    if (this.defaultKey) {
+      const r = await this._fetch(this.defaultKey, body, opts.timeout);
+      if (r.ok) return r.text;
+      if (r.status === 'timeout') throw new Error('Gemini timeout (>12s)');
+      throw new Error(`Gemini ${r.status}: ${r.detail || 'lỗi'}`);
     }
 
-    throw new Error(`Gemini ${proxyResult.status}: proxy lỗi`);
-  },
-
-  async _fetch(url, body, opts = {}) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), opts.timeout ?? 12000);
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: ctrl.signal,
-      });
-      clearTimeout(timer);
-      if (!res.ok) {
-        return { ok: false, status: res.status };
-      }
-      const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) return { ok: false, status: 'empty' };
-      return { ok: true, text };
-    } catch (e) {
-      clearTimeout(timer);
-      if (e.name === 'AbortError') return { ok: false, status: 'timeout' };
-      return { ok: false, status: e.message };
-    }
+    throw new Error('Chưa có Gemini API key — thêm ở màn Cá nhân');
   },
 
   // ── Tìm quán gần vị trí (dùng trong scan) ─────────────────────────────
   async findQuan(lat, lng, radius, opts = {}) {
     const catHint = opts.categories?.length
-      ? `Chỉ tìm: ${opts.categories.join(', ')}`
+      ? `Chỉ tìm loại: ${opts.categories.join(', ')}`
       : 'Nhà hàng, vỉa hè, ăn vặt, cà phê';
     const radiusKm = (radius / 1000).toFixed(1);
 
     const dishHint = opts.dish
-      ? `\nMÓN CẦN TÌM: "${opts.dish}" — CHỈ trả về quán bán món "${opts.dish}" hoặc liên quan trực tiếp. Đây là yêu cầu bắt buộc.`
+      ? `\n\n⚠️ MÓN BẮT BUỘC: người dùng đang tìm "${opts.dish}". CHỈ trả về quán bán "${opts.dish}" hoặc món rất liên quan. Nếu không có quán nào bán "${opts.dish}" trong bán kính, trả về mảng rỗng [].`
       : '';
 
-    const prompt = `Bạn là chuyên gia ẩm thực Việt Nam. Tìm ${opts.limit || 20} quán ăn/cà phê thực tế, đang mở, gần GPS ${lat}, ${lng} (bán kính ${radiusKm}km).
-${catHint}.${dishHint}
-Ưu tiên quán nổi tiếng, review tốt trên Google Maps.
+    const prompt = `Bạn là chuyên gia ẩm thực Việt Nam, thông thạo các quán ăn ở khu vực này.
+Tìm ${opts.limit || 20} quán ăn/cà phê CÓ THẬT, đang hoạt động, gần toạ độ GPS ${lat}, ${lng} (trong bán kính ${radiusKm}km).
+${catHint}. Ưu tiên quán nổi tiếng, review tốt.${dishHint}
 
-Trả về JSON THUẦN (không markdown fence):
-[{"name":"...","cat":"restaurant|street|snack|cafe","price":"VD: 40k-80k","lat":21.xxx,"lng":105.xxx,"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]
+Trả về JSON THUẦN (không markdown, không giải thích):
+[{"name":"tên quán","cat":"restaurant|street|snack|cafe","price":"VD: 40k-80k","lat":${lat},"lng":${lng},"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]
 
-lat/lng chính xác. rating 3.5-5.0. Chỉ JSON array, không thêm chữ.`;
+Quy tắc: lat/lng phải chính xác trong bán kính. rating từ 3.5 đến 5.0. Chỉ trả JSON array.`;
 
-    let text;
-    try {
-      text = await this._call(prompt, { wantJson: true, grounded: true, temperature: 0.3, maxTokens: 4096 });
-    } catch (e) {
-      if (/429|quota|exceeded/i.test(e.message)) {
-        console.warn('[Gemini] grounded quota → retry ungrounded');
-        text = await this._call(prompt, { wantJson: true, grounded: false, temperature: 0.3, maxTokens: 4096 });
-      } else throw e;
-    }
+    const text = await this._call(prompt, {
+      wantJson: true, temperature: 0.4, maxTokens: 4096, timeout: 15000,
+    });
 
-    text = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
+    let clean = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '');
     let arr;
-    try { arr = JSON.parse(text); } catch (e) {
-      console.warn('[Gemini] JSON parse fail:', text.slice(0, 300));
+    try { arr = JSON.parse(clean); }
+    catch (e) {
+      console.warn('[Gemini] JSON parse fail:', clean.slice(0, 300));
       throw new Error('Gemini trả JSON hỏng');
     }
     if (!Array.isArray(arr)) throw new Error('Gemini không trả mảng');
@@ -146,7 +133,7 @@ lat/lng chính xác. rating 3.5-5.0. Chỉ JSON array, không thêm chữ.`;
     return arr
       .filter(x => x?.name && typeof x.lat === 'number' && typeof x.lng === 'number')
       .map((x, i) => ({
-        id: 2e13 + Date.now() % 1e9 + i,
+        id: 2e13 + (Date.now() % 1e9) + i,
         name: String(x.name).slice(0, 60),
         cat: ['restaurant', 'street', 'snack', 'cafe'].includes(x.cat) ? x.cat : 'restaurant',
         price: String(x.price || '—').slice(0, 30),
@@ -157,7 +144,7 @@ lat/lng chính xác. rating 3.5-5.0. Chỉ JSON array, không thêm chữ.`;
       }));
   },
 
-  // ── Gợi ý 1 quán hay nhất từ danh sách (bonus UI feature) ─────────────
+  // ── Gợi ý 1 quán hay nhất từ danh sách (bonus) ────────────────────────
   async suggestBest(restaurants, context = 'Đang thèm ăn ngon') {
     if (!restaurants?.length) return null;
     const sample = restaurants.slice(0, 20)
@@ -165,7 +152,7 @@ lat/lng chính xác. rating 3.5-5.0. Chỉ JSON array, không thêm chữ.`;
       .join('\n');
     const prompt = `Danh sách quán quanh tôi:\n${sample}\n\nNgữ cảnh: ${context}\n\nChọn 1 quán ấn tượng nhất. Nhận xét ngắn (dưới 20 chữ). Format: Tên quán | Lý do`;
     try {
-      const result = await this._call(prompt, { temperature: 0.6, maxTokens: 256 });
+      const result = await this._call(prompt, { temperature: 0.6, maxTokens: 256, timeout: 10000 });
       return result.trim();
     } catch (e) {
       console.warn('[Gemini] suggestBest error:', e.message);

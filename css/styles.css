@@ -757,6 +757,23 @@ body.map-full .tabbar{transform:translateY(105%)}
 .data-btn.import{background:var(--accent);color:var(--cream);border-color:var(--accent-2);box-shadow:2px 2px 0 var(--accent-2)}
 #importFileInput{display:none}
 
+/* ── Gemini AI key section ── */
+.ai-status{font-size:.72rem;font-weight:800;letter-spacing:.02em}
+.ai-hint{font-size:.76rem;color:var(--text-muted,#8a7f6a);line-height:1.4;margin:.4rem 0 .6rem}
+.ai-key-row{display:flex;gap:.4rem;align-items:stretch}
+.ai-key-row .form-input{flex:1}
+.ai-key-toggle{
+  width:44px;flex-shrink:0;border:2px solid var(--text);border-radius:14px;
+  background:var(--white);font-size:1rem;box-shadow:2px 2px 0 var(--text);
+  cursor:pointer;transition:all .12s;
+}
+.ai-key-toggle:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.ai-key-actions{display:flex;gap:.5rem;margin-top:.5rem}
+.ai-getkey{
+  display:inline-block;margin-top:.55rem;font-size:.75rem;font-weight:700;
+  color:var(--primary);text-decoration:none;border-bottom:1.5px dashed var(--primary);
+}
+
 /* ═══════════════════════════════════════════════
    MODAL (Add restaurant)
 ═══════════════════════════════════════════════ */
