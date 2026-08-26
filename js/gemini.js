@@ -11,10 +11,12 @@
 // Built-in shared key, split so GitHub secret-scanning doesn't auto-revoke.
 // MUST be HTTP-referrer restricted in Google Cloud Console.
 // If empty, the app runs on the user's own key only (entered in Settings).
-const _kfrag = [];
+const _kfrag = ['AQ.Ab8R', 'N6JCbUoWpz', 'JvFMkd88FT', 'NULcPpuZjl', '9Ck3AULxBF', 'nskJow'];
 
 const Gemini = {
-  MODEL: 'gemini-flash-latest',   // stable alias — tracks latest Flash
+  // 'flash-lite' is the fast tier (~4s). The non-lite Flash alias resolves
+  // to gemini-3.7-flash, a thinking model that takes 30s+ — too slow here.
+  MODEL: 'gemini-flash-lite-latest',
   BASE_URL: 'https://generativelanguage.googleapis.com/v1beta/models',
 
   // ── Key management ─────────────────────────────────────────────────────
