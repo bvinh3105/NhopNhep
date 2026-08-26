@@ -20,10 +20,16 @@
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
 
-# Same-origin path -> Netlify function (matches Cloudflare Pages path /api/overpass)
+# Same-origin path -> Netlify functions
 [[redirects]]
   from = "/api/overpass"
   to = "/.netlify/functions/overpass"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/gemini"
+  to = "/.netlify/functions/gemini"
   status = 200
   force = true
 

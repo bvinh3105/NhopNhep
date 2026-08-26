@@ -31,7 +31,7 @@ export const handler = async (event) => {
   const mirrors = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass.osm.ch/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
   ];
 
   const PER_MIRROR_TIMEOUT = 8000;
@@ -48,10 +48,13 @@ export const handler = async (event) => {
       clearTimeout(timer);
       if (!res.ok) throw new Error(`${url} → HTTP ${res.status}`);
       const text = await res.text();
-      // Overpass sometimes returns 200 with an error body — sanity-check
-      // that we got JSON that at least mentions "elements"
       if (!text.includes('"elements"')) {
         throw new Error(`${url} → non-JSON response`);
+      }
+      // Reject empty results — stale mirrors return "elements": []
+      const parsed = JSON.parse(text);
+      if (!parsed.elements || parsed.elements.length === 0) {
+        throw new Error(`${url} → 0 elements (stale mirror)`);
       }
       return { url, text, contentType: res.headers.get('content-type') || 'application/json' };
     }).catch(e => {

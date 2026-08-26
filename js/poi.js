@@ -144,7 +144,7 @@ out center 200;`;
 
     // CORS-enabled Overpass mirrors (POST) — last-resort fallback
     endpoints.push({ url: 'https://overpass.kumi.systems/api/interpreter', method: 'POST', body: queryParam });
-    endpoints.push({ url: 'https://overpass.osm.ch/api/interpreter', method: 'POST', body: queryParam });
+    endpoints.push({ url: 'https://maps.mail.ru/osm/tools/overpass/api/interpreter', method: 'POST', body: queryParam });
 
     console.log('[POI] fetching concurrently from', endpoints.length, 'endpoints…');
 
