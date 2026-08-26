@@ -154,8 +154,8 @@ const MapHome = {
         <div style="font-family: var(--font-body); font-size: 0.8rem;">
           <strong style="display:block; font-family: var(--font-display); font-size: 0.95rem;">${r.name}</strong>
           <span style="color: #6B4A38">${cat.label} · ${r.price}</span><br>
-          <a href="https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}" 
-             target="_blank" style="display:inline-block; margin-top:5px; color:#1565c0; text-decoration:none; font-weight:bold;">
+          <a href="${gmapsUrl(r)}"
+             target="_blank" rel="noopener" style="display:inline-block; margin-top:5px; color:#1565c0; text-decoration:none; font-weight:bold;">
             🗺️ Mở Google Maps
           </a>
         </div>

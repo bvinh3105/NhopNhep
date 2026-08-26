@@ -745,8 +745,8 @@ const PlanCtrl = {
               </div>
             </div>
             <div class="tl-time" id="stopTime${i}">Đến ${fmtClock(stop.arrivalClock)} → Rời ${fmtClock(stop.departureClock)}</div>
-            <a href="https://www.google.com/maps/search/?api=1&query=${stop.lat},${stop.lng}" 
-               target="_blank" class="r-gmaps-link" style="margin-top:8px">
+            <a href="${gmapsUrl(stop)}"
+               target="_blank" rel="noopener" class="r-gmaps-link" style="margin-top:8px">
                🗺️ Mở Google Maps
             </a>
           </div>
@@ -1579,8 +1579,7 @@ const DetailModal = {
         showToast('Quán chưa có vị trí trên bản đồ');
         return;
       }
-      const url = `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`;
-      window.open(url, '_blank', 'noopener');
+      window.open(gmapsUrl(r), '_blank', 'noopener');
     });
   },
 
@@ -1596,22 +1595,33 @@ const DetailModal = {
       : '';
 
     const hasCoords = r.lat != null && r.lng != null;
+    const isGemini = !!r._gemini;
     // Preferred display: real address text. Priority:
     //   1) r.address    — what the user typed when adding the place
     //   2) r._resolvedAddress — cached reverse-geocode from earlier open
-    //   3) placeholder → fire off a reverse-geocode async, swap in when it lands
-    const knownAddress = r.address || r._resolvedAddress || null;
+    //   3) placeholder → reverse-geocode async (ONLY for accurate coords)
+    // Gemini coords are unreliable, so we DON'T reverse-geocode them (it
+    // would show a confidently-wrong street) — the "Google Maps" button
+    // searches by name for the authoritative location instead.
     let addressHtml = '';
-    if (knownAddress) {
-      addressHtml = `<div class="detail-address">🏠 ${escape(knownAddress)}</div>`;
+    if (isGemini) {
+      // Gemini's address/coords are approximate — show the hint but label
+      // it, and steer the user to the (name-based) Google Maps button.
+      const hint = r.address
+        ? `📍 <em>${escape(r.address)}</em> <span style="opacity:.7">· gần đúng, bấm 🗺️ để xem chính xác</span>`
+        : `📍 <em>Vị trí gần đúng · bấm 🗺️ Google Maps để xem địa chỉ chính xác</em>`;
+      addressHtml = `<div class="detail-address" style="opacity:.9">${hint}</div>`;
+    } else if (r.address || r._resolvedAddress) {
+      addressHtml = `<div class="detail-address">🏠 ${escape(r.address || r._resolvedAddress)}</div>`;
     } else if (hasCoords) {
       addressHtml = `<div class="detail-address" id="_detailAddrPending">🏠 <em style="opacity:.6">Đang tra địa chỉ…</em></div>`;
     }
-    // Coords line — only shown as a small hint when we don't yet have a
-    // human address (so the user isn't staring at raw numbers when we do).
+    const knownAddress = (!isGemini && (r.address || r._resolvedAddress)) || null;
+    // Coords line — small hint only for accurate (non-Gemini) sources
+    // when we don't yet have a human address.
     const coordsHtml = !hasCoords
       ? `<div class="detail-coords warn">⚠️ Chưa có vị trí trên map · chỉnh sửa hoặc thêm mới để gắn vị trí</div>`
-      : (knownAddress ? '' : `<div class="detail-coords">📍 ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}</div>`);
+      : (knownAddress || isGemini ? '' : `<div class="detail-coords">📍 ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}</div>`);
 
     body.innerHTML = `
       ${imgHtml}
@@ -1628,18 +1638,20 @@ const DetailModal = {
       ${addressHtml}
       ${coordsHtml}
     `;
-    // Disable Google Maps button when no coords
+    // Google Maps button: enabled whenever we have a name or coords
+    // (searches by name for the real listing, even if coords are off).
     const mapsBtn = document.getElementById('detailMaps');
     if (mapsBtn) {
-      mapsBtn.disabled = !hasCoords;
-      mapsBtn.style.opacity = hasCoords ? '' : '.5';
+      const canMap = !!r.name || hasCoords;
+      mapsBtn.disabled = !canMap;
+      mapsBtn.style.opacity = canMap ? '' : '.5';
     }
     document.getElementById('detailModal').classList.add('show');
 
-    // Kick off reverse geocode if we don't have a real address yet.
-    // If the user closes the modal or opens a different place before
-    // the network settles, drop the result silently.
-    if (!knownAddress && hasCoords) {
+    // Reverse-geocode ONLY for accurate coords (not Gemini's approximate
+    // ones). If the user closes the modal or opens another place first,
+    // drop the result silently.
+    if (!knownAddress && hasCoords && !isGemini) {
       Geocoder.reverse(r.lat, r.lng).then(addr => {
         if (this._current !== r) return;
         const pending = document.getElementById('_detailAddrPending');

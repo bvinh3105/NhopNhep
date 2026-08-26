@@ -23,6 +23,28 @@ function haversine(lat1, lng1, lat2, lng2) {
 
 function fmtDist(m) { return m < 1000 ? Math.round(m)+'m' : (m/1000).toFixed(1)+'km'; }
 
+// Google Maps link for a place. Gemini's coordinates are unreliable
+// (often km off), so for AI/OSM results we search by NAME centered near
+// the approximate coords — Google finds the real listing (accurate
+// address + directions). User-added places with a real address search by
+// that. Only fall back to raw coords when there's nothing else.
+function gmapsUrl(r) {
+  const name = (r && r.name) ? String(r.name).trim() : '';
+  if (name) {
+    let q = name;
+    if (r.address) q += ' ' + r.address;
+    // Bias the search to the right area using the (approximate) coords.
+    if (typeof r.lat === 'number' && typeof r.lng === 'number') {
+      return `https://www.google.com/maps/search/${encodeURIComponent(q)}/@${r.lat},${r.lng},15z`;
+    }
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+  }
+  if (typeof r?.lat === 'number' && typeof r?.lng === 'number') {
+    return `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}`;
+  }
+  return 'https://www.google.com/maps';
+}
+
 function fmtTime(min) {
   if (min < 60) return min+'p';
   return Math.floor(min/60)+'h'+(min%60?String(min%60).padStart(2,'0')+'p':'');

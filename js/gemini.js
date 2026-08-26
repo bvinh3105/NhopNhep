@@ -137,18 +137,18 @@ Người dùng đang tìm: "${q}" — gần toạ độ GPS ${lat}, ${lng} (tron
 Trả tối đa ${opts.limit || 20} kết quả, ưu tiên khớp nhất với "${q}" và gần nhất. Nếu hoàn toàn không có gì liên quan trong khu vực, trả mảng rỗng [].
 
 Trả về JSON THUẦN (không markdown, không giải thích):
-[{"name":"tên quán","cat":"restaurant|street|snack|cafe","price":"VD: 40k-80k","lat":${lat},"lng":${lng},"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]
+[{"name":"tên quán","address":"địa chỉ đường + phường/quận nếu biết","cat":"restaurant|street|snack|cafe","price":"VD: 40k-80k","lat":${lat},"lng":${lng},"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]
 
-Quy tắc: lat/lng phải chính xác (đúng vị trí thật của quán). rating 3.5-5.0. Chỉ trả JSON array.`;
+Quy tắc: lat/lng gần đúng khu vực quán. address ghi rõ tên đường/phố + quận. rating 3.5-5.0. Chỉ trả JSON array.`;
     } else {
       prompt = `Bạn là chuyên gia ẩm thực Việt Nam, thông thạo các quán ăn ở khu vực này.
 Tìm ${opts.limit || 20} quán ăn/cà phê CÓ THẬT, đang hoạt động, gần toạ độ GPS ${lat}, ${lng} (trong bán kính ${searchRadiusKm}km).
 ${catHint}. Ưu tiên quán nổi tiếng, review tốt.
 
 Trả về JSON THUẦN (không markdown, không giải thích):
-[{"name":"tên quán","cat":"restaurant|street|snack|cafe","price":"VD: 40k-80k","lat":${lat},"lng":${lng},"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]
+[{"name":"tên quán","address":"địa chỉ đường + phường/quận nếu biết","cat":"restaurant|street|snack|cafe","price":"VD: 40k-80k","lat":${lat},"lng":${lng},"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]
 
-Quy tắc: lat/lng phải chính xác trong bán kính. rating từ 3.5 đến 5.0. Chỉ trả JSON array.`;
+Quy tắc: lat/lng gần đúng khu vực quán. address ghi rõ tên đường/phố + quận. rating từ 3.5 đến 5.0. Chỉ trả JSON array.`;
     }
 
     const callOpts = { wantJson: true, temperature: 0.4, maxTokens: 4096, timeout: 11000 };
@@ -178,6 +178,7 @@ Quy tắc: lat/lng phải chính xác trong bán kính. rating từ 3.5 đến 5
       .map((x, i) => ({
         id: 2e13 + (Date.now() % 1e9) + i,
         name: String(x.name).slice(0, 60),
+        address: x.address ? String(x.address).slice(0, 120) : '',
         cat: ['restaurant', 'street', 'snack', 'cafe'].includes(x.cat) ? x.cat : 'restaurant',
         price: String(x.price || '—').slice(0, 30),
         lat: x.lat, lng: x.lng,
