@@ -151,10 +151,11 @@ Trả về JSON THUẦN (không markdown, không giải thích):
 Quy tắc: lat/lng phải chính xác trong bán kính. rating từ 3.5 đến 5.0. Chỉ trả JSON array.`;
     }
 
-    const callOpts = { wantJson: true, temperature: 0.4, maxTokens: 4096, timeout: 15000 };
+    const callOpts = { wantJson: true, temperature: 0.4, maxTokens: 4096, timeout: 11000 };
 
-    // Try once, retry once on transient failure (429 rate-limit, network
-    // blip, timeout, empty). Rapid successive scans can hit a brief limit.
+    // Try once, retry once on FAST transient failures (parse error, empty,
+    // 429 rate-limit). Do NOT retry a timeout — a second 11s wait would
+    // blow past the 20s budget; better to fall back to OSM immediately.
     let arr;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
@@ -166,8 +167,9 @@ Quy tắc: lat/lng phải chính xác trong bán kính. rating từ 3.5 đến 5
         break;
       } catch (e) {
         console.warn(`[Gemini] attempt ${attempt} failed:`, e.message);
-        if (attempt === 2) throw e;
-        await new Promise(r => setTimeout(r, 700));   // brief backoff, then retry
+        const isTimeout = /timeout/i.test(e.message);
+        if (attempt === 2 || isTimeout) throw e;
+        await new Promise(r => setTimeout(r, 600));   // brief backoff, then retry
       }
     }
 
