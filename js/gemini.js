@@ -131,15 +131,17 @@ const Gemini = {
       prompt = `Bạn là chuyên gia ẩm thực & bản đồ Việt Nam, thông thạo quán ăn khu vực này.
 Người dùng đang tìm: "${q}" — gần toạ độ GPS ${lat}, ${lng} (trong bán kính ${searchRadiusKm}km).
 
-"${q}" có thể là:
-- TÊN MÓN (vd: bánh canh, phở) → trả về các quán bán món đó.
-- TÊN QUÁN / THƯƠNG HIỆU cụ thể (vd: Brave Coffee Brewers, Highlands) → tìm ĐÚNG quán đó và các chi nhánh gần nhất, kể cả khi hơi xa toạ độ trên.
-Trả tối đa ${opts.limit || 20} kết quả, ưu tiên khớp nhất với "${q}" và gần nhất. Nếu hoàn toàn không có gì liên quan trong khu vực, trả mảng rỗng [].
+Xác định "${q}" là TÊN MÓN hay TÊN QUÁN cụ thể:
+- Nếu là TÊN MÓN (vd: bánh canh, phở, bún đậu) → trả các quán bán món đó.
+- Nếu là TÊN QUÁN / THƯƠNG HIỆU (vd: Brave Coffee Brewers, Highlands) → kết quả ĐẦU TIÊN BẮT BUỘC có "name" GIỮ NGUYÊN CHÍNH XÁC = "${q}" (KHÔNG đổi thành tên na ná như "Brave Roastery" hay "Brave Coffee & Tea"). Sau đó mới liệt kê chi nhánh/quán tương tự nếu có.
+
+⛔ TUYỆT ĐỐI KHÔNG bịa tên gần giống. Nếu không chắc quán "${q}" tồn tại, vẫn trả 1 kết quả với name = "${q}" đúng nguyên văn để người dùng tự kiểm tra trên Google Maps.
+Trả tối đa ${opts.limit || 20} kết quả, khớp nhất với "${q}" xếp trước.
 
 Trả về JSON THUẦN (không markdown, không giải thích):
 [{"name":"tên quán","address":"địa chỉ đường + phường/quận nếu biết","cat":"restaurant|street|snack|cafe","price":"VD: 40k-80k","lat":${lat},"lng":${lng},"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]
 
-Quy tắc: lat/lng gần đúng khu vực quán. address ghi rõ tên đường/phố + quận. rating 3.5-5.0. Chỉ trả JSON array.`;
+Quy tắc: lat/lng gần đúng khu vực quán. rating 3.5-5.0. Chỉ trả JSON array.`;
     } else {
       prompt = `Bạn là chuyên gia ẩm thực Việt Nam, thông thạo các quán ăn ở khu vực này.
 Tìm ${opts.limit || 20} quán ăn/cà phê CÓ THẬT, đang hoạt động, gần toạ độ GPS ${lat}, ${lng} (trong bán kính ${searchRadiusKm}km).
@@ -151,7 +153,9 @@ Trả về JSON THUẦN (không markdown, không giải thích):
 Quy tắc: lat/lng gần đúng khu vực quán. address ghi rõ tên đường/phố + quận. rating từ 3.5 đến 5.0. Chỉ trả JSON array.`;
     }
 
-    const callOpts = { wantJson: true, temperature: 0.4, maxTokens: 4096, timeout: 11000 };
+    // Lower temperature for a specific query → less creative name drift
+    // (stops "Brave Coffee Brewers" turning into "Brave Roastery").
+    const callOpts = { wantJson: true, temperature: q ? 0.1 : 0.4, maxTokens: 4096, timeout: 11000 };
 
     // Try once, retry once on FAST transient failures (parse error, empty,
     // 429 rate-limit). Do NOT retry a timeout — a second 11s wait would
