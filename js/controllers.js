@@ -368,14 +368,18 @@ const HomeCtrl = {
   _doScan() {
     const pool = allRestaurants();
     const dishTokens = this._strip(State.activeDish).split(/\s+/).filter(Boolean);
+    const hasQuery = dishTokens.length > 0;
     const results = pool.filter(r => {
       const src = this._srcOf(r);
       if (!State.activeSrcs.has(src)) return false;
       if (!State.activeCats.has(r.cat)) return false;
       if (State.minRating > 0 && (r.rating || 0) < State.minRating) return false;
       const dist = haversine(State.userLat, State.userLng, r.lat, r.lng);
-      if (dist > State.radius) return false;
       r._dist = dist;
+      // Radius filter — but a named query (dish/place) fetched from Gemini
+      // may legitimately sit outside the circle; the user asked for THAT
+      // specific thing, so keep it and just show the real distance.
+      if (dist > State.radius && !(r._gemini && hasQuery)) return false;
       if (dishTokens.length && !r._gemini && !this._dishMatches(r, dishTokens)) return false;
       return true;
     });

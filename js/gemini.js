@@ -117,20 +117,39 @@ const Gemini = {
     const catHint = opts.categories?.length
       ? `Chỉ tìm loại: ${opts.categories.join(', ')}`
       : 'Nhà hàng, vỉa hè, ăn vặt, cà phê';
-    const radiusKm = (radius / 1000).toFixed(1);
 
-    const dishHint = opts.dish
-      ? `\n\n⚠️ MÓN BẮT BUỘC: người dùng đang tìm "${opts.dish}". CHỈ trả về quán bán "${opts.dish}" hoặc món rất liên quan. Nếu không có quán nào bán "${opts.dish}" trong bán kính, trả về mảng rỗng [].`
-      : '';
+    // A named query (dish OR place name) searches a WIDER area — a specific
+    // quán the user typed may sit a few km out, and "not found" is worse
+    // than "found but a bit far". Generic browsing keeps the tight radius.
+    const q = (opts.dish || '').trim();
+    const searchRadiusKm = q
+      ? Math.max(radius / 1000, 6).toFixed(1)
+      : (radius / 1000).toFixed(1);
 
-    const prompt = `Bạn là chuyên gia ẩm thực Việt Nam, thông thạo các quán ăn ở khu vực này.
-Tìm ${opts.limit || 20} quán ăn/cà phê CÓ THẬT, đang hoạt động, gần toạ độ GPS ${lat}, ${lng} (trong bán kính ${radiusKm}km).
-${catHint}. Ưu tiên quán nổi tiếng, review tốt.${dishHint}
+    let prompt;
+    if (q) {
+      prompt = `Bạn là chuyên gia ẩm thực & bản đồ Việt Nam, thông thạo quán ăn khu vực này.
+Người dùng đang tìm: "${q}" — gần toạ độ GPS ${lat}, ${lng} (trong bán kính ${searchRadiusKm}km).
+
+"${q}" có thể là:
+- TÊN MÓN (vd: bánh canh, phở) → trả về các quán bán món đó.
+- TÊN QUÁN / THƯƠNG HIỆU cụ thể (vd: Brave Coffee Brewers, Highlands) → tìm ĐÚNG quán đó và các chi nhánh gần nhất, kể cả khi hơi xa toạ độ trên.
+Trả tối đa ${opts.limit || 20} kết quả, ưu tiên khớp nhất với "${q}" và gần nhất. Nếu hoàn toàn không có gì liên quan trong khu vực, trả mảng rỗng [].
+
+Trả về JSON THUẦN (không markdown, không giải thích):
+[{"name":"tên quán","cat":"restaurant|street|snack|cafe","price":"VD: 40k-80k","lat":${lat},"lng":${lng},"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]
+
+Quy tắc: lat/lng phải chính xác (đúng vị trí thật của quán). rating 3.5-5.0. Chỉ trả JSON array.`;
+    } else {
+      prompt = `Bạn là chuyên gia ẩm thực Việt Nam, thông thạo các quán ăn ở khu vực này.
+Tìm ${opts.limit || 20} quán ăn/cà phê CÓ THẬT, đang hoạt động, gần toạ độ GPS ${lat}, ${lng} (trong bán kính ${searchRadiusKm}km).
+${catHint}. Ưu tiên quán nổi tiếng, review tốt.
 
 Trả về JSON THUẦN (không markdown, không giải thích):
 [{"name":"tên quán","cat":"restaurant|street|snack|cafe","price":"VD: 40k-80k","lat":${lat},"lng":${lng},"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]
 
 Quy tắc: lat/lng phải chính xác trong bán kính. rating từ 3.5 đến 5.0. Chỉ trả JSON array.`;
+    }
 
     const callOpts = { wantJson: true, temperature: 0.4, maxTokens: 4096, timeout: 15000 };
 
