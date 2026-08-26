@@ -9,9 +9,18 @@
 ═══════════════════════════════════════════════ */
 
 // Built-in shared key, split so GitHub secret-scanning doesn't auto-revoke.
-// MUST be HTTP-referrer restricted in Google Cloud Console.
-// If empty, the app runs on the user's own key only (entered in Settings).
+// SECURITY — the key is protected by THREE layers:
+//   1. Private GitHub repo (source not publicly scrapeable)
+//   2. HTTP-referrer restriction on Google Cloud Console (the real guard —
+//      the key only works when the request comes from an allowed domain)
+//   3. Runtime host allow-list below (the app itself refuses to send the
+//      built-in key from any host other than these, so a cloned copy on
+//      another domain can't quietly ride on it)
 const _kfrag = ['AQ.Ab8R', 'N6JCbUoWpz', 'JvFMkd88FT', 'NULcPpuZjl', '9Ck3AULxBF', 'nskJow'];
+
+// Hosts allowed to use the built-in key. Everything else must supply its
+// own key via Settings. Keep in sync with the Google Cloud referrer list.
+const _allowedHosts = ['nhopnhep.pages.dev', 'nhopnhep.netlify.app', 'localhost', '127.0.0.1'];
 
 const Gemini = {
   // 'flash-lite' is the fast tier (~4s). The non-lite Flash alias resolves
@@ -26,7 +35,11 @@ const Gemini = {
     if (t) localStorage.setItem('gemini_api_key', t);
     else localStorage.removeItem('gemini_api_key');
   },
-  get defaultKey() { return _kfrag.join(''); },
+  // Built-in key is only exposed on allowed hosts. Off-domain clones get ''.
+  get defaultKey() {
+    const h = (location.hostname || '').toLowerCase();
+    return _allowedHosts.includes(h) ? _kfrag.join('') : '';
+  },
   get apiKey() { return this.userKey || this.defaultKey; },
   usingCustomKey() { return !!this.userKey; },
   clearKey() { localStorage.removeItem('gemini_api_key'); },
