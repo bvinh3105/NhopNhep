@@ -521,12 +521,16 @@ const ResultsCtrl = {
     // When we're showing generic fallback results for an unmatched query,
     // put a Google Maps search banner on top so the user can still reach
     // the exact place they typed (Google autocompletes obscure names).
+    // Gemini often returns plausible-but-wrong near-matches for an obscure
+    // name (typing "coo" yields "Coo Coffee", not the user's "Coo.chan"),
+    // so ALWAYS offer a Google Maps search for any typed query — the exact
+    // place is one tap away even when our result isn't the right one.
     let bannerHtml = '';
     const q = (State.activeDish || '').trim();
-    if (q && State.queryUnmatched) {
+    if (q) {
       const esc = String(q).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
       bannerHtml = `<a class="es-gmaps-banner" href="${gmapsSearchUrl(q)}" target="_blank" rel="noopener">
-        🗺️ Không thấy "<b>${esc}</b>"? Tìm trên Google Maps →
+        🗺️ Chưa đúng "<b>${esc}</b>"? Tìm chính xác trên Google Maps →
       </a>`;
     }
     grid.innerHTML = bannerHtml + visible.map((r, i) => {
