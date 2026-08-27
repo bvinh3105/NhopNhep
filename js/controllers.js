@@ -384,6 +384,10 @@ const HomeCtrl = {
       return true;
     });
 
+    // Did we actually match the typed query? (used to offer a Google Maps
+    // search when we only have generic fallback results.)
+    State.queryUnmatched = hasQuery && results.length === 0;
+
     if (results.length === 0 && dishTokens.length && pool.length > 0) {
       // Dish filter eliminated everything — fallback: show all nearby results
       const fallback = pool.filter(r => {
@@ -401,9 +405,20 @@ const HomeCtrl = {
     }
 
     if (results.length === 0) {
+      // A specific typed query we couldn't resolve → don't dead-end. Show
+      // the results screen with a "search on Google Maps" escape so the
+      // user still reaches the real place (Google autocompletes "coo").
+      if (State.activeDish) {
+        State.filteredResults = [];
+        State.selected.clear();
+        State.tabFilter = 'all';
+        MapHome.showRestaurants([]);
+        ResultsCtrl.show();
+        this._updateBadge();
+        return;
+      }
       let hint = 'Thử tăng bán kính hoặc bật GPS ở vị trí khác';
       if (!State.activeSrcs.has('osm')) hint = 'Bật 🌐 OpenStreetMap để tìm quán';
-      else if (State.activeDish) hint = `Không có quán "${State.activeDish}" — thử nhập Gemini API key ở Cá nhân`;
       showToast(`🤔 Không tìm thấy quán · ${hint}`);
       MapHome.showRestaurants([]);
       return;
@@ -486,10 +501,35 @@ const ResultsCtrl = {
     const grid = document.getElementById('restaurantGrid');
     const visible = State.visibleResults;
     if (visible.length === 0) {
-      grid.innerHTML = `<div class="empty-state"><div class="es-icon">🍽️</div><div class="es-msg">Không có quán loại này<br>trong bán kính tìm kiếm</div></div>`;
+      const q = (State.activeDish || '').trim();
+      if (q) {
+        // Couldn't resolve the typed query → offer a Google Maps search,
+        // whose autocomplete finds nearby places our data misses ("coo").
+        const esc = String(q).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        grid.innerHTML = `<div class="empty-state">
+          <div class="es-icon">🔍</div>
+          <div class="es-msg">Chưa tìm thấy "<b>${esc}</b>" trong dữ liệu app<br>
+            <span style="font-size:.82rem;opacity:.75">Bấm nút dưới để tìm trực tiếp trên Google Maps</span>
+          </div>
+          <a class="es-gmaps-btn" href="${gmapsSearchUrl(q)}" target="_blank" rel="noopener">🗺️ Tìm "${esc}" trên Google Maps</a>
+        </div>`;
+      } else {
+        grid.innerHTML = `<div class="empty-state"><div class="es-icon">🍽️</div><div class="es-msg">Không có quán loại này<br>trong bán kính tìm kiếm</div></div>`;
+      }
       return;
     }
-    grid.innerHTML = visible.map((r, i) => {
+    // When we're showing generic fallback results for an unmatched query,
+    // put a Google Maps search banner on top so the user can still reach
+    // the exact place they typed (Google autocompletes obscure names).
+    let bannerHtml = '';
+    const q = (State.activeDish || '').trim();
+    if (q && State.queryUnmatched) {
+      const esc = String(q).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      bannerHtml = `<a class="es-gmaps-banner" href="${gmapsSearchUrl(q)}" target="_blank" rel="noopener">
+        🗺️ Không thấy "<b>${esc}</b>"? Tìm trên Google Maps →
+      </a>`;
+    }
+    grid.innerHTML = bannerHtml + visible.map((r, i) => {
       const cat = CATEGORIES[r.cat];
       const sel = State.selected.has(r.id);
       const userAdded = r.id >= 1001 && r.id < 1e12;

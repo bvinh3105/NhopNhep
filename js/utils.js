@@ -55,6 +55,18 @@ function gmapsUrl(r) {
   return 'https://www.google.com/maps';
 }
 
+// Google Maps search for a raw text query (e.g. a partial name "coo"),
+// centered on the user's real location so Google's own autocomplete
+// resolves the nearby match (Coo.chan) even when our data can't.
+function gmapsSearchUrl(query) {
+  const q = String(query || '').trim();
+  const uLat = (typeof State !== 'undefined' && typeof State.userLat === 'number') ? State.userLat : null;
+  const uLng = (typeof State !== 'undefined' && typeof State.userLng === 'number') ? State.userLng : null;
+  if (!q) return uLat != null ? `https://www.google.com/maps/@${uLat},${uLng},15z` : 'https://www.google.com/maps';
+  if (uLat != null) return `https://www.google.com/maps/search/${encodeURIComponent(q)}/@${uLat},${uLng},15z`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+}
+
 function fmtTime(min) {
   if (min < 60) return min+'p';
   return Math.floor(min/60)+'h'+(min%60?String(min%60).padStart(2,'0')+'p':'');

@@ -511,6 +511,25 @@ input,textarea,select{font-family:var(--font-body)}
 }
 .empty-state .es-icon{font-size:3.5rem}
 .empty-state .es-msg{font-family:var(--font-display);font-size:1rem;font-weight:800;text-align:center;color:var(--text2)}
+.es-gmaps-btn{
+  margin-top:.5rem;display:inline-flex;align-items:center;gap:.4rem;
+  padding:.7rem 1.1rem;border-radius:24px;
+  background:var(--primary);color:var(--cream);
+  border:2px solid var(--primary-2);box-shadow:3px 3px 0 var(--primary-2);
+  font-family:var(--font-body);font-weight:800;font-size:.85rem;text-decoration:none;
+  transition:transform .26s var(--ease-out),box-shadow .26s var(--ease-out);
+}
+.es-gmaps-btn:active{transform:translate(2px,2px) scale(.97);box-shadow:1px 1px 0 var(--primary-2)}
+.es-gmaps-banner{
+  grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:.4rem;
+  margin:0 0 .6rem;padding:.6rem .9rem;border-radius:14px;
+  background:var(--primary-tint);border:1.5px dashed var(--primary);
+  color:var(--primary);font-weight:800;font-size:.8rem;text-decoration:none;text-align:center;
+  transition:transform .22s var(--ease-out),background-color .2s var(--ease-ios);
+}
+.es-gmaps-banner b{color:var(--primary-2)}
+.es-gmaps-banner:active{transform:scale(.97)}
+@media (hover:hover) and (pointer:fine){ .es-gmaps-banner:hover{background:var(--primary);color:var(--cream)} .es-gmaps-banner:hover b{color:var(--cream)} }
 
 /* ═══════════════════════════════════════════════
    PLAN SCREEN
