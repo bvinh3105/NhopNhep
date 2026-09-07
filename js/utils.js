@@ -23,16 +23,19 @@ const AVATARS = ['🍜','🍕','🍔','🍣','🍰','🍩','🍦','🥗','🌮',
    though 'scroll' doesn't bubble) and resize.
 
    Gotcha that actually caused the original bug: position:fixed is NOT
-   viewport-relative when an ancestor has a `transform` set — and every
-   .modal-sheet does (the slide-up-open animation), which becomes the
-   fixed containing block instead of the viewport per spec. Move the
-   suggest box to be a direct child of <body> once, on registration, so
-   it always escapes that regardless of which modal it started inside.
+   viewport-relative when an ancestor has a `transform` set — becomes the
+   fixed containing block instead of the viewport per spec. Two different
+   elements here have one: every .modal-sheet (the slide-up-open
+   animation), AND <body> itself (`transform:translateZ(0)` on wide/
+   desktop viewports, for the centered phone-frame look) — so moving the
+   suggest box to be a child of <body> only escapes the first one. Use
+   <html> instead, which has neither.
 ═══════════════════════════════════════════════ */
 const DropdownPosition = {
   _pairs: [],
   register(input, suggest) {
-    if (suggest.parentElement !== document.body) document.body.appendChild(suggest);
+    const root = document.documentElement;
+    if (suggest.parentElement !== root) root.appendChild(suggest);
     this._pairs.push({ input, suggest });
   },
   reposition(input, suggest) {
