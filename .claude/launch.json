@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "nhopnhep",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "5556"],
+      "port": 5556
+    }
+  ]
+}

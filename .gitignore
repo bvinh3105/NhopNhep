@@ -28,3 +28,6 @@ update_*.js
 
 # Cloudflare wrangler local cache
 .wrangler/
+
+# Community server now lives outside this repo/deploy tree entirely, at
+# ../NhopNhep-community-server — see js/community.js for the frontend client.

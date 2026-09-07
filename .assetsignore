@@ -1,0 +1,23 @@
+# Cloudflare Pages Direct Upload deploys the raw directory as-is — it does
+# NOT read .gitignore, so anything here that shouldn't be publicly served
+# at nhopnhep.pages.dev must be listed explicitly.
+#
+# The community backend and internal roadmap docs used to live inside this
+# folder but were moved out entirely (../NhopNhep-community-server,
+# ../NhopNhep-docs) after wrangler tried to upload a 52MB binary from
+# inside them — Pages caps individual files at 25MB and this ignore file
+# doesn't appear to be honored by `wrangler pages deploy` in this version,
+# so "not present in the deployed directory" is the only reliable guard.
+
+# Claude Code project tooling config, not app content
+.claude/
+
+# One-off local patch scripts, never meant to ship
+update_*.js
+
+# Dev/build noise
+node_modules/
+.wrangler/
+.netlify/
+.env
+.env.local

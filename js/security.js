@@ -60,12 +60,22 @@
     shieldEl = null;
   };
 
+  // Require 3 consecutive dirty reads (~2.4s) before locking. A single
+  // reflow (page load, mobile URL-bar collapse, orientation change) can
+  // trip the size-delta check once — real open DevTools stays open across
+  // several ticks, a transient reflow doesn't.
   const THRESHOLD = 170;
+  let dirtyStreak = 0;
   setInterval(() => {
     const opened =
       window.outerWidth - window.innerWidth > THRESHOLD ||
       window.outerHeight - window.innerHeight > THRESHOLD;
-    if (opened) showShield();
-    else hideShield();
+    if (opened) {
+      dirtyStreak++;
+      if (dirtyStreak >= 3) showShield();
+    } else {
+      dirtyStreak = 0;
+      hideShield();
+    }
   }, 800);
 })();
