@@ -201,6 +201,10 @@
           <div class="stat-num" id="statMyR">0</div>
           <div class="stat-lbl">QUÁN CỦA TÔI</div>
         </div>
+        <div class="stat-card" data-stat="score" role="button" tabindex="0" title="Tổng số sao nhận được trên các quán đã đăng">
+          <div class="stat-num" id="statScore">0</div>
+          <div class="stat-lbl">★ ĐIỂM</div>
+        </div>
         <div class="stat-card" data-stat="trips" role="button" tabindex="0" title="Số chuyến ăn đã lên lịch">
           <div class="stat-num" id="statTrips">0</div>
           <div class="stat-lbl">CHUYẾN ĂN</div>
@@ -209,6 +213,34 @@
           <div class="stat-num" id="statFav">🍽️</div>
           <div class="stat-lbl">HAY THÍCH</div>
         </div>
+      </div>
+    </div>
+
+    <!-- Tài khoản cộng đồng + Bạn bè — chỉ hiện khi đã đăng nhập (ở tab Cộng đồng) -->
+    <div class="profile-section" id="profileLoggedOutHint">
+      <p class="ai-hint">Đăng nhập ở tab Cộng đồng để xem bạn bè và quán bạn đã đăng.</p>
+    </div>
+    <div id="profileLoggedIn" class="hidden">
+      <div class="profile-section">
+        <div class="psec-head">
+          <div>
+            <div class="psec-title" id="communityWelcome">Chào <em>bạn</em></div>
+            <div class="community-welcome-sub">Cộng đồng nhỏ — cùng nhau chọn quán</div>
+          </div>
+          <button class="data-btn" id="communityLogout">Đăng xuất</button>
+        </div>
+      </div>
+
+      <div class="profile-section">
+        <div class="psec-head">
+          <div class="psec-title">Bạn <em>bè</em></div>
+        </div>
+        <p class="ai-hint">Quán bạn đăng ở chế độ "Bạn bè" sẽ chỉ hiện với những người bạn thêm ở đây.</p>
+        <div class="loc-row-wrap">
+          <input class="form-input" id="friendSearchInput" type="text" placeholder="🔎 Tìm theo tên hoặc email…" autocomplete="off">
+          <div class="geocode-suggest" id="friendSearchResults"></div>
+        </div>
+        <div class="chip-tag-list" id="friendList" style="margin-top:.7rem"></div>
       </div>
     </div>
 
@@ -227,13 +259,20 @@
       </div>
     </div>
 
-    <!-- My restaurants -->
+    <!-- Quán tôi đã đăng (cộng đồng) — xem/sửa/xoá, không đăng mới ở đây nữa
+         (đăng quán mới làm ở tab Cộng đồng) -->
     <div class="profile-section">
       <div class="psec-head">
         <div class="psec-title">Quán <em>của tôi</em></div>
-        <button class="add-btn" id="addRestaurantBtn">＋ Thêm quán</button>
       </div>
-      <div class="my-r-list" id="myRestaurantList"></div>
+      <div class="cat-chips" id="myRFilterChips">
+        <button class="cat-chip active" data-filter="all">Tất cả</button>
+        <button class="cat-chip" data-filter="restaurant">🍽️ Nhà hàng</button>
+        <button class="cat-chip" data-filter="street">🍜 Vỉa hè</button>
+        <button class="cat-chip" data-filter="snack">🧆 Ăn vặt</button>
+        <button class="cat-chip" data-filter="cafe">☕ Cà phê</button>
+      </div>
+      <div class="comm-r-list" id="myRestaurantList" style="margin-top:.7rem"></div>
     </div>
 
     <!-- Data Management — hidden per request (local-data export/import de-emphasized
@@ -304,30 +343,9 @@
       <button class="community-toggle-link" id="communityAuthToggle" type="button">Chưa có tài khoản? Đăng ký</button>
     </div>
 
-    <!-- Logged-in: main content -->
+    <!-- Logged-in: main content — chỉ còn duyệt/đăng quán ở đây; tài khoản, bạn
+         bè, và "quán của tôi" đã chuyển sang tab Cá nhân -->
     <div id="communityMain" class="hidden">
-      <div class="profile-section">
-        <div class="psec-head">
-          <div>
-            <div class="psec-title" id="communityWelcome">Chào <em>bạn</em></div>
-            <div class="community-welcome-sub">Cộng đồng nhỏ — cùng nhau chọn quán</div>
-          </div>
-          <button class="data-btn" id="communityLogout">Đăng xuất</button>
-        </div>
-      </div>
-
-      <div class="profile-section">
-        <div class="psec-head">
-          <div class="psec-title">Bạn <em>bè</em></div>
-        </div>
-        <p class="ai-hint">Quán bạn đăng ở chế độ "Bạn bè" sẽ chỉ hiện với những người bạn thêm ở đây.</p>
-        <div class="loc-row-wrap">
-          <input class="form-input" id="friendSearchInput" type="text" placeholder="🔎 Tìm theo tên hoặc email…" autocomplete="off">
-          <div class="geocode-suggest" id="friendSearchResults"></div>
-        </div>
-        <div class="chip-tag-list" id="friendList" style="margin-top:.7rem"></div>
-      </div>
-
       <div class="profile-section">
         <div class="psec-head">
           <div class="psec-title">Quán <em>cộng đồng</em></div>
@@ -347,13 +365,13 @@
      BOTTOM TAB BAR
 ═══════════════════════════════════════════════ -->
 <div class="tabbar">
-  <button class="tab-btn active" data-tab="home">
-    <div class="tab-ico">🍜</div>
-    <div>Nhóp Nhép</div>
-  </button>
   <button class="tab-btn" data-tab="profile">
     <div class="tab-ico">👤</div>
     <div>Cá nhân</div>
+  </button>
+  <button class="tab-btn active" data-tab="home">
+    <div class="tab-ico">🍜</div>
+    <div>Nhóp Nhép</div>
   </button>
   <button class="tab-btn" data-tab="community">
     <div class="tab-ico">👥</div>
@@ -558,18 +576,18 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2450"></script>
-<script src="js/utils.js?v=2450"></script>
-<script src="js/state.js?v=2450"></script>
-<script src="js/poi.js?v=2450"></script>
-<script src="js/geocoder.js?v=2450"></script>
-<script src="js/gemini.js?v=2450"></script>
-<script src="js/community.js?v=2450"></script>
-<script src="js/map.js?v=2450"></script>
-<script src="js/gps.js?v=2450"></script>
-<script src="js/locationPicker.js?v=2450"></script>
-<script src="js/controllers.js?v=2450"></script>
-<script src="js/app.js?v=2450"></script>
+<script src="js/security.js?v=2451"></script>
+<script src="js/utils.js?v=2451"></script>
+<script src="js/state.js?v=2451"></script>
+<script src="js/poi.js?v=2451"></script>
+<script src="js/geocoder.js?v=2451"></script>
+<script src="js/gemini.js?v=2451"></script>
+<script src="js/community.js?v=2451"></script>
+<script src="js/map.js?v=2451"></script>
+<script src="js/gps.js?v=2451"></script>
+<script src="js/locationPicker.js?v=2451"></script>
+<script src="js/controllers.js?v=2451"></script>
+<script src="js/app.js?v=2451"></script>
 
 </body>
 </html>

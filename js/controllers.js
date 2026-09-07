@@ -1136,15 +1136,21 @@ const ProfileCtrl = {
       this._renderStats();
     });
 
-    // "Thêm quán" giờ hợp nhất về modal cộng đồng — đăng nhập là đăng thẳng
-    // lên server, không còn tách riêng bản nháp chỉ lưu máy nữa.
-    document.getElementById('addRestaurantBtn').addEventListener('click', () => {
-      if (!Community.isLoggedIn()) {
-        showToast('⚠️ Đăng nhập ở tab Cộng đồng để đăng quán nhé');
-        TabNav.switchTo('community');
-        return;
-      }
-      CommunityAddModal.open();
+    // Đăng quán mới giờ chỉ làm ở tab Cộng đồng — tab này chỉ xem/sửa/xoá quán
+    // đã đăng, kết bạn, và thông tin tài khoản.
+    document.getElementById('communityLogout').addEventListener('click', () => {
+      Community.logout();
+      showToast('👋 Đã đăng xuất');
+      this.render();
+    });
+
+    document.getElementById('myRFilterChips').addEventListener('click', (e) => {
+      const chip = e.target.closest('.cat-chip');
+      if (!chip) return;
+      document.querySelectorAll('#myRFilterChips .cat-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      this._myRFilter = chip.dataset.filter;
+      this._renderMyRestaurants();
     });
 
     // Stat cards — clickable overview shortcuts
@@ -1226,6 +1232,9 @@ const ProfileCtrl = {
     }
   },
 
+  _myRFilter: 'all',
+  _myRestaurants: [], // cache của lần fetch gần nhất, để lọc client-side không gọi lại API
+
   render() {
     document.getElementById('avatarBtn').textContent = State.profile.avatar;
     document.getElementById('profileNameInput').value = State.profile.name;
@@ -1233,21 +1242,30 @@ const ProfileCtrl = {
       c.classList.toggle('active', State.profile.prefs.has(c.dataset.pref));
     });
     this._renderStats();
-    this._renderMyRestaurants();
     this._renderAiStatus();
+
+    const loggedIn = Community.isLoggedIn();
+    document.getElementById('profileLoggedOutHint').classList.toggle('hidden', loggedIn);
+    document.getElementById('profileLoggedIn').classList.toggle('hidden', !loggedIn);
+    if (loggedIn) {
+      const user = Community.currentUser;
+      document.getElementById('communityWelcome').innerHTML = `Chào <em>${escapeHtml(user.name || user.email)}</em>`;
+      CommunityCtrl._renderFriends();
+    }
+    this._loadMyRestaurants();
   },
 
   _renderStats() {
-    document.getElementById('statMyR').textContent = State.userRestaurants.length;
     document.getElementById('statTrips').textContent = State.profile.trips;
     const catPrefs = [...State.profile.prefs].filter(p => CATEGORIES[p]);
     const fav = catPrefs[0] ? CATEGORIES[catPrefs[0]].icon : '🍽️';
     document.getElementById('statFav').textContent = fav;
+    // statMyR / statScore được _loadMyRestaurants() cập nhật (phụ thuộc dữ liệu server)
   },
 
   _onStatClick(stat) {
-    if (stat === 'myR') {
-      HistoryModal.openMyQuan();
+    if (stat === 'myR' || stat === 'score') {
+      document.getElementById('myRestaurantList')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else if (stat === 'trips') {
       HistoryModal.openTrips();
     } else if (stat === 'fav') {
@@ -1262,54 +1280,100 @@ const ProfileCtrl = {
     }
   },
 
-  _renderMyRestaurants() {
+  // ── Quán tôi đã đăng lên cộng đồng — xem/lọc/sửa/xoá ─────────────────────
+  async _loadMyRestaurants() {
     const list = document.getElementById('myRestaurantList');
-    if (State.userRestaurants.length === 0) {
+    if (!Community.isLoggedIn()) {
+      document.getElementById('statMyR').textContent = '0';
+      document.getElementById('statScore').textContent = '0';
       list.innerHTML = `<div class="empty-my-r">
         <div class="em-icon">📝</div>
-        <div class="em-msg">Chưa có quán nào</div>
-        <div class="em-sub">Thêm quán bạn từng ghé để dùng cho chuyến sau</div>
+        <div class="em-msg">Chưa đăng nhập</div>
+        <div class="em-sub">Đăng nhập ở tab Cộng đồng để xem quán bạn đã đăng</div>
       </div>`;
       return;
     }
-    list.innerHTML = State.userRestaurants.map(r => {
-      const cat = CATEGORIES[r.cat];
-      const thumb = r.image
-        ? `<div class="my-r-icon" style="background-image:url('${r.image}');background-size:cover;background-position:center"></div>`
-        : `<div class="my-r-icon" style="background:${cat.color}22;color:${cat.color}">${cat.icon}</div>`;
-      return `<div class="my-r-card" data-id="${r.id}" role="button" tabindex="0" title="Nhấn để xem chi tiết">
-        ${thumb}
-        <div class="my-r-info">
-          <div class="my-r-name">${r.name}</div>
-          <div class="my-r-meta">${cat.label} · 💰 ${r.price}</div>
-          <div class="my-r-desc">${r.desc || 'Không có mô tả'}</div>
+    list.innerHTML = `<div class="empty-my-r"><div class="em-icon">⏳</div><div class="em-msg">Đang tải…</div></div>`;
+    const r = await Community.myRestaurants();
+    this._myRestaurants = r.ok ? r.data.items : [];
+    document.getElementById('statMyR').textContent = this._myRestaurants.length;
+    this._renderMyRestaurants();
+    this._loadMyScore();
+  },
+
+  async _loadMyScore() {
+    const counts = await Promise.all(this._myRestaurants.map(r => Community.voteCount(r.id)));
+    const total = counts.reduce((a, b) => a + b, 0);
+    const el = document.getElementById('statScore');
+    if (el) el.textContent = total;
+  },
+
+  _renderMyRestaurants() {
+    const list = document.getElementById('myRestaurantList');
+    const items = this._myRFilter === 'all'
+      ? this._myRestaurants
+      : this._myRestaurants.filter(r => COMMUNITY_PB_TO_CAT[r.category] === this._myRFilter);
+
+    if (!items.length) {
+      list.innerHTML = `<div class="empty-my-r">
+        <div class="em-icon">📝</div>
+        <div class="em-msg">Chưa có quán nào</div>
+        <div class="em-sub">Đăng quán ở tab Cộng đồng, quán sẽ hiện ở đây</div>
+      </div>`;
+      return;
+    }
+
+    list.innerHTML = items.map(r => {
+      const catKey = COMMUNITY_PB_TO_CAT[r.category] || 'restaurant';
+      const cat = CATEGORIES[catKey];
+      const priceLabel = COMMUNITY_PRICE_LABEL[r.price_range] || '';
+      const thumbUrl = Community.thumbnailUrl(r, '400x300');
+      const cover = thumbUrl
+        ? `<div class="comm-r-cover" style="background-image:url('${thumbUrl}')"></div>`
+        : `<div class="comm-r-cover" style="background:${cat.color}22">${cat.icon}</div>`;
+      const tagsHtml = (r.tags || []).map(t => `<span class="comm-r-chip">${escapeHtml(t)}</span>`).join('');
+      const hashHtml = (r.hashtags || []).map(h => `<span class="comm-r-chip hashtag">#${escapeHtml(h)}</span>`).join('');
+      const visBadge = CommunityCtrl._VIS_BADGE[r.visibility] || '';
+      return `<div class="comm-r-card" data-id="${r.id}">
+        ${cover}
+        <div class="comm-r-body">
+          <div class="comm-r-name">${escapeHtml(r.name)}</div>
+          <div class="comm-r-meta">${cat.icon} ${cat.label}${priceLabel ? ' · ' + priceLabel : ''} · ${visBadge}</div>
+          ${r.description ? `<div class="comm-r-desc">${escapeHtml(r.description)}</div>` : ''}
+          ${(tagsHtml || hashHtml) ? `<div class="comm-r-chips">${tagsHtml}${hashHtml}</div>` : ''}
+          <div class="comm-r-footer">
+            <span class="comm-r-author" id="myRScore-${r.id}">★ …</span>
+            <div style="display:flex;gap:.4rem">
+              <button class="data-btn" data-edit-id="${r.id}">✏️ Sửa</button>
+              <button class="my-r-del" data-del-id="${r.id}" title="Xoá quán">🗑</button>
+            </div>
+          </div>
         </div>
-        <button class="my-r-del" data-id="${r.id}" title="Xoá quán">🗑</button>
       </div>`;
     }).join('');
 
-    list.querySelectorAll('.my-r-del').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const id = parseInt(btn.dataset.id);
-        const r = State.userRestaurants.find(x => x.id === id);
-        if (!r) return;
-        if (confirm(`Xoá quán "${r.name}"?`)) {
-          State.userRestaurants = State.userRestaurants.filter(x => x.id !== id);
-          Storage.save();
-          this._renderMyRestaurants();
-          this._renderStats();
-          HomeCtrl._updateBadge();
-          showToast('🗑 Đã xoá quán');
-        }
+    items.forEach(r => {
+      Community.voteCount(r.id).then(n => {
+        const el = document.getElementById(`myRScore-${r.id}`);
+        if (el) el.textContent = `★ ${n}`;
       });
     });
 
-    list.querySelectorAll('.my-r-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const id = parseInt(card.dataset.id);
-        const r = State.userRestaurants.find(x => x.id === id);
-        if (r) DetailModal.open(r);
+    list.querySelectorAll('[data-edit-id]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const r = this._myRestaurants.find(x => x.id === btn.dataset.editId);
+        if (r) CommunityAddModal.open(r);
+      });
+    });
+    list.querySelectorAll('[data-del-id]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const r = this._myRestaurants.find(x => x.id === btn.dataset.delId);
+        if (!r) return;
+        if (!confirm(`Xoá quán "${r.name}"? Không thể hoàn tác.`)) return;
+        const res = await Community.deleteRestaurant(r.id);
+        if (!res.ok) { showToast(`⚠️ ${res.error}`); return; }
+        showToast('🗑 Đã xoá quán');
+        this._loadMyRestaurants();
       });
     });
   },
@@ -1813,11 +1877,6 @@ const CommunityCtrl = {
       });
     });
 
-    document.getElementById('communityLogout').addEventListener('click', () => {
-      Community.logout();
-      showToast('👋 Đã đăng xuất');
-      this.render();
-    });
     document.getElementById('communityAddBtn').addEventListener('click', () => CommunityAddModal.open());
 
     const search = document.getElementById('communitySearchInput');
@@ -1923,9 +1982,6 @@ const CommunityCtrl = {
     document.getElementById('communityAuth').classList.toggle('hidden', loggedIn);
     document.getElementById('communityMain').classList.toggle('hidden', !loggedIn);
     if (!loggedIn) return;
-    const user = Community.currentUser;
-    document.getElementById('communityWelcome').innerHTML = `Chào <em>${escapeHtml(user.name || user.email)}</em>`;
-    this._renderFriends();
     this._loadList('');
   },
 
@@ -2027,6 +2083,9 @@ const CommunityAddModal = {
   _photoFiles: [],
   _photoPreviewUrls: [],
   _thumbIndex: 0,
+  _editingId: null,      // null = đăng quán mới; có giá trị = đang sửa quán này
+  _editingRecord: null,
+  _existingPhotos: [],   // URL ảnh đã có sẵn trên server, khi đang sửa
 
   init() {
     document.getElementById('cfCatPicker').addEventListener('click', (e) => {
@@ -2119,6 +2178,35 @@ const CommunityAddModal = {
 
   _renderPhotoGrid() {
     const grid = document.getElementById('cfPhotoGrid');
+
+    // Chế độ sửa: chỉ xem ảnh có sẵn + đổi thumbnail, không thêm/xoá ảnh ở
+    // đây (giữ đơn giản — đổi ảnh đầy đủ thì đăng quán mới).
+    if (this._editingId) {
+      if (!this._existingPhotos.length) {
+        grid.innerHTML = `<div style="grid-column:span 4;font-size:.78rem;color:var(--text3)">Quán chưa có ảnh nào</div>`;
+        return;
+      }
+      const filenames = this._editingRecord.photos || [];
+      grid.innerHTML = this._existingPhotos.map((url, i) => {
+        const filename = filenames[i];
+        const starActive = filename && filename === this._editingRecord.thumbnail ? ' active' : '';
+        return `<div class="photo-slot" style="background-image:url('${url}')">
+          <button type="button" class="photo-thumb-star${starActive}" data-filename="${filename}" title="Đặt làm ảnh đại diện">⭐</button>
+        </div>`;
+      }).join('');
+      grid.querySelectorAll('.photo-thumb-star').forEach(b => {
+        b.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const r = await Community.setThumbnail(this._editingId, b.dataset.filename);
+          if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+          this._editingRecord = r.data;
+          this._renderPhotoGrid();
+          showToast('✅ Đã đổi ảnh đại diện');
+        });
+      });
+      return;
+    }
+
     const slots = this._photoFiles.map((file, i) => {
       const url = this._photoPreviewUrls[i];
       const starActive = i === this._thumbIndex ? ' active' : '';
@@ -2155,29 +2243,44 @@ const CommunityAddModal = {
     });
   },
 
-  open() {
+  // record: truyền vào khi sửa quán có sẵn (từ tab Cá nhân); bỏ trống = đăng mới.
+  open(record = null) {
     if (!Community.isLoggedIn()) { showToast('⚠️ Cần đăng nhập trước'); return; }
     const modal = document.getElementById('communityAddModal');
     modal.classList.add('show');
-    document.getElementById('cfName').value = '';
-    document.getElementById('cfDesc').value = '';
+
+    this._editingId = record ? record.id : null;
+    this._editingRecord = record;
+    document.querySelector('#communityAddModal .modal-title').innerHTML = record
+      ? 'Sửa <em>quán</em> ✏️' : 'Đăng quán <em>cộng đồng</em> 👥';
+    document.getElementById('cfSave').textContent = record ? '💾 Cập nhật' : '📤 Đăng quán';
+
+    document.getElementById('cfName').value = record ? record.name : '';
+    document.getElementById('cfDesc').value = record ? (record.description || '') : '';
     const loc = document.getElementById('cfLocSearch');
-    if (loc) loc.value = '';
+    if (loc) loc.value = record ? (record.address || '') : '';
     const locSug = document.getElementById('cfLocSuggest');
     if (locSug) Geocoder.hide(locSug);
 
-    this._selectedCat = 'restaurant';
-    this._selectedPrice = 'binh_dan';
-    this._selectedVisibility = 'public';
-    document.querySelectorAll('#cfCatPicker .cat-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === 'restaurant'));
-    document.querySelectorAll('#cfPricePicker .cat-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.price === 'binh_dan'));
-    document.querySelectorAll('#cfVisibilityPicker .cat-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.vis === 'public'));
+    this._selectedCat = record ? (COMMUNITY_PB_TO_CAT[record.category] || 'restaurant') : 'restaurant';
+    this._selectedPrice = record ? (record.price_range || 'binh_dan') : 'binh_dan';
+    this._selectedVisibility = record ? (record.visibility || 'public') : 'public';
+    document.querySelectorAll('#cfCatPicker .cat-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === this._selectedCat));
+    document.querySelectorAll('#cfPricePicker .cat-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.price === this._selectedPrice));
+    document.querySelectorAll('#cfVisibilityPicker .cat-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.vis === this._selectedVisibility));
 
-    this._pickedLat = null;
-    this._pickedLng = null;
+    // {lon:0,lat:0} là giá trị mặc định của geoPoint chưa từng set — coi như
+    // chưa có vị trí, không phải thật sự ở toạ độ 0,0.
+    const hasLoc = record && record.location && (record.location.lat !== 0 || record.location.lon !== 0);
+    this._pickedLat = hasLoc ? record.location.lat : null;
+    this._pickedLng = hasLoc ? record.location.lon : null;
 
     this._tags.length = 0;
     this._hashtags.length = 0;
+    if (record) {
+      (record.tags || []).forEach(t => this._tags.push(t));
+      (record.hashtags || []).forEach(h => this._hashtags.push(h));
+    }
     this._renderChipList('cfTagList', this._tags, false);
     this._renderChipList('cfHashtagList', this._hashtags, true);
 
@@ -2185,20 +2288,26 @@ const CommunityAddModal = {
     this._photoFiles.length = 0;
     this._photoPreviewUrls.length = 0;
     this._thumbIndex = 0;
+    this._existingPhotos = record ? (record.photos || []).map(f => Community.photoUrl(record, f, '200x200')) : [];
     this._renderPhotoGrid();
 
-    const center = [State.userLat || 21.0285, State.userLng || 105.8542];
+    const center = hasLoc
+      ? [record.location.lat, record.location.lon]
+      : [State.userLat || 21.0285, State.userLng || 105.8542];
     setTimeout(() => {
       LocationPicker.initMap('communityPickerMap', 'communityPickerMap', 'communityPickerMarker', center, (lat, lng) => {
         this._pickedLat = lat;
         this._pickedLng = lng;
         LocationPicker.setMarker('communityPickerMap', 'communityPickerMarker', lat, lng, this._selectedCat);
       });
+      if (hasLoc) LocationPicker.setMarker('communityPickerMap', 'communityPickerMarker', record.location.lat, record.location.lon, this._selectedCat);
     }, 250);
   },
 
   close() {
     document.getElementById('communityAddModal').classList.remove('show');
+    this._editingId = null;
+    this._editingRecord = null;
     setTimeout(() => LocationPicker.teardownMap('communityPickerMap'), 300);
   },
 
@@ -2218,6 +2327,28 @@ const CommunityAddModal = {
       btn.disabled = true; btn.textContent = '🌐 Đang tra vị trí…';
       const found = await LocationPicker.geocodeFallback(addressText);
       if (found) { lat = found.lat; lng = found.lng; }
+    }
+
+    // Sửa quán có sẵn — PATCH field text/chọn, không đụng ảnh (xem _renderPhotoGrid)
+    if (this._editingId) {
+      btn.disabled = true; btn.textContent = '💾 Đang lưu…';
+      const r = await Community.updateRestaurant(this._editingId, {
+        name,
+        category: COMMUNITY_CAT_TO_PB[this._selectedCat],
+        priceRange: this._selectedPrice,
+        visibility: this._selectedVisibility,
+        description: desc,
+        address: addressText,
+        lat, lng,
+        tags: this._tags,
+        hashtags: this._hashtags,
+      });
+      btn.disabled = false; btn.textContent = original;
+      if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+      showToast(`✅ Đã cập nhật "${name}"`);
+      this.close();
+      ProfileCtrl._loadMyRestaurants();
+      return;
     }
 
     btn.disabled = true; btn.textContent = '📤 Đang đăng…';

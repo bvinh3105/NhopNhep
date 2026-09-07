@@ -90,6 +90,38 @@ const Community = {
     return this._fetch(`/api/collections/restaurants/records?${q}`);
   },
 
+  // Tab Cá nhân — mọi quán tôi từng đăng, bất kể độ mở (createRule/listRule
+  // đều cho phép chủ quán xem chính mình regardless of visibility).
+  async myRestaurants() {
+    if (!this.isLoggedIn()) return { ok: true, data: { items: [] } };
+    return this.listRestaurants({ filter: `created_by="${this.currentUser.id}"`, perPage: 100 });
+  },
+
+  // Sửa quán đã đăng — chỉ PATCH các field text/chọn, không đụng tới photos
+  // (đổi ảnh làm ở form khác để tránh lẫn giữa ảnh cũ trên server và file mới
+  // chọn trên máy).
+  async updateRestaurant(id, { name, category, priceRange, description, address, lat, lng, tags, hashtags, visibility } = {}) {
+    const body = {};
+    if (name != null) body.name = name;
+    if (category != null) body.category = category;
+    if (priceRange != null) body.price_range = priceRange;
+    if (description != null) body.description = description;
+    if (address != null) body.address = address;
+    if (lat != null && lng != null) body.location = { lon: lng, lat };
+    if (tags != null) body.tags = this.normalizeTags(tags);
+    if (hashtags != null) body.hashtags = this.normalizeHashtags(hashtags);
+    if (visibility != null) body.visibility = visibility;
+    return this._fetch(`/api/collections/restaurants/records/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+
+  async deleteRestaurant(id) {
+    return this._fetch(`/api/collections/restaurants/records/${id}`, { method: 'DELETE' });
+  },
+
   // photoFiles: tối đa 4 ảnh (giới hạn server-side qua maxSelect). Ảnh đầu
   // tiên tự động thành thumbnail — đổi sau bằng setThumbnail().
   async createRestaurant({ name, category, priceRange, description, address, lat, lng, tags = [], hashtags = [], visibility = 'public', photoFiles = [] }) {
