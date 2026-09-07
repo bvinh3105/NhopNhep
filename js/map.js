@@ -34,27 +34,28 @@ const TabNav = {
 };
 
 /* ═══════════════════════════════════════════════
-   TILE LAYER — CartoDB Voyager (warm, less blocked than OSM)
-   With fallback if primary blocked
+   TILE LAYER — OpenStreetMap standard tiles, with a fallback if blocked.
+   (CartoDB's free rastertiles now require an API key — without one they
+   used to silently return a watermarked "API KEY REQUIRED" placeholder
+   image instead of an HTTP error, so the old tileerror-based fallback
+   never caught it. Switched the primary away from CartoDB entirely;
+   OSM's own tile server needs no key and genuinely 404s/errors when
+   unreachable, so a real fallback can work here.)
 ═══════════════════════════════════════════════ */
 const TileLayer = {
-  PRIMARY:  'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-  FALLBACK: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  SUBDOMAINS: 'abcd',
+  PRIMARY:  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  FALLBACK: 'https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png',
 
   add(map) {
     const layer = L.tileLayer(this.PRIMARY, {
       maxZoom: 19,
-      subdomains: this.SUBDOMAINS,
       attribution: '',
       crossOrigin: true,
     });
-    let failCount = 0;
     layer.on('tileerror', () => {
-      failCount++;
-      if (failCount === 3 && !layer._switched) {
+      if (!layer._switched) {
         layer._switched = true;
-        console.warn('[Tiles] CartoDB blocked, falling back to OSM');
+        console.warn('[Tiles] OSM unreachable, falling back to Wikimedia Maps');
         layer.setUrl(this.FALLBACK);
       }
     });
