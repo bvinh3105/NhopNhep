@@ -34,17 +34,24 @@ const TabNav = {
 };
 
 /* ═══════════════════════════════════════════════
-   TILE LAYER — OpenStreetMap standard tiles, with a fallback if blocked.
+   TILE LAYER — Esri World Street Map, with OSM as fallback if blocked.
    (CartoDB's free rastertiles now require an API key — without one they
    used to silently return a watermarked "API KEY REQUIRED" placeholder
-   image instead of an HTTP error, so the old tileerror-based fallback
-   never caught it. Switched the primary away from CartoDB entirely;
-   OSM's own tile server needs no key and genuinely 404s/errors when
-   unreachable, so a real fallback can work here.)
+   image instead of an HTTP error, so a tileerror-based fallback never
+   caught it. Tried OpenStreetMap's own tile server next, but it turned
+   out to be DNS-blocked on at least one real tester's home router, and
+   the obvious fallback — Wikimedia Maps — actively 403s any non-
+   Wikimedia Referer ("Map tiles are restricted to Wikimedia & affiliated
+   sites only"), so it never worked for us at all despite looking fine
+   in isolated testing. Esri's World Street Map has no API key, sends a
+   permissive Access-Control-Allow-Origin: *, and isn't Referer-gated —
+   verified reachable and rendering correctly (roads + Vietnamese street
+   labels) on the same network where OSM/Wikimedia both failed. Kept
+   OSM as a second-line fallback since it works fine for most networks.)
 ═══════════════════════════════════════════════ */
 const TileLayer = {
-  PRIMARY:  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  FALLBACK: 'https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png',
+  PRIMARY:  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+  FALLBACK: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
 
   add(map) {
     const layer = L.tileLayer(this.PRIMARY, {
@@ -55,7 +62,7 @@ const TileLayer = {
     layer.on('tileerror', () => {
       if (!layer._switched) {
         layer._switched = true;
-        console.warn('[Tiles] OSM unreachable, falling back to Wikimedia Maps');
+        console.warn('[Tiles] Esri unreachable, falling back to OSM');
         layer.setUrl(this.FALLBACK);
       }
     });

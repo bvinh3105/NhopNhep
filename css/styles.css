@@ -162,6 +162,10 @@ input,textarea,select{font-family:var(--font-body)}
 }
 #mainMap{position:absolute;inset:0}
 .leaflet-container{background:var(--cream-2);font-family:var(--font-body)!important}
+/* Warm up the tile imagery to match the app's cream/warm palette — only
+   the tile-image pane, so pins/markers (a different Leaflet pane) stay
+   their true colors. */
+.leaflet-tile-pane{filter:sepia(.35) saturate(1.35) hue-rotate(-8deg) brightness(1.04)}
 
 #homeSheet{
   flex-shrink:0;background:var(--paper);border-top:2px solid var(--text);
