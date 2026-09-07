@@ -28,54 +28,12 @@
     if (e.metaKey && e.altKey && ['I', 'J'].includes(k)) return swallow(e);
   }, { capture: true });
 
-  // Detect DevTools open via window-size delta. Not perfect
-  // (fails for undocked DevTools windows), but catches the
-  // usual F12 side-panel.
-  const OVERLAY_ID = 'nn-devtools-shield';
-  let shieldEl = null;
-  const showShield = () => {
-    if (shieldEl) return;
-    shieldEl = document.createElement('div');
-    shieldEl.id = OVERLAY_ID;
-    shieldEl.setAttribute('style', [
-      'position:fixed', 'inset:0', 'z-index:2147483647',
-      'background:rgba(20,10,5,.96)', 'color:#FBF3D9',
-      'display:flex', 'flex-direction:column',
-      'align-items:center', 'justify-content:center',
-      'padding:2rem', 'text-align:center',
-      'font-family:system-ui,sans-serif',
-    ].join(';'));
-    shieldEl.innerHTML = `
-      <div style="font-size:3rem;margin-bottom:.6rem">🔒</div>
-      <div style="font-size:1.3rem;font-weight:800;margin-bottom:.5rem">Đóng DevTools để tiếp tục</div>
-      <div style="font-size:.9rem;opacity:.8;max-width:28rem;line-height:1.4">
-        App tạm khoá khi phát hiện công cụ debug đang mở. Đóng DevTools
-        (F12 hoặc nhấn <b>Esc</b> trong panel) rồi thao tác lại.
-      </div>`;
-    document.body.appendChild(shieldEl);
-  };
-  const hideShield = () => {
-    if (!shieldEl) return;
-    shieldEl.remove();
-    shieldEl = null;
-  };
-
-  // Require 3 consecutive dirty reads (~2.4s) before locking. A single
-  // reflow (page load, mobile URL-bar collapse, orientation change) can
-  // trip the size-delta check once — real open DevTools stays open across
-  // several ticks, a transient reflow doesn't.
-  const THRESHOLD = 170;
-  let dirtyStreak = 0;
-  setInterval(() => {
-    const opened =
-      window.outerWidth - window.innerWidth > THRESHOLD ||
-      window.outerHeight - window.innerHeight > THRESHOLD;
-    if (opened) {
-      dirtyStreak++;
-      if (dirtyStreak >= 3) showShield();
-    } else {
-      dirtyStreak = 0;
-      hideShield();
-    }
-  }, 800);
+  // A window-size-delta DevTools shield used to live here. Removed: on
+  // real phones (this app's actual target — it's a PWA) mobile browser
+  // chrome (URL bar collapse/expand, notch/nav-bar reporting) routinely
+  // pushes outerWidth/outerHeight away from innerWidth/innerHeight by
+  // more than the threshold, and it stayed wrong for the whole session,
+  // not just a one-tick reflow — so it locked out real users on real
+  // devices, not just snoops. The keyboard/right-click blocks above are
+  // enough of a deterrent and don't have that failure mode.
 })();
