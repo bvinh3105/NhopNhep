@@ -859,6 +859,10 @@ body.map-full .tabbar{transform:translateY(105%)}
 .cat-pick-btn[data-cat="street"].active{background:var(--cat-street);border-color:var(--accent-2);box-shadow:2px 2px 0 var(--accent-2)}
 .cat-pick-btn[data-cat="snack"].active{background:var(--cat-snack);border-color:#A8365F;box-shadow:2px 2px 0 #A8365F}
 .cat-pick-btn[data-cat="cafe"].active{background:var(--cat-cafe);border-color:#5A3B24;box-shadow:2px 2px 0 #5A3B24}
+/* Price picker reuses .cat-pick-btn but keys off data-price, not data-cat */
+#cfPricePicker .cat-pick-btn.active{background:var(--accent);border-color:var(--accent-2);box-shadow:2px 2px 0 var(--accent-2)}
+/* Visibility picker — same reuse, keys off data-vis */
+#cfVisibilityPicker .cat-pick-btn.active{background:var(--text2);border-color:var(--text);box-shadow:2px 2px 0 var(--text)}
 
 #pickerMap { background: #e5e3df url("data:image/svg+xml,%3Csvg width='20' height='20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 0L0 20M0 0L20 20' stroke='%23d3d1cc' stroke-width='1' opacity='0.5'/%3E%3C/svg%3E");
 
@@ -1138,3 +1142,98 @@ body.map-full .tabbar{transform:translateY(105%)}
   *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;
     transition-duration:.05ms !important}
 }
+
+/* ═══════════════════════════════════════════════
+   GENERIC UTILITY
+═══════════════════════════════════════════════ */
+.hidden{display:none !important}
+
+/* ═══════════════════════════════════════════════
+   COMMUNITY — auth form, restaurant cards, add-quán modal
+═══════════════════════════════════════════════ */
+.community-toggle-link{
+  display:block;width:100%;text-align:center;margin-top:.6rem;
+  font-size:.78rem;font-weight:700;color:var(--primary);
+  text-decoration:none;border-bottom:none;background:none;
+}
+.community-toggle-link:active{opacity:.6}
+
+.community-welcome-sub{font-size:.75rem;color:var(--text3);margin-top:.1rem;font-weight:600}
+
+/* Restaurant card — like my-r-card but with a taller cover photo + chip rows */
+.comm-r-list{display:flex;flex-direction:column;gap:.75rem;padding-bottom:calc(var(--safe-bottom) + 1rem)}
+.comm-r-card{
+  background:var(--white);border:2px solid var(--text);border-radius:var(--radius);
+  box-shadow:3px 3px 0 var(--text);overflow:hidden;
+}
+.comm-r-cover{
+  height:140px;background:var(--cream-2) center/cover no-repeat;
+  display:flex;align-items:center;justify-content:center;font-size:2.2rem;
+  border-bottom:2px solid var(--text);
+}
+.comm-r-body{padding:.75rem}
+.comm-r-top{display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem}
+.comm-r-name{font-family:var(--font-display);font-size:1rem;font-weight:900;color:var(--text);letter-spacing:-.2px;line-height:1.25}
+.comm-r-meta{font-size:.72rem;color:var(--text2);font-weight:600;margin-top:.15rem}
+.comm-r-desc{font-size:.78rem;color:var(--text3);margin-top:.45rem;line-height:1.45}
+.comm-r-chips{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.55rem}
+.comm-r-chip{
+  padding:.2rem .55rem;border-radius:20px;font-size:.68rem;font-weight:700;
+  background:var(--cream-2);color:var(--text2);border:1.5px solid var(--line-2);
+}
+.comm-r-chip.hashtag{background:var(--primary-tint);color:var(--primary-2)}
+.comm-r-footer{display:flex;align-items:center;justify-content:space-between;margin-top:.65rem;padding-top:.6rem;border-top:1.5px dashed var(--line-2)}
+.comm-r-author{font-size:.7rem;color:var(--text3);font-weight:600}
+
+.vote-btn{
+  display:flex;align-items:center;gap:.3rem;padding:.35rem .7rem;border-radius:20px;
+  border:2px solid var(--text);background:var(--white);font-size:.8rem;font-weight:800;
+  color:var(--text);box-shadow:2px 2px 0 var(--text);transition:all .12s;
+}
+.vote-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.vote-btn.voted{background:var(--primary);color:var(--cream);border-color:var(--primary-2);box-shadow:2px 2px 0 var(--primary-2)}
+
+.empty-comm{
+  padding:2rem 1rem;text-align:center;background:var(--paper);
+  border:2px dashed var(--text2);border-radius:var(--radius);color:var(--text3);
+}
+.empty-comm .em-icon{font-size:2.5rem;margin-bottom:.4rem}
+.empty-comm .em-msg{font-family:var(--font-display);font-size:.95rem;font-weight:800;color:var(--text2);font-style:italic}
+.empty-comm .em-sub{font-size:.75rem;color:var(--text3);margin-top:.3rem;font-weight:500}
+
+/* Tag / hashtag chip input — type + Enter, chips render below */
+.chip-tag-list{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.5rem}
+.chip-tag{
+  display:flex;align-items:center;gap:.35rem;padding:.3rem .4rem .3rem .65rem;
+  border-radius:20px;border:2px solid var(--text);background:var(--white);
+  font-size:.75rem;font-weight:700;color:var(--text);box-shadow:2px 2px 0 var(--text);
+}
+.chip-tag.hashtag{background:var(--primary-tint);color:var(--primary-2)}
+.chip-tag-remove{
+  width:1.1rem;height:1.1rem;border-radius:50%;background:var(--paper);
+  border:1.5px solid var(--text2);color:var(--text2);font-size:.65rem;line-height:1;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.chip-tag-remove:active{background:var(--primary);color:var(--cream);border-color:var(--primary-2)}
+
+/* Photo picker — up to 4 slots, star = pick thumbnail */
+.photo-picker-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-top:.5rem}
+.photo-slot{
+  position:relative;aspect-ratio:1;border-radius:12px;border:2px solid var(--text);
+  overflow:hidden;background:var(--white) center/cover no-repeat;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.7rem;font-weight:700;color:var(--text2);text-align:center;line-height:1.3;
+}
+.photo-slot-empty{background:var(--paper);border-style:dashed;color:var(--text3)}
+.photo-slot-remove{
+  position:absolute;top:3px;right:3px;width:1.3rem;height:1.3rem;border-radius:50%;
+  background:rgba(42,24,16,.75);color:var(--cream);font-size:.7rem;line-height:1;
+  display:flex;align-items:center;justify-content:center;border:1px solid var(--cream);
+}
+.photo-thumb-star{
+  position:absolute;bottom:3px;left:3px;width:1.5rem;height:1.5rem;border-radius:50%;
+  background:rgba(42,24,16,.55);color:var(--cream-3);font-size:.85rem;line-height:1;
+  display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.4);
+  transition:all .12s;
+}
+.photo-thumb-star.active{background:var(--primary);color:#FFD966;border-color:var(--primary-2)}

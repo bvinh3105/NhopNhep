@@ -17,6 +17,7 @@ const State = {
   dwellOverrides: {},
   mainMap: null, planMap: null, pickerMap: null,
   userMarker: null, radiusCircle: null, pickerMarker: null,
+  communityPickerMap: null, communityPickerMarker: null,
 
   // Profile persistence
   profile: {

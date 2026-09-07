@@ -13,6 +13,15 @@ const AVATARS = ['🍜','🍕','🍔','🍣','🍰','🍩','🍦','🥗','🌮',
 /* ═══════════════════════════════════════════════
    UTILITY FUNCTIONS
 ═══════════════════════════════════════════════ */
+// Everything the app itself creates (own profile, "Quán của tôi") is
+// trusted single-user data. Community content is written by OTHER real
+// users and rendered via innerHTML in other people's browsers — escape it
+// or a restaurant name like "<img onerror=...>" becomes stored XSS.
+const _escMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+function escapeHtml(str) {
+  return String(str == null ? '' : str).replace(/[&<>"']/g, (c) => _escMap[c]);
+}
+
 function haversine(lat1, lng1, lat2, lng2) {
   const R = 6371000;
   const p1 = lat1 * Math.PI/180, p2 = lat2 * Math.PI/180;

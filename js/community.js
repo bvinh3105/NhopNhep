@@ -85,18 +85,19 @@ const Community = {
 
   // ── Restaurants ─────────────────────────────────────────────────────────
   async listRestaurants({ page = 1, perPage = 50, sort = '-created', filter = '' } = {}) {
-    const q = new URLSearchParams({ page, perPage, sort });
+    const q = new URLSearchParams({ page, perPage, sort, expand: 'created_by' });
     if (filter) q.set('filter', filter);
     return this._fetch(`/api/collections/restaurants/records?${q}`);
   },
 
   // photoFiles: tối đa 4 ảnh (giới hạn server-side qua maxSelect). Ảnh đầu
   // tiên tự động thành thumbnail — đổi sau bằng setThumbnail().
-  async createRestaurant({ name, category, priceRange, description, address, lat, lng, tags = [], hashtags = [], photoFiles = [] }) {
+  async createRestaurant({ name, category, priceRange, description, address, lat, lng, tags = [], hashtags = [], visibility = 'public', photoFiles = [] }) {
     if (!this.isLoggedIn()) return { ok: false, error: 'Cần đăng nhập trước' };
     const fd = new FormData();
     fd.append('name', name);
     fd.append('category', category);
+    fd.append('visibility', ['private', 'friends', 'public'].includes(visibility) ? visibility : 'public');
     if (priceRange) fd.append('price_range', priceRange);
     if (description) fd.append('description', description);
     if (address) fd.append('address', address);
@@ -183,7 +184,9 @@ const Community = {
     return this.listRestaurants({ page, perPage, filter });
   },
 
-  // ── Votes ("tùy chọn cùng nhau") ─────────────────────────────────────────
+  // ── Stars ("càng nhiều sao càng ngon", kiểu GitHub) ──────────────────────
+  // Vẫn dùng collection `votes` phía server (1 record = 1 sao từ 1 người,
+  // unique theo restaurant+user) — chỉ đổi cách gọi/hiển thị ở tầng UI.
   async myVote(restaurantId) {
     if (!this.isLoggedIn()) return null;
     const filter = `restaurant="${restaurantId}" && user="${this.currentUser.id}"`;
@@ -210,6 +213,48 @@ const Community = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ restaurant: restaurantId, user: this.currentUser.id }),
     });
+  },
+
+  // ── Friends ──────────────────────────────────────────────────────────────
+  // Một chiều, không cần đối phương chấp nhận: A thêm B vào friends của A
+  // nghĩa là quán A đăng ở chế độ "friends" sẽ hiện với B (xem rule server-side
+  // trên collection restaurants). Không có nghĩa A thấy được đồ "friends" của B.
+  async searchUsers(query) {
+    const q = (query || '').trim().replace(/"/g, '');
+    if (q.length < 2) return { ok: true, data: { items: [] } };
+    const filter = `email ~ "${q}" || name ~ "${q}"`;
+    return this._fetch(`/api/collections/users/records?perPage=10&filter=${encodeURIComponent(filter)}`);
+  },
+
+  async myFriends() {
+    if (!this.isLoggedIn()) return { ok: true, data: { items: [] } };
+    return this._fetch(`/api/collections/users/records/${this.currentUser.id}?expand=friends`);
+  },
+
+  async _setFriends(ids) {
+    const r = await this._fetch(`/api/collections/users/records/${this.currentUser.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ friends: ids }),
+    });
+    if (r.ok) this.currentUser = r.data; // keep cached session user in sync
+    return r;
+  },
+
+  async addFriend(userId) {
+    if (!this.isLoggedIn()) return { ok: false, error: 'Cần đăng nhập trước' };
+    const cur = await this.myFriends();
+    const ids = new Set((cur.ok && cur.data.friends) || []);
+    ids.add(userId);
+    return this._setFriends([...ids]);
+  },
+
+  async removeFriend(userId) {
+    if (!this.isLoggedIn()) return { ok: false, error: 'Cần đăng nhập trước' };
+    const cur = await this.myFriends();
+    const ids = new Set((cur.ok && cur.data.friends) || []);
+    ids.delete(userId);
+    return this._setFriends([...ids]);
   },
 
   // ── Client-side image prep ──────────────────────────────────────────────

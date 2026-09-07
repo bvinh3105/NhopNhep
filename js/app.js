@@ -42,6 +42,8 @@ function boot() {
   AddModal.init();
   DetailModal.init();
   HistoryModal.init();
+  CommunityCtrl.init();
+  CommunityAddModal.init();
   wireScrollMasks();
 
   // Fallback default location — Hoàn Kiếm, Hà Nội

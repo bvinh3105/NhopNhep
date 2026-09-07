@@ -505,7 +505,7 @@ const ResultsCtrl = {
       if (q) {
         // Couldn't resolve the typed query → offer a Google Maps search,
         // whose autocomplete finds nearby places our data misses ("coo").
-        const esc = String(q).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        const esc = escapeHtml(q);
         grid.innerHTML = `<div class="empty-state">
           <div class="es-icon">🔍</div>
           <div class="es-msg">Chưa tìm thấy "<b>${esc}</b>" trong dữ liệu app<br>
@@ -1136,8 +1136,15 @@ const ProfileCtrl = {
       this._renderStats();
     });
 
+    // "Thêm quán" giờ hợp nhất về modal cộng đồng — đăng nhập là đăng thẳng
+    // lên server, không còn tách riêng bản nháp chỉ lưu máy nữa.
     document.getElementById('addRestaurantBtn').addEventListener('click', () => {
-      AddModal.open();
+      if (!Community.isLoggedIn()) {
+        showToast('⚠️ Đăng nhập ở tab Cộng đồng để đăng quán nhé');
+        TabNav.switchTo('community');
+        return;
+      }
+      CommunityAddModal.open();
     });
 
     // Stat cards — clickable overview shortcuts
@@ -1371,64 +1378,19 @@ const AddModal = {
 
     document.getElementById('fSave').addEventListener('click', () => this._save());
 
-    // Address autocomplete inside the modal
-    this._initLocSearch();
-  },
-
-  // Debounced address suggestions for the modal address input.
-  // Selecting a suggestion drops the picker marker at that spot and pans
-  // the picker map — user can still tap the map for fine adjustment.
-  _initLocSearch() {
-    const input = document.getElementById('fLocSearch');
-    const suggest = document.getElementById('fLocSuggest');
-    if (!input || !suggest) return;
-
-    const pick = (r) => {
+    // Address autocomplete — picking a suggestion drops the marker + prefills
+    // the name if it's still blank; user can also tap the map directly.
+    LocationPicker.initSearch('fLocSearch', 'fLocSuggest', (r) => {
       this._pickedLat = r.lat;
       this._pickedLng = r.lng;
-      // Update marker + map view
       if (State.pickerMap) {
         State.pickerMap.setView([r.lat, r.lng], 17);
-        this._setMarker(r.lat, r.lng);
+        LocationPicker.setMarker('pickerMap', 'pickerMarker', r.lat, r.lng, this._selectedCat);
       }
-      // Prefill name if the input's blank — most convenient
       const nameInput = document.getElementById('fName');
       if (nameInput && !nameInput.value.trim()) nameInput.value = r.name;
-      input.value = r.name;
-      Geocoder.hide(suggest);
-    };
-
-    const bias = () => ({ nearLat: State.userLat, nearLng: State.userLng });
-
-    input.addEventListener('input', (e) => {
-      const q = e.target.value.trim();
-      if (q.length < 3) { Geocoder.hide(suggest); return; }
-      Geocoder.showLoading(suggest);
-      Geocoder.onInput('fLocSearch', q, 450, (results) => {
-        Geocoder.renderSuggestions(suggest, results, pick);
-      }, bias());
-    });
-
-    input.addEventListener('keydown', async (e) => {
-      if (e.key !== 'Enter') return;
-      e.preventDefault();
-      const q = input.value.trim();
-      if (!q) return;
-      Geocoder.showLoading(suggest);
-      const results = await Geocoder.search(q, bias());
-      // Prefer address-shaped hits so Enter doesn't land on a nearby
-      // landmark POI when the user typed an address.
-      const addressFirst = results.filter(r => Geocoder.isAddressType(r));
-      const pool = addressFirst.length ? addressFirst : results;
-      if (pool.length) pick(pool[0]);
-      else Geocoder.renderSuggestions(suggest, [], pick);
-    });
-
-    // Dismiss dropdown on outside click
-    document.addEventListener('click', (e) => {
-      if (!e.target.closest('#fLocSearch') && !e.target.closest('#fLocSuggest')) {
-        Geocoder.hide(suggest);
-      }
+      document.getElementById('fLocSearch').value = r.name;
+      Geocoder.hide(document.getElementById('fLocSuggest'));
     });
   },
 
@@ -1454,42 +1416,20 @@ const AddModal = {
     // user actually chooses somewhere.
     this._pickedLat = null;
     this._pickedLng = null;
-    this._pickerCenter = [State.userLat || 21.0285, State.userLng || 105.8542];
-    setTimeout(() => this._initPickerMap(), 250);
+    // No marker on open — dropped only when the user picks or clicks.
+    const center = [State.userLat || 21.0285, State.userLng || 105.8542];
+    setTimeout(() => {
+      LocationPicker.initMap('pickerMap', 'pickerMap', 'pickerMarker', center, (lat, lng) => {
+        this._pickedLat = lat;
+        this._pickedLng = lng;
+        LocationPicker.setMarker('pickerMap', 'pickerMarker', lat, lng, this._selectedCat);
+      });
+    }, 250);
   },
 
   close() {
     document.getElementById('addModal').classList.remove('show');
-    setTimeout(() => {
-      if (State.pickerMap) { try { State.pickerMap.remove(); } catch(_){} State.pickerMap = null; }
-    }, 300);
-  },
-
-  _initPickerMap() {
-    if (State.pickerMap) { try { State.pickerMap.remove(); } catch(_){} State.pickerMap = null; }
-    if (State.pickerMarker) { try { State.pickerMarker.remove(); } catch(_){} State.pickerMarker = null; }
-    State.pickerMap = L.map('pickerMap', {
-      center: this._pickerCenter, zoom: 15,
-      zoomControl: false, attributionControl: false,
-    });
-    TileLayer.add(State.pickerMap);
-    // No marker on open — dropped only when the user picks or clicks.
-    State.pickerMap.on('click', e => {
-      const { lat, lng } = e.latlng;
-      this._pickedLat = lat;
-      this._pickedLng = lng;
-      this._setMarker(lat, lng);
-    });
-  },
-
-  _setMarker(lat, lng) {
-    if (State.pickerMarker) State.pickerMarker.remove();
-    const cat = CATEGORIES[this._selectedCat];
-    const icon = L.divIcon({
-      html:`<div class="r-map-marker" style="background:${cat.color};font-size:1.05rem">${cat.icon}</div>`,
-      iconSize:[32,32], iconAnchor:[16,16], className:''
-    });
-    State.pickerMarker = L.marker([lat,lng],{icon}).addTo(State.pickerMap);
+    setTimeout(() => LocationPicker.teardownMap('pickerMap'), 300);
   },
 
   async _save() {
@@ -1837,5 +1777,462 @@ const HistoryModal = {
     if (sameDay) return `Hôm nay ${time}`;
     if (isYesterday) return `Hôm qua ${time}`;
     return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${time}`;
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   COMMUNITY — auth, browse/search, vote
+   Data comes from other real users via the PocketBase backend — every
+   string rendered below goes through escapeHtml() first. Don't add a
+   community field to a template without it.
+═══════════════════════════════════════════════ */
+const COMMUNITY_CAT_TO_PB = { restaurant: 'nha_hang', street: 'via_he', snack: 'an_vat', cafe: 'ca_phe' };
+const COMMUNITY_PB_TO_CAT = { nha_hang: 'restaurant', via_he: 'street', an_vat: 'snack', ca_phe: 'cafe' };
+const COMMUNITY_PRICE_LABEL = { binh_dan: '💸 Bình dân', tam_trung: '💰 Tầm trung', sang_chanh: '✨ Sang chảnh' };
+
+const CommunityCtrl = {
+  _mode: 'login', // 'login' | 'register'
+  _searchDebounce: null,
+
+  init() {
+    document.getElementById('communityAuthToggle').addEventListener('click', () => {
+      this._mode = this._mode === 'login' ? 'register' : 'login';
+      this._renderAuthMode();
+    });
+    document.getElementById('communityAuthSubmit').addEventListener('click', () => this._submitAuth());
+    document.getElementById('communityLogout').addEventListener('click', () => {
+      Community.logout();
+      showToast('👋 Đã đăng xuất');
+      this.render();
+    });
+    document.getElementById('communityAddBtn').addEventListener('click', () => CommunityAddModal.open());
+
+    const search = document.getElementById('communitySearchInput');
+    search.addEventListener('input', () => {
+      clearTimeout(this._searchDebounce);
+      this._searchDebounce = setTimeout(() => this._loadList(search.value.trim()), 350);
+    });
+
+    this._initFriendSearch();
+    this._renderAuthMode();
+  },
+
+  // ── Friends ("quán đăng chế độ Bạn bè chỉ hiện với người ở đây") ─────────
+  _initFriendSearch() {
+    const input = document.getElementById('friendSearchInput');
+    const results = document.getElementById('friendSearchResults');
+    if (!input || !results) return;
+
+    let debounce = null;
+    input.addEventListener('input', () => {
+      clearTimeout(debounce);
+      const q = input.value.trim();
+      if (q.length < 2) { results.classList.remove('show'); results.innerHTML = ''; return; }
+      debounce = setTimeout(async () => {
+        const r = await Community.searchUsers(q);
+        const items = (r.ok ? r.data.items : []).filter(u => u.id !== Community.currentUser?.id);
+        if (!items.length) {
+          results.innerHTML = `<div class="go-empty">Không tìm thấy ai khớp "${escapeHtml(q)}"</div>`;
+        } else {
+          results.innerHTML = items.map(u => `<div class="go-item" data-id="${u.id}">👤 ${escapeHtml(u.name || 'Ẩn danh')}</div>`).join('');
+          results.querySelectorAll('.go-item[data-id]').forEach(el => {
+            el.addEventListener('click', async () => {
+              const r2 = await Community.addFriend(el.dataset.id);
+              if (!r2.ok) { showToast(`⚠️ ${r2.error}`); return; }
+              showToast('✅ Đã thêm bạn');
+              input.value = '';
+              results.classList.remove('show'); results.innerHTML = '';
+              this._renderFriends();
+            });
+          });
+        }
+        results.classList.add('show');
+      }, 350);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('#friendSearchInput') && !e.target.closest('#friendSearchResults')) {
+        results.classList.remove('show');
+      }
+    });
+  },
+
+  async _renderFriends() {
+    const el = document.getElementById('friendList');
+    if (!el) return;
+    const r = await Community.myFriends();
+    const friends = (r.ok && r.data.expand && r.data.expand.friends) || [];
+    if (!friends.length) {
+      el.innerHTML = `<span style="font-size:.78rem;color:var(--text3)">Chưa có bạn nào — tìm ở trên để thêm</span>`;
+      return;
+    }
+    el.innerHTML = friends.map(u => `<span class="chip-tag">👤 ${escapeHtml(u.name || 'Ẩn danh')}<button type="button" class="chip-tag-remove" data-id="${u.id}">✕</button></span>`).join('');
+    el.querySelectorAll('.chip-tag-remove').forEach(b => {
+      b.addEventListener('click', async () => {
+        const r2 = await Community.removeFriend(b.dataset.id);
+        if (!r2.ok) { showToast(`⚠️ ${r2.error}`); return; }
+        this._renderFriends();
+      });
+    });
+  },
+
+  _renderAuthMode() {
+    const isRegister = this._mode === 'register';
+    document.getElementById('communityNameGroup').classList.toggle('hidden', !isRegister);
+    document.getElementById('communityAuthSubmit').textContent = isRegister ? 'Đăng ký' : 'Đăng nhập';
+    document.getElementById('communityAuthToggle').textContent = isRegister
+      ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký';
+  },
+
+  async _submitAuth() {
+    const email = document.getElementById('cAuthEmail').value.trim();
+    const password = document.getElementById('cAuthPassword').value;
+    const name = document.getElementById('cAuthName').value.trim();
+    if (!email || !password) { showToast('⚠️ Điền email và mật khẩu'); return; }
+    if (this._mode === 'register' && password.length < 8) { showToast('⚠️ Mật khẩu tối thiểu 8 ký tự'); return; }
+
+    const btn = document.getElementById('communityAuthSubmit');
+    const original = btn.textContent;
+    btn.disabled = true; btn.textContent = '⏳ Đang xử lý…';
+    const r = this._mode === 'register'
+      ? await Community.register(email, password, name)
+      : await Community.login(email, password);
+    btn.disabled = false; btn.textContent = original;
+
+    if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+    showToast(this._mode === 'register' ? '🎉 Đã đăng ký!' : '✅ Đăng nhập thành công');
+    document.getElementById('cAuthPassword').value = '';
+    this.render();
+  },
+
+  render() {
+    const loggedIn = Community.isLoggedIn();
+    document.getElementById('communityAuth').classList.toggle('hidden', loggedIn);
+    document.getElementById('communityMain').classList.toggle('hidden', !loggedIn);
+    if (!loggedIn) return;
+    const user = Community.currentUser;
+    document.getElementById('communityWelcome').innerHTML = `Chào <em>${escapeHtml(user.name || user.email)}</em>`;
+    this._renderFriends();
+    this._loadList('');
+  },
+
+  async _loadList(query) {
+    const list = document.getElementById('communityList');
+    list.innerHTML = `<div class="empty-comm"><div class="em-icon">⏳</div><div class="em-msg">Đang tải…</div></div>`;
+    const r = query ? await Community.searchRestaurants(query) : await Community.listRestaurants();
+    if (!r.ok) {
+      list.innerHTML = `<div class="empty-comm">
+        <div class="em-icon">😕</div><div class="em-msg">Không tải được</div>
+        <div class="em-sub">${escapeHtml(r.error)}</div>
+      </div>`;
+      return;
+    }
+    this._renderList(r.data.items);
+  },
+
+  _renderList(items) {
+    const list = document.getElementById('communityList');
+    if (!items.length) {
+      list.innerHTML = `<div class="empty-comm">
+        <div class="em-icon">🍽️</div>
+        <div class="em-msg">Chưa có quán nào</div>
+        <div class="em-sub">Đăng quán đầu tiên cho cả nhóm!</div>
+      </div>`;
+      return;
+    }
+    list.innerHTML = items.map(r => this._cardHtml(r)).join('');
+    list.querySelectorAll('.vote-btn').forEach(btn => {
+      btn.addEventListener('click', () => this._onVoteClick(btn));
+    });
+    items.forEach(r => this._loadVoteState(r.id));
+  },
+
+  _VIS_BADGE: { private: '🔒', friends: '👥', public: '🌍' },
+
+  _cardHtml(r) {
+    const catKey = COMMUNITY_PB_TO_CAT[r.category] || 'restaurant';
+    const cat = CATEGORIES[catKey];
+    const priceLabel = COMMUNITY_PRICE_LABEL[r.price_range] || '';
+    const thumbUrl = Community.thumbnailUrl(r, '500x360');
+    const cover = thumbUrl
+      ? `<div class="comm-r-cover" style="background-image:url('${thumbUrl}')"></div>`
+      : `<div class="comm-r-cover" style="background:${cat.color}22">${cat.icon}</div>`;
+    const tagsHtml = (r.tags || []).map(t => `<span class="comm-r-chip">${escapeHtml(t)}</span>`).join('');
+    const hashHtml = (r.hashtags || []).map(h => `<span class="comm-r-chip hashtag">#${escapeHtml(h)}</span>`).join('');
+    const authorName = (r.expand && r.expand.created_by && r.expand.created_by.name) || 'Ẩn danh';
+    const visBadge = this._VIS_BADGE[r.visibility] || '';
+    return `<div class="comm-r-card">
+      ${cover}
+      <div class="comm-r-body">
+        <div class="comm-r-name">${escapeHtml(r.name)}</div>
+        <div class="comm-r-meta">${cat.icon} ${cat.label}${priceLabel ? ' · ' + priceLabel : ''} · ${visBadge}</div>
+        ${r.description ? `<div class="comm-r-desc">${escapeHtml(r.description)}</div>` : ''}
+        ${(tagsHtml || hashHtml) ? `<div class="comm-r-chips">${tagsHtml}${hashHtml}</div>` : ''}
+        <div class="comm-r-footer">
+          <span class="comm-r-author">👤 ${escapeHtml(authorName)}</span>
+          <button class="vote-btn" data-id="${r.id}"><span class="vote-ico">☆</span><span class="vote-count">···</span></button>
+        </div>
+      </div>
+    </div>`;
+  },
+
+  // Kiểu GitHub: bấm ★ để "star" một quán, càng nhiều sao càng ngon. Vẫn
+  // dùng đúng cơ chế vote (unique restaurant+user) phía server, chỉ đổi icon.
+  async _loadVoteState(restaurantId) {
+    const [mine, count] = await Promise.all([
+      Community.myVote(restaurantId),
+      Community.voteCount(restaurantId),
+    ]);
+    const btn = document.querySelector(`.vote-btn[data-id="${restaurantId}"]`);
+    if (!btn) return;
+    btn.classList.toggle('voted', !!mine);
+    btn.querySelector('.vote-ico').textContent = mine ? '★' : '☆';
+    btn.querySelector('.vote-count').textContent = count;
+  },
+
+  async _onVoteClick(btn) {
+    const id = btn.dataset.id;
+    btn.disabled = true;
+    const r = await Community.toggleVote(id);
+    btn.disabled = false;
+    if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+    this._loadVoteState(id);
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   COMMUNITY ADD RESTAURANT MODAL
+═══════════════════════════════════════════════ */
+const CommunityAddModal = {
+  _selectedCat: 'restaurant',
+  _selectedPrice: 'binh_dan',
+  _selectedVisibility: 'public',
+  _pickedLat: null,
+  _pickedLng: null,
+  _tags: [],
+  _hashtags: [],
+  _photoFiles: [],
+  _photoPreviewUrls: [],
+  _thumbIndex: 0,
+
+  init() {
+    document.getElementById('cfCatPicker').addEventListener('click', (e) => {
+      const btn = e.target.closest('.cat-pick-btn');
+      if (!btn) return;
+      document.querySelectorAll('#cfCatPicker .cat-pick-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      this._selectedCat = btn.dataset.cat;
+    });
+
+    document.getElementById('cfPricePicker').addEventListener('click', (e) => {
+      const btn = e.target.closest('.cat-pick-btn');
+      if (!btn) return;
+      document.querySelectorAll('#cfPricePicker .cat-pick-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      this._selectedPrice = btn.dataset.price;
+    });
+
+    document.getElementById('cfVisibilityPicker').addEventListener('click', (e) => {
+      const btn = e.target.closest('.cat-pick-btn');
+      if (!btn) return;
+      document.querySelectorAll('#cfVisibilityPicker .cat-pick-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      this._selectedVisibility = btn.dataset.vis;
+    });
+
+    document.getElementById('cfCancel').addEventListener('click', () => this.close());
+    document.getElementById('communityAddModal').addEventListener('click', (e) => {
+      if (e.target.id === 'communityAddModal') this.close();
+    });
+
+    document.getElementById('cfPhotoInput').addEventListener('change', (e) => {
+      const files = Array.from(e.target.files || []);
+      const room = 4 - this._photoFiles.length;
+      if (files.length > room) showToast(`⚠️ Chỉ nhận thêm được ${room} ảnh (tối đa 4)`);
+      files.slice(0, room).forEach(f => {
+        this._photoFiles.push(f);
+        this._photoPreviewUrls.push(URL.createObjectURL(f));
+      });
+      e.target.value = '';
+      this._renderPhotoGrid();
+    });
+
+    // Tag/hashtag arrays are mutated in place (never reassigned) so these
+    // closures keep working after open() resets the form.
+    this._wireChipInput('cfTagInput', 'cfTagList', this._tags, { hashtag: false });
+    this._wireChipInput('cfHashtagInput', 'cfHashtagList', this._hashtags, { hashtag: true });
+
+    document.getElementById('cfSave').addEventListener('click', () => this._save());
+
+    LocationPicker.initSearch('cfLocSearch', 'cfLocSuggest', (r) => {
+      this._pickedLat = r.lat;
+      this._pickedLng = r.lng;
+      if (State.communityPickerMap) {
+        State.communityPickerMap.setView([r.lat, r.lng], 17);
+        LocationPicker.setMarker('communityPickerMap', 'communityPickerMarker', r.lat, r.lng, this._selectedCat);
+      }
+      document.getElementById('cfLocSearch').value = r.name;
+      Geocoder.hide(document.getElementById('cfLocSuggest'));
+    });
+  },
+
+  _wireChipInput(inputId, listId, arr, { hashtag }) {
+    const input = document.getElementById(inputId);
+    input.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      const raw = input.value.trim();
+      if (!raw) return;
+      const val = hashtag ? Community.normalizeHashtags([raw])[0] : raw.slice(0, 30);
+      input.value = '';
+      if (!val || arr.some(x => x.toLowerCase() === val.toLowerCase())) return;
+      const max = hashtag ? 15 : 10;
+      if (arr.length >= max) { showToast(`⚠️ Tối đa ${max} ${hashtag ? 'hashtag' : 'thẻ'}`); return; }
+      arr.push(val);
+      this._renderChipList(listId, arr, hashtag);
+    });
+  },
+
+  _renderChipList(listId, arr, hashtag) {
+    const el = document.getElementById(listId);
+    el.innerHTML = arr.map((v, i) => `<span class="chip-tag${hashtag ? ' hashtag' : ''}">${hashtag ? '#' : ''}${escapeHtml(v)}<button type="button" class="chip-tag-remove" data-i="${i}">✕</button></span>`).join('');
+    el.querySelectorAll('.chip-tag-remove').forEach(b => {
+      b.addEventListener('click', () => {
+        arr.splice(parseInt(b.dataset.i), 1);
+        this._renderChipList(listId, arr, hashtag);
+      });
+    });
+  },
+
+  _renderPhotoGrid() {
+    const grid = document.getElementById('cfPhotoGrid');
+    const slots = this._photoFiles.map((file, i) => {
+      const url = this._photoPreviewUrls[i];
+      const starActive = i === this._thumbIndex ? ' active' : '';
+      return `<div class="photo-slot" style="background-image:url('${url}')">
+        <button type="button" class="photo-slot-remove" data-idx="${i}">✕</button>
+        <button type="button" class="photo-thumb-star${starActive}" data-idx="${i}" title="Đặt làm ảnh đại diện">⭐</button>
+      </div>`;
+    }).join('');
+    const addSlot = this._photoFiles.length < 4
+      ? `<button class="photo-slot photo-slot-empty" id="cfPhotoAddBtn" type="button">＋<br><span style="font-size:.65rem">Thêm ảnh</span></button>`
+      : '';
+    grid.innerHTML = slots + addSlot;
+
+    const addBtn = document.getElementById('cfPhotoAddBtn');
+    if (addBtn) addBtn.addEventListener('click', () => document.getElementById('cfPhotoInput').click());
+    grid.querySelectorAll('.photo-slot-remove').forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(b.dataset.idx);
+        URL.revokeObjectURL(this._photoPreviewUrls[idx]);
+        this._photoFiles.splice(idx, 1);
+        this._photoPreviewUrls.splice(idx, 1);
+        if (this._thumbIndex === idx) this._thumbIndex = 0;
+        else if (this._thumbIndex > idx) this._thumbIndex--;
+        this._renderPhotoGrid();
+      });
+    });
+    grid.querySelectorAll('.photo-thumb-star').forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this._thumbIndex = parseInt(b.dataset.idx);
+        this._renderPhotoGrid();
+      });
+    });
+  },
+
+  open() {
+    if (!Community.isLoggedIn()) { showToast('⚠️ Cần đăng nhập trước'); return; }
+    const modal = document.getElementById('communityAddModal');
+    modal.classList.add('show');
+    document.getElementById('cfName').value = '';
+    document.getElementById('cfDesc').value = '';
+    const loc = document.getElementById('cfLocSearch');
+    if (loc) loc.value = '';
+    const locSug = document.getElementById('cfLocSuggest');
+    if (locSug) Geocoder.hide(locSug);
+
+    this._selectedCat = 'restaurant';
+    this._selectedPrice = 'binh_dan';
+    this._selectedVisibility = 'public';
+    document.querySelectorAll('#cfCatPicker .cat-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === 'restaurant'));
+    document.querySelectorAll('#cfPricePicker .cat-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.price === 'binh_dan'));
+    document.querySelectorAll('#cfVisibilityPicker .cat-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.vis === 'public'));
+
+    this._pickedLat = null;
+    this._pickedLng = null;
+
+    this._tags.length = 0;
+    this._hashtags.length = 0;
+    this._renderChipList('cfTagList', this._tags, false);
+    this._renderChipList('cfHashtagList', this._hashtags, true);
+
+    this._photoPreviewUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch(_) {} });
+    this._photoFiles.length = 0;
+    this._photoPreviewUrls.length = 0;
+    this._thumbIndex = 0;
+    this._renderPhotoGrid();
+
+    const center = [State.userLat || 21.0285, State.userLng || 105.8542];
+    setTimeout(() => {
+      LocationPicker.initMap('communityPickerMap', 'communityPickerMap', 'communityPickerMarker', center, (lat, lng) => {
+        this._pickedLat = lat;
+        this._pickedLng = lng;
+        LocationPicker.setMarker('communityPickerMap', 'communityPickerMarker', lat, lng, this._selectedCat);
+      });
+    }, 250);
+  },
+
+  close() {
+    document.getElementById('communityAddModal').classList.remove('show');
+    setTimeout(() => LocationPicker.teardownMap('communityPickerMap'), 300);
+  },
+
+  async _save() {
+    const name = document.getElementById('cfName').value.trim();
+    if (!name) { showToast('⚠️ Nhập tên quán trước nhé!'); return; }
+    if (!Community.isLoggedIn()) { showToast('⚠️ Cần đăng nhập trước'); return; }
+
+    const desc = document.getElementById('cfDesc').value.trim();
+    const addressText = (document.getElementById('cfLocSearch')?.value || '').trim();
+    let lat = this._pickedLat, lng = this._pickedLng;
+
+    const btn = document.getElementById('cfSave');
+    const original = btn.textContent;
+
+    if (lat == null && addressText.length >= 3) {
+      btn.disabled = true; btn.textContent = '🌐 Đang tra vị trí…';
+      const found = await LocationPicker.geocodeFallback(addressText);
+      if (found) { lat = found.lat; lng = found.lng; }
+    }
+
+    btn.disabled = true; btn.textContent = '📤 Đang đăng…';
+
+    // Move the chosen cover photo to index 0 — createRestaurant() auto-sets
+    // thumbnail = photos[0] right after the record is created.
+    const orderedFiles = this._thumbIndex > 0 && this._photoFiles[this._thumbIndex]
+      ? [this._photoFiles[this._thumbIndex], ...this._photoFiles.filter((_, i) => i !== this._thumbIndex)]
+      : this._photoFiles;
+
+    const r = await Community.createRestaurant({
+      name,
+      category: COMMUNITY_CAT_TO_PB[this._selectedCat],
+      priceRange: this._selectedPrice,
+      visibility: this._selectedVisibility,
+      description: desc,
+      address: addressText,
+      lat, lng,
+      tags: this._tags,
+      hashtags: this._hashtags,
+      photoFiles: orderedFiles,
+    });
+
+    btn.disabled = false; btn.textContent = original;
+
+    if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+    showToast(`✅ Đã đăng "${name}" cho cộng đồng!`);
+    this.close();
+    CommunityCtrl._loadList('');
   },
 };

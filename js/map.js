@@ -19,12 +19,16 @@ const TabNav = {
     document.getElementById('resultsScreen').classList.add('hidden');
     document.getElementById('planScreen').classList.add('hidden');
     document.getElementById('profileScreen').classList.add('hidden');
+    document.getElementById('communityScreen').classList.add('hidden');
     if (tab === 'home') {
       document.getElementById('homeScreen').classList.remove('hidden');
       setTimeout(() => State.mainMap?.invalidateSize(), 60);
     } else if (tab === 'profile') {
       document.getElementById('profileScreen').classList.remove('hidden');
       ProfileCtrl.render();
+    } else if (tab === 'community') {
+      document.getElementById('communityScreen').classList.remove('hidden');
+      CommunityCtrl.render();
     }
   },
 };
