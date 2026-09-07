@@ -1800,6 +1800,19 @@ const CommunityCtrl = {
       this._renderAuthMode();
     });
     document.getElementById('communityAuthSubmit').addEventListener('click', () => this._submitAuth());
+
+    // Hiện/ẩn mật khẩu — cùng pattern với ô key Gemini ở tab Cá nhân
+    const authPassword = document.getElementById('cAuthPassword');
+    document.getElementById('cAuthPasswordToggle').addEventListener('click', () => {
+      authPassword.type = authPassword.type === 'password' ? 'text' : 'password';
+    });
+    // Enter ở bất kỳ ô nào trong form đều submit — giống hành vi form thường thấy
+    ['cAuthName', 'cAuthEmail', 'cAuthPassword'].forEach(id => {
+      document.getElementById(id).addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); this._submitAuth(); }
+      });
+    });
+
     document.getElementById('communityLogout').addEventListener('click', () => {
       Community.logout();
       showToast('👋 Đã đăng xuất');
