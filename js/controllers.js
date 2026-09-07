@@ -75,7 +75,32 @@ const HomeCtrl = {
     // Address autocomplete for "Điểm xuất phát"
     this._initLocInput();
 
+    this._initEasterEgg();
+
     this._updateBadge();
+  },
+
+  // Easter egg — "vi vu cùng Vinh và Thảo ♥" ẩn mặc định, bấm liên tiếp 5
+  // lần vào tiêu đề mới hiện ra. Đếm reset nếu khoảng cách giữa 2 lần bấm
+  // quá 1.5s, để bấm rời rạc qua nhiều lần mở app không vô tình trúng.
+  _initEasterEgg() {
+    const title = document.getElementById('heroTitle');
+    const tagline = document.getElementById('heroTagline');
+    if (!title || !tagline) return;
+    let count = 0;
+    let lastTap = 0;
+    title.addEventListener('click', () => {
+      const now = Date.now();
+      count = (now - lastTap > 1500) ? 1 : count + 1;
+      lastTap = now;
+      if (count >= 5) {
+        count = 0;
+        if (!tagline.classList.contains('show')) {
+          tagline.classList.add('show');
+          showToast('💕 Easter egg!');
+        }
+      }
+    });
   },
 
   // Debounced address suggestions dropdown for the "Điểm xuất phát" field.

@@ -118,15 +118,22 @@ input,textarea,select{font-family:var(--font-body)}
 ═══════════════════════════════════════════════ */
 .hero-title{
   font-family:var(--font-display);font-weight:900;font-size:2.1rem;line-height:1;
-  color:var(--primary);letter-spacing:-1px;
+  color:var(--primary);letter-spacing:-1px;user-select:none;
 }
 .hero-title em{font-style:italic;color:var(--accent);font-weight:900}
+/* Easter egg — ẩn mặc định, bấm 5 lần vào tiêu đề mới hiện (xem HomeCtrl._initEasterEgg) */
 .hero-tagline{
   font-family:var(--font-display);font-style:italic;font-weight:700;
   font-size:.85rem;color:var(--primary);margin-top:.2rem;
   letter-spacing:.2px;line-height:1;
+  display:none;
 }
+.hero-tagline.show{display:block;animation:tagline-pop .4s var(--ease-spring)}
 .hero-tagline em{font-style:italic;color:var(--accent);font-weight:800}
+@keyframes tagline-pop{
+  from{opacity:0;transform:translateY(-4px) scale(.9)}
+  to{opacity:1;transform:none}
+}
 
 /* ═══════════════════════════════════════════════
    HOME (Nhóp Nhép tab)
