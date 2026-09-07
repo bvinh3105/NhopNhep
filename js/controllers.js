@@ -1687,6 +1687,42 @@ function wireCardDetail(container, items) {
   });
 }
 
+// "Theo dõi" = kết bạn, 1 chiều kiểu Twitter — bấm là xong ngay, không cần
+// đối phương đồng ý (xem UserQuanModal/CommunityAddModal cho cách "bạn bè"
+// dùng để lọc quán visibility="friends").
+function followBtnHtml(userId, userName, following) {
+  return `<button type="button" class="follow-btn${following ? ' following' : ''}" data-user-id="${userId}" data-user-name="${escapeHtml(userName)}">${following ? '✓ Đang theo dõi' : '👤+ Theo dõi'}</button>`;
+}
+function wireFollowButtons(container, onChange) {
+  container.querySelectorAll('.follow-btn[data-user-id]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.userId;
+      const isFollowing = btn.classList.contains('following');
+      btn.disabled = true;
+      const r = isFollowing ? await Community.removeFriend(id) : await Community.addFriend(id);
+      btn.disabled = false;
+      if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+      btn.classList.toggle('following', !isFollowing);
+      btn.textContent = !isFollowing ? '✓ Đang theo dõi' : '👤+ Theo dõi';
+      showToast(!isFollowing ? '✅ Đã theo dõi' : '↺ Đã bỏ theo dõi');
+      if (onChange) onChange();
+    });
+  });
+}
+// "Xem profile" — tên người khác (kết quả tìm bạn, danh sách đang theo dõi,
+// tác giả 1 quán) đều mở UserQuanModal: quán họ đăng mà mình xem được, kèm
+// nút Theo dõi ngay trong đó.
+function wireProfileLinks(container) {
+  container.querySelectorAll('[data-user-id]').forEach(el => {
+    if (el.classList.contains('follow-btn')) return; // nút Theo dõi xử lý riêng
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      UserQuanModal.open(el.dataset.userId, el.dataset.userName);
+    });
+  });
+}
+
 const CommunityCtrl = {
   _mode: 'login', // 'login' | 'register'
   _searchDebounce: null,
@@ -1757,22 +1793,22 @@ const CommunityCtrl = {
       const q = input.value.trim();
       if (q.length < 2) { results.classList.remove('show'); results.innerHTML = ''; return; }
       debounce = setTimeout(async () => {
-        const r = await Community.searchUsers(q);
-        const items = (r.ok ? r.data.items : []).filter(u => u.id !== Community.currentUser?.id);
+        const [searchRes, friendsRes] = await Promise.all([Community.searchUsers(q), Community.myFriends()]);
+        const items = (searchRes.ok ? searchRes.data.items : []).filter(u => u.id !== Community.currentUser?.id);
+        const followingIds = new Set(((friendsRes.ok && friendsRes.data.friends) || []));
         if (!items.length) {
           results.innerHTML = `<div class="go-empty">Không tìm thấy ai khớp "${escapeHtml(q)}"</div>`;
         } else {
-          results.innerHTML = items.map(u => `<div class="go-item" data-id="${u.id}">👤 ${escapeHtml(u.name || 'Ẩn danh')}</div>`).join('');
-          results.querySelectorAll('.go-item[data-id]').forEach(el => {
-            el.addEventListener('click', async () => {
-              const r2 = await Community.addFriend(el.dataset.id);
-              if (!r2.ok) { showToast(`⚠️ ${r2.error}`); return; }
-              showToast('✅ Đã thêm bạn');
-              input.value = '';
-              results.classList.remove('show'); results.innerHTML = '';
-              this._renderFriends();
-            });
-          });
+          // Tên → xem profile (UserQuanModal); nút riêng → theo dõi/bỏ theo
+          // dõi. Không đóng dropdown sau khi bấm — theo dõi nhiều người
+          // trong 1 lần tìm cho tự nhiên, giống mạng xã hội thật.
+          results.innerHTML = items.map(u => `
+            <div class="go-item follow-row">
+              <span class="follow-name" data-user-id="${u.id}" data-user-name="${escapeHtml(u.name || 'Ẩn danh')}">👤 ${escapeHtml(u.name || 'Ẩn danh')}</span>
+              ${followBtnHtml(u.id, u.name || 'Ẩn danh', followingIds.has(u.id))}
+            </div>`).join('');
+          wireProfileLinks(results);
+          wireFollowButtons(results, () => this._renderFriends());
         }
         reposition();
         results.classList.add('show');
@@ -1795,9 +1831,11 @@ const CommunityCtrl = {
       el.innerHTML = `<span style="font-size:.78rem;color:var(--text3)">Chưa có bạn nào — tìm ở trên để thêm</span>`;
       return;
     }
-    el.innerHTML = friends.map(u => `<span class="chip-tag">👤 ${escapeHtml(u.name || 'Ẩn danh')}<button type="button" class="chip-tag-remove" data-id="${u.id}">✕</button></span>`).join('');
+    el.innerHTML = friends.map(u => `<span class="chip-tag"><span data-user-id="${u.id}" data-user-name="${escapeHtml(u.name || 'Ẩn danh')}" style="cursor:pointer">👤 ${escapeHtml(u.name || 'Ẩn danh')}</span><button type="button" class="chip-tag-remove" data-id="${u.id}">✕</button></span>`).join('');
+    wireProfileLinks(el);
     el.querySelectorAll('.chip-tag-remove').forEach(b => {
-      b.addEventListener('click', async () => {
+      b.addEventListener('click', async (e) => {
+        e.stopPropagation();
         const r2 = await Community.removeFriend(b.dataset.id);
         if (!r2.ok) { showToast(`⚠️ ${r2.error}`); return; }
         this._renderFriends();
@@ -1972,6 +2010,16 @@ const UserQuanModal = {
     body.innerHTML = `<div class="empty-comm"><div class="em-icon">⏳</div><div class="em-msg">Đang tải…</div></div>`;
     document.getElementById('userQuanCount').textContent = '';
     document.getElementById('userQuanModal').classList.add('show');
+
+    // Nút Theo dõi ngay trong profile — không hiện với chính mình.
+    const followSlot = document.getElementById('userQuanFollowSlot');
+    followSlot.innerHTML = '';
+    if (Community.currentUser && userId !== Community.currentUser.id) {
+      const friendsRes = await Community.myFriends();
+      const following = !!(friendsRes.ok && (friendsRes.data.friends || []).includes(userId));
+      followSlot.innerHTML = followBtnHtml(userId, userName || 'người này', following);
+      wireFollowButtons(followSlot, () => CommunityCtrl._renderFriends());
+    }
 
     const r = await Community.listRestaurants({ filter: `created_by="${userId}"` });
     if (!r.ok) {

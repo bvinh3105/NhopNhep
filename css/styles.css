@@ -296,6 +296,18 @@ input,textarea,select{font-family:var(--font-body)}
 .go-item .go-primary{font-weight:800;font-family:var(--font-display);color:var(--primary);letter-spacing:-.2px}
 .go-item .go-sub{font-size:.72rem;color:var(--text2);margin-top:2px;font-weight:500}
 .go-loading{padding:.75rem;text-align:center;font-size:.78rem;color:var(--text2);font-style:italic;font-family:var(--font-display)}
+
+/* Follow row — tên (bấm xem profile) + nút Theo dõi/Đang theo dõi riêng */
+.go-item.follow-row{display:flex;align-items:center;justify-content:space-between;gap:.5rem;cursor:default}
+.follow-name{cursor:pointer;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.follow-name:hover{color:var(--primary)}
+.follow-btn{
+  flex-shrink:0;padding:.35rem .7rem;border-radius:20px;font-size:.72rem;font-weight:800;
+  border:2px solid var(--text);background:var(--white);color:var(--text);
+  box-shadow:2px 2px 0 var(--text);transition:all .12s;white-space:nowrap;
+}
+.follow-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.follow-btn.following{background:var(--primary);color:var(--cream);border-color:var(--primary-2);box-shadow:2px 2px 0 var(--primary-2)}
 .go-empty{padding:.75rem;text-align:center;font-size:.78rem;color:var(--text3);font-style:italic}
 
 .loc-input{
