@@ -380,83 +380,6 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════
-     ADD RESTAURANT MODAL
-═══════════════════════════════════════════════ -->
-<div class="modal-overlay" id="addModal">
-  <div class="modal-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title">Thêm quán mới ✨</div>
-    <div class="modal-sub">Điền thông tin về quán bạn từng ghé</div>
-
-    <div class="form-group">
-      <label class="form-label">Tên quán</label>
-      <input class="form-input" id="fName" type="text" placeholder="VD: Bún bò Huế Bà Khế" maxlength="60">
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">Loại quán</label>
-      <div class="cat-picker" id="fCatPicker">
-        <button class="cat-pick-btn active" data-cat="restaurant">🍽️ Nhà hàng</button>
-        <button class="cat-pick-btn" data-cat="street">🍜 Vỉa hè</button>
-        <button class="cat-pick-btn" data-cat="snack">🧆 Ăn vặt</button>
-        <button class="cat-pick-btn" data-cat="cafe">☕ Cà phê</button>
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">Giá tiền (một người)</label>
-      <input class="form-input" id="fPrice" type="text" placeholder="VD: 50k–100k" maxlength="30">
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">Mô tả ngắn</label>
-      <textarea class="form-textarea" id="fDesc" placeholder="Món đặc trưng, view quán, giờ mở cửa…" maxlength="200"></textarea>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label">Vị trí quán</label>
-      <div class="loc-row-wrap">
-        <input class="form-input" id="fLocSearch" type="text"
-          placeholder="VD: 16 Trần Hưng Đạo · hoặc chỉ 'phố + quận'" autocomplete="off" spellcheck="false">
-        <div class="geocode-suggest" id="fLocSuggest"></div>
-      </div>
-      <div id="pickerMap" style="margin-top:.55rem"></div>
-      <div class="picker-hint">
-        Chọn dropdown nếu có · hoặc chỉ ghi tên phố + quận · quán không có trên map thì nhấn thẳng lên bản đồ
-      </div>
-    </div>
-
-    
-    <div class="form-group">
-      <label class="form-label">Hình ảnh quán (Tùy chọn)</label>
-      <input class="form-input" id="fImage" type="file" accept="image/png, image/jpeg, image/webp" style="padding-top:8px">
-      <div id="fImagePreview" style="margin-top:8px; display:none; border-radius:12px; overflow:hidden; border:2px solid var(--text);">
-        <img style="width:100%; height:120px; object-fit:cover; display:block;">
-      </div>
-    </div>
-    <div class="form-actions">
-      <button class="btn-cancel" id="fCancel">Huỷ</button>
-      <button class="btn-save" id="fSave">💾 Lưu quán</button>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════
-     MY QUÁN LIST MODAL — full list of user's saved places
-═══════════════════════════════════════════════ -->
-<div class="modal-overlay" id="myQuanModal">
-  <div class="modal-sheet list-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title">Quán <em>của tôi</em></div>
-    <div class="modal-sub" id="myQuanCount">0 quán</div>
-    <div class="list-modal-body" id="myQuanBody"></div>
-    <div class="form-actions">
-      <button class="btn-cancel" id="myQuanClose">Đóng</button>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════
      TRIP HISTORY MODAL — past itineraries
 ═══════════════════════════════════════════════ -->
 <div class="modal-overlay" id="tripsModal">
@@ -576,18 +499,18 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2451"></script>
-<script src="js/utils.js?v=2451"></script>
-<script src="js/state.js?v=2451"></script>
-<script src="js/poi.js?v=2451"></script>
-<script src="js/geocoder.js?v=2451"></script>
-<script src="js/gemini.js?v=2451"></script>
-<script src="js/community.js?v=2451"></script>
-<script src="js/map.js?v=2451"></script>
-<script src="js/gps.js?v=2451"></script>
-<script src="js/locationPicker.js?v=2451"></script>
-<script src="js/controllers.js?v=2451"></script>
-<script src="js/app.js?v=2451"></script>
+<script src="js/security.js?v=2452"></script>
+<script src="js/utils.js?v=2452"></script>
+<script src="js/state.js?v=2452"></script>
+<script src="js/poi.js?v=2452"></script>
+<script src="js/geocoder.js?v=2452"></script>
+<script src="js/gemini.js?v=2452"></script>
+<script src="js/community.js?v=2452"></script>
+<script src="js/map.js?v=2452"></script>
+<script src="js/gps.js?v=2452"></script>
+<script src="js/locationPicker.js?v=2452"></script>
+<script src="js/controllers.js?v=2452"></script>
+<script src="js/app.js?v=2452"></script>
 
 </body>
 </html>

@@ -15,8 +15,8 @@ const State = {
   tabFilter: 'all',
   itinerary: [],
   dwellOverrides: {},
-  mainMap: null, planMap: null, pickerMap: null,
-  userMarker: null, radiusCircle: null, pickerMarker: null,
+  mainMap: null, planMap: null,
+  userMarker: null, radiusCircle: null,
   communityPickerMap: null, communityPickerMarker: null,
 
   // Profile persistence

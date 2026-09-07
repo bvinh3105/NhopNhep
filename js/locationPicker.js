@@ -1,10 +1,11 @@
 /* ═══════════════════════════════════════════════
    LOCATION PICKER — shared "chọn vị trí trên bản đồ" behavior
-   AddModal ("Quán của tôi") and CommunityAddModal ("Đăng quán cộng đồng")
-   both need the same thing: an address-autocomplete input that drops a
-   marker on a small Leaflet map, plus tap-to-place on the map itself. This
-   used to be copy-pasted in both — pulled out here so a third add-flow
-   (or an "edit location" feature later) is one call, not another copy.
+   Originally pulled out because two add-flows (a local-only "Quán của tôi"
+   modal, since removed, and CommunityAddModal) both needed an address-
+   autocomplete input that drops a marker on a small Leaflet map, plus
+   tap-to-place on the map itself. Kept as its own module so a future
+   add/edit flow (or a second picker on screen at once) is one call away,
+   not another copy-paste.
 ═══════════════════════════════════════════════ */
 const LocationPicker = {
   // Wires <input id=inputId> + <div id=suggestId> (Geocoder-style dropdown).
