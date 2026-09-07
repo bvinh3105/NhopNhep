@@ -316,6 +316,17 @@
 <div id="communityScreen" class="screen hidden">
   <div class="profile-scroll">
 
+    <!-- Địa chỉ server — luôn hiện dù đã đăng nhập hay chưa, vì server tự
+         host đổi URL mỗi lần tunnel restart (xem community-server/README.md) -->
+    <div class="profile-section" style="padding-bottom:0">
+      <button class="community-toggle-link" id="communityServerToggle" type="button" style="text-align:left">⚙️ Đổi địa chỉ server</button>
+      <div class="form-group hidden" id="communityServerGroup" style="margin-top:.6rem">
+        <label class="form-label">Địa chỉ server cộng đồng</label>
+        <input class="form-input" id="communityServerInput" type="text" placeholder="https://xxxx.trycloudflare.com" autocomplete="off" spellcheck="false">
+        <button class="data-btn" id="communityServerSave" style="width:100%;margin-top:.5rem">💾 Lưu địa chỉ</button>
+      </div>
+    </div>
+
     <!-- Logged-out: auth form -->
     <div id="communityAuth" class="profile-section">
       <div class="psec-head">
@@ -499,18 +510,18 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2452"></script>
-<script src="js/utils.js?v=2452"></script>
-<script src="js/state.js?v=2452"></script>
-<script src="js/poi.js?v=2452"></script>
-<script src="js/geocoder.js?v=2452"></script>
-<script src="js/gemini.js?v=2452"></script>
-<script src="js/community.js?v=2452"></script>
-<script src="js/map.js?v=2452"></script>
-<script src="js/gps.js?v=2452"></script>
-<script src="js/locationPicker.js?v=2452"></script>
-<script src="js/controllers.js?v=2452"></script>
-<script src="js/app.js?v=2452"></script>
+<script src="js/security.js?v=2453"></script>
+<script src="js/utils.js?v=2453"></script>
+<script src="js/state.js?v=2453"></script>
+<script src="js/poi.js?v=2453"></script>
+<script src="js/geocoder.js?v=2453"></script>
+<script src="js/gemini.js?v=2453"></script>
+<script src="js/community.js?v=2453"></script>
+<script src="js/map.js?v=2453"></script>
+<script src="js/gps.js?v=2453"></script>
+<script src="js/locationPicker.js?v=2453"></script>
+<script src="js/controllers.js?v=2453"></script>
+<script src="js/app.js?v=2453"></script>
 
 </body>
 </html>

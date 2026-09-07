@@ -1615,7 +1615,28 @@ const CommunityCtrl = {
     });
 
     this._initFriendSearch();
+    this._initServerSettings();
     this._renderAuthMode();
+  },
+
+  // Địa chỉ server tự host đổi mỗi lần tunnel restart (Quick Tunnel không có
+  // domain cố định) — cho phép người dùng tự dán URL mới thay vì phải nhờ
+  // sửa code. Lưu vào localStorage qua setter Community.BASE_URL có sẵn.
+  _initServerSettings() {
+    const toggle = document.getElementById('communityServerToggle');
+    const group = document.getElementById('communityServerGroup');
+    const input = document.getElementById('communityServerInput');
+    const save = document.getElementById('communityServerSave');
+
+    input.value = Community.BASE_URL;
+    toggle.addEventListener('click', () => group.classList.toggle('hidden'));
+    save.addEventListener('click', () => {
+      const v = input.value.trim();
+      if (!v) { showToast('⚠️ Dán địa chỉ server trước nhé'); return; }
+      Community.BASE_URL = v;
+      showToast('✅ Đã lưu — thử đăng nhập lại');
+      group.classList.add('hidden');
+    });
   },
 
   // ── Friends ("quán đăng chế độ Bạn bè chỉ hiện với người ở đây") ─────────
