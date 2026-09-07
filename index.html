@@ -16,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800;9..144,900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/styles.css?v=2456">
 </head>
 <body>
 
@@ -504,24 +504,53 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════
+     COMMUNITY RESTAURANT DETAIL — full photos + info for 1 quán
+═══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="communityDetailModal">
+  <div class="modal-sheet detail-sheet">
+    <div class="modal-handle"></div>
+    <div id="communityDetailBody"></div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="communityDetailClose">Đóng</button>
+      <button class="btn-save" id="communityDetailMaps">🗺 Mở Google Maps</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     USER QUÁN MODAL — every quán one person has posted (that I can see)
+═══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="userQuanModal">
+  <div class="modal-sheet list-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="userQuanTitle">Quán <em>của</em>...</div>
+    <div class="modal-sub" id="userQuanCount">0 quán</div>
+    <div class="comm-r-list" id="userQuanBody" style="padding-bottom:1rem"></div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="userQuanClose">Đóng</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast"></div>
 
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2455"></script>
-<script src="js/utils.js?v=2455"></script>
-<script src="js/state.js?v=2455"></script>
-<script src="js/poi.js?v=2455"></script>
-<script src="js/geocoder.js?v=2455"></script>
-<script src="js/gemini.js?v=2455"></script>
-<script src="js/community.js?v=2455"></script>
-<script src="js/map.js?v=2455"></script>
-<script src="js/gps.js?v=2455"></script>
-<script src="js/locationPicker.js?v=2455"></script>
-<script src="js/controllers.js?v=2455"></script>
-<script src="js/app.js?v=2455"></script>
+<script src="js/security.js?v=2456"></script>
+<script src="js/utils.js?v=2456"></script>
+<script src="js/state.js?v=2456"></script>
+<script src="js/poi.js?v=2456"></script>
+<script src="js/geocoder.js?v=2456"></script>
+<script src="js/gemini.js?v=2456"></script>
+<script src="js/community.js?v=2456"></script>
+<script src="js/map.js?v=2456"></script>
+<script src="js/gps.js?v=2456"></script>
+<script src="js/locationPicker.js?v=2456"></script>
+<script src="js/controllers.js?v=2456"></script>
+<script src="js/app.js?v=2456"></script>
 
 </body>
 </html>

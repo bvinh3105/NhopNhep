@@ -33,6 +33,7 @@ function wireScrollMasks() {
 
 function boot() {
   Storage.load();
+  DropdownPosition.init();
   TabNav.init();
   MapHome.init();
   HomeCtrl.init();
@@ -43,6 +44,8 @@ function boot() {
   HistoryModal.init();
   CommunityCtrl.init();
   CommunityAddModal.init();
+  CommunityDetailModal.init();
+  UserQuanModal.init();
   wireScrollMasks();
 
   // Fallback default location — Hoàn Kiếm, Hà Nội

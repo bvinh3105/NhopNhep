@@ -110,6 +110,8 @@ const HomeCtrl = {
     const input = document.getElementById('locInput');
     const suggest = document.getElementById('locSuggest');
     if (!input || !suggest) return;
+    DropdownPosition.register(input, suggest);
+    const reposition = () => DropdownPosition.reposition(input, suggest);
 
     const pick = (r) => {
       MapHome.setUserLocation(r.lat, r.lng, null, { center: true });
@@ -123,8 +125,10 @@ const HomeCtrl = {
     input.addEventListener('input', (e) => {
       const q = e.target.value.trim();
       if (q.length < 3) { Geocoder.hide(suggest); return; }
+      reposition();
       Geocoder.showLoading(suggest);
       Geocoder.onInput('locInput', q, 450, (results) => {
+        reposition();
         Geocoder.renderSuggestions(suggest, results, pick);
       }, bias());
     });
@@ -135,8 +139,10 @@ const HomeCtrl = {
       e.preventDefault();
       const q = input.value.trim();
       if (!q) { this.scan(); return; }
+      reposition();
       Geocoder.showLoading(suggest);
       const results = await Geocoder.search(q, bias());
+      reposition();
       if (results.length) { pick(results[0]); }
       else { Geocoder.renderSuggestions(suggest, [], pick); }
     });
@@ -1348,34 +1354,8 @@ const ProfileCtrl = {
       return;
     }
 
-    list.innerHTML = items.map(r => {
-      const catKey = COMMUNITY_PB_TO_CAT[r.category] || 'restaurant';
-      const cat = CATEGORIES[catKey];
-      const priceLabel = COMMUNITY_PRICE_LABEL[r.price_range] || '';
-      const thumbUrl = Community.thumbnailUrl(r, '400x300');
-      const cover = thumbUrl
-        ? `<div class="comm-r-cover" style="background-image:url('${thumbUrl}')"></div>`
-        : `<div class="comm-r-cover" style="background:${cat.color}22">${cat.icon}</div>`;
-      const tagsHtml = (r.tags || []).map(t => `<span class="comm-r-chip">${escapeHtml(t)}</span>`).join('');
-      const hashHtml = (r.hashtags || []).map(h => `<span class="comm-r-chip hashtag">#${escapeHtml(h)}</span>`).join('');
-      const visBadge = CommunityCtrl._VIS_BADGE[r.visibility] || '';
-      return `<div class="comm-r-card" data-id="${r.id}">
-        ${cover}
-        <div class="comm-r-body">
-          <div class="comm-r-name">${escapeHtml(r.name)}</div>
-          <div class="comm-r-meta">${cat.icon} ${cat.label}${priceLabel ? ' · ' + priceLabel : ''} · ${visBadge}</div>
-          ${r.description ? `<div class="comm-r-desc">${escapeHtml(r.description)}</div>` : ''}
-          ${(tagsHtml || hashHtml) ? `<div class="comm-r-chips">${tagsHtml}${hashHtml}</div>` : ''}
-          <div class="comm-r-footer">
-            <span class="comm-r-author" id="myRScore-${r.id}">★ …</span>
-            <div style="display:flex;gap:.4rem">
-              <button class="data-btn" data-edit-id="${r.id}">✏️ Sửa</button>
-              <button class="my-r-del" data-del-id="${r.id}" title="Xoá quán">🗑</button>
-            </div>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
+    list.innerHTML = items.map(r => communityCardHtml(r, { footer: 'owner' })).join('');
+    wireCardDetail(list, items);
 
     items.forEach(r => {
       Community.voteCount(r.id).then(n => {
@@ -1385,13 +1365,15 @@ const ProfileCtrl = {
     });
 
     list.querySelectorAll('[data-edit-id]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const r = this._myRestaurants.find(x => x.id === btn.dataset.editId);
         if (r) CommunityAddModal.open(r);
       });
     });
     list.querySelectorAll('[data-del-id]').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
         const r = this._myRestaurants.find(x => x.id === btn.dataset.delId);
         if (!r) return;
         if (!confirm(`Xoá quán "${r.name}"? Không thể hoàn tác.`)) return;
@@ -1607,6 +1589,103 @@ const HistoryModal = {
 const COMMUNITY_CAT_TO_PB = { restaurant: 'nha_hang', street: 'via_he', snack: 'an_vat', cafe: 'ca_phe' };
 const COMMUNITY_PB_TO_CAT = { nha_hang: 'restaurant', via_he: 'street', an_vat: 'snack', ca_phe: 'cafe' };
 const COMMUNITY_PRICE_LABEL = { binh_dan: '💸 Bình dân', tam_trung: '💰 Tầm trung', sang_chanh: '✨ Sang chảnh' };
+const COMMUNITY_VIS_BADGE = { private: '🔒', friends: '👥', public: '🌍' };
+
+// Card markup shared by 3 places that all list community restaurants:
+// browse (Cộng đồng tab), "Quán của tôi" (Cá nhân tab), and a user's public
+// list (UserQuanModal). `footer` picks which actions show bottom-right:
+//   'vote'  — 👤 tác giả (mở UserQuanModal) + nút ☆ sao (mặc định)
+//   'owner' — ★ điểm (chỉ đọc) + nút ✏️ Sửa / 🗑 Xoá (tab Cá nhân, đã là chủ)
+// Card + author button click wiring lives with each caller (they know which
+// modal to open), not here — this only builds the HTML string.
+function communityCardHtml(r, { footer = 'vote' } = {}) {
+  const catKey = COMMUNITY_PB_TO_CAT[r.category] || 'restaurant';
+  const cat = CATEGORIES[catKey];
+  const priceLabel = COMMUNITY_PRICE_LABEL[r.price_range] || '';
+  const thumbUrl = Community.thumbnailUrl(r, '500x360');
+  const cover = thumbUrl
+    ? `<div class="comm-r-cover" style="background-image:url('${thumbUrl}')"></div>`
+    : `<div class="comm-r-cover" style="background:${cat.color}22">${cat.icon}</div>`;
+  const tagsHtml = (r.tags || []).map(t => `<span class="comm-r-chip">${escapeHtml(t)}</span>`).join('');
+  const hashHtml = (r.hashtags || []).map(h => `<span class="comm-r-chip hashtag">#${escapeHtml(h)}</span>`).join('');
+  const visBadge = COMMUNITY_VIS_BADGE[r.visibility] || '';
+  const author = r.expand && r.expand.created_by;
+  const authorName = (author && author.name) || 'Ẩn danh';
+  const authorId = (author && author.id) || r.created_by || '';
+
+  const footerHtml = footer === 'owner'
+    ? `<span class="comm-r-author" id="myRScore-${r.id}">★ …</span>
+       <div style="display:flex;gap:.4rem">
+         <button class="data-btn" data-edit-id="${r.id}">✏️ Sửa</button>
+         <button class="my-r-del" data-del-id="${r.id}" title="Xoá quán">🗑</button>
+       </div>`
+    : `<button class="comm-r-author" type="button" data-user-id="${authorId}" data-user-name="${escapeHtml(authorName)}">👤 ${escapeHtml(authorName)}</button>
+       <button class="vote-btn" data-id="${r.id}"><span class="vote-ico">☆</span><span class="vote-count">···</span></button>`;
+
+  return `<div class="comm-r-card" data-id="${r.id}">
+    ${cover}
+    <div class="comm-r-body">
+      <div class="comm-r-name">${escapeHtml(r.name)}</div>
+      <div class="comm-r-meta">${cat.icon} ${cat.label}${priceLabel ? ' · ' + priceLabel : ''} · ${visBadge}</div>
+      ${r.description ? `<div class="comm-r-desc">${escapeHtml(r.description)}</div>` : ''}
+      ${(tagsHtml || hashHtml) ? `<div class="comm-r-chips">${tagsHtml}${hashHtml}</div>` : ''}
+      <div class="comm-r-footer">${footerHtml}</div>
+    </div>
+  </div>`;
+}
+
+// Wires ☆ vote buttons scoped to `container` — NOT global document, because
+// a card for the same restaurant can appear in more than one list at once
+// (e.g. the browse list underneath + UserQuanModal open on top of it).
+function wireVoteButtons(container) {
+  container.querySelectorAll('.vote-btn[data-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      btn.disabled = true;
+      const r = await Community.toggleVote(id);
+      btn.disabled = false;
+      if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+      _loadVoteState(btn.dataset.id, container);
+    });
+    _loadVoteState(btn.dataset.id, container);
+  });
+}
+// Kiểu GitHub: bấm ★ để "star" một quán, càng nhiều sao càng ngon. Vẫn dùng
+// đúng cơ chế vote (unique restaurant+user) phía server, chỉ đổi icon.
+async function _loadVoteState(restaurantId, container) {
+  const [mine, count] = await Promise.all([
+    Community.myVote(restaurantId),
+    Community.voteCount(restaurantId),
+  ]);
+  const btn = container.querySelector(`.vote-btn[data-id="${restaurantId}"]`);
+  if (!btn) return;
+  btn.classList.toggle('voted', !!mine);
+  btn.querySelector('.vote-ico').textContent = mine ? '★' : '☆';
+  btn.querySelector('.vote-count').textContent = count;
+}
+
+// "👤 tên tác giả" — bấm mở UserQuanModal xem hết quán người đó đã đăng.
+function wireAuthorButtons(container) {
+  container.querySelectorAll('.comm-r-author[data-user-id]').forEach(btn => {
+    if (!btn.dataset.userId) return;
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      UserQuanModal.open(btn.dataset.userId, btn.dataset.userName);
+    });
+  });
+}
+
+// Bấm vào thân card (không phải 1 nút con) mở CommunityDetailModal — đủ ảnh
+// + thông tin đầy đủ, thay vì chỉ xem được ảnh đại diện + mô tả rút gọn.
+function wireCardDetail(container, items) {
+  container.querySelectorAll('.comm-r-card[data-id]').forEach(cardEl => {
+    cardEl.addEventListener('click', (e) => {
+      if (e.target.closest('button')) return;
+      const r = items.find(x => x.id === cardEl.dataset.id);
+      if (r) CommunityDetailModal.open(r);
+    });
+  });
+}
 
 const CommunityCtrl = {
   _mode: 'login', // 'login' | 'register'
@@ -1669,6 +1748,8 @@ const CommunityCtrl = {
     const input = document.getElementById('friendSearchInput');
     const results = document.getElementById('friendSearchResults');
     if (!input || !results) return;
+    DropdownPosition.register(input, results);
+    const reposition = () => DropdownPosition.reposition(input, results);
 
     let debounce = null;
     input.addEventListener('input', () => {
@@ -1693,6 +1774,7 @@ const CommunityCtrl = {
             });
           });
         }
+        reposition();
         results.classList.add('show');
       }, 350);
     });
@@ -1771,76 +1853,143 @@ const CommunityCtrl = {
       </div>`;
       return;
     }
-    this._renderList(r.data.items);
+    this._renderList(r.data.items, query);
   },
 
-  _renderList(items) {
+  // query khác rỗng khi đang tìm kiếm — 0 kết quả lúc đó nghĩa là "không
+  // khớp", không phải "cộng đồng chưa có quán nào" (2 tình huống khác hẳn
+  // nhau, gộp chung dễ hiểu lầm là cả cộng đồng trống trơn).
+  _renderList(items, query) {
     const list = document.getElementById('communityList');
     if (!items.length) {
-      list.innerHTML = `<div class="empty-comm">
-        <div class="em-icon">🍽️</div>
-        <div class="em-msg">Chưa có quán nào</div>
-        <div class="em-sub">Đăng quán đầu tiên cho cả nhóm!</div>
-      </div>`;
+      list.innerHTML = query
+        ? `<div class="empty-comm">
+            <div class="em-icon">🔍</div>
+            <div class="em-msg">Không tìm thấy quán khớp "${escapeHtml(query)}"</div>
+            <div class="em-sub">Thử từ khoá ngắn hơn hoặc kiểm tra lại chính tả</div>
+          </div>`
+        : `<div class="empty-comm">
+            <div class="em-icon">🍽️</div>
+            <div class="em-msg">Cộng đồng chưa có quán nào</div>
+            <div class="em-sub">Đăng quán đầu tiên cho cộng đồng!</div>
+          </div>`;
       return;
     }
-    list.innerHTML = items.map(r => this._cardHtml(r)).join('');
-    list.querySelectorAll('.vote-btn').forEach(btn => {
-      btn.addEventListener('click', () => this._onVoteClick(btn));
+    list.innerHTML = items.map(r => communityCardHtml(r, { footer: 'vote' })).join('');
+    wireVoteButtons(list);
+    wireAuthorButtons(list);
+    wireCardDetail(list, items);
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   COMMUNITY DETAIL MODAL — full photos + info for 1 quán cộng đồng
+   Separate from DetailModal (r.cat/r.lat/r.lng, local-only records) since
+   community records have a different shape (r.category is a PB select
+   value, r.location is {lat,lon}, plus tags/hashtags/visibility/photos).
+═══════════════════════════════════════════════ */
+const CommunityDetailModal = {
+  _current: null,
+
+  init() {
+    document.getElementById('communityDetailClose').addEventListener('click', () => this.close());
+    document.getElementById('communityDetailModal').addEventListener('click', (e) => {
+      if (e.target.id === 'communityDetailModal') this.close();
     });
-    items.forEach(r => this._loadVoteState(r.id));
+    document.getElementById('communityDetailMaps').addEventListener('click', () => {
+      const r = this._current;
+      const hasLoc = r && r.location && (r.location.lat !== 0 || r.location.lon !== 0);
+      if (!hasLoc) { showToast('Quán chưa có vị trí trên bản đồ'); return; }
+      window.open(gmapsUrl({ name: r.name, lat: r.location.lat, lng: r.location.lon }), '_blank', 'noopener');
+    });
   },
 
-  _VIS_BADGE: { private: '🔒', friends: '👥', public: '🌍' },
-
-  _cardHtml(r) {
+  open(r) {
+    this._current = r;
     const catKey = COMMUNITY_PB_TO_CAT[r.category] || 'restaurant';
     const cat = CATEGORIES[catKey];
     const priceLabel = COMMUNITY_PRICE_LABEL[r.price_range] || '';
-    const thumbUrl = Community.thumbnailUrl(r, '500x360');
-    const cover = thumbUrl
-      ? `<div class="comm-r-cover" style="background-image:url('${thumbUrl}')"></div>`
-      : `<div class="comm-r-cover" style="background:${cat.color}22">${cat.icon}</div>`;
+    const visBadge = COMMUNITY_VIS_BADGE[r.visibility] || '';
+    const photos = r.photos || [];
+    const photoStrip = photos.length
+      ? `<div class="detail-photo-strip">${photos.map(f => `<img src="${Community.photoUrl(r, f, '700x500')}" alt="${escapeHtml(r.name)}" loading="lazy">`).join('')}</div>`
+      : '';
     const tagsHtml = (r.tags || []).map(t => `<span class="comm-r-chip">${escapeHtml(t)}</span>`).join('');
     const hashHtml = (r.hashtags || []).map(h => `<span class="comm-r-chip hashtag">#${escapeHtml(h)}</span>`).join('');
-    const authorName = (r.expand && r.expand.created_by && r.expand.created_by.name) || 'Ẩn danh';
-    const visBadge = this._VIS_BADGE[r.visibility] || '';
-    return `<div class="comm-r-card">
-      ${cover}
-      <div class="comm-r-body">
-        <div class="comm-r-name">${escapeHtml(r.name)}</div>
-        <div class="comm-r-meta">${cat.icon} ${cat.label}${priceLabel ? ' · ' + priceLabel : ''} · ${visBadge}</div>
-        ${r.description ? `<div class="comm-r-desc">${escapeHtml(r.description)}</div>` : ''}
-        ${(tagsHtml || hashHtml) ? `<div class="comm-r-chips">${tagsHtml}${hashHtml}</div>` : ''}
-        <div class="comm-r-footer">
-          <span class="comm-r-author">👤 ${escapeHtml(authorName)}</span>
-          <button class="vote-btn" data-id="${r.id}"><span class="vote-ico">☆</span><span class="vote-count">···</span></button>
-        </div>
+    const author = r.expand && r.expand.created_by;
+    const authorName = (author && author.name) || 'Ẩn danh';
+    const authorId = (author && author.id) || r.created_by || '';
+    const addressHtml = r.address ? `<div class="detail-address">🏠 ${escapeHtml(r.address)}</div>` : '';
+
+    document.getElementById('communityDetailBody').innerHTML = `
+      ${photoStrip}
+      <div class="detail-cat-wrap">
+        <span class="detail-cat" style="color:${cat.color};background:${cat.color}18">${cat.icon} ${cat.label}</span>
+        ${priceLabel ? `<span class="detail-cat" style="color:var(--text2);background:var(--cream-2)">${priceLabel}</span>` : ''}
+        <span class="detail-cat" style="color:var(--text2);background:var(--cream-2)">${visBadge}</span>
       </div>
-    </div>`;
+      <div class="detail-name">${escapeHtml(r.name)}</div>
+      ${r.description ? `<div class="detail-desc">${escapeHtml(r.description)}</div>` : ''}
+      ${(tagsHtml || hashHtml) ? `<div class="comm-r-chips" style="margin-bottom:.6rem">${tagsHtml}${hashHtml}</div>` : ''}
+      ${addressHtml}
+      <div class="comm-r-footer" style="border-top:1.5px dashed var(--line-2);margin-top:.9rem;padding-top:.7rem">
+        <button class="comm-r-author" type="button" data-user-id="${authorId}" data-user-name="${escapeHtml(authorName)}">👤 ${escapeHtml(authorName)}</button>
+        <button class="vote-btn" data-id="${r.id}"><span class="vote-ico">☆</span><span class="vote-count">···</span></button>
+      </div>
+    `;
+    const body = document.getElementById('communityDetailBody');
+    wireVoteButtons(body);
+    wireAuthorButtons(body);
+
+    const hasLoc = r.location && (r.location.lat !== 0 || r.location.lon !== 0);
+    const mapsBtn = document.getElementById('communityDetailMaps');
+    mapsBtn.disabled = !hasLoc;
+    mapsBtn.style.opacity = hasLoc ? '' : '.5';
+
+    document.getElementById('communityDetailModal').classList.add('show');
   },
 
-  // Kiểu GitHub: bấm ★ để "star" một quán, càng nhiều sao càng ngon. Vẫn
-  // dùng đúng cơ chế vote (unique restaurant+user) phía server, chỉ đổi icon.
-  async _loadVoteState(restaurantId) {
-    const [mine, count] = await Promise.all([
-      Community.myVote(restaurantId),
-      Community.voteCount(restaurantId),
-    ]);
-    const btn = document.querySelector(`.vote-btn[data-id="${restaurantId}"]`);
-    if (!btn) return;
-    btn.classList.toggle('voted', !!mine);
-    btn.querySelector('.vote-ico').textContent = mine ? '★' : '☆';
-    btn.querySelector('.vote-count').textContent = count;
+  close() {
+    document.getElementById('communityDetailModal').classList.remove('show');
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   USER QUÁN MODAL — every quán 1 người đã đăng mà tôi xem được (rule
+   visibility phía server tự lọc: public/friends-nếu-tôi-là-bạn/chính tôi)
+═══════════════════════════════════════════════ */
+const UserQuanModal = {
+  init() {
+    document.getElementById('userQuanClose').addEventListener('click', () => this.close());
+    document.getElementById('userQuanModal').addEventListener('click', (e) => {
+      if (e.target.id === 'userQuanModal') this.close();
+    });
   },
 
-  async _onVoteClick(btn) {
-    const id = btn.dataset.id;
-    btn.disabled = true;
-    const r = await Community.toggleVote(id);
-    btn.disabled = false;
-    if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
-    this._loadVoteState(id);
+  async open(userId, userName) {
+    document.getElementById('userQuanTitle').innerHTML = `Quán <em>của ${escapeHtml(userName || 'người này')}</em>`;
+    const body = document.getElementById('userQuanBody');
+    body.innerHTML = `<div class="empty-comm"><div class="em-icon">⏳</div><div class="em-msg">Đang tải…</div></div>`;
+    document.getElementById('userQuanCount').textContent = '';
+    document.getElementById('userQuanModal').classList.add('show');
+
+    const r = await Community.listRestaurants({ filter: `created_by="${userId}"` });
+    if (!r.ok) {
+      body.innerHTML = `<div class="empty-comm"><div class="em-icon">😕</div><div class="em-msg">Không tải được</div></div>`;
+      return;
+    }
+    document.getElementById('userQuanCount').textContent = `${r.data.items.length} quán`;
+    if (!r.data.items.length) {
+      body.innerHTML = `<div class="empty-comm"><div class="em-icon">🍽️</div><div class="em-msg">Chưa có quán nào bạn xem được</div></div>`;
+      return;
+    }
+    body.innerHTML = r.data.items.map(x => communityCardHtml(x, { footer: 'vote' })).join('');
+    wireVoteButtons(body);
+    wireCardDetail(body, r.data.items);
+  },
+
+  close() {
+    document.getElementById('userQuanModal').classList.remove('show');
   },
 };
 

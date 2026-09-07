@@ -215,11 +215,47 @@ const Community = {
   // khớp theo kiểu LIKE trên chuỗi JSON serialize của field — đủ dùng ở quy mô
   // 50-100 người; nếu sau này cần search nhanh/chính xác hơn thì tách tags
   // thành collection riêng có index.
-  async searchRestaurants(query, { page = 1, perPage = 50 } = {}) {
-    const q = (query || '').trim().replace(/"/g, '');
-    if (!q) return this.listRestaurants({ page, perPage });
-    const filter = `name ~ "${q}" || description ~ "${q}" || tags ~ "${q}" || hashtags ~ "${q}"`;
-    return this.listRestaurants({ page, perPage, filter });
+  // Bỏ dấu tiếng Việt + lowercase — tìm không phân biệt hoa/thường, không
+  // cần gõ đúng dấu, và né được lệch chuẩn hoá Unicode (cùng 1 chữ có dấu
+  // đôi khi lưu ở 2 dạng byte khác nhau trông y hệt nhau nhưng so sánh
+  // chuỗi thô không khớp — đây là nguyên nhân "cà phê chill" từng không
+  // tìm ra khi gõ "cà phê").
+  _normalize(s) {
+    return String(s || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase().trim();
+  },
+
+  // Server-side `~` trên field JSON (tags/hashtags) không đáng tin cho thứ
+  // này — không rõ nó so khớp theo phần tử mảng hay theo chuỗi JSON thô.
+  // Ở quy mô vài chục/vài trăm quán, tải hết rồi tự so khớp ở client vừa
+  // đúng vừa cho fuzzy thật sự (chuẩn hoá dấu + khớp từng từ độc lập thứ tự,
+  // nới lỏng dần nếu không ra kết quả nào).
+  async searchRestaurants(query, { perPage = 200 } = {}) {
+    const all = await this.listRestaurants({ perPage });
+    if (!all.ok) return all;
+    const q = this._normalize(query);
+    if (!q) return all;
+    const terms = q.split(/\s+/).filter(Boolean);
+    const haystackOf = (r) => this._normalize(
+      [r.name, r.description, r.address, ...(r.tags || []), ...(r.hashtags || [])].join(' ')
+    );
+
+    // Tier 1: mọi từ khoá đều khớp đâu đó (AND) — chính xác nhất.
+    let items = all.data.items.filter(r => {
+      const h = haystackOf(r);
+      return terms.every(t => h.includes(t));
+    });
+    // Tier 2 — fuzzy fallback: không có gì khớp AND → nới thành khớp BẤT
+    // KỲ từ nào (OR), để gõ thiếu/thừa chữ vẫn có cơ hội ra kết quả thay
+    // vì im lặng trả về rỗng.
+    if (!items.length) {
+      items = all.data.items.filter(r => {
+        const h = haystackOf(r);
+        return terms.some(t => h.includes(t));
+      });
+    }
+    return { ok: true, data: { ...all.data, items, totalItems: items.length } };
   },
 
   // ── Stars ("càng nhiều sao càng ngon", kiểu GitHub) ──────────────────────

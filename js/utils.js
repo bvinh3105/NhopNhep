@@ -11,6 +11,48 @@ const CATEGORIES = {
 const AVATARS = ['🍜','🍕','🍔','🍣','🍰','🍩','🍦','🥗','🌮','🍤','🍱','🥘','🍲','🥟','🍢','☕','🧋','🍹'];
 
 /* ═══════════════════════════════════════════════
+   DROPDOWN POSITIONING
+   `.geocode-suggest` boxes (address search, friend search) live inside
+   scrollable containers (home sheet, modal sheet). position:absolute
+   there is fragile — the containing block's height can be stale the
+   instant new content changes it, and mobile browsers reflow the layout
+   viewport when the on-screen keyboard opens, both of which can leave the
+   box floating far from its input. Compute position:fixed coordinates
+   from the input's live bounding rect instead, and re-sync on scroll
+   (capture:true catches scroll on any nested scrollable ancestor even
+   though 'scroll' doesn't bubble) and resize.
+
+   Gotcha that actually caused the original bug: position:fixed is NOT
+   viewport-relative when an ancestor has a `transform` set — and every
+   .modal-sheet does (the slide-up-open animation), which becomes the
+   fixed containing block instead of the viewport per spec. Move the
+   suggest box to be a direct child of <body> once, on registration, so
+   it always escapes that regardless of which modal it started inside.
+═══════════════════════════════════════════════ */
+const DropdownPosition = {
+  _pairs: [],
+  register(input, suggest) {
+    if (suggest.parentElement !== document.body) document.body.appendChild(suggest);
+    this._pairs.push({ input, suggest });
+  },
+  reposition(input, suggest) {
+    const r = input.getBoundingClientRect();
+    suggest.style.setProperty('--go-left', `${r.left}px`);
+    suggest.style.setProperty('--go-top', `${r.bottom + 4}px`);
+    suggest.style.setProperty('--go-width', `${r.width}px`);
+  },
+  _syncShown() {
+    this._pairs.forEach(({ input, suggest }) => {
+      if (suggest.classList.contains('show')) this.reposition(input, suggest);
+    });
+  },
+  init() {
+    window.addEventListener('scroll', () => this._syncShown(), true);
+    window.addEventListener('resize', () => this._syncShown());
+  },
+};
+
+/* ═══════════════════════════════════════════════
    UTILITY FUNCTIONS
 ═══════════════════════════════════════════════ */
 // Everything the app itself creates (own profile, "Quán của tôi") is

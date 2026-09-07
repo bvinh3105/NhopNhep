@@ -14,14 +14,18 @@ const LocationPicker = {
     const input = document.getElementById(inputId);
     const suggest = document.getElementById(suggestId);
     if (!input || !suggest) return;
+    DropdownPosition.register(input, suggest);
+    const reposition = () => DropdownPosition.reposition(input, suggest);
 
     const bias = () => ({ nearLat: State.userLat, nearLng: State.userLng });
 
     input.addEventListener('input', (e) => {
       const q = e.target.value.trim();
       if (q.length < 3) { Geocoder.hide(suggest); return; }
+      reposition();
       Geocoder.showLoading(suggest);
       Geocoder.onInput(inputId, q, 450, (results) => {
+        reposition();
         Geocoder.renderSuggestions(suggest, results, onPick);
       }, bias());
     });
@@ -31,8 +35,10 @@ const LocationPicker = {
       e.preventDefault();
       const q = input.value.trim();
       if (!q) return;
+      reposition();
       Geocoder.showLoading(suggest);
       const results = await Geocoder.search(q, bias());
+      reposition();
       // Address-shaped hits first so Enter doesn't land on a nearby
       // landmark POI when the user typed an actual address.
       const addressFirst = results.filter(r => Geocoder.isAddressType(r));
