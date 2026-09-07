@@ -11,9 +11,15 @@
 ═══════════════════════════════════════════════ */
 
 const Community = {
-  // Override at runtime via localStorage('community_api_url') once the
-  // Cloudflare Tunnel is up — e.g. https://community.nhopnhep.pages.dev
-  DEFAULT_URL: 'http://127.0.0.1:8090',
+  // Quick Tunnel URL — changes every time the tunnel process restarts (no
+  // fixed domain on the free tier). Update this constant + redeploy when
+  // it does; localhost stays the fallback for same-machine dev/testing.
+  // Real users get this automatically, no per-device setup needed — the
+  // ⚙️ "Đổi địa chỉ server" field in the Cộng đồng tab is just the manual
+  // override for whenever this goes stale before a redeploy catches up.
+  DEFAULT_URL: (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+    ? 'http://127.0.0.1:8090'
+    : 'https://skirt-did-sierra-export.trycloudflare.com',
   get BASE_URL() {
     return (localStorage.getItem('community_api_url') || this.DEFAULT_URL).replace(/\/$/, '');
   },
