@@ -735,7 +735,20 @@ body.map-full .tabbar{transform:translateY(105%)}
   padding:.15rem 0;border-bottom:2.5px dashed transparent;width:100%;
 }
 .profile-name-input:focus{border-bottom-color:var(--primary)}
+.profile-name-display{
+  font-family:var(--font-display);font-size:1.4rem;font-weight:900;color:var(--primary);
+  letter-spacing:-.5px;padding:.15rem 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
 .profile-tagline{font-size:.78rem;color:var(--text2);font-weight:600;margin-top:.15rem}
+
+.avatar-picker{display:flex;flex-wrap:wrap;gap:.5rem}
+.avatar-pick-btn{
+  width:44px;height:44px;border-radius:50%;background:var(--white);
+  border:2px solid var(--text);display:flex;align-items:center;justify-content:center;
+  font-size:1.3rem;box-shadow:2px 2px 0 var(--text);transition:all .12s;flex-shrink:0;
+}
+.avatar-pick-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.avatar-pick-btn.active{background:var(--primary-tint);border-color:var(--primary-2);box-shadow:2px 2px 0 var(--primary-2)}
 
 .profile-stats{
   display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;margin-top:1rem;
@@ -1102,7 +1115,7 @@ body.map-full .tabbar{transform:translateY(105%)}
 .tab-btn,.dish-chip,.cat-chip,.radius-chip,.loc-gps-btn,.scan-btn,
 .back-btn,.reshuffle-btn,.cat-tab,.r-card,.r-check,.r-gmaps-link,
 .action-btn,.pmap-btn,.dwell-btn,.data-btn,.ai-key-toggle,.pref-chip,
-.stat-card,.add-btn,.avatar,.go-item,.cat-pick-btn{
+.stat-card,.add-btn,.avatar,.go-item,.cat-pick-btn,.avatar-pick-btn{
   transition:transform .26s var(--ease-out),
              box-shadow .26s var(--ease-out),
              background-color .2s var(--ease-ios),
@@ -1122,7 +1135,7 @@ body.map-full .tabbar{transform:translateY(105%)}
 }
 .r-card:active{transform:translate(1px,1px) scale(.985) !important}
 .tab-btn:active{transform:scale(.9) !important}
-.pref-chip:active,.cat-pick-btn:active,.dish-chip:active,.go-item:active{transform:scale(.93) !important}
+.pref-chip:active,.cat-pick-btn:active,.dish-chip:active,.go-item:active,.avatar-pick-btn:active{transform:scale(.93) !important}
 .stat-card:active{transform:scale(.95) !important}
 .avatar:active{transform:scale(.9) !important}
 .dwell-btn:active{transform:scale(.85) !important}

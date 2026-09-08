@@ -16,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800;9..144,900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="css/styles.css?v=2463">
+<link rel="stylesheet" href="css/styles.css?v=2464">
 </head>
 <body>
 
@@ -188,9 +188,9 @@
     <!-- Hero -->
     <div class="profile-hero">
       <div class="profile-avatar-row">
-        <div class="avatar" id="avatarBtn" title="Đổi avatar">🍜</div>
+        <div class="avatar" id="avatarBtn" title="Chạm để mở tài khoản">🍜</div>
         <div class="profile-name-wrap">
-          <input class="profile-name-input" id="profileNameInput" type="text" placeholder="Tên của bạn…" maxlength="30">
+          <div class="profile-name-display" id="profileNameDisplay">Tên của bạn…</div>
           <div class="profile-tagline">Fan của quán ngon 🍴</div>
         </div>
       </div>
@@ -213,34 +213,6 @@
           <div class="stat-num" id="statFav">🍽️</div>
           <div class="stat-lbl">HAY THÍCH</div>
         </div>
-      </div>
-    </div>
-
-    <!-- Tài khoản cộng đồng + Bạn bè — chỉ hiện khi đã đăng nhập (ở tab Cộng đồng) -->
-    <div class="profile-section" id="profileLoggedOutHint">
-      <p class="ai-hint">Đăng nhập ở tab Cộng đồng để xem bạn bè và quán bạn đã đăng.</p>
-    </div>
-    <div id="profileLoggedIn" class="hidden">
-      <div class="profile-section">
-        <div class="psec-head">
-          <div>
-            <div class="psec-title" id="communityWelcome">Chào <em>bạn</em></div>
-            <div class="community-welcome-sub">Cộng đồng nhỏ — cùng nhau chọn quán</div>
-          </div>
-          <button class="data-btn" id="communityLogout">Đăng xuất</button>
-        </div>
-      </div>
-
-      <div class="profile-section">
-        <div class="psec-head">
-          <div class="psec-title">Bạn <em>bè</em></div>
-        </div>
-        <p class="ai-hint">Quán bạn đăng ở chế độ "Bạn bè" sẽ chỉ hiện với những người bạn thêm ở đây.</p>
-        <div class="loc-row-wrap">
-          <input class="form-input" id="friendSearchInput" type="text" placeholder="🔎 Tìm theo tên hoặc email…" autocomplete="off">
-          <div class="geocode-suggest" id="friendSearchResults"></div>
-        </div>
-        <div class="chip-tag-list" id="friendList" style="margin-top:.7rem"></div>
       </div>
     </div>
 
@@ -523,24 +495,78 @@
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════
+     ACCOUNT MODAL — avatar, tên, bạn bè, đăng xuất.
+     Mở bằng cách chạm vào avatar ở tab Cá nhân — gom mọi thứ "chỉnh sửa
+     tài khoản" vào 1 chỗ thay vì để rải ngay trên màn hình chính.
+═══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="accountModal">
+  <div class="modal-sheet list-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Tài khoản <em>của tôi</em></div>
+
+    <div class="form-group">
+      <label class="form-label">Avatar</label>
+      <div class="avatar-picker" id="avatarPicker"></div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Tên hiển thị</label>
+      <input class="form-input" id="profileNameInput" type="text" placeholder="Tên của bạn…" maxlength="30">
+    </div>
+
+    <!-- Tài khoản cộng đồng + Bạn bè — chỉ hiện khi đã đăng nhập (ở tab Cộng đồng) -->
+    <div class="profile-section" id="profileLoggedOutHint" style="padding:0 0 .9rem">
+      <p class="ai-hint">Đăng nhập ở tab Cộng đồng để xem bạn bè và quán bạn đã đăng.</p>
+    </div>
+    <div id="profileLoggedIn" class="hidden">
+      <div class="profile-section" style="padding:0 0 .9rem">
+        <div class="psec-head">
+          <div>
+            <div class="psec-title" id="communityWelcome">Chào <em>bạn</em></div>
+            <div class="community-welcome-sub">Cộng đồng nhỏ — cùng nhau chọn quán</div>
+          </div>
+          <button class="data-btn" id="communityLogout">Đăng xuất</button>
+        </div>
+      </div>
+
+      <div class="profile-section" style="padding:0">
+        <div class="psec-head">
+          <div class="psec-title">Bạn <em>bè</em></div>
+        </div>
+        <p class="ai-hint">Quán bạn đăng ở chế độ "Bạn bè" sẽ chỉ hiện với những người bạn thêm ở đây.</p>
+        <div class="loc-row-wrap">
+          <input class="form-input" id="friendSearchInput" type="text" placeholder="🔎 Tìm theo tên hoặc email…" autocomplete="off">
+          <div class="geocode-suggest" id="friendSearchResults"></div>
+        </div>
+        <div class="chip-tag-list" id="friendList" style="margin-top:.7rem"></div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-cancel" id="accountModalClose">Đóng</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast"></div>
 
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2463"></script>
-<script src="js/utils.js?v=2463"></script>
-<script src="js/state.js?v=2463"></script>
-<script src="js/poi.js?v=2463"></script>
-<script src="js/geocoder.js?v=2463"></script>
-<script src="js/gemini.js?v=2463"></script>
-<script src="js/community.js?v=2463"></script>
-<script src="js/map.js?v=2463"></script>
-<script src="js/gps.js?v=2463"></script>
-<script src="js/locationPicker.js?v=2463"></script>
-<script src="js/controllers.js?v=2463"></script>
-<script src="js/app.js?v=2463"></script>
+<script src="js/security.js?v=2464"></script>
+<script src="js/utils.js?v=2464"></script>
+<script src="js/state.js?v=2464"></script>
+<script src="js/poi.js?v=2464"></script>
+<script src="js/geocoder.js?v=2464"></script>
+<script src="js/gemini.js?v=2464"></script>
+<script src="js/community.js?v=2464"></script>
+<script src="js/map.js?v=2464"></script>
+<script src="js/gps.js?v=2464"></script>
+<script src="js/locationPicker.js?v=2464"></script>
+<script src="js/controllers.js?v=2464"></script>
+<script src="js/app.js?v=2464"></script>
 
 </body>
 </html>

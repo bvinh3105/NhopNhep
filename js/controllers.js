@@ -1138,17 +1138,17 @@ const PlanCtrl = {
 ═══════════════════════════════════════════════ */
 const ProfileCtrl = {
   init() {
+    // Avatar giờ chỉ mở modal Tài khoản (đổi ava/tên/bạn bè/đăng xuất đều
+    // gom vào đây) thay vì tự cycle avatar ngay khi chạm.
     document.getElementById('avatarBtn').addEventListener('click', () => {
-      const idx = AVATARS.indexOf(State.profile.avatar);
-      const next = AVATARS[(idx+1) % AVATARS.length];
-      State.profile.avatar = next;
-      document.getElementById('avatarBtn').textContent = next;
-      Storage.save();
+      this._openAccountModal();
     });
+    this._initAccountModal();
 
     const nameInput = document.getElementById('profileNameInput');
     nameInput.addEventListener('input', () => {
       State.profile.name = nameInput.value;
+      document.getElementById('profileNameDisplay').textContent = nameInput.value || 'Tên của bạn…';
       Storage.save();
     });
 
@@ -1266,9 +1266,39 @@ const ProfileCtrl = {
   _myRFilter: 'all',
   _myRestaurants: [], // cache của lần fetch gần nhất, để lọc client-side không gọi lại API
 
+  // ── Modal Tài khoản (avatar picker, tên, bạn bè, đăng xuất) ─────────────
+  _initAccountModal() {
+    const modal = document.getElementById('accountModal');
+    document.getElementById('accountModalClose').addEventListener('click', () => modal.classList.remove('show'));
+    modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('show'); });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && modal.classList.contains('show')) modal.classList.remove('show');
+    });
+
+    const picker = document.getElementById('avatarPicker');
+    picker.innerHTML = AVATARS.map(a => `<button type="button" class="avatar-pick-btn" data-avatar="${a}">${a}</button>`).join('');
+    picker.addEventListener('click', e => {
+      const btn = e.target.closest('.avatar-pick-btn');
+      if (!btn) return;
+      const a = btn.dataset.avatar;
+      State.profile.avatar = a;
+      document.getElementById('avatarBtn').textContent = a;
+      picker.querySelectorAll('.avatar-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.avatar === a));
+      Storage.save();
+    });
+  },
+
+  _openAccountModal() {
+    document.querySelectorAll('#avatarPicker .avatar-pick-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.avatar === State.profile.avatar);
+    });
+    document.getElementById('accountModal').classList.add('show');
+  },
+
   render() {
     document.getElementById('avatarBtn').textContent = State.profile.avatar;
     document.getElementById('profileNameInput').value = State.profile.name;
+    document.getElementById('profileNameDisplay').textContent = State.profile.name || 'Tên của bạn…';
     document.querySelectorAll('.pref-chip').forEach(c => {
       c.classList.toggle('active', State.profile.prefs.has(c.dataset.pref));
     });
