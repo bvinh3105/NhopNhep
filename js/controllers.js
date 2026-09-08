@@ -1951,7 +1951,7 @@ const CommunityDetailModal = {
       const r = this._current;
       const hasLoc = r && r.location && (r.location.lat !== 0 || r.location.lon !== 0);
       if (!hasLoc) { showToast('Quán chưa có vị trí trên bản đồ'); return; }
-      window.open(gmapsUrl({ name: r.name, lat: r.location.lat, lng: r.location.lon }), '_blank', 'noopener');
+      window.open(gmapsUrl({ name: r.name, address: r.address, lat: r.location.lat, lng: r.location.lon }), '_blank', 'noopener');
     });
   },
 
