@@ -34,7 +34,7 @@ const TabNav = {
 };
 
 /* ═══════════════════════════════════════════════
-   TILE LAYER — Esri Light Gray Canvas (base + label overlay), OSM fallback.
+   TILE LAYER — Esri World Street Map, grayscale-filtered; OSM fallback.
    (CartoDB's free rastertiles now require an API key — without one they
    used to silently return a watermarked "API KEY REQUIRED" placeholder
    image instead of an HTTP error, so a tileerror-based fallback never
@@ -47,28 +47,23 @@ const TabNav = {
    Access-Control-Allow-Origin: *, and isn't Referer-gated — verified
    reachable on the same network where OSM/Wikimedia both failed.
 
-   Switched from Esri's colorful World_Street_Map to the Light Gray
-   Canvas pair (2026-09-08, per request for a cleaner grayscale look
-   instead of the warm-tinted street map) — this is Esri's "basemap" +
-   "reference" pattern: the base layer alone has NO labels at all, a
-   second transparent-PNG layer drawn on top adds just the road/place
-   names. Both come from the same server, so the existing OSM fallback
-   logic only needs to watch the base layer; if it trips, OSM's own
-   tiles already bake in labels, so the separate reference layer is
-   removed rather than doubling up text.)
+   Briefly tried Esri's Light Gray Canvas (base+reference pair) for a
+   cleaner gray look (2026-09-08), but it turned out to cap real detail
+   at z16 (verified by downloading actual tile bytes, not just checking
+   HTTP status — z17+ still returns 200 but the body is a 2.5KB "Map
+   data not yet available" placeholder, the SAME silently-fake-success
+   failure mode as the CartoDB/API-key issue this whole setup was built
+   to dodge). Upscaling past z16 made deep zoom look visibly blurry —
+   real streets no longer lining up crisply under the location marker,
+   which read as "GPS isn't tracking right." World_Street_Map has
+   genuine detail through z19 (verified the same way), so it's back as
+   PRIMARY; the gray look now comes from a CSS grayscale filter on the
+   tile pane instead of a different tile source, keeping full sharpness
+   at every zoom the app actually uses.)
 ═══════════════════════════════════════════════ */
 const TileLayer = {
-  PRIMARY:   'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
-  REFERENCE: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
-  FALLBACK:  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  // Verified by downloading actual tiles (not just checking HTTP status —
-  // z17+ still returns 200 but it's a 2.5KB "Map data not yet available"
-  // placeholder image, the exact same silently-fake-success failure mode
-  // as the CartoDB/API-key issue this tile setup was originally built to
-  // dodge). Real cartographic detail stops at z16 for both layers; above
-  // that Leaflet upscales the z16 tile instead of requesting nonexistent
-  // deeper zooms.
-  MAX_NATIVE_ZOOM: 16,
+  PRIMARY:  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+  FALLBACK: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
   // Audit fix (2026-09-08): switching to OSM after a SINGLE tileerror was
   // too eager — one transient dropped tile (weak wifi, or a coordinate at
   // the edge of Esri's coverage) permanently flipped the whole map to OSM
@@ -81,13 +76,6 @@ const TileLayer = {
   add(map) {
     const layer = L.tileLayer(this.PRIMARY, {
       maxZoom: 19,
-      maxNativeZoom: this.MAX_NATIVE_ZOOM,
-      attribution: '',
-      crossOrigin: true,
-    });
-    const refLayer = L.tileLayer(this.REFERENCE, {
-      maxZoom: 19,
-      maxNativeZoom: this.MAX_NATIVE_ZOOM,
       attribution: '',
       crossOrigin: true,
     });
@@ -101,12 +89,9 @@ const TileLayer = {
         layer._switched = true;
         console.warn(`[Tiles] Esri: ${errorTimes.length} tile errors in ${this.ERROR_WINDOW_MS}ms, falling back to OSM`);
         layer.setUrl(this.FALLBACK);
-        layer.options.maxNativeZoom = undefined; // OSM does have global z19 coverage
-        map.removeLayer(refLayer);
       }
     });
     layer.addTo(map);
-    refLayer.addTo(map);
     return layer;
   },
 };

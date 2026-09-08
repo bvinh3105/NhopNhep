@@ -161,11 +161,19 @@ input,textarea,select{font-family:var(--font-body)}
   box-shadow:6px 6px 0 var(--primary-2);
 }
 #mainMap{position:absolute;inset:0}
-/* Esri Light Gray Canvas base is itself a near-white gray — match that
-   here so panning never reveals the app's warm cream tone at the edges
-   before tiles finish loading (was var(--cream-2), a visibly yellow
-   #F5EBC1, which read as "the whole map is tinted yellow"). */
+/* Neutral light-gray ground so panning never reveals the app's warm
+   cream tone at the edges before tiles finish loading (was
+   var(--cream-2), a visibly yellow #F5EBC1, which read as "the whole
+   map is tinted yellow"). */
 .leaflet-container{background:#F2F1EE;font-family:var(--font-body)!important}
+/* Grayscale filter instead of switching tile source — Esri's dedicated
+   gray basemap (Light Gray Canvas) only has real detail to z16 and
+   blurs badly when upscaled past that, which made deep-zoom street
+   alignment (and the location pin sitting on it) look broken. This
+   keeps World_Street_Map's full z19 sharpness and just desaturates it
+   toward the same light-gray look, only on the tile-image pane so
+   pins/markers (a different Leaflet pane) stay their true colors. */
+.leaflet-tile-pane{filter:grayscale(1) brightness(1.16) contrast(.9)}
 
 #homeSheet{
   flex-shrink:0;background:var(--paper);border-top:2px solid var(--text);
