@@ -21,15 +21,12 @@
     Cache-Control = "no-cache, no-store, must-revalidate"
 
 # Same-origin path -> Netlify functions
+# (gemini.js proxy removed 2026-09-08 — the live app never called it, it
+# was an unauthenticated CORS-open relay signing every request with the
+# real Gemini API key: pure quota/cost-abuse risk with zero legitimate use.)
 [[redirects]]
   from = "/api/overpass"
   to = "/.netlify/functions/overpass"
-  status = 200
-  force = true
-
-[[redirects]]
-  from = "/api/gemini"
-  to = "/.netlify/functions/gemini"
   status = 200
   force = true
 

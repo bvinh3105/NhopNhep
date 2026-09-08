@@ -52,18 +52,38 @@ const TabNav = {
 const TileLayer = {
   PRIMARY:  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
   FALLBACK: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  // Esri's World Street Map isn't guaranteed to have imagery at every zoom
+  // level everywhere in Vietnam — capping native zoom below Leaflet's
+  // maxZoom lets it upscale instead of requesting tiles that 404, which
+  // used to look identical to "Esri is down" and trip the fallback below.
+  MAX_NATIVE_ZOOM: 18,
+  // Audit fix (2026-09-08): switching to OSM after a SINGLE tileerror was
+  // too eager — one transient dropped tile (weak wifi, or a coordinate at
+  // the edge of Esri's coverage) permanently flipped the whole map to OSM
+  // (losing the warm color filter) for the rest of the session, with the
+  // console log misleadingly claiming "Esri unreachable". Require a burst
+  // of errors in a short window — that's what an actual outage looks like.
+  ERROR_THRESHOLD: 4,
+  ERROR_WINDOW_MS: 4000,
 
   add(map) {
     const layer = L.tileLayer(this.PRIMARY, {
       maxZoom: 19,
+      maxNativeZoom: this.MAX_NATIVE_ZOOM,
       attribution: '',
       crossOrigin: true,
     });
+    let errorTimes = [];
     layer.on('tileerror', () => {
-      if (!layer._switched) {
+      if (layer._switched) return;
+      const now = Date.now();
+      errorTimes.push(now);
+      errorTimes = errorTimes.filter(t => now - t < this.ERROR_WINDOW_MS);
+      if (errorTimes.length >= this.ERROR_THRESHOLD) {
         layer._switched = true;
-        console.warn('[Tiles] Esri unreachable, falling back to OSM');
+        console.warn(`[Tiles] Esri: ${errorTimes.length} tile errors in ${this.ERROR_WINDOW_MS}ms, falling back to OSM`);
         layer.setUrl(this.FALLBACK);
+        layer.options.maxNativeZoom = undefined; // OSM does have global z19 coverage
       }
     });
     layer.addTo(map);

@@ -60,6 +60,22 @@ export async function onRequest(context) {
     });
   }
 
+  // Security audit fix (2026-09-08): this endpoint has no auth and CORS is
+  // wide open (needed — it's called cross-origin-free same-site, but also
+  // means literally anyone can POST here), so without a shape check it's a
+  // free anonymous relay for ARBITRARY Overpass QL against 3 real public
+  // mirrors under our shared User-Agent — abuse risk is those mirrors
+  // throttling/banning that UA, breaking real POI lookups for our actual
+  // users. Reject anything that doesn't look like the small bounded-radius
+  // query js/poi.js._query() actually generates.
+  const rejection = validateOverpassQuery(decodeURIComponent(body.replace(/^data=/, '')));
+  if (rejection) {
+    return new Response(JSON.stringify({ error: rejection }), {
+      status: 400,
+      headers: { ...cors, 'Content-Type': 'application/json' },
+    });
+  }
+
   // Edge cache key — same body → same result within TTL
   const cacheKey = new Request(
     `https://cache.local/overpass?h=${await sha1(body)}`,
@@ -173,4 +189,18 @@ function raceForNonEmpty(promises) {
 async function sha1(str) {
   const buf = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(str));
   return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Only accept small, bounded-radius "around" queries shaped like the ones
+// js/poi.js._query() actually generates — rejects arbitrary/expensive
+// planet-wide Overpass QL relayed through us by someone who isn't the app.
+const MAX_QUERY_LEN = 3000;
+const MAX_RADIUS_M = 10000; // app's own UI radius chips top out at 5km
+function validateOverpassQuery(query) {
+  if (!query || query.length > MAX_QUERY_LEN) return 'Query too large or empty';
+  if (!/\[out:json\]/.test(query)) return 'Query missing [out:json]';
+  const radii = [...query.matchAll(/around:(\d+)/g)].map(m => parseInt(m[1], 10));
+  if (!radii.length) return 'Query missing around(radius,...) filter';
+  if (radii.some(r => r > MAX_RADIUS_M)) return `Radius exceeds ${MAX_RADIUS_M}m limit`;
+  return null; // ok
 }

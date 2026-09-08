@@ -577,10 +577,10 @@ const ResultsCtrl = {
       return `<div class="r-card${sel?' selected':''}${flagCls}" data-id="${r.id}" style="animation-delay:${Math.min(i,10)*30}ms" role="button" tabindex="0" title="Nhấn để xem chi tiết">
         <button class="r-check" data-id="${r.id}" title="Chọn để thêm vào lịch trình" aria-label="Chọn" aria-pressed="${sel?'true':'false'}">✓</button>
         <div class="r-cat-badge" style="background:${cat.color}22;color:${cat.color}">${cat.icon} ${cat.label}</div>
-        <div class="r-name">${r.name}</div>
+        <div class="r-name">${escapeHtml(r.name)}</div>
         ${hoursBadge}
         <div class="r-price">${priceLabel}</div>
-        <div class="r-desc">${r.desc}</div>
+        <div class="r-desc">${escapeHtml(r.desc)}</div>
         <div class="r-meta">
           <span class="r-rating">${ratingLabel}</span>
           <span class="r-dist">${fmtDist(r._dist)}</span>
@@ -806,7 +806,7 @@ const PlanCtrl = {
             <div class="tl-stop-header">
               <div class="tl-stop-icon">${cat.icon}</div>
               <div class="tl-stop-info">
-                <div class="tl-stop-name">${stop.name}</div>
+                <div class="tl-stop-name">${escapeHtml(stop.name)}</div>
                 <div class="tl-stop-cat" style="color:${cat.color}">${cat.label} · ${stop.price}</div>
               </div>
             </div>
@@ -1634,7 +1634,7 @@ function communityCardHtml(r, { footer = 'vote' } = {}) {
   const priceLabel = COMMUNITY_PRICE_LABEL[r.price_range] || '';
   const thumbUrl = Community.thumbnailUrl(r, '500x360');
   const cover = thumbUrl
-    ? `<div class="comm-r-cover" style="background-image:url('${thumbUrl}')"></div>`
+    ? `<div class="comm-r-cover" style="background-image:url('${escapeHtml(thumbUrl)}')"></div>`
     : `<div class="comm-r-cover" style="background:${cat.color}22">${cat.icon}</div>`;
   const tagsHtml = (r.tags || []).map(t => `<span class="comm-r-chip">${escapeHtml(t)}</span>`).join('');
   const hashHtml = (r.hashtags || []).map(h => `<span class="comm-r-chip hashtag">#${escapeHtml(h)}</span>`).join('');

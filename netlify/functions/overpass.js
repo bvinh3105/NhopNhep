@@ -28,6 +28,16 @@ export const handler = async (event) => {
         : '')
     : (event.body || '');
 
+  // Security audit fix (2026-09-08): no auth + CORS '*' means anyone can
+  // POST here — reject anything that doesn't look like the small bounded-
+  // radius query js/poi.js._query() actually generates, so this can't be
+  // used as a free anonymous relay for arbitrary/expensive Overpass QL
+  // (abuse risk: shared mirrors throttle/ban our UA, breaking real lookups).
+  const rejection = validateOverpassQuery(decodeURIComponent(body.replace(/^data=/, '')));
+  if (rejection) {
+    return { statusCode: 400, headers: cors, body: JSON.stringify({ error: rejection }) };
+  }
+
   const mirrors = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
@@ -84,3 +94,14 @@ export const handler = async (event) => {
     };
   }
 };
+
+const MAX_QUERY_LEN = 3000;
+const MAX_RADIUS_M = 10000; // app's own UI radius chips top out at 5km
+function validateOverpassQuery(query) {
+  if (!query || query.length > MAX_QUERY_LEN) return 'Query too large or empty';
+  if (!/\[out:json\]/.test(query)) return 'Query missing [out:json]';
+  const radii = [...query.matchAll(/around:(\d+)/g)].map(m => parseInt(m[1], 10));
+  if (!radii.length) return 'Query missing around(radius,...) filter';
+  if (radii.some(r => r > MAX_RADIUS_M)) return `Radius exceeds ${MAX_RADIUS_M}m limit`;
+  return null; // ok
+}

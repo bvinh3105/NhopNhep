@@ -48,6 +48,15 @@ function boot() {
   UserQuanModal.init();
   wireScrollMasks();
 
+  // Community._fetch() fires this on any 401 (expired/revoked token) so
+  // whichever screen is open re-renders immediately instead of silently
+  // keeping stale "logged in" UI until the user happens to switch tabs.
+  document.addEventListener('community:session-expired', () => {
+    showToast('⚠️ Phiên đăng nhập đã hết hạn — đăng nhập lại nhé');
+    ProfileCtrl.render();
+    CommunityCtrl.render();
+  });
+
   // Fallback default location — Hoàn Kiếm, Hà Nội
   State.userLat = 21.0285;
   State.userLng = 105.8542;

@@ -49,19 +49,48 @@ const Community = {
   isLoggedIn() { return !!this.token && !!this.currentUser; },
 
   // ── Low-level fetch — PocketBase wants the raw token, no "Bearer " prefix ──
-  async _fetch(path, opts = {}) {
+  // Security/reliability audit fixes (2026-09-08):
+  //  - Added a real timeout (was the only fetch in the app with none — a
+  //    server that's alive-but-slow, not fully dead, used to hang every
+  //    vote/follow/post button forever with no recovery but a page reload).
+  //  - 401 now fires a 'community:session-expired' event instead of only
+  //    silently clearing localStorage — nothing was listening before, so
+  //    the UI kept showing "logged in" until the user happened to switch
+  //    tabs, and the generic error looked identical to "server is down".
+  //  - A manually-overridden BASE_URL (community_api_url in localStorage)
+  //    that's gone stale (leftover from testing, or a dead old tunnel) had
+  //    no in-app way to clear itself since the settings field was hidden —
+  //    self-heal once by falling back to DEFAULT_URL on a real connection
+  //    failure instead of staying permanently dead for that one browser.
+  async _fetch(path, opts = {}, _retried = false) {
     const headers = Object.assign({}, opts.headers);
     if (this.token) headers['Authorization'] = this.token;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 12000);
     try {
-      const res = await fetch(`${this.BASE_URL}${path}`, Object.assign({}, opts, { headers }));
+      const res = await fetch(`${this.BASE_URL}${path}`, Object.assign({}, opts, { headers, signal: ctrl.signal }));
+      clearTimeout(timer);
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        // Expired/invalid token — drop the stale session so UI can prompt re-login.
-        if (res.status === 401) { this.token = ''; this.currentUser = null; }
+        if (res.status === 401) {
+          this.token = ''; this.currentUser = null;
+          document.dispatchEvent(new CustomEvent('community:session-expired'));
+          return { ok: false, status: 401, error: 'Phiên đăng nhập đã hết hạn — đăng nhập lại nhé' };
+        }
         return { ok: false, status: res.status, error: (data && data.message) || 'Lỗi kết nối server cộng đồng' };
       }
       return { ok: true, data };
     } catch(e) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') {
+        return { ok: false, status: 'timeout', error: 'Server phản hồi chậm — thử lại sau nhé' };
+      }
+      const usingOverride = !!localStorage.getItem('community_api_url');
+      if (!_retried && usingOverride) {
+        console.warn('[Community] override URL unreachable, falling back to default once');
+        this.BASE_URL = '';
+        return this._fetch(path, opts, true);
+      }
       return { ok: false, status: 0, error: 'Không kết nối được server cộng đồng — server có đang chạy không?' };
     }
   },
