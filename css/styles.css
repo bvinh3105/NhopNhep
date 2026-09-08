@@ -161,11 +161,11 @@ input,textarea,select{font-family:var(--font-body)}
   box-shadow:6px 6px 0 var(--primary-2);
 }
 #mainMap{position:absolute;inset:0}
-.leaflet-container{background:var(--cream-2);font-family:var(--font-body)!important}
-/* Warm up the tile imagery to match the app's cream/warm palette — only
-   the tile-image pane, so pins/markers (a different Leaflet pane) stay
-   their true colors. */
-.leaflet-tile-pane{filter:sepia(.35) saturate(1.35) hue-rotate(-8deg) brightness(1.04)}
+/* Esri Light Gray Canvas base is itself a near-white gray — match that
+   here so panning never reveals the app's warm cream tone at the edges
+   before tiles finish loading (was var(--cream-2), a visibly yellow
+   #F5EBC1, which read as "the whole map is tinted yellow"). */
+.leaflet-container{background:#F2F1EE;font-family:var(--font-body)!important}
 
 #homeSheet{
   flex-shrink:0;background:var(--paper);border-top:2px solid var(--text);

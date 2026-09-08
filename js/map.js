@@ -34,7 +34,7 @@ const TabNav = {
 };
 
 /* ═══════════════════════════════════════════════
-   TILE LAYER — Esri World Street Map, with OSM as fallback if blocked.
+   TILE LAYER — Esri Light Gray Canvas (base + label overlay), OSM fallback.
    (CartoDB's free rastertiles now require an API key — without one they
    used to silently return a watermarked "API KEY REQUIRED" placeholder
    image instead of an HTTP error, so a tileerror-based fallback never
@@ -43,31 +43,49 @@ const TabNav = {
    the obvious fallback — Wikimedia Maps — actively 403s any non-
    Wikimedia Referer ("Map tiles are restricted to Wikimedia & affiliated
    sites only"), so it never worked for us at all despite looking fine
-   in isolated testing. Esri's World Street Map has no API key, sends a
-   permissive Access-Control-Allow-Origin: *, and isn't Referer-gated —
-   verified reachable and rendering correctly (roads + Vietnamese street
-   labels) on the same network where OSM/Wikimedia both failed. Kept
-   OSM as a second-line fallback since it works fine for most networks.)
+   in isolated testing. Esri has no API key, sends a permissive
+   Access-Control-Allow-Origin: *, and isn't Referer-gated — verified
+   reachable on the same network where OSM/Wikimedia both failed.
+
+   Switched from Esri's colorful World_Street_Map to the Light Gray
+   Canvas pair (2026-09-08, per request for a cleaner grayscale look
+   instead of the warm-tinted street map) — this is Esri's "basemap" +
+   "reference" pattern: the base layer alone has NO labels at all, a
+   second transparent-PNG layer drawn on top adds just the road/place
+   names. Both come from the same server, so the existing OSM fallback
+   logic only needs to watch the base layer; if it trips, OSM's own
+   tiles already bake in labels, so the separate reference layer is
+   removed rather than doubling up text.)
 ═══════════════════════════════════════════════ */
 const TileLayer = {
-  PRIMARY:  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
-  FALLBACK: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  // Esri's World Street Map isn't guaranteed to have imagery at every zoom
-  // level everywhere in Vietnam — capping native zoom below Leaflet's
-  // maxZoom lets it upscale instead of requesting tiles that 404, which
-  // used to look identical to "Esri is down" and trip the fallback below.
-  MAX_NATIVE_ZOOM: 18,
+  PRIMARY:   'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+  REFERENCE: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+  FALLBACK:  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  // Verified by downloading actual tiles (not just checking HTTP status —
+  // z17+ still returns 200 but it's a 2.5KB "Map data not yet available"
+  // placeholder image, the exact same silently-fake-success failure mode
+  // as the CartoDB/API-key issue this tile setup was originally built to
+  // dodge). Real cartographic detail stops at z16 for both layers; above
+  // that Leaflet upscales the z16 tile instead of requesting nonexistent
+  // deeper zooms.
+  MAX_NATIVE_ZOOM: 16,
   // Audit fix (2026-09-08): switching to OSM after a SINGLE tileerror was
   // too eager — one transient dropped tile (weak wifi, or a coordinate at
   // the edge of Esri's coverage) permanently flipped the whole map to OSM
-  // (losing the warm color filter) for the rest of the session, with the
-  // console log misleadingly claiming "Esri unreachable". Require a burst
-  // of errors in a short window — that's what an actual outage looks like.
+  // for the rest of the session, with the console log misleadingly
+  // claiming "Esri unreachable". Require a burst of errors in a short
+  // window — that's what an actual outage looks like.
   ERROR_THRESHOLD: 4,
   ERROR_WINDOW_MS: 4000,
 
   add(map) {
     const layer = L.tileLayer(this.PRIMARY, {
+      maxZoom: 19,
+      maxNativeZoom: this.MAX_NATIVE_ZOOM,
+      attribution: '',
+      crossOrigin: true,
+    });
+    const refLayer = L.tileLayer(this.REFERENCE, {
       maxZoom: 19,
       maxNativeZoom: this.MAX_NATIVE_ZOOM,
       attribution: '',
@@ -84,9 +102,11 @@ const TileLayer = {
         console.warn(`[Tiles] Esri: ${errorTimes.length} tile errors in ${this.ERROR_WINDOW_MS}ms, falling back to OSM`);
         layer.setUrl(this.FALLBACK);
         layer.options.maxNativeZoom = undefined; // OSM does have global z19 coverage
+        map.removeLayer(refLayer);
       }
     });
     layer.addTo(map);
+    refLayer.addTo(map);
     return layer;
   },
 };
