@@ -126,30 +126,45 @@ const Gemini = {
       ? Math.max(radius / 1000, 6).toFixed(1)
       : (radius / 1000).toFixed(1);
 
+    // Region hint (2026-09): the prompt used to hardcode "Việt Nam", which
+    // made Gemini default to Vietnamese-style assumptions (VNĐ "k" pricing,
+    // Vietnamese address conventions) even when the GPS coords are clearly
+    // somewhere else — worse than just not knowing, since it actively
+    // pushes wrong-currency/wrong-format guesses. Ask it to infer the real
+    // country/region FROM the coordinates instead of assuming one. Core
+    // focus is still Vietnam/Southeast Asia/Asia (where OSM+this app's own
+    // data is strongest), but a correct "this is actually Bangkok" beats a
+    // confident-but-wrong Vietnam-flavored guess every time.
+    const regionHint = 'Trước tiên xác định quốc gia/thành phố thực tế của toạ độ GPS này (trọng tâm là Việt Nam, Đông Nam Á, và Châu Á nói chung — nhưng nếu toạ độ rơi vào nơi khác thì vẫn phải nhận diện đúng, đừng mặc định là Việt Nam). Dựa vào đó suy ra: tên quán viết đúng theo ngôn ngữ/cách viết địa phương, địa chỉ đúng định dạng địa phương, và GIÁ ghi bằng ĐÚNG đơn vị tiền tệ + cách viết của nước đó (VD: Việt Nam "25.000-45.000đ", Thái Lan "100-200 บาท / 100-200 THB", Indonesia "30.000-60.000 Rp", Philippines "₱150-300", Malaysia "RM15-30" — không mặc định ghi kiểu "40k-80k" nếu không phải Việt Nam).';
+
     let prompt;
     if (q) {
-      prompt = `Bạn là chuyên gia ẩm thực & bản đồ Việt Nam, thông thạo quán ăn khu vực này.
+      prompt = `Bạn là chuyên gia ẩm thực & bản đồ khắp Châu Á, thông thạo quán ăn địa phương ở bất kỳ đâu trong khu vực.
+${regionHint}
+
 Người dùng đang tìm: "${q}" — gần toạ độ GPS ${lat}, ${lng} (trong bán kính ${searchRadiusKm}km).
 
 Xác định "${q}" là TÊN MÓN hay TÊN QUÁN cụ thể:
-- Nếu là TÊN MÓN (vd: bánh canh, phở, bún đậu) → trả các quán bán món đó.
-- Nếu là TÊN QUÁN / THƯƠNG HIỆU (kể cả gõ tắt/viết thường, vd "brave", "highlands") → kết quả ĐẦU TIÊN phải là quán CÓ THẬT khớp nhất, với "name" là TÊN ĐẦY ĐỦ CHÍNH THỨC ĐÚNG như trên Google Maps (vd gõ "brave" → name "Brave Coffee Brewers"; gõ "highlands" → "Highlands Coffee"). Viết hoa đúng chuẩn, KHÔNG để nguyên chữ người dùng gõ, KHÔNG bịa quán khác tên na ná (vd KHÔNG trả "Brave Roastery" khi họ tìm Brave Coffee Brewers).
+- Nếu là TÊN MÓN (vd: bánh canh, phở, tom yum, nasi goreng) → trả các quán bán món đó.
+- Nếu là TÊN QUÁN / THƯƠNG HIỆU (kể cả gõ tắt/viết thường, vd "brave", "highlands") → kết quả ĐẦU TIÊN phải là quán CÓ THẬT khớp nhất, với "name" là TÊN ĐẦY ĐỦ CHÍNH THỨC ĐÚNG như trên Google Maps (vd gõ "brave" → name "Brave Coffee Brewers"; gõ "highlands" → "Highlands Coffee"). Viết hoa đúng chuẩn, KHÔNG để nguyên chữ người dùng gõ, KHÔNG bịa quán khác tên na ná (vd KHÔNG trả "Brave Roastery" khi họ tìm Brave Coffee Brewers). Nếu không chắc chắn quán đó có thật ở đúng vị trí này không, đừng bịa — bỏ qua kết quả đó thay vì đoán liều.
 
 Sau kết quả đầu, mới liệt kê chi nhánh / quán liên quan. Trả tối đa ${opts.limit || 20} kết quả, khớp nhất xếp trước. Nếu không có quán nào khớp, trả [].
 
 Trả về JSON THUẦN (không markdown, không giải thích):
-[{"name":"tên quán","address":"địa chỉ đường + phường/quận nếu biết","cat":"restaurant|street|snack|cafe","price":"VD: 40k-80k","lat":${lat},"lng":${lng},"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]
+[{"name":"tên quán","address":"địa chỉ đúng định dạng địa phương","cat":"restaurant|street|snack|cafe","price":"giá bằng đúng tiền tệ địa phương","lat":${lat},"lng":${lng},"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]
 
 Quy tắc: lat/lng gần đúng khu vực quán. rating 3.5-5.0. Chỉ trả JSON array.`;
     } else {
-      prompt = `Bạn là chuyên gia ẩm thực Việt Nam, thông thạo các quán ăn ở khu vực này.
+      prompt = `Bạn là chuyên gia ẩm thực & bản đồ khắp Châu Á, thông thạo quán ăn địa phương ở bất kỳ đâu trong khu vực.
+${regionHint}
+
 Tìm ${opts.limit || 20} quán ăn/cà phê CÓ THẬT, đang hoạt động, gần toạ độ GPS ${lat}, ${lng} (trong bán kính ${searchRadiusKm}km).
-${catHint}. Ưu tiên quán nổi tiếng, review tốt.
+${catHint}. Ưu tiên quán nổi tiếng, review tốt. Nếu không chắc chắn 1 quán có thật ở đúng vị trí này không, đừng bịa — bỏ qua thay vì đoán liều.
 
 Trả về JSON THUẦN (không markdown, không giải thích):
-[{"name":"tên quán","address":"địa chỉ đường + phường/quận nếu biết","cat":"restaurant|street|snack|cafe","price":"VD: 40k-80k","lat":${lat},"lng":${lng},"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]
+[{"name":"tên quán","address":"địa chỉ đúng định dạng địa phương","cat":"restaurant|street|snack|cafe","price":"giá bằng đúng tiền tệ địa phương","lat":${lat},"lng":${lng},"rating":4.5,"desc":"mô tả ngắn dưới 20 từ"}]
 
-Quy tắc: lat/lng gần đúng khu vực quán. address ghi rõ tên đường/phố + quận. rating từ 3.5 đến 5.0. Chỉ trả JSON array.`;
+Quy tắc: lat/lng gần đúng khu vực quán. address ghi rõ tên đường/phố + khu vực theo cách viết địa phương. rating từ 3.5 đến 5.0. Chỉ trả JSON array.`;
     }
 
     // Lower temperature for a specific query → less creative name drift
