@@ -560,8 +560,14 @@ const ResultsCtrl = {
     const q = (State.activeDish || '').trim();
     if (q) {
       const esc = String(q).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      // NOTE: .es-gmaps-banner is display:flex — a flex container with
+      // mixed text nodes AND an element child (the <b> here) wraps each
+      // text run in its own anonymous flex item, splitting the sentence
+      // into fragments that lay out independently (looked broken/garbled
+      // on real devices). Wrapping everything in one <span> keeps it as
+      // ordinary inline content instead — a single flex item.
       bannerHtml = `<a class="es-gmaps-banner" href="${gmapsSearchUrl(q)}" target="_blank" rel="noopener">
-        🗺️ Chưa đúng "<b>${esc}</b>"? Tìm chính xác trên Google Maps →
+        <span>🗺️ Chưa đúng "<b>${esc}</b>"? Tìm chính xác trên Google Maps →</span>
       </a>`;
     }
     grid.innerHTML = bannerHtml + visible.map((r, i) => {
