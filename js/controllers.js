@@ -661,6 +661,7 @@ const ResultsCtrl = {
       if (r) DetailModal.open(r);
     });
     document.getElementById('planBtn').addEventListener('click', () => {
+      PlanCtrl._returnTo = 'results';
       PlanCtrl.buildItinerary();
       PlanCtrl.show();
     });
@@ -671,11 +672,21 @@ const ResultsCtrl = {
    PLAN CONTROLLER
 ═══════════════════════════════════════════════ */
 const PlanCtrl = {
-  buildItinerary() {
-    const all = allRestaurants();
-    const stops = all
-      .filter(r => State.selected.has(r.id))
-      .map(r => ({ ...r, _dist: haversine(State.userLat, State.userLng, r.lat, r.lng) }));
+  // 'results' (mặc định) hay 'profile' — planBack quay lại đúng màn đã
+  // vào từ đó (bấm "Đi lại" ở lịch sử chuyến ăn vào thẳng đây, không qua
+  // màn Kết quả, nên phải nhớ để nút Quay lại trả đúng chỗ).
+  _returnTo: 'results',
+
+  // customStops (tuỳ chọn): dùng khi "đi lại" 1 chuyến cũ — dữ liệu tự lấy
+  // từ chính chuyến đó (đã lưu đủ id/tên/toạ độ/loại) thay vì tra lại
+  // State.selected + allRestaurants(), vì id của kết quả AI (Gemini) chỉ
+  // dùng 1 lần, lần quét sau sẽ không còn khớp id cũ nữa.
+  buildItinerary(customStops) {
+    const stops = customStops
+      ? customStops.map(r => ({ ...r, _dist: haversine(State.userLat, State.userLng, r.lat, r.lng) }))
+      : allRestaurants()
+          .filter(r => State.selected.has(r.id))
+          .map(r => ({ ...r, _dist: haversine(State.userLat, State.userLng, r.lat, r.lng) }));
 
     let current = { lat: State.userLat, lng: State.userLng };
     const ordered = [];
@@ -739,11 +750,30 @@ const PlanCtrl = {
   },
 
   show() {
+    // Hide every top-level screen unconditionally (not just Results) —
+    // this can now also be entered straight from Cá nhân via replayTrip(),
+    // which never passes through Results at all.
+    document.getElementById('homeScreen').classList.add('hidden');
     document.getElementById('resultsScreen').classList.add('hidden');
+    document.getElementById('profileScreen').classList.add('hidden');
+    document.getElementById('communityScreen').classList.add('hidden');
     document.getElementById('planScreen').classList.remove('hidden');
     this._renderSummary();
     this._renderTimeline();
     this._initPlanMap();
+  },
+
+  // "Đi lại" 1 chuyến đã đi (tab Cá nhân → Chuyến ăn đã đi) — giữ nguyên
+  // thứ tự/danh sách quán, chỉ tính lại giờ giấc + lộ trình xuất phát từ
+  // vị trí GPS hiện tại thay vì điểm xuất phát của lần đó.
+  replayTrip(trip) {
+    if (State.userLat == null || State.userLng == null) {
+      showToast('📍 Cần bật GPS hoặc chọn vị trí hiện tại trước đã');
+      return;
+    }
+    this._returnTo = 'profile';
+    this.buildItinerary(trip.stops.map(s => ({ ...s })));
+    this.show();
   },
 
   _renderSummary() {
@@ -977,8 +1007,13 @@ const PlanCtrl = {
     document.getElementById('planBack').addEventListener('click', () => {
       this._stopLiveTracking();
       document.getElementById('planMapWrap')?.classList.remove('fullscreen');
-      document.getElementById('resultsScreen').classList.remove('hidden');
       document.getElementById('planScreen').classList.add('hidden');
+      if (this._returnTo === 'profile') {
+        document.getElementById('profileScreen').classList.remove('hidden');
+        ProfileCtrl.render();
+      } else {
+        document.getElementById('resultsScreen').classList.remove('hidden');
+      }
     });
     // Esc exits fullscreen
     document.addEventListener('keydown', e => {
@@ -1580,7 +1615,10 @@ const HistoryModal = {
           </div>`).join('');
         return `
           <div class="trip-item">
-            <div class="trip-date">📅 ${dateLabel} · ${trip.stops.length} điểm</div>
+            <div class="trip-date-row">
+              <div class="trip-date">📅 ${dateLabel} · ${trip.stops.length} điểm</div>
+              <button type="button" class="trip-replay-btn" data-trip-id="${trip.id}" title="Đi lại lộ trình này, bắt đầu từ vị trí hiện tại">🔁 Đi lại</button>
+            </div>
             ${stopsHtml}
           </div>`;
       }).join('');
@@ -1592,6 +1630,19 @@ const HistoryModal = {
           const id = parseInt(el.dataset.id);
           const stop = trips.flatMap(t => t.stops).find(s => s.id === id);
           if (stop) DetailModal.open(stop);
+        });
+      });
+      // "Đi lại" — replay the same stops in the same order, but starting
+      // from wherever the user actually is right now instead of the
+      // original starting point.
+      body.querySelectorAll('.trip-replay-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = parseInt(btn.dataset.tripId);
+          const trip = trips.find(t => t.id === id);
+          if (!trip) return;
+          this._close(document.getElementById('tripsModal'));
+          PlanCtrl.replayTrip(trip);
         });
       });
     }
