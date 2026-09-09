@@ -484,10 +484,10 @@ const ResultsCtrl = {
   },
   _updateHeader() {
     const n = State.filteredResults.length;
-    document.getElementById('resultsTitle').textContent = `${n} quán gần đây`;
+    document.getElementById('resultsTitle').textContent = I18N.t('results.nCount', { n });
     const src = State.lastScanSource === 'gemini' ? '✨ Google Maps (Gemini)'
       : State.lastScanSource === 'osm' ? '🌐 OpenStreetMap'
-      : '📌 Chưa quét';
+      : I18N.t('results.notScanned');
     document.getElementById('resultsSub').textContent = `${fmtDist(State.radius)} · ${src}`;
   },
   _setTabFilter(filter) {
@@ -539,13 +539,13 @@ const ResultsCtrl = {
         const esc = escapeHtml(q);
         grid.innerHTML = `<div class="empty-state">
           <div class="es-icon">🔍</div>
-          <div class="es-msg">Chưa tìm thấy "<b>${esc}</b>" trong dữ liệu app<br>
-            <span style="font-size:.82rem;opacity:.75">Bấm nút dưới để tìm trực tiếp trên Google Maps</span>
+          <div class="es-msg">${I18N.t('empty.notFound', { q: `<b>${esc}</b>` })}<br>
+            <span style="font-size:.82rem;opacity:.75">${I18N.t('empty.tapBelow')}</span>
           </div>
-          <a class="es-gmaps-btn" href="${gmapsSearchUrl(q)}" target="_blank" rel="noopener">🗺️ Tìm "${esc}" trên Google Maps</a>
+          <a class="es-gmaps-btn" href="${gmapsSearchUrl(q)}" target="_blank" rel="noopener">${I18N.t('empty.findOnMaps', { q: esc })}</a>
         </div>`;
       } else {
-        grid.innerHTML = `<div class="empty-state"><div class="es-icon">🍽️</div><div class="es-msg">Không có quán loại này<br>trong bán kính tìm kiếm</div></div>`;
+        grid.innerHTML = `<div class="empty-state"><div class="es-icon">🍽️</div><div class="es-msg">${I18N.t('empty.noneInCategory')}</div></div>`;
       }
       return;
     }
@@ -567,7 +567,7 @@ const ResultsCtrl = {
       // on real devices). Wrapping everything in one <span> keeps it as
       // ordinary inline content instead — a single flex item.
       bannerHtml = `<a class="es-gmaps-banner" href="${gmapsSearchUrl(q)}" target="_blank" rel="noopener">
-        <span>🗺️ Chưa đúng "<b>${esc}</b>"? Tìm chính xác trên Google Maps →</span>
+        <span>${I18N.t('banner.wrongResult', { q: `<b>${esc}</b>` })}</span>
       </a>`;
     }
     grid.innerHTML = bannerHtml + visible.map((r, i) => {
@@ -599,7 +599,7 @@ const ResultsCtrl = {
     const n = State.selected.size;
     const btn = document.getElementById('planBtn');
     btn.disabled = n === 0;
-    btn.textContent = n === 0 ? 'Lên lịch' : `📋 Lên lịch ${n} quán đã chọn`;
+    btn.textContent = n === 0 ? I18N.t('results.schedule') : I18N.t('results.scheduleN', { n });
   },
   init() {
     document.getElementById('resultsBack').addEventListener('click', () => {
@@ -774,7 +774,7 @@ const PlanCtrl = {
   // vị trí GPS hiện tại thay vì điểm xuất phát của lần đó.
   replayTrip(trip) {
     if (State.userLat == null || State.userLng == null) {
-      showToast('📍 Cần bật GPS hoặc chọn vị trí hiện tại trước đã');
+      showToast(I18N.t('trips.needGps'));
       return;
     }
     this._returnTo = 'profile';
@@ -790,11 +790,11 @@ const PlanCtrl = {
     const startTime   = State.itinerary.length ? addMinutes(State.itinerary[0].arrivalClock, -State.itinerary[0].travelMin) : new Date();
 
     document.getElementById('planSummary').innerHTML = `
-      <div class="sum-chip"><span class="sci">🏪</span>${State.itinerary.length} điểm</div>
+      <div class="sum-chip"><span class="sci">🏪</span>${I18N.t('plan.stops', { n: State.itinerary.length })}</div>
       <div class="sum-chip"><span class="sci">🕐</span>${fmtClock(startTime)} → ${fmtClock(endTime)}</div>
       <div class="sum-chip"><span class="sci">⏱</span>${fmtTime(totalTravel+totalDwell)}</div>
       <div class="sum-chip"><span class="sci">📍</span>${fmtDist(totalDist)}</div>
-      <div class="sum-chip"><span class="sci">🛵</span>Xe máy</div>
+      <div class="sum-chip"><span class="sci">🛵</span>${I18N.t('plan.motorbike')}</div>
     `;
   },
 
@@ -802,7 +802,7 @@ const PlanCtrl = {
     if (!stop.hours) return '';
     const parsed = parseOpeningHours(stop.hours);
     if (!parsed || parsed.isOpen !== false) return '';
-    return `<div class="tl-hours-warn">⚠️ Quán có thể đã đóng lúc bạn đến · ${parsed.detail}</div>`;
+    return `<div class="tl-hours-warn">${I18N.t('plan.hoursWarn', { detail: parsed.detail })}</div>`;
   },
 
   _renderTimeline() {
@@ -811,7 +811,7 @@ const PlanCtrl = {
 
     html += `<div class="tl-item">
       <div class="tl-spine"><div class="tl-dot" style="background:#F8DFD3;border-color:#B92626;font-size:.85rem">📍</div><div class="tl-line"></div></div>
-      <div class="tl-content"><div class="tl-start">Xuất phát · ${fmtClock(addMinutes(State.itinerary[0].arrivalClock, -State.itinerary[0].travelMin))}</div></div>
+      <div class="tl-content"><div class="tl-start">${I18N.t('plan.depart', { time: fmtClock(addMinutes(State.itinerary[0].arrivalClock, -State.itinerary[0].travelMin)) })}</div></div>
     </div>`;
 
     State.itinerary.forEach((stop, i) => {
@@ -825,8 +825,8 @@ const PlanCtrl = {
           <div class="tl-travel">
             <span class="tl-travel-icon">🛵</span>
             <div class="tl-travel-info">
-              <div class="tl-travel-time">${stop.travelMin} phút di chuyển</div>
-              <div class="tl-travel-dist">${fmtDist(stop._legDist)} · xe máy</div>
+              <div class="tl-travel-time">${I18N.t('plan.travelMin', { min: stop.travelMin })}</div>
+              <div class="tl-travel-dist">${I18N.t('plan.distMoto', { dist: fmtDist(stop._legDist) })}</div>
             </div>
           </div>
         </div>
@@ -848,17 +848,17 @@ const PlanCtrl = {
             </div>
             ${hoursWarn}
             <div class="tl-dwell">
-              <span class="dwell-label">⏱ Thời gian ở:</span>
+              <span class="dwell-label">${I18N.t('plan.dwellLabel')}</span>
               <div class="dwell-adj">
                 <button class="dwell-btn" data-action="minus" data-idx="${i}">−</button>
-                <span class="dwell-num" id="dwell${i}">${stop.dwell}p</span>
+                <span class="dwell-num" id="dwell${i}">${I18N.t('plan.minAbbr', { n: stop.dwell })}</span>
                 <button class="dwell-btn" data-action="plus" data-idx="${i}">+</button>
               </div>
             </div>
-            <div class="tl-time" id="stopTime${i}">Đến ${fmtClock(stop.arrivalClock)} → Rời ${fmtClock(stop.departureClock)}</div>
+            <div class="tl-time" id="stopTime${i}">${I18N.t('plan.arriveDepart', { a: fmtClock(stop.arrivalClock), b: fmtClock(stop.departureClock) })}</div>
             <a href="${gmapsUrl(stop)}"
                target="_blank" rel="noopener" class="r-gmaps-link" style="margin-top:8px">
-               🗺️ Mở Google Maps
+               ${I18N.t('common.openMaps')}
             </a>
           </div>
         </div>
@@ -869,7 +869,7 @@ const PlanCtrl = {
       const last = State.itinerary[State.itinerary.length-1];
       html += `<div class="tl-item">
         <div class="tl-spine"><div class="tl-dot" style="background:#FFF3B0;border-color:#B98A00;font-size:.85rem">🏁</div></div>
-        <div class="tl-content"><div class="tl-start" style="color:#B98A00" id="endTimeNode">Kết thúc chuyến ăn · ${fmtClock(last.departureClock)}</div></div>
+        <div class="tl-content"><div class="tl-start" style="color:#B98A00" id="endTimeNode">${I18N.t('plan.endTrip', { time: fmtClock(last.departureClock) })}</div></div>
       </div>`;
     }
 
@@ -899,13 +899,13 @@ const PlanCtrl = {
         }
         const dwellEl = document.getElementById(`dwell${i}`);
         const timeEl = document.getElementById(`stopTime${i}`);
-        if (dwellEl) dwellEl.textContent = s.dwell+'p';
-        if (timeEl) timeEl.textContent = `Đến ${fmtClock(s.arrivalClock)} → Rời ${fmtClock(s.departureClock)}`;
+        if (dwellEl) dwellEl.textContent = I18N.t('plan.minAbbr', { n: s.dwell });
+        if (timeEl) timeEl.textContent = I18N.t('plan.arriveDepart', { a: fmtClock(s.arrivalClock), b: fmtClock(s.departureClock) });
       }
       const endNode = document.getElementById('endTimeNode');
       if (endNode) {
         const last = State.itinerary[State.itinerary.length-1];
-        endNode.textContent = `Kết thúc chuyến ăn · ${fmtClock(last.departureClock)}`;
+        endNode.textContent = I18N.t('plan.endTrip', { time: fmtClock(last.departureClock) });
       }
       this._renderSummary();
     });
@@ -1189,7 +1189,7 @@ const ProfileCtrl = {
     const nameInput = document.getElementById('profileNameInput');
     nameInput.addEventListener('input', () => {
       State.profile.name = nameInput.value;
-      document.getElementById('profileNameDisplay').textContent = nameInput.value || 'Tên của bạn…';
+      document.getElementById('profileNameDisplay').textContent = nameInput.value || I18N.t('profile.namePlaceholder');
       Storage.save();
     });
 
@@ -1327,6 +1327,21 @@ const ProfileCtrl = {
       picker.querySelectorAll('.avatar-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.avatar === a));
       Storage.save();
     });
+
+    // Ngôn ngữ — đổi xong áp lại bản dịch + báo cho các màn đang render
+    // (Cộng đồng/Cá nhân) tự vẽ lại phần chữ động bằng ngôn ngữ mới.
+    const langPicker = document.getElementById('langPicker');
+    langPicker.querySelectorAll('.cat-pick-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.lang === I18N.lang);
+    });
+    langPicker.addEventListener('click', e => {
+      const btn = e.target.closest('.cat-pick-btn');
+      if (!btn || btn.dataset.lang === I18N.lang) return;
+      I18N.lang = btn.dataset.lang;
+      I18N.apply();
+      langPicker.querySelectorAll('.cat-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === I18N.lang));
+      document.dispatchEvent(new CustomEvent('i18n:changed'));
+    });
   },
 
   _openAccountModal() {
@@ -1339,7 +1354,7 @@ const ProfileCtrl = {
   render() {
     document.getElementById('avatarBtn').textContent = State.profile.avatar;
     document.getElementById('profileNameInput').value = State.profile.name;
-    document.getElementById('profileNameDisplay').textContent = State.profile.name || 'Tên của bạn…';
+    document.getElementById('profileNameDisplay').textContent = State.profile.name || I18N.t('profile.namePlaceholder');
     document.querySelectorAll('.pref-chip').forEach(c => {
       c.classList.toggle('active', State.profile.prefs.has(c.dataset.pref));
     });
@@ -1351,7 +1366,7 @@ const ProfileCtrl = {
     document.getElementById('profileLoggedIn').classList.toggle('hidden', !loggedIn);
     if (loggedIn) {
       const user = Community.currentUser;
-      document.getElementById('communityWelcome').innerHTML = `Chào <em>${escapeHtml(user.name || user.email)}</em>`;
+      document.getElementById('communityWelcome').innerHTML = I18N.t('account.helloName', { name: escapeHtml(user.name || user.email) });
       CommunityCtrl._renderFriends();
     }
     this._loadMyRestaurants();
@@ -1597,14 +1612,14 @@ const HistoryModal = {
   // ── Lịch sử chuyến ăn — flat name+address bars per stop
   openTrips() {
     const trips = State.profile.tripHistory || [];
-    document.getElementById('tripsCount').textContent = `${trips.length} chuyến`;
+    document.getElementById('tripsCount').textContent = I18N.t('trips.count', { n: trips.length });
     const body = document.getElementById('tripsBody');
     if (trips.length === 0) {
       body.innerHTML = `
         <div class="list-empty">
           <div class="list-empty-icon">🍜</div>
-          <div class="list-empty-msg">Chưa có chuyến nào</div>
-          <div class="list-empty-sub">Quét quán → chọn vài chỗ → nhấn "Lên lịch" để tạo chuyến đầu tiên</div>
+          <div class="list-empty-msg">${I18N.t('trips.empty')}</div>
+          <div class="list-empty-sub">${I18N.t('trips.emptySub')}</div>
         </div>`;
     } else {
       const esc = this._esc;
@@ -1616,14 +1631,14 @@ const HistoryModal = {
             <div class="trip-stop-idx">${i + 1}</div>
             <div class="trip-stop-info">
               <div class="trip-stop-name">${esc(s.name)}</div>
-              <div class="trip-stop-addr">${esc(s.address || (s.lat != null ? `📍 ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}` : 'Chưa có địa chỉ'))}</div>
+              <div class="trip-stop-addr">${esc(s.address || (s.lat != null ? `📍 ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}` : I18N.t('trips.noAddress')))}</div>
             </div>
           </div>`).join('');
         return `
           <div class="trip-item">
             <div class="trip-date-row">
               <div class="trip-date">📅 ${dateLabel} · ${trip.stops.length} điểm</div>
-              <button type="button" class="trip-replay-btn" data-trip-id="${trip.id}" title="Đi lại lộ trình này, bắt đầu từ vị trí hiện tại">🔁 Đi lại</button>
+              <button type="button" class="trip-replay-btn" data-trip-id="${trip.id}" title="${I18N.t('trips.replayTitle')}">${I18N.t('trips.replay')}</button>
             </div>
             ${stopsHtml}
           </div>`;
@@ -1661,8 +1676,8 @@ const HistoryModal = {
     const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
     const isYesterday = d.toDateString() === yesterday.toDateString();
     const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    if (sameDay) return `Hôm nay ${time}`;
-    if (isYesterday) return `Hôm qua ${time}`;
+    if (sameDay) return `${I18N.t('trips.today')} ${time}`;
+    if (isYesterday) return `${I18N.t('trips.yesterday')} ${time}`;
     return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${time}`;
   },
 };
@@ -1675,7 +1690,13 @@ const HistoryModal = {
 ═══════════════════════════════════════════════ */
 const COMMUNITY_CAT_TO_PB = { restaurant: 'nha_hang', street: 'via_he', snack: 'an_vat', cafe: 'ca_phe' };
 const COMMUNITY_PB_TO_CAT = { nha_hang: 'restaurant', via_he: 'street', an_vat: 'snack', ca_phe: 'cafe' };
-const COMMUNITY_PRICE_LABEL = { binh_dan: '💸 Bình dân', tam_trung: '💰 Tầm trung', sang_chanh: '✨ Sang chảnh' };
+// Getter per key (như CATEGORIES.label) — tự đổi theo I18N.lang, không cần
+// sửa lại 4 chỗ đang đọc COMMUNITY_PRICE_LABEL[...] khi đổi ngôn ngữ.
+const COMMUNITY_PRICE_LABEL = {
+  get binh_dan() { return `💸 ${I18N.t('priceLabel.cheap')}`; },
+  get tam_trung() { return `💰 ${I18N.t('priceLabel.mid')}`; },
+  get sang_chanh() { return `✨ ${I18N.t('priceLabel.premium')}`; },
+};
 const COMMUNITY_VIS_BADGE = { private: '🔒', friends: '👥', public: '🌍' };
 
 // Card markup shared by 3 places that all list community restaurants:
@@ -1916,9 +1937,9 @@ const CommunityCtrl = {
   _renderAuthMode() {
     const isRegister = this._mode === 'register';
     document.getElementById('communityNameGroup').classList.toggle('hidden', !isRegister);
-    document.getElementById('communityAuthSubmit').textContent = isRegister ? 'Đăng ký' : 'Đăng nhập';
+    document.getElementById('communityAuthSubmit').textContent = isRegister ? I18N.t('community.register') : I18N.t('community.signIn');
     document.getElementById('communityAuthToggle').textContent = isRegister
-      ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký';
+      ? I18N.t('community.toLogin') : I18N.t('community.toRegister');
   },
 
   async _submitAuth() {

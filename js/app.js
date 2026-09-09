@@ -32,6 +32,7 @@ function wireScrollMasks() {
 }
 
 function boot() {
+  I18N.init(); // trước tiên — mọi chữ tĩnh trong HTML phải đúng ngôn ngữ ngay từ lần vẽ đầu
   Storage.load();
   DropdownPosition.init();
   TabNav.init();
@@ -55,6 +56,16 @@ function boot() {
     showToast('⚠️ Phiên đăng nhập đã hết hạn — đăng nhập lại nhé');
     ProfileCtrl.render();
     CommunityCtrl.render();
+  });
+
+  // Đổi ngôn ngữ xong: I18N.apply() đã tự sửa lại mọi [data-i18n] tĩnh,
+  // nhưng phần nội dung ĐỘNG (đã render sẵn = còn chữ ngôn ngữ cũ) ở
+  // những màn hay đang mở cần vẽ lại bằng tay.
+  document.addEventListener('i18n:changed', () => {
+    ProfileCtrl.render();
+    CommunityCtrl.render();
+    if (State.filteredResults?.length) { ResultsCtrl._updateHeader(); ResultsCtrl._applyFilters(); }
+    ResultsCtrl._updatePlanBtn();
   });
 
   // Fallback default location — Hoàn Kiếm, Hà Nội

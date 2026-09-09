@@ -1,11 +1,15 @@
 /* ═══════════════════════════════════════════════
    CONSTANTS
 ═══════════════════════════════════════════════ */
+// .label là getter đọc I18N.t(...) tại thời điểm truy cập (không phải giá
+// trị cố định) — nên mọi nơi trong app đang gọi CATEGORIES[x].label tự
+// động ra đúng ngôn ngữ hiện tại, kể cả sau khi người dùng đổi ngôn ngữ
+// giữa chừng, không cần sửa lại từng chỗ gọi.
 const CATEGORIES = {
-  restaurant: { label:'Nhà hàng',  icon:'🍽️', color:'#B92626', dwell:60 },
-  street:     { label:'Vỉa hè',    icon:'🍜', color:'#E8843C', dwell:30 },
-  snack:      { label:'Ăn vặt',    icon:'🧆', color:'#D64B7A', dwell:20 },
-  cafe:       { label:'Cà phê',    icon:'☕', color:'#7A4E2F', dwell:45 },
+  restaurant: { get label(){ return I18N.t('catLabel.restaurant'); }, icon:'🍽️', color:'#B92626', dwell:60 },
+  street:     { get label(){ return I18N.t('catLabel.street'); },     icon:'🍜', color:'#E8843C', dwell:30 },
+  snack:      { get label(){ return I18N.t('catLabel.snack'); },      icon:'🧆', color:'#D64B7A', dwell:20 },
+  cafe:       { get label(){ return I18N.t('catLabel.cafe'); },       icon:'☕', color:'#7A4E2F', dwell:45 },
 };
 
 const AVATARS = ['🍜','🍕','🍔','🍣','🍰','🍩','🍦','🥗','🌮','🍤','🍱','🥘','🍲','🥟','🍢','☕','🧋','🍹'];

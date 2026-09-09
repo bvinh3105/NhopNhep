@@ -1,0 +1,311 @@
+/* ═══════════════════════════════════════════════
+   I18N — song ngữ Việt / English
+   Từ điển phẳng key → chuỗi, cho mỗi ngôn ngữ. Element nào có
+   data-i18n="key" thì nội dung (innerHTML) được thay bằng I18N.t(key) —
+   dùng innerHTML (không phải textContent) vì nhiều chuỗi có <em>/<b> lồng
+   bên trong; từ điển này do dev viết cứng sẵn (không phải input người
+   dùng) nên innerHTML ở đây an toàn, không phải nơi cần escapeHtml().
+   Thêm data-i18n-attr="placeholder" (hoặc "title", "aria-label"...) cạnh
+   data-i18n để dịch 1 thuộc tính thay vì nội dung thẻ.
+
+   CATEGORIES (utils.js) và các bảng nhãn category/price/visibility dùng
+   getter đọc thẳng I18N.t(...) tại thời điểm truy cập — nên đổi ngôn ngữ
+   xong, mọi nơi đang gọi cat.label/priceLabel(...) tự động ra đúng ngôn
+   ngữ mới mà không cần sửa lại từng chỗ gọi.
+═══════════════════════════════════════════════ */
+const I18N = {
+  LANG_KEY: 'app_lang',
+  get lang() { return localStorage.getItem(this.LANG_KEY) || 'vi'; },
+  set lang(v) { localStorage.setItem(this.LANG_KEY, v); },
+
+  t(key, vars) {
+    const table = this.dict[this.lang] || this.dict.vi;
+    let s = table[key] ?? this.dict.vi[key] ?? key;
+    if (vars) for (const k in vars) s = s.replaceAll(`{${k}}`, vars[k]);
+    return s;
+  },
+
+  // Áp dụng bản dịch hiện tại lên mọi [data-i18n] trong root (mặc định
+  // toàn trang) — gọi lại sau khi đổi ngôn ngữ, hoặc sau khi 1 phần DOM
+  // mới được render (root truyền vào để không phải quét lại cả trang).
+  apply(root) {
+    (root || document).querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.dataset.i18n;
+      const attr = el.dataset.i18nAttr;
+      const text = this.t(key);
+      if (attr) el.setAttribute(attr, text);
+      else el.innerHTML = text;
+    });
+    document.documentElement.lang = this.lang;
+  },
+
+  toggle() {
+    this.lang = this.lang === 'vi' ? 'en' : 'vi';
+    this.apply();
+    document.dispatchEvent(new CustomEvent('i18n:changed'));
+  },
+
+  init() {
+    this.apply();
+  },
+
+  dict: {
+    vi: {
+      // ── Ribbon ──
+      'ribbon.eat': 'ĂN THÔI', 'ribbon.good': 'QUÁN NGON', 'ribbon.near': 'Ở GẦN',
+      // ── Hero (Home) ──
+      'hero.tagline': 'vi vu cùng <em>Vinh</em> và <em>Thảo</em> ♥',
+      'hero.sub': 'Random quán ngon · Lên lịch tự động',
+      'hero.badge': '✦ Quét để tìm',
+      'scanning.text': 'Đang tìm quán ngon…',
+      // ── Category / price / visibility (dùng chung khắp app) ──
+      'catLabel.restaurant': 'Nhà hàng', 'catLabel.street': 'Vỉa hè',
+      'catLabel.snack': 'Ăn vặt', 'catLabel.cafe': 'Cà phê',
+      'priceLabel.cheap': 'Bình dân', 'priceLabel.mid': 'Tầm trung', 'priceLabel.premium': 'Sang chảnh',
+      'visLabel.private': 'Riêng tư', 'visLabel.friends': 'Bạn bè', 'visLabel.public': 'Công khai',
+      'src.mine': 'Của tôi', 'src.community': 'Cộng đồng',
+      'filter.all': 'Tất cả',
+      // ── Home sheet ──
+      'home.wantToEat': 'Tôi muốn ăn',
+      'home.findDish': 'Tìm <em>món / quán</em> · tuỳ chọn',
+      'home.dishPlaceholder': 'VD: phở, bánh mì, tên quán… (bỏ trống = mọi món)',
+      'home.clearDish': 'Xoá bộ lọc món',
+      'home.radius': 'Bán kính tìm kiếm',
+      'home.advancedFilters': '⚙️ Bộ lọc <em>nâng cao</em>',
+      'home.dataSource': 'Nguồn dữ liệu',
+      'home.rating': 'Đánh giá',
+      'home.startPoint': 'Điểm xuất phát',
+      'home.locPlaceholder': 'Gõ địa chỉ, tên đường, quán… hoặc dùng GPS',
+      'home.gpsTitle': 'Bật GPS · nhấn giữ để tracking liên tục',
+      'home.scanNow': '🔍 Quét <em>ngay</em>!',
+      // ── Results screen ──
+      'results.nearby': 'Quán gần đây',
+      'results.nCount': '{n} quán gần đây',
+      'results.notScanned': '📌 Chưa quét',
+      'results.reshuffle': '🔀 Xáo lại',
+      'results.schedule': 'Lên lịch',
+      'results.scheduleN': '📋 Lên lịch {n} quán đã chọn',
+      // ── Plan screen ──
+      'plan.title': 'Lịch trình hôm nay',
+      'plan.stops': '{n} điểm',
+      'plan.motorbike': 'Xe máy',
+      'plan.hoursWarn': '⚠️ Quán có thể đã đóng lúc bạn đến · {detail}',
+      'plan.depart': 'Xuất phát · {time}',
+      'plan.travelMin': '{min} phút di chuyển',
+      'plan.distMoto': '{dist} · xe máy',
+      'plan.dwellLabel': '⏱ Thời gian ở:',
+      'plan.arriveDepart': 'Đến {a} → Rời {b}',
+      'plan.endTrip': 'Kết thúc chuyến ăn · {time}',
+      'plan.minAbbr': '{n}p',
+      // ── Profile screen ──
+      'profile.tapAccount': 'Chạm để mở tài khoản',
+      'profile.namePlaceholder': 'Tên của bạn…',
+      'profile.tagline': 'Fan của quán ngon 🍴',
+      'profile.statMyR.title': 'Xem danh sách quán của tôi',
+      'profile.statScore.title': 'Tổng số sao nhận được trên các quán đã đăng',
+      'profile.statTrips.title': 'Số chuyến ăn đã lên lịch',
+      'profile.statFav.title': 'Loại quán bạn hay chọn',
+      'profile.statMyR.lbl': 'QUÁN CỦA TÔI', 'profile.statScore.lbl': '★ ĐIỂM',
+      'profile.statTrips.lbl': 'CHUYẾN ĂN', 'profile.statFav.lbl': 'HAY THÍCH',
+      'profile.prefs': 'Sở <em>thích</em>',
+      'profile.myRestaurants': 'Quán <em>của tôi</em>',
+      'profile.dataSection': 'Dữ <em>liệu</em>',
+      'profile.exportData': '📤 Xuất dữ liệu', 'profile.importData': '📥 Nhập dữ liệu',
+      'profile.geminiHint': 'Tìm quán thông minh bằng AI. Mặc định đã có key dùng chung — bạn có thể dùng key riêng để không giới hạn lượt.',
+      'profile.keyPlaceholder': 'Dán API key của bạn (tùy chọn)…',
+      'profile.toggleKey': 'Hiện/ẩn key',
+      'profile.saveKey': '💾 Lưu key', 'profile.clearKey': '↺ Dùng key mặc định',
+      'profile.getKey': 'Lấy key miễn phí tại Google AI Studio →',
+      // ── Community screen ──
+      'community.title': 'Cộng <em>đồng</em>',
+      'community.signInHint': 'Đăng nhập để xem quán cả nhóm chia sẻ và đăng quán của bạn.',
+      'community.displayName': 'Tên hiển thị',
+      'community.namePlaceholder': 'Tên bạn muốn hiện với mọi người',
+      'community.email': 'Email',
+      'community.password': 'Mật khẩu',
+      'community.passwordPlaceholder': 'Ít nhất 8 ký tự',
+      'community.togglePassword': 'Hiện/ẩn mật khẩu',
+      'community.signIn': 'Đăng nhập',
+      'community.register': 'Đăng ký',
+      'community.toRegister': 'Chưa có tài khoản? Đăng ký',
+      'community.toLogin': 'Đã có tài khoản? Đăng nhập',
+      'community.restaurants': 'Quán <em>cộng đồng</em>',
+      'community.post': '＋ Đăng quán',
+      'community.searchPlaceholder': '🔎 Tìm theo tên, thẻ, hashtag…',
+      // ── Tab bar ──
+      'tab.profile': 'Cá nhân', 'tab.community': 'Cộng đồng',
+      // ── Common (dùng lại khắp modal) ──
+      'common.close': 'Đóng', 'common.cancel': 'Huỷ',
+      'common.openMaps': '🗺 Mở Google Maps',
+      // ── Trip history modal ──
+      'trips.title': 'Chuyến <em>ăn đã đi</em>',
+      'trips.replay': '🔁 Đi lại',
+      'trips.replayTitle': 'Đi lại lộ trình này, bắt đầu từ vị trí hiện tại',
+      'trips.needGps': '📍 Cần bật GPS hoặc chọn vị trí hiện tại trước đã',
+      'empty.notFound': 'Chưa tìm thấy "{q}" trong dữ liệu app',
+      'empty.tapBelow': 'Bấm nút dưới để tìm trực tiếp trên Google Maps',
+      'empty.findOnMaps': '🗺️ Tìm "{q}" trên Google Maps',
+      'empty.noneInCategory': 'Không có quán loại này<br>trong bán kính tìm kiếm',
+      'banner.wrongResult': '🗺️ Chưa đúng "{q}"? Tìm chính xác trên Google Maps →',
+      'trips.count': '{n} chuyến',
+      'trips.empty': 'Chưa có chuyến nào',
+      'trips.emptySub': 'Quét quán → chọn vài chỗ → nhấn "Lên lịch" để tạo chuyến đầu tiên',
+      'trips.today': 'Hôm nay', 'trips.yesterday': 'Hôm qua',
+      'trips.noAddress': 'Chưa có địa chỉ',
+      // ── Community add modal ──
+      'addQuan.title': 'Đăng quán <em>cộng đồng</em> 👥',
+      'addQuan.sub': 'Chia sẻ quán ngon cho cả nhóm',
+      'addQuan.name': 'Tên quán',
+      'addQuan.namePlaceholder': 'VD: Bún bò Huế Bà Khế',
+      'addQuan.category': 'Loại quán',
+      'addQuan.priceRange': 'Mức giá',
+      'addQuan.visibility': 'Độ mở',
+      'addQuan.desc': 'Mô tả',
+      'addQuan.descPlaceholder': 'Món đặc trưng, view quán, lưu ý gì đó cho cả nhóm…',
+      'addQuan.location': 'Vị trí quán',
+      'addQuan.locPlaceholder': "VD: 16 Trần Hưng Đạo · hoặc chỉ 'phố + quận'",
+      'addQuan.pickerHint': 'Chọn dropdown nếu có · hoặc nhấn thẳng lên bản đồ',
+      'addQuan.tags': 'Thẻ', 'addQuan.tagsHint': '(vd: ăn nhẹ, nhẹ bụng…)',
+      'addQuan.tagPlaceholder': 'Gõ thẻ rồi nhấn Enter…',
+      'addQuan.hashtags': 'Hashtag', 'addQuan.hashtagsHint': '(để dễ tìm kiếm)',
+      'addQuan.hashtagPlaceholder': 'Gõ hashtag rồi nhấn Enter…',
+      'addQuan.photos': 'Ảnh quán', 'addQuan.photosHint': '(tối đa 4 · nhấn ⭐ để chọn ảnh đại diện)',
+      'addQuan.addPhoto': 'Thêm ảnh',
+      'addQuan.submit': '📤 Đăng quán',
+      // ── Account modal ──
+      'account.title': 'Tài khoản <em>của tôi</em>',
+      'account.avatar': 'Avatar',
+      'account.loggedOutHint': 'Đăng nhập ở tab Cộng đồng để xem bạn bè và quán bạn đã đăng.',
+      'account.hello': 'Chào <em>bạn</em>',
+      'account.helloName': 'Chào <em>{name}</em>',
+      'account.communitySub': 'Cộng đồng nhỏ — cùng nhau chọn quán',
+      'account.signOut': 'Đăng xuất',
+      'account.friends': 'Bạn <em>bè</em>',
+      'account.friendsHint': 'Quán bạn đăng ở chế độ "Bạn bè" sẽ chỉ hiện với những người bạn thêm ở đây.',
+      'account.friendSearchPlaceholder': '🔎 Tìm theo tên hoặc email…',
+      'account.language': 'Ngôn ngữ',
+    },
+    en: {
+      'ribbon.eat': "LET'S EAT", 'ribbon.good': 'GOOD FOOD', 'ribbon.near': 'NEARBY',
+      'hero.tagline': 'roaming around with <em>Vinh</em> & <em>Thảo</em> ♥',
+      'hero.sub': 'Random great food · Auto-scheduling',
+      'hero.badge': '✦ Scan to find',
+      'scanning.text': 'Finding great food…',
+      'catLabel.restaurant': 'Restaurant', 'catLabel.street': 'Street food',
+      'catLabel.snack': 'Snacks', 'catLabel.cafe': 'Café',
+      'priceLabel.cheap': 'Budget', 'priceLabel.mid': 'Mid-range', 'priceLabel.premium': 'Upscale',
+      'visLabel.private': 'Private', 'visLabel.friends': 'Friends', 'visLabel.public': 'Public',
+      'src.mine': 'Mine', 'src.community': 'Community',
+      'filter.all': 'All',
+      'home.wantToEat': 'I want to eat',
+      'home.findDish': 'Find <em>dish / restaurant</em> · optional',
+      'home.dishPlaceholder': 'e.g. phở, bánh mì, restaurant name… (blank = any dish)',
+      'home.clearDish': 'Clear dish filter',
+      'home.radius': 'Search radius',
+      'home.advancedFilters': '⚙️ <em>Advanced</em> filters',
+      'home.dataSource': 'Data source',
+      'home.rating': 'Rating',
+      'home.startPoint': 'Starting point',
+      'home.locPlaceholder': 'Type address, street, restaurant… or use GPS',
+      'home.gpsTitle': 'Enable GPS · hold to track continuously',
+      'home.scanNow': '🔍 Scan <em>now</em>!',
+      'results.nearby': 'Nearby restaurants',
+      'results.nCount': '{n} nearby restaurants',
+      'results.notScanned': '📌 Not scanned yet',
+      'results.reshuffle': '🔀 Reshuffle',
+      'results.schedule': 'Schedule',
+      'results.scheduleN': '📋 Schedule {n} selected',
+      'plan.title': "Today's itinerary",
+      'plan.stops': '{n} stops',
+      'plan.motorbike': 'Motorbike',
+      'plan.hoursWarn': '⚠️ This place may be closed by the time you arrive · {detail}',
+      'plan.depart': 'Depart · {time}',
+      'plan.travelMin': '{min} min travel',
+      'plan.distMoto': '{dist} · motorbike',
+      'plan.dwellLabel': '⏱ Time here:',
+      'plan.arriveDepart': 'Arrive {a} → Leave {b}',
+      'plan.endTrip': 'Trip ends · {time}',
+      'plan.minAbbr': '{n}min',
+      'profile.tapAccount': 'Tap to open account',
+      'profile.namePlaceholder': 'Your name…',
+      'profile.tagline': 'Foodie fan 🍴',
+      'profile.statMyR.title': 'View my restaurant list',
+      'profile.statScore.title': 'Total stars earned on your posted restaurants',
+      'profile.statTrips.title': 'Number of scheduled food trips',
+      'profile.statFav.title': 'Your most-picked category',
+      'profile.statMyR.lbl': 'MY PLACES', 'profile.statScore.lbl': '★ SCORE',
+      'profile.statTrips.lbl': 'TRIPS', 'profile.statFav.lbl': 'FAVORITE',
+      'profile.prefs': '<em>Preferences</em>',
+      'profile.myRestaurants': '<em>My</em> restaurants',
+      'profile.dataSection': '<em>Data</em>',
+      'profile.exportData': '📤 Export data', 'profile.importData': '📥 Import data',
+      'profile.geminiHint': 'Find restaurants smartly with AI. A shared key is included by default — use your own key for unlimited requests.',
+      'profile.keyPlaceholder': 'Paste your API key (optional)…',
+      'profile.toggleKey': 'Show/hide key',
+      'profile.saveKey': '💾 Save key', 'profile.clearKey': '↺ Use default key',
+      'profile.getKey': 'Get a free key at Google AI Studio →',
+      'community.title': '<em>Community</em>',
+      'community.signInHint': 'Sign in to see restaurants shared by the group and post your own.',
+      'community.displayName': 'Display name',
+      'community.namePlaceholder': 'Name everyone will see',
+      'community.email': 'Email',
+      'community.password': 'Password',
+      'community.passwordPlaceholder': 'At least 8 characters',
+      'community.togglePassword': 'Show/hide password',
+      'community.signIn': 'Sign in',
+      'community.register': 'Sign up',
+      'community.toRegister': "Don't have an account? Sign up",
+      'community.toLogin': 'Already have an account? Sign in',
+      'community.restaurants': '<em>Community</em> restaurants',
+      'community.post': '＋ Post a place',
+      'community.searchPlaceholder': '🔎 Search by name, tag, hashtag…',
+      'tab.profile': 'Profile', 'tab.community': 'Community',
+      'common.close': 'Close', 'common.cancel': 'Cancel',
+      'common.openMaps': '🗺 Open Google Maps',
+      'trips.title': '<em>Past</em> trips',
+      'trips.replay': '🔁 Replay',
+      'trips.replayTitle': 'Redo this itinerary, starting from your current location',
+      'trips.needGps': '📍 Enable GPS or pick a current location first',
+      'empty.notFound': 'Couldn\'t find "{q}" in the app\'s data',
+      'empty.tapBelow': 'Tap below to search directly on Google Maps',
+      'empty.findOnMaps': '🗺️ Search "{q}" on Google Maps',
+      'empty.noneInCategory': 'No restaurants in this category<br>within the search radius',
+      'banner.wrongResult': '🗺️ Not quite "{q}"? Find the exact place on Google Maps →',
+      'trips.count': '{n} trips',
+      'trips.empty': 'No trips yet',
+      'trips.emptySub': 'Scan for places → pick a few → tap "Schedule" to make your first trip',
+      'trips.today': 'Today', 'trips.yesterday': 'Yesterday',
+      'trips.noAddress': 'No address yet',
+      'addQuan.title': 'Post a <em>community</em> place 👥',
+      'addQuan.sub': 'Share a great place with the group',
+      'addQuan.name': 'Restaurant name',
+      'addQuan.namePlaceholder': 'e.g. Bún Bò Huế Bà Khế',
+      'addQuan.category': 'Category',
+      'addQuan.priceRange': 'Price range',
+      'addQuan.visibility': 'Visibility',
+      'addQuan.desc': 'Description',
+      'addQuan.descPlaceholder': 'Signature dish, view, any notes for the group…',
+      'addQuan.location': 'Location',
+      'addQuan.locPlaceholder': "e.g. 16 Trần Hưng Đạo · or just 'street + district'",
+      'addQuan.pickerHint': 'Pick from the dropdown if shown · or tap directly on the map',
+      'addQuan.tags': 'Tags', 'addQuan.tagsHint': '(e.g. light meal, quick bite…)',
+      'addQuan.tagPlaceholder': 'Type a tag then press Enter…',
+      'addQuan.hashtags': 'Hashtags', 'addQuan.hashtagsHint': '(to help others find it)',
+      'addQuan.hashtagPlaceholder': 'Type a hashtag then press Enter…',
+      'addQuan.photos': 'Photos', 'addQuan.photosHint': '(up to 4 · tap ⭐ to set the cover photo)',
+      'addQuan.addPhoto': 'Add photo',
+      'addQuan.submit': '📤 Post',
+      'account.title': '<em>My</em> account',
+      'account.avatar': 'Avatar',
+      'account.loggedOutHint': 'Sign in on the Community tab to see friends and your posted restaurants.',
+      'account.hello': 'Hello <em>there</em>',
+      'account.helloName': 'Hello <em>{name}</em>',
+      'account.communitySub': 'A small community — picking places together',
+      'account.signOut': 'Sign out',
+      'account.friends': '<em>Friends</em>',
+      'account.friendsHint': 'Restaurants you post as "Friends" will only show to people you add here.',
+      'account.friendSearchPlaceholder': '🔎 Search by name or email…',
+      'account.language': 'Language',
+    },
+  },
+};

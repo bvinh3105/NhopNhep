@@ -893,6 +893,8 @@ body.map-full .tabbar{transform:translateY(105%)}
 #cfPricePicker .cat-pick-btn.active{background:var(--accent);border-color:var(--accent-2);box-shadow:2px 2px 0 var(--accent-2)}
 /* Visibility picker — same reuse, keys off data-vis */
 #cfVisibilityPicker .cat-pick-btn.active{background:var(--text2);border-color:var(--text);box-shadow:2px 2px 0 var(--text)}
+/* Language picker (Account modal) — same reuse, keys off data-lang */
+#langPicker .cat-pick-btn.active{background:var(--primary);border-color:var(--primary-2);box-shadow:2px 2px 0 var(--primary-2)}
 
 /* Map "chọn vị trí" của modal đăng quán cộng đồng — thêm selector ở đây nếu
    sau này có picker thứ 2 (modal thêm-quán cũ, chỉ lưu local, đã gỡ). */
