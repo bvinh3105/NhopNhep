@@ -145,8 +145,8 @@ ${regionHint}
 Người dùng đang tìm: "${q}" — gần toạ độ GPS ${lat}, ${lng} (trong bán kính ${searchRadiusKm}km).
 
 Xác định "${q}" là TÊN MÓN hay TÊN QUÁN cụ thể:
-- Nếu là TÊN MÓN (vd: bánh canh, phở, tom yum, nasi goreng) → trả các quán bán món đó.
-- Nếu là TÊN QUÁN / THƯƠNG HIỆU (kể cả gõ tắt/viết thường, vd "brave", "highlands") → kết quả ĐẦU TIÊN phải là quán CÓ THẬT khớp nhất, với "name" là TÊN ĐẦY ĐỦ CHÍNH THỨC ĐÚNG như trên Google Maps (vd gõ "brave" → name "Brave Coffee Brewers"; gõ "highlands" → "Highlands Coffee"). Viết hoa đúng chuẩn, KHÔNG để nguyên chữ người dùng gõ, KHÔNG bịa quán khác tên na ná (vd KHÔNG trả "Brave Roastery" khi họ tìm Brave Coffee Brewers). Nếu không chắc chắn quán đó có thật ở đúng vị trí này không, đừng bịa — bỏ qua kết quả đó thay vì đoán liều.
+- Nếu là TÊN MÓN (vd: bánh canh, phở, tom yum, nasi goreng, lẩu) → liệt kê CÀNG NHIỀU quán CÓ THẬT, đang hoạt động, bán/phục vụ món đó gần toạ độ này CÀNG TỐT — mục tiêu 10-15+ quán nếu khu vực đủ đông đúc (giống mức độ đầy đủ như tìm trên Google Maps, đừng chỉ liệt kê vài quán nổi tiếng nhất rồi dừng). Đây KHÔNG phải tra tên thương hiệu cụ thể nên không cần chắc chắn tuyệt đối từng quán — chỉ cần là quán ăn thật sự tồn tại ở khu vực này và nhiều khả năng có bán món này (theo loại hình/tên quán/ẩm thực đặc trưng khu vực), không cần bỏ qua chỉ vì không chắc 100%.
+- Nếu là TÊN QUÁN / THƯƠNG HIỆU cụ thể (kể cả gõ tắt/viết thường, vd "brave", "highlands") → kết quả ĐẦU TIÊN phải là quán CÓ THẬT khớp nhất, với "name" là TÊN ĐẦY ĐỦ CHÍNH THỨC ĐÚNG như trên Google Maps (vd gõ "brave" → name "Brave Coffee Brewers"; gõ "highlands" → "Highlands Coffee"). Viết hoa đúng chuẩn, KHÔNG để nguyên chữ người dùng gõ, KHÔNG bịa quán khác tên na ná (vd KHÔNG trả "Brave Roastery" khi họ tìm Brave Coffee Brewers). Nếu không chắc chắn quán đó có thật ở đúng vị trí này không, đừng bịa — bỏ qua kết quả đó thay vì đoán liều. (Lưu ý: mức độ thận trọng này CHỈ áp dụng cho tra tên thương hiệu cụ thể, KHÔNG áp dụng cho trường hợp TÊN MÓN ở trên.)
 
 Sau kết quả đầu, mới liệt kê chi nhánh / quán liên quan. Trả tối đa ${opts.limit || 20} kết quả, khớp nhất xếp trước. Nếu không có quán nào khớp, trả [].
 
@@ -167,9 +167,13 @@ Trả về JSON THUẦN (không markdown, không giải thích):
 Quy tắc: lat/lng gần đúng khu vực quán. address ghi rõ tên đường/phố + khu vực theo cách viết địa phương. rating từ 3.5 đến 5.0. Chỉ trả JSON array.`;
     }
 
-    // Lower temperature for a specific query → less creative name drift
-    // (stops "Brave Coffee Brewers" turning into "Brave Roastery").
-    const callOpts = { wantJson: true, temperature: q ? 0.1 : 0.4, maxTokens: 4096, timeout: 11000 };
+    // Lower temperature for a named query → less creative name drift (stops
+    // "Brave Coffee Brewers" turning into "Brave Roastery"). Not as low as
+    // before (0.1) — that also suppressed recall on plain DISH searches
+    // (e.g. "lẩu" only returning 5 quán vs 13-15 on Google Maps for the same
+    // spot), since the same low-temperature caution meant for exact brand
+    // names was bleeding into "just list every real quán serving this dish".
+    const callOpts = { wantJson: true, temperature: q ? 0.3 : 0.4, maxTokens: 4096, timeout: 11000 };
 
     // Try once, retry once on FAST transient failures (parse error, empty,
     // 429 rate-limit). Do NOT retry a timeout — a second 11s wait would

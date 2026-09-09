@@ -259,17 +259,23 @@ const HomeCtrl = {
 
       let raceResult;
       if (dishQuery && useGemini) {
-        // ── DISH SEARCH: only Gemini understands a specific dish. OSM
-        //    returns generic nearby quán and would win the race with
-        //    useless results, so we WAIT for Gemini and only fall back
-        //    to OSM if Gemini comes back empty. ─────────────────────────
-        const g = await geminiP;
-        if (g.length) {
-          raceResult = { items: g, source: 'gemini' };
-        } else {
-          const o = await osmP;
-          raceResult = { items: o, source: o.length ? 'osm' : 'none' };
-        }
+        // ── DISH SEARCH: Gemini recalls real, well-known places for the
+        //    dish (from model knowledge, not a live search index — its
+        //    coverage of a common dish like "lẩu" is real but incomplete,
+        //    e.g. it found 5 while Google Maps' actual index shows 13-15
+        //    for the same spot). Rather than treating Gemini vs OSM as
+        //    either/or, ALWAYS also text-match OSM's real indexed listings
+        //    against the dish name — a lot of Vietnamese quán literally
+        //    have the dish in their name ("Lẩu Phan", "Lẩu Bò Tơ...") so
+        //    OSM catches genuine places Gemini's recall missed — then
+        //    merge, deduped by name, so coverage is the union of both
+        //    instead of capped at whichever one "won". ───────────────────
+        const [g, o] = await Promise.all([geminiP, osmP]);
+        const dishTokens = this._strip(dishQuery).split(/\s+/).filter(Boolean);
+        const gNames = new Set(g.map(r => this._strip(r.name)));
+        const oMatched = o.filter(r => this._dishMatches(r, dishTokens) && !gNames.has(this._strip(r.name)));
+        const merged = [...g, ...oMatched];
+        raceResult = { items: merged, source: merged.length ? (g.length ? 'gemini' : 'osm') : 'none' };
       } else {
         // ── GENERAL SEARCH: race both, first non-empty wins (fastest UX)
         raceResult = await new Promise(resolve => {
@@ -299,13 +305,18 @@ const HomeCtrl = {
 
     State.osmRestaurants = items;
     State.lastScanSource = source;
+    // Data-source name is intentionally dev-only (devtools console) — never
+    // shown in the UI. Users shouldn't need to know/care which map backend
+    // answered a given scan.
+    console.debug('[scan] source:', source, '· items:', items.length);
     ov.style.display = 'none';
     this._scanning = false;
 
     // ── Toast kết quả ───────────────────────────────────────────────────
     if (items.length) {
-      const srcLabel = source === 'gemini' ? '✨ Gemini' : '🗺️ OSM';
-      showToast(I18N.t('toast.foundN', { n: items.length, src: srcLabel }), 2200);
+      showToast(source === 'gemini'
+        ? I18N.t('toast.foundN', { n: items.length, src: '✨ Gemini' })
+        : I18N.t('toast.foundNPlain', { n: items.length }), 2200);
     } else if (State.activeSrcs.has('osm')) {
       // Nothing came back from either source
       const geminiOn = typeof Gemini !== 'undefined' && Gemini.isConfigured();
@@ -483,10 +494,12 @@ const ResultsCtrl = {
   _updateHeader() {
     const n = State.filteredResults.length;
     document.getElementById('resultsTitle').textContent = I18N.t('results.nCount', { n });
+    // Data-source name is dev-only info (see console.debug in scan()) — the
+    // OSM case intentionally shows no source suffix here, just the radius.
     const src = State.lastScanSource === 'gemini' ? '✨ Google Maps (Gemini)'
-      : State.lastScanSource === 'osm' ? '🌐 OpenStreetMap'
+      : State.lastScanSource === 'osm' ? ''
       : I18N.t('results.notScanned');
-    document.getElementById('resultsSub').textContent = `${fmtDist(State.radius)} · ${src}`;
+    document.getElementById('resultsSub').textContent = src ? `${fmtDist(State.radius)} · ${src}` : fmtDist(State.radius);
   },
   _setTabFilter(filter) {
     State.tabFilter = filter;
@@ -576,7 +589,11 @@ const ResultsCtrl = {
       const isOsm = r.id >= 1e13 && !isGemini;
       const flagCls = userAdded ? ' user-added' : (isGemini ? ' gemini-added' : (isOsm ? ' osm-added' : ''));
       const priceLabel = r.price && r.price !== '—' ? `💰 ${r.price}` : '💰 —';
-      const ratingLabel = isGemini ? `${r.rating.toFixed(1)} ★` : (isOsm ? '🌐 OSM' : `${r.rating} ★`);
+      // No real rating for OSM-sourced places — show a neutral "no data"
+      // dash (matches the existing '💰 —' convention below) instead of
+      // naming the data source; that stays dev-only (osm-added CSS class
+      // + console.debug in scan()), never surfaced as text to users.
+      const ratingLabel = isGemini ? `${r.rating.toFixed(1)} ★` : (isOsm ? '★ —' : `${r.rating} ★`);
       const hoursBadge = this._renderHoursBadge(r);
       return `<div class="r-card${sel?' selected':''}${flagCls}" data-id="${r.id}" style="animation-delay:${Math.min(i,10)*30}ms" role="button" tabindex="0" title="${I18N.t('card.tapDetail')}">
         <button class="r-check" data-id="${r.id}" title="${I18N.t('card.selectAdd')}" aria-label="${I18N.t('card.select')}" aria-pressed="${sel?'true':'false'}">✓</button>
