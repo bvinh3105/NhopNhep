@@ -21,10 +21,10 @@ const GPS = {
   },
 
   toggle() {
-    if (!navigator.geolocation) { showToast('⚠️ Trình duyệt không hỗ trợ GPS'); return; }
+    if (!navigator.geolocation) { showToast(I18N.t('toast.gpsNotSupported')); return; }
     if (!this.isSecure()) {
-      this.hint('⚠️ GPS cần HTTPS. Vui lòng dùng https:// hoặc localhost', 'warn');
-      showToast('⚠️ GPS chỉ hoạt động qua HTTPS!');
+      this.hint(I18N.t('gps.httpsHint'), 'warn');
+      showToast(I18N.t('gps.httpsToast'));
       return;
     }
     if (this._tracking) {
@@ -39,7 +39,7 @@ const GPS = {
     const btn = document.getElementById('gpsBtn');
     btn.textContent = '⏳';
     btn.classList.remove('active');
-    this.hint('🛰 Đang bật GPS…');
+    this.hint(I18N.t('gps.turningOn'));
     this._sessionFirstFix = true;
     this._watchId = navigator.geolocation.watchPosition(
       pos => this._onPosition(pos),
@@ -60,7 +60,7 @@ const GPS = {
     btn.classList.add('active');
     btn.textContent = '📍';
     MapHome.clearAccuracyCircle();
-    this.hint('✋ Đã dừng theo dõi vị trí', '');
+    this.hint(I18N.t('gps.stopped'), '');
     setTimeout(() => this.hint(''), 2500);
     if (State.userLat) MapHome.setUserLocation(State.userLat, State.userLng, null, { tracking:false });
   },
@@ -73,7 +73,7 @@ const GPS = {
     MapHome.setUserLocation(lat, lng, accuracy, { center: shouldCenter, tracking: true });
     
     // Reverse geocode optionally or just show coordinates
-    document.getElementById('locInput').value = `📍 Vị trí GPS của bạn`;
+    document.getElementById('locInput').value = I18N.t('gps.yourLocation');
 
     const btn = document.getElementById('gpsBtn');
     btn.textContent = '📍';
@@ -82,23 +82,23 @@ const GPS = {
 
     let hintCls = 'tracking';
     let msg;
-    if (accuracy <= 20) msg = `🎯 Chính xác cao · ±${Math.round(accuracy)}m`;
-    else if (accuracy <= 100) msg = `📡 Đang bắt sóng · ±${Math.round(accuracy)}m`;
-    else { msg = `⚠️ Tín hiệu yếu · ±${Math.round(accuracy)}m — ra chỗ thoáng`; hintCls = 'warn'; }
+    if (accuracy <= 20) msg = I18N.t('gps.highAccuracy', { n: Math.round(accuracy) });
+    else if (accuracy <= 100) msg = I18N.t('gps.acquiring', { n: Math.round(accuracy) });
+    else { msg = I18N.t('gps.weakSignal', { n: Math.round(accuracy) }); hintCls = 'warn'; }
     this.hint(msg, hintCls);
 
-    if (shouldCenter) showToast('✅ Đã bật GPS · theo dõi liên tục');
+    if (shouldCenter) showToast(I18N.t('gps.enabledToast'));
   },
 
   _onError(err) {
     const msgs = {
-      1: '🚫 Bạn đã từ chối quyền truy cập vị trí',
-      2: '⚠️ Không lấy được vị trí — kiểm tra GPS/mạng',
-      3: '⏱ Timeout — thử ra chỗ thoáng',
+      1: I18N.t('gps.err.denied'),
+      2: I18N.t('gps.err.unavailable'),
+      3: I18N.t('gps.err.timeout'),
     };
-    const msg = msgs[err.code] || '⚠️ Lỗi GPS';
+    const msg = msgs[err.code] || I18N.t('gps.err.generic');
     showToast(msg);
-    this.hint(msg + ' · nhấn 📍 để thử lại', 'warn');
+    this.hint(msg + I18N.t('gps.retryHint'), 'warn');
     this.stopTracking();
   },
 
@@ -108,7 +108,7 @@ const GPS = {
       pos => {
         const {latitude:lat, longitude:lng, accuracy} = pos.coords;
         MapHome.setUserLocation(lat, lng, accuracy, { center:true, tracking:false });
-        document.getElementById('locInput').value = `📍 Vị trí GPS của bạn`;
+        document.getElementById('locInput').value = I18N.t('gps.yourLocation');
         document.getElementById('gpsBtn').classList.add('active');
       },
       () => {},

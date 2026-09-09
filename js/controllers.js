@@ -8,7 +8,7 @@ const HomeCtrl = {
       if (!chip) return;
       const cat = chip.dataset.cat;
       if (State.activeCats.has(cat)) {
-        if (State.activeCats.size === 1) { showToast('Chọn ít nhất 1 loại nhé!'); return; }
+        if (State.activeCats.size === 1) { showToast(I18N.t('toast.needOneCat')); return; }
         State.activeCats.delete(cat);
         chip.classList.remove('active');
       } else {
@@ -33,11 +33,11 @@ const HomeCtrl = {
       if (!chip) return;
       const src = chip.dataset.src;
       if (src === 'community') {
-        showToast('👥 Sắp có · cần backend cho ratings cộng đồng');
+        showToast(I18N.t('toast.ratingSoon'));
         return;
       }
       if (State.activeSrcs.has(src)) {
-        if (State.activeSrcs.size === 1) { showToast('Chọn ít nhất 1 nguồn nhé!'); return; }
+        if (State.activeSrcs.size === 1) { showToast(I18N.t('toast.needOneSrc')); return; }
         State.activeSrcs.delete(src);
         chip.classList.remove('active');
       } else {
@@ -159,7 +159,7 @@ const HomeCtrl = {
   _updateBadge() {
     const badge = document.getElementById('scanCountBadge');
     const total = allRestaurants().length;
-    badge.textContent = total > 0 ? `✦ ${total} quán` : '✦ Quét để tìm';
+    badge.textContent = total > 0 ? I18N.t('hero.badgeCount', { n: total }) : I18N.t('hero.badge');
   },
 
   _scanning: false,
@@ -181,12 +181,12 @@ const HomeCtrl = {
     // Consider "default HCMC" as unset — check if it's still the boot placeholder
     const isDefault = locInput && locInput.value.startsWith('📌');
     if (isDefault && typedQ.length < 3) {
-      showToast('📍 Gõ địa chỉ hoặc bật GPS trước nhé!');
+      showToast(I18N.t('toast.typeAddrOrGps'));
       return;
     }
     if (isDefault || !State.userLat) {
       if (typedQ.length >= 3) {
-        showToast('🔍 Đang tìm vị trí…', 1500);
+        showToast(I18N.t('toast.findingLocation'), 1500);
         const results = await Geocoder.search(typedQ.replace(/^📌\s*/, ''), { nearLat: State.userLat, nearLng: State.userLng });
         if (results.length) {
           MapHome.setUserLocation(results[0].lat, results[0].lng, null, { center: true });
@@ -195,7 +195,7 @@ const HomeCtrl = {
         }
       }
       if (!State.userLat || isDefault) {
-        showToast('📍 Dùng GPS hoặc nhập địa chỉ (nhấn Enter) trước nhé!');
+        showToast(I18N.t('toast.useGpsOrAddr'));
         return;
       }
     }
@@ -207,7 +207,7 @@ const HomeCtrl = {
       State.osmRestaurants = hit.items;
       State.lastScanSource = hit.source;
       this._doScan();
-      showToast('⚡ Từ cache · bấm 🔀 để quét lại', 1800);
+      showToast(I18N.t('toast.fromCache'), 1800);
       return;
     }
 
@@ -231,9 +231,7 @@ const HomeCtrl = {
         Gemini.isConfigured();
 
       // Animated status while waiting
-      const statusMsgs = useGemini
-        ? ['✨ Gemini + 🗺️ OSM đang tìm song song…', '🔍 Đang tìm quán gần bạn…', '✨ Hỏi Gemini AI…', '🗺️ Quét bản đồ…', '⏳ Sắp có kết quả rồi…']
-        : ['🗺️ OSM đang quét quanh bạn…', '🔍 Đang tìm quán…', '⏳ Sắp xong rồi…'];
+      const statusMsgs = (useGemini ? I18N.t('scan.loadingMsgsGemini') : I18N.t('scan.loadingMsgsOsm')).split('|');
       let msgIdx = 0;
       setTxt(statusMsgs[0]);
       const statusTick = setInterval(() => {
@@ -245,9 +243,9 @@ const HomeCtrl = {
       const scanStart = performance.now();
       const elapsedTick = setInterval(() => {
         const s = Math.floor((performance.now() - scanStart) / 1000);
-        setSubTxt(`⏱ ${s}s · tối đa 20s`);
+        setSubTxt(I18N.t('scan.subTick', { s }));
       }, 1000);
-      setSubTxt('⏱ 0s · tối đa 20s');
+      setSubTxt(I18N.t('scan.subTick', { s: 0 }));
 
       const dishQuery = (State.activeDish || '').trim();
       const geminiP = useGemini
@@ -307,14 +305,14 @@ const HomeCtrl = {
     // ── Toast kết quả ───────────────────────────────────────────────────
     if (items.length) {
       const srcLabel = source === 'gemini' ? '✨ Gemini' : '🗺️ OSM';
-      showToast(`✅ Tìm thấy ${items.length} quán (${srcLabel})`, 2200);
+      showToast(I18N.t('toast.foundN', { n: items.length, src: srcLabel }), 2200);
     } else if (State.activeSrcs.has('osm')) {
       // Nothing came back from either source
       const geminiOn = typeof Gemini !== 'undefined' && Gemini.isConfigured();
       if (!geminiOn) {
-        showToast('🔑 Chưa có Gemini key · vào Cá nhân thêm key để tìm quán thông minh', 4000);
+        showToast(I18N.t('toast.noGeminiKey'), 4000);
       } else {
-        showToast('😕 Không tìm thấy quán · thử tăng bán kính hoặc đổi vị trí', 3500);
+        showToast(I18N.t('toast.noResults'), 3500);
       }
     }
 
@@ -373,7 +371,7 @@ const HomeCtrl = {
       input.value = '';
       State.activeDish = '';
       syncChips();
-      showToast('🍽️ Đã xoá bộ lọc món');
+      showToast(I18N.t('toast.dishFilterCleared'));
       input.focus();
     });
 
@@ -430,7 +428,7 @@ const HomeCtrl = {
         return true;
       });
       if (fallback.length) {
-        showToast(`🔍 Không tìm thấy "${State.activeDish}" cụ thể · hiện ${fallback.length} quán gần đây`, 3000);
+        showToast(I18N.t('toast.dishNotFoundFallback', { q: State.activeDish, n: fallback.length }), 3000);
         results.push(...fallback);
       }
     }
@@ -448,9 +446,9 @@ const HomeCtrl = {
         this._updateBadge();
         return;
       }
-      let hint = 'Thử tăng bán kính hoặc bật GPS ở vị trí khác';
-      if (!State.activeSrcs.has('osm')) hint = 'Bật 🌐 OpenStreetMap để tìm quán';
-      showToast(`🤔 Không tìm thấy quán · ${hint}`);
+      let hint = I18N.t('hint.tryRadiusOrGps');
+      if (!State.activeSrcs.has('osm')) hint = I18N.t('hint.enableOsm');
+      showToast(I18N.t('toast.noResultsHint', { hint }));
       MapHome.showRestaurants([]);
       return;
     }
@@ -580,8 +578,8 @@ const ResultsCtrl = {
       const priceLabel = r.price && r.price !== '—' ? `💰 ${r.price}` : '💰 —';
       const ratingLabel = isGemini ? `${r.rating.toFixed(1)} ★` : (isOsm ? '🌐 OSM' : `${r.rating} ★`);
       const hoursBadge = this._renderHoursBadge(r);
-      return `<div class="r-card${sel?' selected':''}${flagCls}" data-id="${r.id}" style="animation-delay:${Math.min(i,10)*30}ms" role="button" tabindex="0" title="Nhấn để xem chi tiết">
-        <button class="r-check" data-id="${r.id}" title="Chọn để thêm vào lịch trình" aria-label="Chọn" aria-pressed="${sel?'true':'false'}">✓</button>
+      return `<div class="r-card${sel?' selected':''}${flagCls}" data-id="${r.id}" style="animation-delay:${Math.min(i,10)*30}ms" role="button" tabindex="0" title="${I18N.t('card.tapDetail')}">
+        <button class="r-check" data-id="${r.id}" title="${I18N.t('card.selectAdd')}" aria-label="${I18N.t('card.select')}" aria-pressed="${sel?'true':'false'}">✓</button>
         <div class="r-cat-badge" style="background:${cat.color}22;color:${cat.color}">${cat.icon} ${cat.label}</div>
         <div class="r-name">${escapeHtml(r.name)}</div>
         ${hoursBadge}
@@ -614,14 +612,14 @@ const ResultsCtrl = {
         HomeCtrl._scanCache.delete(HomeCtrl._cacheKey());
         document.getElementById('resultsScreen').classList.add('hidden');
         document.getElementById('homeScreen').classList.remove('hidden');
-        showToast('🔄 Đang quét lại từ API…');
+        showToast(I18N.t('toast.rescanning'));
         setTimeout(() => HomeCtrl.scan(), 200);
         return;
       }
       this._lastShuffle = now;
       State.filteredResults = shuffle(State.filteredResults);
       this._applyFilters();
-      showToast('🔀 Xáo lại · nhấn lại nhanh để quét mới');
+      showToast(I18N.t('toast.reshuffleHint'));
     });
     document.getElementById('catTabs').addEventListener('click', e => {
       const tab = e.target.closest('.cat-tab');
@@ -639,7 +637,7 @@ const ResultsCtrl = {
         e.stopPropagation();
         const nowSelected = !State.selected.has(id);
         if (nowSelected) {
-          if (State.selected.size >= 6) { showToast('Tối đa 6 quán mỗi chuyến 😄'); return; }
+          if (State.selected.size >= 6) { showToast(I18N.t('toast.maxSelected')); return; }
           State.selected.add(id);
           card.classList.add('selected');
         } else {
@@ -958,11 +956,11 @@ const PlanCtrl = {
     ctrl = document.createElement('div');
     ctrl.className = 'pmap-controls';
     ctrl.innerHTML = `
-      <button class="pmap-btn" id="pmapZoomIn" title="Phóng to">＋</button>
-      <button class="pmap-btn" id="pmapZoomOut" title="Thu nhỏ">－</button>
-      <button class="pmap-btn pmap-fit" id="pmapFit" title="Xem toàn lộ trình">⤢</button>
-      <button class="pmap-btn pmap-locate" id="pmapLocate" title="Vị trí của tôi (realtime)">📍</button>
-      <button class="pmap-btn pmap-fs" id="pmapFs" title="Toàn màn hình">⛶</button>
+      <button class="pmap-btn" id="pmapZoomIn" title="${I18N.t('pmap.zoomIn')}">＋</button>
+      <button class="pmap-btn" id="pmapZoomOut" title="${I18N.t('pmap.zoomOut')}">－</button>
+      <button class="pmap-btn pmap-fit" id="pmapFit" title="${I18N.t('pmap.fitRoute')}">⤢</button>
+      <button class="pmap-btn pmap-locate" id="pmapLocate" title="${I18N.t('pmap.myLocation')}">📍</button>
+      <button class="pmap-btn pmap-fs" id="pmapFs" title="${I18N.t('pmap.fullscreen')}">⛶</button>
     `;
     wrap.appendChild(ctrl);
     document.getElementById('pmapZoomIn').addEventListener('click', () => State.planMap.zoomIn());
@@ -979,7 +977,7 @@ const PlanCtrl = {
     startBtn.className = 'pmap-start-btn';
     startBtn.id = 'pmapStart';
     startBtn.type = 'button';
-    startBtn.setAttribute('aria-label', 'Bắt đầu dẫn đường');
+    startBtn.setAttribute('aria-label', I18N.t('nav.startAria'));
     startBtn.innerHTML = `
       <svg viewBox="0 0 24 24" width="26" height="26" fill="none" aria-hidden="true">
         <path d="M12 3.2c-.5 0-1 .3-1.2.85L4 20.2c-.35.85.55 1.65 1.35 1.2L12 17.7l6.65 3.7c.8.45 1.7-.35 1.35-1.2L13.2 4.05C13 3.5 12.5 3.2 12 3.2Z"
@@ -1046,7 +1044,7 @@ const PlanCtrl = {
     document.body.classList.toggle('map-full', isFs);
     if (btn) {
       btn.textContent = isFs ? '✕' : '⛶';
-      btn.title = isFs ? 'Thoát toàn màn hình (Esc)' : 'Toàn màn hình';
+      btn.title = isFs ? I18N.t('nav.exitFullscreen') : I18N.t('nav.fullscreen');
     }
     // Leaflet needs to recompute size after the container resizes;
     // wait past the ribbon/tabbar slide (0.32s) before invalidating
@@ -1054,7 +1052,7 @@ const PlanCtrl = {
     setTimeout(() => State.planMap.invalidateSize(), 340);
     if (isFs) {
       this._startLiveTracking();
-      showToast('🛰 Đang theo dõi vị trí realtime');
+      showToast(I18N.t('toast.trackingRealtime'));
     } else {
       this._stopLiveTracking();
     }
@@ -1083,7 +1081,7 @@ const PlanCtrl = {
     this._startLiveTracking();
 
     if (State.userLat == null || State.userLng == null) {
-      showToast('🛰 Đang lấy GPS, đợi vài giây…');
+      showToast(I18N.t('toast.fetchingGps'));
       return;
     }
     State.planMap.setView([State.userLat, State.userLng], 17);
@@ -1106,12 +1104,12 @@ const PlanCtrl = {
         const label = minD < 1
           ? `${Math.round(minD * 1000)}m`
           : `${minD.toFixed(1)}km`;
-        showToast(`🧭 Đi tới ${nearest.name} · còn ${label}`);
+        showToast(I18N.t('toast.navigatingTo', { name: nearest.name, label }));
       } else {
-        showToast('🧭 Đi theo dấu chấm xanh nhé!');
+        showToast(I18N.t('toast.followBlueDot'));
       }
     } else {
-      showToast('🧭 Đi theo dấu chấm xanh nhé!');
+      showToast(I18N.t('toast.followBlueDot'));
     }
   },
 
@@ -1126,12 +1124,12 @@ const PlanCtrl = {
 
   _startLiveTracking() {
     if (this._watchId != null) return;
-    if (!navigator.geolocation) { showToast('⚠️ Trình duyệt không hỗ trợ GPS'); return; }
+    if (!navigator.geolocation) { showToast(I18N.t('toast.gpsNotSupported')); return; }
     this._watchId = navigator.geolocation.watchPosition(
       pos => this._onLiveFix(pos),
       err => {
-        const msgs = {1: '🚫 Bạn từ chối vị trí', 2: '⚠️ Không lấy được vị trí', 3: '⏱ GPS timeout'};
-        showToast(msgs[err.code] || '⚠️ Lỗi GPS');
+        const msgs = {1: I18N.t('gps2.err.denied'), 2: I18N.t('gps2.err.unavailable'), 3: I18N.t('gps2.err.timeout')};
+        showToast(msgs[err.code] || I18N.t('gps.err.generic'));
         this._stopLiveTracking();
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
@@ -1212,7 +1210,7 @@ const ProfileCtrl = {
     // đã đăng, kết bạn, và thông tin tài khoản.
     document.getElementById('communityLogout').addEventListener('click', () => {
       Community.logout();
-      showToast('👋 Đã đăng xuất');
+      showToast(I18N.t('toast.loggedOut'));
       this.render();
     });
 
@@ -1267,13 +1265,13 @@ const ProfileCtrl = {
     if (keySave && keyInput) {
       keySave.addEventListener('click', () => {
         const v = keyInput.value.trim();
-        if (!v) { showToast('⚠️ Dán API key trước nhé!'); return; }
-        if (v.length < 20) { showToast('⚠️ Key không hợp lệ (quá ngắn)'); return; }
+        if (!v) { showToast(I18N.t('toast.pasteKeyFirst')); return; }
+        if (v.length < 20) { showToast(I18N.t('toast.keyTooShort')); return; }
         Gemini.userKey = v;
         keyInput.value = '';
         HomeCtrl._scanCache?.clear?.();
         this._renderAiStatus();
-        showToast('✅ Đã lưu key riêng · quét lại để dùng');
+        showToast(I18N.t('toast.customKeySaved'));
       });
     }
     if (keyClear) {
@@ -1282,7 +1280,7 @@ const ProfileCtrl = {
         if (keyInput) keyInput.value = '';
         HomeCtrl._scanCache?.clear?.();
         this._renderAiStatus();
-        showToast('↺ Đã chuyển về key mặc định');
+        showToast(I18N.t('toast.defaultKeyRestored'));
       });
     }
   },
@@ -1293,13 +1291,13 @@ const ProfileCtrl = {
     const custom = Gemini.usingCustomKey();
     const hasDefault = !!Gemini.defaultKey;
     if (custom) {
-      el.textContent = '● Key riêng';
+      el.textContent = I18N.t('ai.customKey');
       el.style.color = '#2e9e5b';
     } else if (hasDefault) {
-      el.textContent = '● Key mặc định';
+      el.textContent = I18N.t('ai.defaultKey');
       el.style.color = '#B92626';
     } else {
-      el.textContent = '● Chưa có key';
+      el.textContent = I18N.t('ai.noKey');
       el.style.color = '#999';
     }
   },
@@ -1388,10 +1386,10 @@ const ProfileCtrl = {
     } else if (stat === 'fav') {
       const catPrefs = [...State.profile.prefs].filter(p => CATEGORIES[p]);
       if (catPrefs.length === 0) {
-        showToast('Chọn loại quán bạn thích ở dưới nhé 👇');
+        showToast(I18N.t('toast.pickCatBelow'));
       } else {
         const labels = catPrefs.map(p => CATEGORIES[p].label).join(', ');
-        showToast(`🍽️ Bạn hay thích: ${labels}`);
+        showToast(I18N.t('toast.favLabels', { labels }));
       }
       document.getElementById('prefChips')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
@@ -1405,12 +1403,12 @@ const ProfileCtrl = {
       document.getElementById('statScore').textContent = '0';
       list.innerHTML = `<div class="empty-my-r">
         <div class="em-icon">📝</div>
-        <div class="em-msg">Chưa đăng nhập</div>
-        <div class="em-sub">Đăng nhập ở tab Cộng đồng để xem quán bạn đã đăng</div>
+        <div class="em-msg">${I18N.t('em.notLoggedIn')}</div>
+        <div class="em-sub">${I18N.t('em.signInToSeeYours')}</div>
       </div>`;
       return;
     }
-    list.innerHTML = `<div class="empty-my-r"><div class="em-icon">⏳</div><div class="em-msg">Đang tải…</div></div>`;
+    list.innerHTML = `<div class="empty-my-r"><div class="em-icon">⏳</div><div class="em-msg">${I18N.t('em.loading')}</div></div>`;
     const r = await Community.myRestaurants();
     this._myRestaurants = r.ok ? r.data.items : [];
     document.getElementById('statMyR').textContent = this._myRestaurants.length;
@@ -1434,8 +1432,8 @@ const ProfileCtrl = {
     if (!items.length) {
       list.innerHTML = `<div class="empty-my-r">
         <div class="em-icon">📝</div>
-        <div class="em-msg">Chưa có quán nào</div>
-        <div class="em-sub">Đăng quán ở tab Cộng đồng, quán sẽ hiện ở đây</div>
+        <div class="em-msg">${I18N.t('em.noRestaurantsYet')}</div>
+        <div class="em-sub">${I18N.t('em.postToSeeHere')}</div>
       </div>`;
       return;
     }
@@ -1465,7 +1463,7 @@ const ProfileCtrl = {
         if (!confirm(`Xoá quán "${r.name}"? Không thể hoàn tác.`)) return;
         const res = await Community.deleteRestaurant(r.id);
         if (!res.ok) { showToast(`⚠️ ${res.error}`); return; }
-        showToast('🗑 Đã xoá quán');
+        showToast(I18N.t('toast.restaurantDeleted'));
         this._loadMyRestaurants();
       });
     });
@@ -1486,7 +1484,7 @@ const DetailModal = {
     document.getElementById('detailMaps').addEventListener('click', () => {
       const r = this._current;
       if (!r || r.lat == null || r.lng == null) {
-        showToast('Quán chưa có vị trí trên bản đồ');
+        showToast(I18N.t('toast.noLocationYet'));
         return;
       }
       window.open(gmapsUrl(r), '_blank', 'noopener');
@@ -1544,7 +1542,7 @@ const DetailModal = {
         <span>⭐ ${(r.rating ?? 5).toFixed(1)}</span>
         ${r.hours ? `<span>🕒 ${escape(r.hours)}</span>` : ''}
       </div>
-      <div class="detail-desc">${escape(r.desc || 'Không có mô tả')}</div>
+      <div class="detail-desc">${escape(r.desc || I18N.t('detail.noDesc'))}</div>
       ${addressHtml}
       ${coordsHtml}
     `;
@@ -1718,14 +1716,14 @@ function communityCardHtml(r, { footer = 'vote' } = {}) {
   const hashHtml = (r.hashtags || []).map(h => `<span class="comm-r-chip hashtag">#${escapeHtml(h)}</span>`).join('');
   const visBadge = COMMUNITY_VIS_BADGE[r.visibility] || '';
   const author = r.expand && r.expand.created_by;
-  const authorName = (author && author.name) || 'Ẩn danh';
+  const authorName = (author && author.name) || I18N.t('common.anonymous');
   const authorId = (author && author.id) || r.created_by || '';
 
   const footerHtml = footer === 'owner'
     ? `<span class="comm-r-author" id="myRScore-${r.id}">★ …</span>
        <div style="display:flex;gap:.4rem">
          <button class="data-btn" data-edit-id="${r.id}">✏️ Sửa</button>
-         <button class="my-r-del" data-del-id="${r.id}" title="Xoá quán">🗑</button>
+         <button class="my-r-del" data-del-id="${r.id}" title="${I18N.t('myR.delete')}">🗑</button>
        </div>`
     : `<button class="comm-r-author" type="button" data-user-id="${authorId}" data-user-name="${escapeHtml(authorName)}">👤 ${escapeHtml(authorName)}</button>
        <button class="vote-btn" data-id="${r.id}"><span class="vote-ico">☆</span><span class="vote-count">···</span></button>`;
@@ -1799,7 +1797,7 @@ function wireCardDetail(container, items) {
 // đối phương đồng ý (xem UserQuanModal/CommunityAddModal cho cách "bạn bè"
 // dùng để lọc quán visibility="friends").
 function followBtnHtml(userId, userName, following) {
-  return `<button type="button" class="follow-btn${following ? ' following' : ''}" data-user-id="${userId}" data-user-name="${escapeHtml(userName)}">${following ? '✓ Đang theo dõi' : '👤+ Theo dõi'}</button>`;
+  return `<button type="button" class="follow-btn${following ? ' following' : ''}" data-user-id="${userId}" data-user-name="${escapeHtml(userName)}">${following ? I18N.t('follow.following') : I18N.t('follow.notFollowing')}</button>`;
 }
 function wireFollowButtons(container, onChange) {
   container.querySelectorAll('.follow-btn[data-user-id]').forEach(btn => {
@@ -1812,8 +1810,8 @@ function wireFollowButtons(container, onChange) {
       btn.disabled = false;
       if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
       btn.classList.toggle('following', !isFollowing);
-      btn.textContent = !isFollowing ? '✓ Đang theo dõi' : '👤+ Theo dõi';
-      showToast(!isFollowing ? '✅ Đã theo dõi' : '↺ Đã bỏ theo dõi');
+      btn.textContent = !isFollowing ? I18N.t('follow.following') : I18N.t('follow.notFollowing');
+      showToast(!isFollowing ? I18N.t('toast.nowFollowing') : I18N.t('toast.unfollowed'));
       if (onChange) onChange();
     });
   });
@@ -1888,15 +1886,15 @@ const CommunityCtrl = {
         const items = (searchRes.ok ? searchRes.data.items : []).filter(u => u.id !== Community.currentUser?.id);
         const followingIds = new Set(((friendsRes.ok && friendsRes.data.friends) || []));
         if (!items.length) {
-          results.innerHTML = `<div class="go-empty">Không tìm thấy ai khớp "${escapeHtml(q)}"</div>`;
+          results.innerHTML = `<div class="go-empty">${I18N.t('em.noUserMatch', { q: escapeHtml(q) })}</div>`;
         } else {
           // Tên → xem profile (UserQuanModal); nút riêng → theo dõi/bỏ theo
           // dõi. Không đóng dropdown sau khi bấm — theo dõi nhiều người
           // trong 1 lần tìm cho tự nhiên, giống mạng xã hội thật.
           results.innerHTML = items.map(u => `
             <div class="go-item follow-row">
-              <span class="follow-name" data-user-id="${u.id}" data-user-name="${escapeHtml(u.name || 'Ẩn danh')}">👤 ${escapeHtml(u.name || 'Ẩn danh')}</span>
-              ${followBtnHtml(u.id, u.name || 'Ẩn danh', followingIds.has(u.id))}
+              <span class="follow-name" data-user-id="${u.id}" data-user-name="${escapeHtml(u.name || I18N.t('common.anonymous'))}">👤 ${escapeHtml(u.name || I18N.t('common.anonymous'))}</span>
+              ${followBtnHtml(u.id, u.name || I18N.t('common.anonymous'), followingIds.has(u.id))}
             </div>`).join('');
           wireProfileLinks(results);
           wireFollowButtons(results, () => this._renderFriends());
@@ -1919,10 +1917,10 @@ const CommunityCtrl = {
     const r = await Community.myFriends();
     const friends = (r.ok && r.data.expand && r.data.expand.friends) || [];
     if (!friends.length) {
-      el.innerHTML = `<span style="font-size:.78rem;color:var(--text3)">Chưa có bạn nào — tìm ở trên để thêm</span>`;
+      el.innerHTML = `<span style="font-size:.78rem;color:var(--text3)">${I18N.t('em.noFriendsYet')}</span>`;
       return;
     }
-    el.innerHTML = friends.map(u => `<span class="chip-tag"><span data-user-id="${u.id}" data-user-name="${escapeHtml(u.name || 'Ẩn danh')}" style="cursor:pointer">👤 ${escapeHtml(u.name || 'Ẩn danh')}</span><button type="button" class="chip-tag-remove" data-id="${u.id}">✕</button></span>`).join('');
+    el.innerHTML = friends.map(u => `<span class="chip-tag"><span data-user-id="${u.id}" data-user-name="${escapeHtml(u.name || I18N.t('common.anonymous'))}" style="cursor:pointer">👤 ${escapeHtml(u.name || I18N.t('common.anonymous'))}</span><button type="button" class="chip-tag-remove" data-id="${u.id}">✕</button></span>`).join('');
     wireProfileLinks(el);
     el.querySelectorAll('.chip-tag-remove').forEach(b => {
       b.addEventListener('click', async (e) => {
@@ -1946,19 +1944,19 @@ const CommunityCtrl = {
     const email = document.getElementById('cAuthEmail').value.trim();
     const password = document.getElementById('cAuthPassword').value;
     const name = document.getElementById('cAuthName').value.trim();
-    if (!email || !password) { showToast('⚠️ Điền email và mật khẩu'); return; }
-    if (this._mode === 'register' && password.length < 8) { showToast('⚠️ Mật khẩu tối thiểu 8 ký tự'); return; }
+    if (!email || !password) { showToast(I18N.t('toast.fillEmailPassword')); return; }
+    if (this._mode === 'register' && password.length < 8) { showToast(I18N.t('toast.passwordMin8')); return; }
 
     const btn = document.getElementById('communityAuthSubmit');
     const original = btn.textContent;
-    btn.disabled = true; btn.textContent = '⏳ Đang xử lý…';
+    btn.disabled = true; btn.textContent = I18N.t('auth.processing');
     const r = this._mode === 'register'
       ? await Community.register(email, password, name)
       : await Community.login(email, password);
     btn.disabled = false; btn.textContent = original;
 
     if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
-    showToast(this._mode === 'register' ? '🎉 Đã đăng ký!' : '✅ Đăng nhập thành công');
+    showToast(this._mode === 'register' ? I18N.t('toast.registered') : I18N.t('toast.loginSuccess'));
     document.getElementById('cAuthPassword').value = '';
     this.render();
   },
@@ -1973,11 +1971,11 @@ const CommunityCtrl = {
 
   async _loadList(query) {
     const list = document.getElementById('communityList');
-    list.innerHTML = `<div class="empty-comm"><div class="em-icon">⏳</div><div class="em-msg">Đang tải…</div></div>`;
+    list.innerHTML = `<div class="empty-comm"><div class="em-icon">⏳</div><div class="em-msg">${I18N.t('em.loading')}</div></div>`;
     const r = query ? await Community.searchRestaurants(query) : await Community.listRestaurants();
     if (!r.ok) {
       list.innerHTML = `<div class="empty-comm">
-        <div class="em-icon">😕</div><div class="em-msg">Không tải được</div>
+        <div class="em-icon">😕</div><div class="em-msg">${I18N.t('em.loadFail')}</div>
         <div class="em-sub">${escapeHtml(r.error)}</div>
       </div>`;
       return;
@@ -1994,13 +1992,13 @@ const CommunityCtrl = {
       list.innerHTML = query
         ? `<div class="empty-comm">
             <div class="em-icon">🔍</div>
-            <div class="em-msg">Không tìm thấy quán khớp "${escapeHtml(query)}"</div>
-            <div class="em-sub">Thử từ khoá ngắn hơn hoặc kiểm tra lại chính tả</div>
+            <div class="em-msg">${I18N.t('em.noMatchFor', { q: escapeHtml(query) })}</div>
+            <div class="em-sub">${I18N.t('em.tryShorterQuery')}</div>
           </div>`
         : `<div class="empty-comm">
             <div class="em-icon">🍽️</div>
-            <div class="em-msg">Cộng đồng chưa có quán nào</div>
-            <div class="em-sub">Đăng quán đầu tiên cho cộng đồng!</div>
+            <div class="em-msg">${I18N.t('em.communityEmpty')}</div>
+            <div class="em-sub">${I18N.t('em.postFirst')}</div>
           </div>`;
       return;
     }
@@ -2028,7 +2026,7 @@ const CommunityDetailModal = {
     document.getElementById('communityDetailMaps').addEventListener('click', () => {
       const r = this._current;
       const hasLoc = r && r.location && (r.location.lat !== 0 || r.location.lon !== 0);
-      if (!hasLoc) { showToast('Quán chưa có vị trí trên bản đồ'); return; }
+      if (!hasLoc) { showToast(I18N.t('toast.noLocationYet')); return; }
       window.open(gmapsUrl({ name: r.name, address: r.address, lat: r.location.lat, lng: r.location.lon }), '_blank', 'noopener');
     });
   },
@@ -2046,7 +2044,7 @@ const CommunityDetailModal = {
     const tagsHtml = (r.tags || []).map(t => `<span class="comm-r-chip">${escapeHtml(t)}</span>`).join('');
     const hashHtml = (r.hashtags || []).map(h => `<span class="comm-r-chip hashtag">#${escapeHtml(h)}</span>`).join('');
     const author = r.expand && r.expand.created_by;
-    const authorName = (author && author.name) || 'Ẩn danh';
+    const authorName = (author && author.name) || I18N.t('common.anonymous');
     const authorId = (author && author.id) || r.created_by || '';
     const addressHtml = r.address ? `<div class="detail-address">🏠 ${escapeHtml(r.address)}</div>` : '';
 
@@ -2096,9 +2094,9 @@ const UserQuanModal = {
   },
 
   async open(userId, userName) {
-    document.getElementById('userQuanTitle').innerHTML = `Quán <em>của ${escapeHtml(userName || 'người này')}</em>`;
+    document.getElementById('userQuanTitle').innerHTML = I18N.t('userQuan.title', { name: escapeHtml(userName || I18N.t('common.thisPerson')) });
     const body = document.getElementById('userQuanBody');
-    body.innerHTML = `<div class="empty-comm"><div class="em-icon">⏳</div><div class="em-msg">Đang tải…</div></div>`;
+    body.innerHTML = `<div class="empty-comm"><div class="em-icon">⏳</div><div class="em-msg">${I18N.t('em.loading')}</div></div>`;
     document.getElementById('userQuanCount').textContent = '';
     document.getElementById('userQuanModal').classList.add('show');
 
@@ -2108,18 +2106,18 @@ const UserQuanModal = {
     if (Community.currentUser && userId !== Community.currentUser.id) {
       const friendsRes = await Community.myFriends();
       const following = !!(friendsRes.ok && (friendsRes.data.friends || []).includes(userId));
-      followSlot.innerHTML = followBtnHtml(userId, userName || 'người này', following);
+      followSlot.innerHTML = followBtnHtml(userId, userName || I18N.t('common.thisPerson'), following);
       wireFollowButtons(followSlot, () => CommunityCtrl._renderFriends());
     }
 
     const r = await Community.listRestaurants({ filter: `created_by="${userId}"` });
     if (!r.ok) {
-      body.innerHTML = `<div class="empty-comm"><div class="em-icon">😕</div><div class="em-msg">Không tải được</div></div>`;
+      body.innerHTML = `<div class="empty-comm"><div class="em-icon">😕</div><div class="em-msg">${I18N.t('em.loadFail')}</div></div>`;
       return;
     }
-    document.getElementById('userQuanCount').textContent = `${r.data.items.length} quán`;
+    document.getElementById('userQuanCount').textContent = I18N.t('userQuan.count', { n: r.data.items.length });
     if (!r.data.items.length) {
-      body.innerHTML = `<div class="empty-comm"><div class="em-icon">🍽️</div><div class="em-msg">Chưa có quán nào bạn xem được</div></div>`;
+      body.innerHTML = `<div class="empty-comm"><div class="em-icon">🍽️</div><div class="em-msg">${I18N.t('em.noneVisible')}</div></div>`;
       return;
     }
     body.innerHTML = r.data.items.map(x => communityCardHtml(x, { footer: 'vote' })).join('');
@@ -2183,7 +2181,7 @@ const CommunityAddModal = {
     document.getElementById('cfPhotoInput').addEventListener('change', (e) => {
       const files = Array.from(e.target.files || []);
       const room = 4 - this._photoFiles.length;
-      if (files.length > room) showToast(`⚠️ Chỉ nhận thêm được ${room} ảnh (tối đa 4)`);
+      if (files.length > room) showToast(I18N.t('toast.tooManyPhotos', { room }));
       files.slice(0, room).forEach(f => {
         this._photoFiles.push(f);
         this._photoPreviewUrls.push(URL.createObjectURL(f));
@@ -2222,7 +2220,7 @@ const CommunityAddModal = {
       input.value = '';
       if (!val || arr.some(x => x.toLowerCase() === val.toLowerCase())) return;
       const max = hashtag ? 15 : 10;
-      if (arr.length >= max) { showToast(`⚠️ Tối đa ${max} ${hashtag ? 'hashtag' : 'thẻ'}`); return; }
+      if (arr.length >= max) { showToast(I18N.t('toast.maxTagsOrHashtags', { max, kind: I18N.t(hashtag ? 'kind.hashtag' : 'kind.tag') })); return; }
       arr.push(val);
       this._renderChipList(listId, arr, hashtag);
     });
@@ -2246,7 +2244,7 @@ const CommunityAddModal = {
     // đây (giữ đơn giản — đổi ảnh đầy đủ thì đăng quán mới).
     if (this._editingId) {
       if (!this._existingPhotos.length) {
-        grid.innerHTML = `<div style="grid-column:span 4;font-size:.78rem;color:var(--text3)">Quán chưa có ảnh nào</div>`;
+        grid.innerHTML = `<div style="grid-column:span 4;font-size:.78rem;color:var(--text3)">${I18N.t('photo.none')}</div>`;
         return;
       }
       const filenames = this._editingRecord.photos || [];
@@ -2254,7 +2252,7 @@ const CommunityAddModal = {
         const filename = filenames[i];
         const starActive = filename && filename === this._editingRecord.thumbnail ? ' active' : '';
         return `<div class="photo-slot" style="background-image:url('${url}')">
-          <button type="button" class="photo-thumb-star${starActive}" data-filename="${filename}" title="Đặt làm ảnh đại diện">⭐</button>
+          <button type="button" class="photo-thumb-star${starActive}" data-filename="${filename}" title="${I18N.t('photo.setCover')}">⭐</button>
         </div>`;
       }).join('');
       grid.querySelectorAll('.photo-thumb-star').forEach(b => {
@@ -2264,7 +2262,7 @@ const CommunityAddModal = {
           if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
           this._editingRecord = r.data;
           this._renderPhotoGrid();
-          showToast('✅ Đã đổi ảnh đại diện');
+          showToast(I18N.t('toast.thumbnailChanged'));
         });
       });
       return;
@@ -2275,7 +2273,7 @@ const CommunityAddModal = {
       const starActive = i === this._thumbIndex ? ' active' : '';
       return `<div class="photo-slot" style="background-image:url('${url}')">
         <button type="button" class="photo-slot-remove" data-idx="${i}">✕</button>
-        <button type="button" class="photo-thumb-star${starActive}" data-idx="${i}" title="Đặt làm ảnh đại diện">⭐</button>
+        <button type="button" class="photo-thumb-star${starActive}" data-idx="${i}" title="${I18N.t('photo.setCover')}">⭐</button>
       </div>`;
     }).join('');
     const addSlot = this._photoFiles.length < 4
@@ -2308,15 +2306,15 @@ const CommunityAddModal = {
 
   // record: truyền vào khi sửa quán có sẵn (từ tab Cá nhân); bỏ trống = đăng mới.
   open(record = null) {
-    if (!Community.isLoggedIn()) { showToast('⚠️ Cần đăng nhập trước'); return; }
+    if (!Community.isLoggedIn()) { showToast(I18N.t('toast.needLoginBang')); return; }
     const modal = document.getElementById('communityAddModal');
     modal.classList.add('show');
 
     this._editingId = record ? record.id : null;
     this._editingRecord = record;
     document.querySelector('#communityAddModal .modal-title').innerHTML = record
-      ? 'Sửa <em>quán</em> ✏️' : 'Đăng quán <em>cộng đồng</em> 👥';
-    document.getElementById('cfSave').textContent = record ? '💾 Cập nhật' : '📤 Đăng quán';
+      ? I18N.t('addQuan.editTitle') : I18N.t('addQuan.title');
+    document.getElementById('cfSave').textContent = record ? I18N.t('addQuan.update') : I18N.t('addQuan.submit');
 
     document.getElementById('cfName').value = record ? record.name : '';
     document.getElementById('cfDesc').value = record ? (record.description || '') : '';
@@ -2376,8 +2374,8 @@ const CommunityAddModal = {
 
   async _save() {
     const name = document.getElementById('cfName').value.trim();
-    if (!name) { showToast('⚠️ Nhập tên quán trước nhé!'); return; }
-    if (!Community.isLoggedIn()) { showToast('⚠️ Cần đăng nhập trước'); return; }
+    if (!name) { showToast(I18N.t('toast.needNameFirst')); return; }
+    if (!Community.isLoggedIn()) { showToast(I18N.t('toast.needLoginBang')); return; }
 
     const desc = document.getElementById('cfDesc').value.trim();
     const addressText = (document.getElementById('cfLocSearch')?.value || '').trim();
@@ -2387,14 +2385,14 @@ const CommunityAddModal = {
     const original = btn.textContent;
 
     if (lat == null && addressText.length >= 3) {
-      btn.disabled = true; btn.textContent = '🌐 Đang tra vị trí…';
+      btn.disabled = true; btn.textContent = I18N.t('addQuan.lookingUpLoc');
       const found = await LocationPicker.geocodeFallback(addressText);
       if (found) { lat = found.lat; lng = found.lng; }
     }
 
     // Sửa quán có sẵn — PATCH field text/chọn, không đụng ảnh (xem _renderPhotoGrid)
     if (this._editingId) {
-      btn.disabled = true; btn.textContent = '💾 Đang lưu…';
+      btn.disabled = true; btn.textContent = I18N.t('addQuan.saving');
       const r = await Community.updateRestaurant(this._editingId, {
         name,
         category: COMMUNITY_CAT_TO_PB[this._selectedCat],
@@ -2408,13 +2406,13 @@ const CommunityAddModal = {
       });
       btn.disabled = false; btn.textContent = original;
       if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
-      showToast(`✅ Đã cập nhật "${name}"`);
+      showToast(I18N.t('toast.updatedName', { name }));
       this.close();
       ProfileCtrl._loadMyRestaurants();
       return;
     }
 
-    btn.disabled = true; btn.textContent = '📤 Đang đăng…';
+    btn.disabled = true; btn.textContent = I18N.t('addQuan.posting');
 
     // Move the chosen cover photo to index 0 — createRestaurant() auto-sets
     // thumbnail = photos[0] right after the record is created.
@@ -2438,7 +2436,7 @@ const CommunityAddModal = {
     btn.disabled = false; btn.textContent = original;
 
     if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
-    showToast(`✅ Đã đăng "${name}" cho cộng đồng!`);
+    showToast(I18N.t('toast.postedName', { name }));
     this.close();
     CommunityCtrl._loadList('');
   },

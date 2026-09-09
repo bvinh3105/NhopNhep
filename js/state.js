@@ -88,14 +88,14 @@ const Storage = {
     document.body.appendChild(a);
     a.click();
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
-    showToast('📤 Đã xuất dữ liệu!');
+    showToast(I18N.t('state.exported'));
   },
 
   importJSON(jsonString) {
     try {
       const data = JSON.parse(jsonString);
       if (data._app !== 'NhopNhep') {
-        showToast('⚠️ File không phải backup NhopNhep!');
+        showToast(I18N.t('state.importBadFile'));
         return false;
       }
       if (data.profile) {
@@ -108,11 +108,11 @@ const Storage = {
         State.userRestaurants = data.userRestaurants;
       }
       this.save();
-      showToast('📥 Đã nhập dữ liệu thành công!');
+      showToast(I18N.t('state.imported'));
       return true;
     } catch(e) {
       console.warn('Import failed:', e);
-      showToast('⚠️ File không hợp lệ!');
+      showToast(I18N.t('state.importInvalid'));
       return false;
     }
   },

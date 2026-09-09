@@ -57,7 +57,7 @@ out center 200;`;
     const parts = [];
     if (tags.cuisine) parts.push('🍴 ' + tags.cuisine.replace(/;/g, ', ').replace(/_/g, ' '));
     if (tags.description && tags.description.length < 60) parts.push(tags.description);
-    return parts.length ? parts.join(' · ') : 'Quán từ OpenStreetMap';
+    return parts.length ? parts.join(' · ') : I18N.t('poi.fallbackDesc');
   },
 
   _parse(elements) {

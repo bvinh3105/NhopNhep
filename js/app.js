@@ -53,7 +53,7 @@ function boot() {
   // whichever screen is open re-renders immediately instead of silently
   // keeping stale "logged in" UI until the user happens to switch tabs.
   document.addEventListener('community:session-expired', () => {
-    showToast('⚠️ Phiên đăng nhập đã hết hạn — đăng nhập lại nhé');
+    showToast(I18N.t('app.sessionExpired'));
     ProfileCtrl.render();
     CommunityCtrl.render();
   });
@@ -71,7 +71,7 @@ function boot() {
   // Fallback default location — Hoàn Kiếm, Hà Nội
   State.userLat = 21.0285;
   State.userLng = 105.8542;
-  document.getElementById('locInput').value = '📌 Hoàn Kiếm, Hà Nội (mẫu)';
+  document.getElementById('locInput').value = I18N.t('app.sampleLocation');
   MapHome.setUserLocation(State.userLat, State.userLng, null, { center:true });
 
   // Silent GPS attempt if the context is secure
@@ -80,7 +80,7 @@ function boot() {
   // Warn if not secure context
   if (!GPS.isSecure() && location.protocol === 'http:' && location.hostname !== 'localhost') {
     setTimeout(() => {
-      GPS.hint('⚠️ GPS chỉ chạy qua HTTPS. Deploy Netlify hoặc dùng localhost để test', 'warn');
+      GPS.hint(I18N.t('app.httpsHint'), 'warn');
     }, 800);
   }
 }

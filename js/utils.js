@@ -177,7 +177,7 @@ function parseOpeningHours(hoursStr) {
 
   // 24/7
   if (s === '24/7') {
-    return { isOpen: true, label: 'Mở 24/7', detail: '', raw: s };
+    return { isOpen: true, label: I18N.t('openHours.always'), detail: '', raw: s };
   }
 
   const now = new Date();
@@ -254,7 +254,7 @@ function parseOpeningHours(hoursStr) {
         isOpen = true;
         const closeH = Math.floor(r.closeMin / 60).toString().padStart(2,'0');
         const closeM = (r.closeMin % 60).toString().padStart(2,'0');
-        nextChange = `Đóng lúc ${closeH}:${closeM}`;
+        nextChange = I18N.t('openHours.closesAt', { t: `${closeH}:${closeM}` });
         break;
       }
     }
@@ -264,12 +264,12 @@ function parseOpeningHours(hoursStr) {
       if (next) {
         const openH = Math.floor(next.openMin / 60).toString().padStart(2,'0');
         const openM = (next.openMin % 60).toString().padStart(2,'0');
-        nextChange = `Mở lúc ${openH}:${openM}`;
+        nextChange = I18N.t('openHours.opensAt', { t: `${openH}:${openM}` });
       }
     }
     return {
       isOpen,
-      label: isOpen ? 'Đang mở' : 'Đã đóng',
+      label: isOpen ? I18N.t('openHours.open') : I18N.t('openHours.closed'),
       detail: nextChange,
       raw: s,
     };

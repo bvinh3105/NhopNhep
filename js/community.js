@@ -75,15 +75,15 @@ const Community = {
         if (res.status === 401) {
           this.token = ''; this.currentUser = null;
           document.dispatchEvent(new CustomEvent('community:session-expired'));
-          return { ok: false, status: 401, error: 'Phiên đăng nhập đã hết hạn — đăng nhập lại nhé' };
+          return { ok: false, status: 401, error: I18N.t('err.sessionExpired') };
         }
-        return { ok: false, status: res.status, error: (data && data.message) || 'Lỗi kết nối server cộng đồng' };
+        return { ok: false, status: res.status, error: (data && data.message) || I18N.t('err.connectionGeneric') };
       }
       return { ok: true, data };
     } catch(e) {
       clearTimeout(timer);
       if (e.name === 'AbortError') {
-        return { ok: false, status: 'timeout', error: 'Server phản hồi chậm — thử lại sau nhé' };
+        return { ok: false, status: 'timeout', error: I18N.t('err.serverSlow') };
       }
       const usingOverride = !!localStorage.getItem('community_api_url');
       if (!_retried && usingOverride) {
@@ -91,7 +91,7 @@ const Community = {
         this.BASE_URL = '';
         return this._fetch(path, opts, true);
       }
-      return { ok: false, status: 0, error: 'Không kết nối được server cộng đồng — server có đang chạy không?' };
+      return { ok: false, status: 0, error: I18N.t('err.serverUnreachable') };
     }
   },
 
@@ -160,7 +160,7 @@ const Community = {
   // photoFiles: tối đa 4 ảnh (giới hạn server-side qua maxSelect). Ảnh đầu
   // tiên tự động thành thumbnail — đổi sau bằng setThumbnail().
   async createRestaurant({ name, category, priceRange, description, address, lat, lng, tags = [], hashtags = [], visibility = 'public', photoFiles = [] }) {
-    if (!this.isLoggedIn()) return { ok: false, error: 'Cần đăng nhập trước' };
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin')};
     const fd = new FormData();
     fd.append('name', name);
     fd.append('category', category);
@@ -306,7 +306,7 @@ const Community = {
   // Vote/unvote toggle — unique (restaurant,user) index on the server means
   // a double-click race just 400s on the second insert, harmless to ignore.
   async toggleVote(restaurantId) {
-    if (!this.isLoggedIn()) return { ok: false, error: 'Cần đăng nhập trước' };
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin')};
     const existing = await this.myVote(restaurantId);
     if (existing) {
       return this._fetch(`/api/collections/votes/records/${existing.id}`, { method: 'DELETE' });
@@ -345,7 +345,7 @@ const Community = {
   },
 
   async addFriend(userId) {
-    if (!this.isLoggedIn()) return { ok: false, error: 'Cần đăng nhập trước' };
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin')};
     const cur = await this.myFriends();
     const ids = new Set((cur.ok && cur.data.friends) || []);
     ids.add(userId);
@@ -353,7 +353,7 @@ const Community = {
   },
 
   async removeFriend(userId) {
-    if (!this.isLoggedIn()) return { ok: false, error: 'Cần đăng nhập trước' };
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin')};
     const cur = await this.myFriends();
     const ids = new Set((cur.ok && cur.data.friends) || []);
     ids.delete(userId);
@@ -380,7 +380,7 @@ const Community = {
           canvas.toBlob((jpegBlob) => resolve(jpegBlob), 'image/jpeg', quality); // WebP unsupported
         }, 'image/webp', quality);
       };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Không đọc được ảnh')); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(I18N.t('err.imageUnreadable'))); };
       img.src = url;
     });
   },

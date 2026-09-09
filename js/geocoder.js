@@ -52,21 +52,19 @@ const Geocoder = {
     const params = new URLSearchParams({
       q: q,
       limit: '8',
-      lang: 'default', // Photon mostly uses default local names (Vietnamese)
+      lang: 'default', // Photon uses each place's own local name
     });
-    // Bias the upstream search to the caller's reference point when
-    // provided; otherwise fall back to center-of-VN so unrelated
-    // countries never bubble up.
-    const biasLat = opts.nearLat != null ? opts.nearLat : 16.0;
-    const biasLng = opts.nearLng != null ? opts.nearLng : 106.0;
-    params.set('lat', String(biasLat));
-    params.set('lon', String(biasLng));
-
-    let searchQuery = q;
-    if (!/vietnam|việt nam|vn/i.test(q)) {
-       searchQuery = q + ', Việt Nam';
+    // Bias the upstream search to the caller's reference point (usually
+    // the user's GPS fix) when we have one. We used to fall back to a
+    // hardcoded center-of-Vietnam bias + force-append ", Việt Nam" onto
+    // every query when no fix was available yet — that broke address
+    // search for users outside Vietnam (e.g. before they granted GPS),
+    // so now an unbiased global search runs instead in that case.
+    if (opts.nearLat != null && opts.nearLng != null) {
+      params.set('lat', String(opts.nearLat));
+      params.set('lon', String(opts.nearLng));
     }
-    params.set('q', searchQuery);
+    params.set('q', q);
 
     try {
       const res = await fetch(`${this.ENDPOINT}?${params}`);
@@ -86,7 +84,7 @@ const Geocoder = {
         return {
           lat: coords[1],
           lng: coords[0],
-          name: p.name || parts[0] || 'Địa điểm không tên',
+          name: p.name || parts[0] || I18N.t('geo.unnamed'),
           sub: parts.join(' · ') || (p.country || ''),
           // Photon classification kept so callers can filter POIs out
           // when they wanted an address, not a landmark or shop.
@@ -163,8 +161,7 @@ const Geocoder = {
     if (!results.length) {
       suggestEl.innerHTML = `
         <div class="go-empty">
-          Không tìm thấy · thử gõ ngắn hơn ("tên phố, quận") ·
-          hoặc nhấn map dưới đây để chọn tay
+          ${I18N.t('geo.noResults')}
         </div>`;
       suggestEl.classList.add('show');
       return;
@@ -198,7 +195,7 @@ const Geocoder = {
   },
 
   showLoading(suggestEl) {
-    suggestEl.innerHTML = '<div class="go-loading">📍 Đang tìm địa chỉ...</div>';
+    suggestEl.innerHTML = `<div class="go-loading">${I18N.t('geo.searching')}</div>`;
     suggestEl.classList.add('show');
   },
 
