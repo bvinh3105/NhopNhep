@@ -244,13 +244,22 @@ input,textarea,select{font-family:var(--font-body)}
      Negative margin keeps the row's outer footprint unchanged. */
   padding:12px 2.2rem 8px 6px;margin:-10px 0 -6px -6px;scrollbar-width:none;
   -webkit-overflow-scrolling:touch;
-  /* Right-edge fade — signals "there's more, keep scrolling". Narrow
-     (12px) + wider right padding above so the last chip has breathing
-     room and doesn't render half-transparent behind the fade (Vinh
-     flagged 2026-09-11: chip "Cà phê" was being clipped). Fade drops
-     off when .at-end is added by wireScrollMasks in app.js. */
-  -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
-          mask-image:linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
+  /* Right-edge fade — signals "there's more, keep scrolling". Fade drops
+     off when .at-end is added by wireScrollMasks in app.js (added
+     automatically for any row that fits without scrolling, e.g. Home's
+     4-chip #catChips — so widening this never affects a row that isn't
+     actually overflowing).
+     Widened 12px -> 44px (Vinh flagged 2026-09-11 the 12px version still
+     looked broken, not just "clipped": on a 5-chip row like the profile
+     filter tabs (#myRFilterChips — 4 categories + "Tất cả"), the peeking
+     last chip's visible sliver mostly sat OUTSIDE the narrow fade zone,
+     so it rendered at full opacity and then got a hard clip right at the
+     scroll boundary — a flat, content-less rounded shape, not a fade.
+     44px reaches back far enough that the entire visible peek of a
+     cut-off chip sits inside the gradient and actually fades to nothing,
+     reading as "scroll for more" instead of a rendering glitch. */
+  -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 44px), transparent 100%);
+          mask-image:linear-gradient(to right, #000 calc(100% - 44px), transparent 100%);
 }
 .cat-chips::-webkit-scrollbar{display:none}
 .cat-chips.at-end{-webkit-mask-image:none;mask-image:none}
@@ -265,6 +274,14 @@ input,textarea,select{font-family:var(--font-body)}
 .cat-chip.active{background:var(--primary);color:var(--cream);border-color:var(--primary-2);box-shadow:2px 2px 0 var(--primary-2)}
 .cat-chip[data-cat="street"].active{background:var(--accent);border-color:var(--accent-2);box-shadow:2px 2px 0 var(--accent-2)}
 .cat-chip[data-cat="snack"].active{background:var(--cat-snack);border-color:#A8365F;box-shadow:2px 2px 0 #A8365F}
+/* Profile filter tabs (#myRFilterChips) have 1 more chip than Home's
+   #catChips ("Tất cả" + 4 categories vs just 4), which was enough extra
+   width to overflow and trigger the half-clipped-chip look above. A
+   slightly tighter size (scoped to this row only, doesn't touch Home's
+   chips) shrinks that overflow so less of the trailing chip needs to
+   fade out in the first place. */
+#myRFilterChips{gap:.4rem}
+#myRFilterChips .cat-chip{padding:.46rem .7rem}
 .cat-chip[data-cat="cafe"].active{background:var(--cat-cafe);border-color:#5A3B24;box-shadow:2px 2px 0 #5A3B24}
 /* Community source chip — was flagged "sắp có" until the PocketBase
    backend went live. Now a normal, selectable source. */
