@@ -76,8 +76,27 @@ const Gemini = {
   usingCustomKey() { return !!this.userKey; },
   clearKey() { localStorage.removeItem('gemini_api_key'); },
 
-  // Configured if we have ANY key (user or built-in).
-  isConfigured() { return this.apiKey.length > 20; },
+  // ── Shared-key cooldown ─────────────────────────────────────────────────
+  // The built-in key's free-tier quota is small and shared across every
+  // visitor of the app — once Google says 429 RESOURCE_EXHAUSTED, every
+  // scan for the rest of that window would otherwise still pay the full
+  // ~11s timeout attempting (and failing) the same call before falling
+  // back to OSM. Remember "don't bother" for a few hours instead, so a
+  // launch-day spike degrades to instant OSM results, not a slow retry
+  // loop, once the shared quota is known to be out. Only affects the
+  // SHARED key — a user's own key is never put on cooldown by this.
+  get _sharedCooldownUntil() { return parseInt(localStorage.getItem('gemini_shared_cooldown') || '0', 10); },
+  _setSharedCooldown(hours = 3) {
+    localStorage.setItem('gemini_shared_cooldown', String(Date.now() + hours * 3600 * 1000));
+  },
+  _sharedOnCooldown() { return Date.now() < this._sharedCooldownUntil; },
+
+  // Configured if we have ANY key (user or built-in) that isn't on
+  // cooldown right now.
+  isConfigured() {
+    if (this.userKey) return this.userKey.length > 20;
+    return this.defaultKey.length > 20 && !this._sharedOnCooldown();
+  },
 
   // ── Low-level call to Google, with a specific key ──────────────────────
   // Returns { ok, text } or { ok:false, status }.
@@ -137,6 +156,10 @@ const Gemini = {
     if (this.defaultKey) {
       const r = await this._fetch(this.defaultKey, body, opts.timeout);
       if (r.ok) return r.text;
+      if (r.status === 429) {
+        console.warn('[Gemini] shared key quota exhausted, cooling down 3h');
+        this._setSharedCooldown();
+      }
       if (r.status === 'timeout') throw new Error('Gemini timeout (>12s)');
       throw new Error(`Gemini ${r.status}: ${r.detail || 'lỗi'}`);
     }
