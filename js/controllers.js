@@ -1194,9 +1194,10 @@ const PlanCtrl = {
 ═══════════════════════════════════════════════ */
 const ProfileCtrl = {
   init() {
-    // Avatar giờ chỉ mở modal Tài khoản (đổi ava/tên/bạn bè/đăng xuất đều
-    // gom vào đây) thay vì tự cycle avatar ngay khi chạm.
-    document.getElementById('avatarBtn').addEventListener('click', () => {
+    // Settings gear (top-right of profile) opens accountModal — replaces
+    // the old "tap avatar to open modal" gesture (avatar removed from
+    // main profile in favor of the community identity header below).
+    document.getElementById('settingsGearBtn')?.addEventListener('click', () => {
       this._openAccountModal();
     });
     this._initAccountModal();
@@ -1204,7 +1205,8 @@ const ProfileCtrl = {
     const nameInput = document.getElementById('profileNameInput');
     nameInput.addEventListener('input', () => {
       State.profile.name = nameInput.value;
-      document.getElementById('profileNameDisplay').textContent = nameInput.value || I18N.t('profile.namePlaceholder');
+      // profileNameDisplay no longer exists — community header shows the
+      // canonical name now. Keep the local name synced to State only.
       Storage.save();
     });
 
@@ -1240,14 +1242,8 @@ const ProfileCtrl = {
       this._renderMyRestaurants();
     });
 
-    // Stat cards — clickable overview shortcuts
-    document.querySelectorAll('.stat-card[data-stat]').forEach(card => {
-      const handle = () => this._onStatClick(card.dataset.stat);
-      card.addEventListener('click', handle);
-      card.addEventListener('keydown', e => {
-        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handle(); }
-      });
-    });
+    // Stat cards removed from main profile (moved into accountModal).
+    // Stat click handler kept as a no-op — nothing binds it now.
 
     // Export / Import
     document.getElementById('exportDataBtn').addEventListener('click', () => {
@@ -1338,9 +1334,13 @@ const ProfileCtrl = {
       if (!btn) return;
       const a = btn.dataset.avatar;
       State.profile.avatar = a;
-      document.getElementById('avatarBtn').textContent = a;
+      // avatarBtn was removed from main profile — community header
+      // shows the current avatar and re-renders on next _renderMyRestaurants().
+      const avBtn = document.getElementById('avatarBtn'); if (avBtn) avBtn.textContent = a;
       picker.querySelectorAll('.avatar-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.avatar === a));
       Storage.save();
+      // Refresh community header immediately so user sees the change
+      ProfileCtrl._renderMyRestaurants();
       // Best-effort push to the server too — the picker used to be
       // localStorage-only, so other people's feed/profile views had no way
       // to see your chosen avatar. Silent no-op if not logged in.
@@ -1371,9 +1371,9 @@ const ProfileCtrl = {
   },
 
   render() {
-    document.getElementById('avatarBtn').textContent = State.profile.avatar;
+    // avatarBtn / profileNameDisplay were removed from main profile —
+    // community header inside #myRProfileHeader shows identity now.
     document.getElementById('profileNameInput').value = State.profile.name;
-    document.getElementById('profileNameDisplay').textContent = State.profile.name || I18N.t('profile.namePlaceholder');
     document.querySelectorAll('.pref-chip').forEach(c => {
       c.classList.toggle('active', State.profile.prefs.has(c.dataset.pref));
     });
@@ -1392,36 +1392,40 @@ const ProfileCtrl = {
   },
 
   _renderStats() {
-    document.getElementById('statTrips').textContent = State.profile.trips;
-    const catPrefs = [...State.profile.prefs].filter(p => CATEGORIES[p]);
-    const fav = catPrefs[0] ? CATEGORIES[catPrefs[0]].icon : '🍽️';
-    document.getElementById('statFav').textContent = fav;
-    // statMyR / statScore được _loadMyRestaurants() cập nhật (phụ thuộc dữ liệu server)
+    // Stat cards removed — only community header shows counts now.
+    // Guard with `?.` so any lingering call is a no-op instead of a
+    // TypeError. Elements can be added back later without changing JS.
+    const trips = document.getElementById('statTrips');
+    if (trips) trips.textContent = State.profile.trips;
+    const favEl = document.getElementById('statFav');
+    if (favEl) {
+      const catPrefs = [...State.profile.prefs].filter(p => CATEGORIES[p]);
+      favEl.textContent = catPrefs[0] ? CATEGORIES[catPrefs[0]].icon : '🍽️';
+    }
   },
 
   _onStatClick(stat) {
-    if (stat === 'myR' || stat === 'score') {
-      document.getElementById('myRestaurantList')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    } else if (stat === 'trips') {
-      HistoryModal.openTrips();
-    } else if (stat === 'fav') {
-      const catPrefs = [...State.profile.prefs].filter(p => CATEGORIES[p]);
-      if (catPrefs.length === 0) {
-        showToast(I18N.t('toast.pickCatBelow'));
-      } else {
-        const labels = catPrefs.map(p => CATEGORIES[p].label).join(', ');
-        showToast(I18N.t('toast.favLabels', { labels }));
-      }
-      document.getElementById('prefChips')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    // Dead code path — stat cards were removed. Kept as no-op so any
+    // stale listener (e.g. keyboard shortcut) doesn't throw.
   },
 
   // ── Quán tôi đã đăng lên cộng đồng — xem/lọc/sửa/xoá ─────────────────────
   async _loadMyRestaurants() {
     const list = document.getElementById('myRestaurantList');
+    const headerEl = document.getElementById('myRProfileHeader');
     if (!Community.isLoggedIn()) {
-      document.getElementById('statMyR').textContent = '0';
-      document.getElementById('statScore').textContent = '0';
+      // No community identity yet — render a placeholder header from
+      // local profile so the page isn't headless.
+      if (headerEl) headerEl.innerHTML = communityProfileHeaderHtml({
+        avatar: State.profile.avatar,
+        name: State.profile.name || I18N.t('profile.namePlaceholder'),
+        tagline: I18N.t('profile.tagline'),
+        postCount: 0, starCount: 0, followerCount: 0,
+      });
+      // Stat elements were removed from main profile — guard against
+      // any lingering reference (e.g. hidden diagnostic HTML).
+      const s1 = document.getElementById('statMyR'); if (s1) s1.textContent = '0';
+      const s2 = document.getElementById('statScore'); if (s2) s2.textContent = '0';
       list.innerHTML = `<div class="empty-my-r">
         <div class="em-icon">📝</div>
         <div class="em-msg">${I18N.t('em.notLoggedIn')}</div>
@@ -1432,7 +1436,8 @@ const ProfileCtrl = {
     list.innerHTML = `<div class="empty-my-r"><div class="em-icon">⏳</div><div class="em-msg">${I18N.t('em.loading')}</div></div>`;
     const r = await Community.myRestaurants();
     this._myRestaurants = r.ok ? r.data.items : [];
-    document.getElementById('statMyR').textContent = this._myRestaurants.length;
+    // Old #statMyR was removed — count is shown in the community header
+    // (rendered by _renderMyRestaurants below via the postCount slot).
     this._myFollowerCount = await Community.followerCount(Community.currentUser.id);
     this._renderMyRestaurants();
     this._loadMyScore();
@@ -1442,17 +1447,18 @@ const ProfileCtrl = {
     const counts = await Promise.all(this._myRestaurants.map(r => Community.voteCount(r.id)));
     const total = counts.reduce((a, b) => a + b, 0);
     this._myStarTotal = total;
-    const el = document.getElementById('statScore');
-    if (el) el.textContent = total;
     // Header was already drawn with a "…" placeholder star count before this
     // resolved (votes need their own round-trip per restaurant) — patch it
-    // in now that the real total is known.
-    const headerStat = document.querySelector('#myRestaurantList .social-stat span[data-star-total]');
+    // in now that the real total is known. Header lives in
+    // #myRProfileHeader now (moved out of #myRestaurantList to sit ABOVE
+    // the filter tabs, matching the Instagram-style layout).
+    const headerStat = document.querySelector('#myRProfileHeader .social-stat span[data-star-total]');
     if (headerStat) headerStat.textContent = total;
   },
 
   _renderMyRestaurants() {
     const list = document.getElementById('myRestaurantList');
+    const headerEl = document.getElementById('myRProfileHeader');
     const items = this._myRFilter === 'all'
       ? this._myRestaurants
       : this._myRestaurants.filter(r => COMMUNITY_PB_TO_CAT[r.category] === this._myRFilter);
@@ -1465,9 +1471,12 @@ const ProfileCtrl = {
       starCount: `<span data-star-total>${this._myStarTotal ?? '···'}</span>`,
       followerCount: this._myFollowerCount ?? '···',
     });
+    // Header lands ABOVE filter tabs in dedicated container so layout
+    // matches Instagram-style profile (identity → tabs → grid).
+    if (headerEl) headerEl.innerHTML = header;
 
     if (!items.length) {
-      list.innerHTML = header + `<div class="empty-my-r">
+      list.innerHTML = `<div class="empty-my-r">
         <div class="em-icon">📝</div>
         <div class="em-msg">${I18N.t('em.noRestaurantsYet')}</div>
         <div class="em-sub">${I18N.t('em.postToSeeHere')}</div>
@@ -1475,7 +1484,7 @@ const ProfileCtrl = {
       return;
     }
 
-    list.innerHTML = header + `<div class="social-grid">${items.map(r => communityGridCellHtml(r)).join('')}</div>`;
+    list.innerHTML = `<div class="social-grid">${items.map(r => communityGridCellHtml(r)).join('')}</div>`;
     wireCardDetail(list, items);
   },
 };

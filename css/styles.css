@@ -1304,12 +1304,24 @@ body.map-full .tabbar{transform:translateY(105%)}
 .social-stat b{display:block;font-size:1rem;font-weight:900;color:var(--text)}
 .social-stat span{display:block;font-size:.66rem;color:var(--text3);margin-top:.1rem}
 
-.social-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:var(--text)}
+.social-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:transparent}
 .grid-cell{
   aspect-ratio:1/1;background-color:var(--cream-2);background-size:cover;background-position:center;
   display:flex;align-items:center;justify-content:center;font-size:1.6rem;cursor:pointer;
-  border:none;border-radius:0;box-shadow:none;
+  border:1.5px solid var(--text);border-radius:12px;box-shadow:2px 2px 0 var(--text);
+  transition:transform .12s var(--ease-spring),box-shadow .12s;
 }
+.grid-cell:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+
+/* Settings gear — top-right of profile screen, replaces old avatar-tap */
+.settings-gear{
+  position:absolute;top:calc(env(safe-area-inset-top, 0px) + .6rem);right:.9rem;
+  width:2.4rem;height:2.4rem;border-radius:50%;
+  background:var(--white);border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
+  display:flex;align-items:center;justify-content:center;font-size:1.15rem;
+  cursor:pointer;z-index:6;transition:transform .12s var(--ease-spring),box-shadow .12s;
+}
+.settings-gear:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
 
 .empty-comm{
   padding:2rem 1rem;text-align:center;background:var(--paper);
