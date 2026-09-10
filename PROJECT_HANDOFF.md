@@ -135,7 +135,7 @@ Từ buổi bàn "làm cộng đồng giống mạng xã hội hơn", có 4 hư�
 ## 8. Tài liệu liên quan đã có
 
 - `PROJECT_HANDOFF.md` — chính là file này.
-- `README.md` — **RẤT CŨ** (viết ngày đầu dự án 2026-08-23), mô tả sai kiến trúc hiện tại (nói "1 file index.html", không nhắc AI/cộng đồng/song ngữ, hướng dẫn deploy Netlify trong khi thực tế dùng Cloudflare Pages). Nên viết lại hoặc xoá — chưa làm vì ngoài phạm vi yêu cầu lần này.
+- `README.md` — **đã viết lại cùng ngày với file này (2026-09-10)**, khớp với thực tế hiện tại: kiến trúc 13 module JS, tech stack (Gemini + OSM + Photon + OSRM + PocketBase), deploy Cloudflare Pages Direct Upload, quy trình bump `?v=NNNN`, hướng dẫn chạy local. Nội dung là bản rút gọn của file này (~140 dòng vs 154 dòng của HANDOFF), dùng làm entry point cho người mới; cần bối cảnh sâu vẫn dẫn về file này.
 - `NhopNhep-docs/` (thư mục riêng) — có sẵn `NhopNhep-TongQuan`, `NhopNhep-LoTrinh`, `NhopNhep-BaoCaoTienDo` (html+pdf) — CHƯA kiểm tra độ mới, có thể cũng đã cũ, nên đối chiếu lại nếu dùng.
 - Bản pitch deck nhà đầu tư (VI+EN, PDF) đã tạo trong phiên làm việc này — chứa nghiên cứu thị trường Đông Nam Á/Việt Nam có trích nguồn thật (Momentum Works, e-Conomy SEA, Do Ventures/NIC/VPCA/BCG...) và khung định giá tham khảo — hữu ích nếu cần lại số liệu thị trường mà không muốn research lại từ đầu. File nằm ở scratchpad phiên làm việc lúc đó, không nằm trong repo — nếu cần lại, phải tạo mới.
 
@@ -151,4 +151,4 @@ Không thiếu người chơi lớn (ShopeeFood/GrabFood ~95% thị phần giao 
 
 1. **Quyết định mô hình doanh thu** hoặc ít nhất gắn analytics để có số liệu thật trước khi quyết định — hiện đang hoàn toàn "bay mù" không biết ai dùng app.
 2. **Nâng cấp Gemini API lên gói trả phí** (rẻ, theo lượng dùng) trước khi push công khai rộng rãi — quota miễn phí hiện tại quá nhỏ so với 1 bài đăng lan truyền.
-3. **Viết lại `README.md`** cho khớp thực tế hiện tại (đang sai gần như hoàn toàn) — ảnh hưởng trực tiếp đến việc người khác (kể cả 1 Claude session khác) hiểu đúng dự án khi mới vào.
+3. **Gắn analytics tối thiểu** (Cloudflare Web Analytics — miễn phí, không cần thay đổi code ngoài 1 dòng `<script>`) trước khi push rộng — mục 2 mục 5 vẫn đang là "bay mù hoàn toàn", chưa có cách nào validate quyết định #1 (mô hình doanh thu) mà không có số liệu.
