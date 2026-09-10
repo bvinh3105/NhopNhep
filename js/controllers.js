@@ -2471,9 +2471,17 @@ const CommunityCtrl = {
     if (this._mode === 'register' && password.length < 8) { showToast(I18N.t('toast.passwordMin8')); return; }
 
     // Bot check only gates NEW account creation — login stays untouched.
+    // IMPORTANT: turnstile.getResponse()/.reset() need the actual container
+    // ELEMENT, not its id as a string — passing a string throws "Could not
+    // find widget for provided container" (caught live-testing 2026-09-11
+    // before shipping; would have silently broken every registration
+    // attempt). Wrapped in try/catch too as a defensive backstop — an
+    // uncaught throw here would otherwise abort _submitAuth() with zero
+    // visible feedback to the user.
+    const turnstileEl = document.getElementById('communityTurnstile');
     let turnstileToken = null;
     if (this._mode === 'register') {
-      turnstileToken = window.turnstile?.getResponse('communityTurnstile') || null;
+      try { turnstileToken = window.turnstile?.getResponse(turnstileEl) || null; } catch (_) { turnstileToken = null; }
       if (!turnstileToken) { showToast(I18N.t('toast.turnstileRequired')); return; }
     }
 
@@ -2488,7 +2496,7 @@ const CommunityCtrl = {
     // Turnstile tokens are single-use — always reset after an attempt so
     // a retry (this one failing, or the next registration this same page
     // load) gets a fresh token instead of silently reusing a spent one.
-    if (this._mode === 'register') window.turnstile?.reset('communityTurnstile');
+    if (this._mode === 'register') { try { window.turnstile?.reset(turnstileEl); } catch (_) {} }
 
     if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
     if (typeof Analytics !== 'undefined') {
