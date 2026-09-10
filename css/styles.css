@@ -708,36 +708,36 @@ body.map-full .tabbar{transform:translateY(105%)}
 .pmap-start-btn.navigating:active{box-shadow:1px 2px 0 #1B5E20}
 .pmap-start-btn.navigating:hover{background:#256428}
 
+/* "Tạm dừng" (paused) state — same button, amber instead of green so
+   it's visually obvious tracking is on hold (tap = resume). One button
+   cycles navigating <-> paused; long-press ends the trip from either. */
+.pmap-start-btn.paused{
+  background:var(--accent-2);border-color:#8a4315;
+  box-shadow:3px 4px 0 #8a4315;animation:none;
+}
+.pmap-start-btn.paused:active{box-shadow:1px 2px 0 #8a4315}
+.pmap-start-btn.paused:hover{background:#c05f1e}
+
 /* Long-press-to-end fill — a dark overlay that sweeps left-to-right
    while held, so holding long enough to end the trip is visibly
    confirmed instead of feeling like an accidental tap. --hold-ms is set
    from JS (HOLD_END_MS) so the animation always finishes exactly when
-   the timer actually fires. */
-.pmap-start-btn.navigating::after{
+   the timer actually fires. Applies in both active states (navigating
+   or paused) — long-press ends the trip from either. */
+.pmap-start-btn.navigating::after,
+.pmap-start-btn.paused::after{
   content:'';position:absolute;inset:0;background:rgba(0,0,0,.3);
   transform:scaleX(0);transform-origin:left center;pointer-events:none;
 }
-.pmap-start-btn.navigating.holding::after{
+.pmap-start-btn.navigating.holding::after,
+.pmap-start-btn.paused.holding::after{
   animation:hold-fill var(--hold-ms,650ms) linear forwards;
 }
 @keyframes hold-fill{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @media (prefers-reduced-motion: reduce){
-  .pmap-start-btn.navigating.holding::after{animation-duration:.01ms}
+  .pmap-start-btn.navigating.holding::after,
+  .pmap-start-btn.paused.holding::after{animation-duration:.01ms}
 }
-
-.pmap-pause-btn{
-  width:52px;height:52px;flex-shrink:0;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  background:var(--white);color:var(--text);
-  border:3px solid var(--text);box-shadow:3px 4px 0 var(--text);
-  cursor:pointer;
-}
-/* Our own display:flex above otherwise outranks the UA [hidden]{display:
-   none} rule (same specificity, later in source), so the pause button
-   would stay visible even with the hidden attribute set. Restore it
-   explicitly — bug caught live-testing before shipping. */
-.pmap-pause-btn[hidden]{display:none}
-.pmap-pause-btn:active{transform:translate(1px,2px);box-shadow:1px 2px 0 var(--text)}
 
 /* Off-route banner — warm amber "heads up", not a scary red error
    (matches the lesson from the duplicate-post confirm box: system

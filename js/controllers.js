@@ -1103,28 +1103,31 @@ const PlanCtrl = {
     document.getElementById('pmapLocate').addEventListener('click', () => PlanCtrl._centerOnMe());
     document.getElementById('pmapFs').addEventListener('click', () => PlanCtrl._toggleFullscreen());
 
-    // Primary "Bắt đầu"/"Đang đi" navigation control cluster — only
-    // visible in fullscreen. Wrapper centers the main button + the
-    // pause button (which only appears once navigating) as one unit.
+    // Single "Bắt đầu"/"Đang đi"/"Tạm dừng" button — only visible in
+    // fullscreen. One control, 3 states, cycling: idle -> tap starts ->
+    // tap pauses -> tap resumes -> ... -> long-press ends -> back to
+    // idle. No separate pause button (see _wireNavButtons/_renderNavButtonState).
     const oldNavControls = wrap.querySelector('.pmap-nav-controls');
     if (oldNavControls) oldNavControls.remove();
     const navControls = document.createElement('div');
     navControls.className = 'pmap-nav-controls';
     navControls.innerHTML = `
       <button class="pmap-start-btn" id="pmapStart" type="button" aria-label="${I18N.t('nav.startAria')}">
-        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" aria-hidden="true">
-          <path d="M12 3.2c-.5 0-1 .3-1.2.85L4 20.2c-.35.85.55 1.65 1.35 1.2L12 17.7l6.65 3.7c.8.45 1.7-.35 1.35-1.2L13.2 4.05C13 3.5 12.5 3.2 12 3.2Z"
-                fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-        </svg>
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" aria-hidden="true"></svg>
         <span></span>
       </button>
-      <button class="pmap-pause-btn" id="pmapPause" type="button" hidden></button>
     `;
     wrap.appendChild(navControls);
     this._navActive = false;
     this._navPaused = false;
     this._wireNavButtons();
   },
+
+  // The button's icon swaps with its state (nav arrow while idle/moving,
+  // a play triangle once paused, to hint "tap to resume"). Path data for
+  // each, injected into the <svg> created above.
+  NAV_ICON_ARROW: '<path d="M12 3.2c-.5 0-1 .3-1.2.85L4 20.2c-.35.85.55 1.65 1.35 1.2L12 17.7l6.65 3.7c.8.45 1.7-.35 1.35-1.2L13.2 4.05C13 3.5 12.5 3.2 12 3.2Z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>',
+  NAV_ICON_PLAY: '<path d="M8 5v14l11-7z" fill="currentColor"/>',
 
   init() {
     document.getElementById('planBack').addEventListener('click', () => {
@@ -1206,8 +1209,9 @@ const PlanCtrl = {
 
   // Google-Maps-style "Bắt đầu": start live GPS, zoom to user, fetch the
   // real route for the current leg, and switch the button into "Đang đi"
-  // (navigating) state. Tapping the green button again just re-centers
-  // (_recenterNav) — only a long-press ends the trip (_endNav).
+  // (navigating) state. From there the SAME button cycles: tap ->
+  // pause, tap -> resume, ... ; long-press -> end (_endNav). Recentering
+  // is the separate 📍 pmapLocate button, not this one.
   async _startNav() {
     if (!State.planMap) return;
     const wrap = document.getElementById('planMapWrap');
@@ -1242,14 +1246,6 @@ const PlanCtrl = {
     const pts = [[State.userLat, State.userLng], ...stops.map(s => [s.lat, s.lng])];
     const routePts = await this._drawRoute(pts);
     this._navRoutePoints = routePts || pts;
-  },
-
-  // Tap on the already-navigating (green) button — just re-center, same
-  // "idempotent" spirit as the original single-state button.
-  _recenterNav() {
-    if (State.userLat != null && State.userLng != null && State.planMap) {
-      State.planMap.setView([State.userLat, State.userLng], 17);
-    }
   },
 
   // Fully stops the GPS watch (not just a flag _onLiveFix checks) — the
@@ -1293,28 +1289,36 @@ const PlanCtrl = {
     if (!opts.silent) showToast(I18N.t('nav.ended'));
   },
 
+  // 3 states, one button: idle "Bắt đầu" (red) -> navigating "Đang đi"
+  // (green, nav-arrow) -> paused "Tạm dừng" (amber, play icon, hints
+  // "tap to resume") -> ... cycling between navigating/paused on each
+  // tap -> long-press ends, back to idle. No separate pause button.
   _renderNavButtonState() {
     const btn = document.getElementById('pmapStart');
-    const pauseBtn = document.getElementById('pmapPause');
     if (!btn) return;
-    btn.classList.toggle('navigating', this._navActive);
+    btn.classList.toggle('navigating', this._navActive && !this._navPaused);
+    btn.classList.toggle('paused', this._navActive && this._navPaused);
     const label = btn.querySelector('span');
-    if (label) label.textContent = this._navActive ? I18N.t('nav.navigating') : I18N.t('nav.start');
-    if (pauseBtn) {
-      pauseBtn.hidden = !this._navActive;
-      pauseBtn.setAttribute('aria-label', I18N.t(this._navPaused ? 'nav.resumeAria' : 'nav.pauseAria'));
-      pauseBtn.innerHTML = this._navPaused
-        ? `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>`
-        : `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`;
+    const icon = btn.querySelector('svg');
+    let text, iconSvg, aria;
+    if (!this._navActive) {
+      text = I18N.t('nav.start'); iconSvg = this.NAV_ICON_ARROW; aria = I18N.t('nav.startAria');
+    } else if (this._navPaused) {
+      text = I18N.t('nav.pausedLabel'); iconSvg = this.NAV_ICON_PLAY; aria = I18N.t('nav.resumeAria');
+    } else {
+      text = I18N.t('nav.navigating'); iconSvg = this.NAV_ICON_ARROW; aria = I18N.t('nav.pauseAria');
     }
+    if (label) label.textContent = text;
+    if (icon) icon.innerHTML = iconSvg;
+    btn.setAttribute('aria-label', aria);
   },
 
-  // Tap = start / recenter / resume. Long-press (HOLD_END_MS) on the
-  // green "Đang đi" button = end the trip. Pointer events (not click)
-  // so touch + mouse share one code path and we can time the hold.
+  // Tap: idle -> start; navigating -> pause; paused -> resume. Long-press
+  // (HOLD_END_MS), only while active (paused or not) -> end the trip.
+  // Pointer events (not click) so touch + mouse share one code path and
+  // we can time the hold.
   _wireNavButtons() {
     const startBtn = document.getElementById('pmapStart');
-    const pauseBtn = document.getElementById('pmapPause');
     if (!startBtn) return;
     this._renderNavButtonState();
 
@@ -1347,20 +1351,10 @@ const PlanCtrl = {
     );
     startBtn.addEventListener('click', () => {
       if (this._suppressNextClick) { this._suppressNextClick = false; return; }
-      if (this._navActive) {
-        if (this._navPaused) this._resumeNav();
-        else this._recenterNav();
-      } else {
-        this._startNav();
-      }
+      if (!this._navActive) this._startNav();
+      else if (this._navPaused) this._resumeNav();
+      else this._pauseNav();
     });
-
-    if (pauseBtn) {
-      pauseBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (this._navPaused) this._resumeNav(); else this._pauseNav();
-      });
-    }
   },
 
   _showOffRouteBanner(show) {
