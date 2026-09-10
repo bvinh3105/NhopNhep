@@ -1005,6 +1005,36 @@ const PlanCtrl = {
     });
   },
 
+  // Draws a route through `pts` ([lat,lng][], in order) on State.planMap:
+  // an immediate dashed straight-line fallback so the map is never empty,
+  // then swaps in the real OSRM road route once it resolves (kept on
+  // failure — better an approximate line than none). Shared by the
+  // initial preview draw, nav-start, each leg-advance, and reroute-on-
+  // deviation, so all of them look and behave the same way. Returns a
+  // Promise of the resolved route's points ([lat,lng][]) or null.
+  _routeLayer: null,
+  _drawRoute(pts) {
+    if (this._routeLayer) { try { this._routeLayer.remove(); } catch(_){} }
+    this._routeLayer = L.polyline(pts, {
+      color: '#B92626', weight: 3, opacity: .55, dashArray: '7,5',
+    }).addTo(State.planMap);
+
+    const osrmCoords = pts.map(([la, lo]) => `${lo},${la}`).join(';');
+    return fetch(`https://router.project-osrm.org/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson`)
+      .then(r => r.json())
+      .then(data => {
+        const geom = data.routes?.[0]?.geometry;
+        if (!geom) return null;
+        if (this._routeLayer) { try { this._routeLayer.remove(); } catch(_){} }
+        const routePts = geom.coordinates.map(([lo, la]) => [la, lo]);
+        this._routeLayer = L.polyline(routePts, {
+          color: '#B92626', weight: 4.5, opacity: .9, lineJoin: 'round', lineCap: 'round',
+        }).addTo(State.planMap);
+        return routePts;
+      })
+      .catch(() => null); // keep the dashed fallback on error
+  },
+
   _initPlanMap() {
     if (State.planMap) { try { State.planMap.remove(); } catch(_){} State.planMap = null; }
     const stops = State.itinerary;
@@ -1013,10 +1043,16 @@ const PlanCtrl = {
     const allPts = [[State.userLat, State.userLng], ...stops.map(s => [s.lat, s.lng])];
     const bounds = L.latLngBounds(allPts);
 
-    // Interactive map — user can pan/zoom to inspect the route
+    // Interactive map — user can pan/zoom to inspect the route.
+    // rotate:true (leaflet-rotate plugin, loaded in index.html) enables
+    // heading-up nav mode via setBearing() — see _onLiveFix(). Markers
+    // default to rotateWithView:false in that plugin, so stop pins/live
+    // dot stay screen-upright automatically as the map rotates; nothing
+    // extra needed here for that.
     State.planMap = L.map('planMap', {
       zoomControl: false, attributionControl: false,
       dragging: true, scrollWheelZoom: true, touchZoom: true, doubleClickZoom: true,
+      rotate: true, rotateControl: false, touchRotate: true, bearing: 0,
     });
     TileLayer.add(State.planMap);
     State.planMap.fitBounds(bounds.pad(0.25));
@@ -1038,10 +1074,12 @@ const PlanCtrl = {
       L.marker([s.lat, s.lng], { icon }).addTo(State.planMap);
     });
 
-    // Draw straight-line fallback immediately so map isn't empty while routing loads
-    const fallbackLine = L.polyline(allPts, {
-      color: '#B92626', weight: 3, opacity: .55, dashArray: '7,5',
-    }).addTo(State.planMap);
+    // Draw straight-line fallback immediately so map isn't empty while
+    // routing loads, then swap in the real road route once OSRM answers
+    // (see _drawRoute — shared with nav-time reroute/leg-advance so the
+    // "dashed now, solid once loaded" behavior stays consistent everywhere).
+    this._routeLayer = null;
+    this._drawRoute(allPts);
 
     // Overlay controls: zoom + fit + locate + fullscreen
     const wrap = document.getElementById('planMapWrap');
@@ -1065,42 +1103,27 @@ const PlanCtrl = {
     document.getElementById('pmapLocate').addEventListener('click', () => PlanCtrl._centerOnMe());
     document.getElementById('pmapFs').addEventListener('click', () => PlanCtrl._toggleFullscreen());
 
-    // Primary "Bắt đầu" navigation button — only visible in fullscreen.
-    // Cute Google-Maps-style pill with a rounded navigation arrow.
-    const oldStart = wrap.querySelector('.pmap-start-btn');
-    if (oldStart) oldStart.remove();
-    const startBtn = document.createElement('button');
-    startBtn.className = 'pmap-start-btn';
-    startBtn.id = 'pmapStart';
-    startBtn.type = 'button';
-    startBtn.setAttribute('aria-label', I18N.t('nav.startAria'));
-    startBtn.innerHTML = `
-      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" aria-hidden="true">
-        <path d="M12 3.2c-.5 0-1 .3-1.2.85L4 20.2c-.35.85.55 1.65 1.35 1.2L12 17.7l6.65 3.7c.8.45 1.7-.35 1.35-1.2L13.2 4.05C13 3.5 12.5 3.2 12 3.2Z"
-              fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
-      </svg>
-      <span>Bắt đầu</span>
+    // Primary "Bắt đầu"/"Đang đi" navigation control cluster — only
+    // visible in fullscreen. Wrapper centers the main button + the
+    // pause button (which only appears once navigating) as one unit.
+    const oldNavControls = wrap.querySelector('.pmap-nav-controls');
+    if (oldNavControls) oldNavControls.remove();
+    const navControls = document.createElement('div');
+    navControls.className = 'pmap-nav-controls';
+    navControls.innerHTML = `
+      <button class="pmap-start-btn" id="pmapStart" type="button" aria-label="${I18N.t('nav.startAria')}">
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" aria-hidden="true">
+          <path d="M12 3.2c-.5 0-1 .3-1.2.85L4 20.2c-.35.85.55 1.65 1.35 1.2L12 17.7l6.65 3.7c.8.45 1.7-.35 1.35-1.2L13.2 4.05C13 3.5 12.5 3.2 12 3.2Z"
+                fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+        </svg>
+        <span></span>
+      </button>
+      <button class="pmap-pause-btn" id="pmapPause" type="button" hidden></button>
     `;
-    wrap.appendChild(startBtn);
-    startBtn.addEventListener('click', () => PlanCtrl._startNav());
-
-    // Fetch real road route from OSRM (free, no key needed)
-    // Coords format: lng,lat;lng,lat;...
-    const osrmCoords = allPts.map(([la, lo]) => `${lo},${la}`).join(';');
-    fetch(`https://router.project-osrm.org/route/v1/driving/${osrmCoords}?overview=full&geometries=geojson`)
-      .then(r => r.json())
-      .then(data => {
-        const geom = data.routes?.[0]?.geometry;
-        if (!geom) return;
-        // Remove fallback dashed line, draw real road route
-        fallbackLine.remove();
-        L.geoJSON(geom, {
-          style: { color: '#B92626', weight: 4.5, opacity: .9, lineJoin: 'round', lineCap: 'round' },
-        }).addTo(State.planMap);
-      })
-      .catch(() => {
-        // Keep the fallback dashed line — no-op on error
-      });
+    wrap.appendChild(navControls);
+    this._navActive = false;
+    this._navPaused = false;
+    this._wireNavButtons();
   },
 
   init() {
@@ -1166,12 +1189,27 @@ const PlanCtrl = {
     document.getElementById('pmapLocate')?.classList.add('tracking');
   },
 
-  // Google-Maps-style "Bắt đầu": start live GPS, zoom to user, and tell
-  // them how far the nearest planned stop is so they know where they're
-  // heading. Idempotent — pressing again just re-centers.
-  _startNav() {
+  // ── Turn-by-turn nav state (all PlanCtrl-scoped, like _watchId/_liveMarker
+  //    already were — reset fresh on every _initPlanMap rebuild) ──────────
+  _navActive: false,       // trip in progress (button shows green "Đang đi")
+  _navPaused: false,       // tracking frozen mid-trip, trip still "active"
+  _navLegIndex: 0,         // State.itinerary[navLegIndex] = stop we're heading to now
+  _navRoutePoints: [],     // [lat,lng][] remaining road ahead for the CURRENT leg — trimmed as the user walks it
+  _navHeading: null,       // smoothed bearing (deg, 0=north) — drives map rotation
+  _navOffRoute: false,     // true while a reroute fetch is in flight
+  _offRouteStreak: 0,      // consecutive off-threshold fixes (debounce GPS jitter before declaring off-route)
+  OFF_ROUTE_M: 40,         // meters from the route line before it's "wrong direction"
+  OFF_ROUTE_STREAK: 2,     // how many consecutive bad fixes before triggering reroute
+  ARRIVE_M: 30,            // meters from a stop to count as "arrived"
+  HOLD_END_MS: 650,        // long-press duration to end the trip
+  _suppressNextClick: false, // set right before _endNav()'s DOM rebuild so the trailing click (on whichever button ends up at that spot) doesn't re-trigger _startNav()
+
+  // Google-Maps-style "Bắt đầu": start live GPS, zoom to user, fetch the
+  // real route for the current leg, and switch the button into "Đang đi"
+  // (navigating) state. Tapping the green button again just re-centers
+  // (_recenterNav) — only a long-press ends the trip (_endNav).
+  async _startNav() {
     if (!State.planMap) return;
-    // Make sure we're in fullscreen so the map is actually usable
     const wrap = document.getElementById('planMapWrap');
     if (wrap && !wrap.classList.contains('fullscreen')) this._toggleFullscreen();
     this._startLiveTracking();
@@ -1180,32 +1218,197 @@ const PlanCtrl = {
       showToast(I18N.t('toast.fetchingGps'));
       return;
     }
-    State.planMap.setView([State.userLat, State.userLng], 17);
 
-    // Find the nearest planned stop, hint the distance in the toast so
-    // the user has a target as they set off.
-    const stops = State.selected instanceof Set
-      ? [...State.selected].map(id =>
-          (State.results || []).find(r => r.id === id) ||
-          (State.userRestaurants || []).find(r => r.id === id)
-        ).filter(s => s && s.lat != null && s.lng != null)
-      : [];
-    if (stops.length) {
-      let nearest = null, minD = Infinity;
-      for (const s of stops) {
-        const d = this._haversineKm(State.userLat, State.userLng, s.lat, s.lng);
-        if (d < minD) { minD = d; nearest = s; }
-      }
-      if (nearest) {
-        const label = minD < 1
-          ? `${Math.round(minD * 1000)}m`
-          : `${minD.toFixed(1)}km`;
-        showToast(I18N.t('toast.navigatingTo', { name: nearest.name, label }));
+    this._navActive = true;
+    this._navPaused = false;
+    this._navLegIndex = 0;
+    this._navHeading = null;
+    this._navOffRoute = false;
+    this._offRouteStreak = 0;
+    this._renderNavButtonState();
+
+    State.planMap.setView([State.userLat, State.userLng], 17);
+    showToast(I18N.t('toast.trackingRealtime'));
+    await this._buildLegRoute();
+  },
+
+  // Fetches the road route from the CURRENT position through every stop
+  // from _navLegIndex onward, and stores the point array for off-route/
+  // trim math (_onLiveFix). Called at nav-start and again after each
+  // arrival (advancing to the next leg).
+  async _buildLegRoute() {
+    const stops = State.itinerary.slice(this._navLegIndex);
+    if (!stops.length || State.userLat == null || State.userLng == null) return;
+    const pts = [[State.userLat, State.userLng], ...stops.map(s => [s.lat, s.lng])];
+    const routePts = await this._drawRoute(pts);
+    this._navRoutePoints = routePts || pts;
+  },
+
+  // Tap on the already-navigating (green) button — just re-center, same
+  // "idempotent" spirit as the original single-state button.
+  _recenterNav() {
+    if (State.userLat != null && State.userLng != null && State.planMap) {
+      State.planMap.setView([State.userLat, State.userLng], 17);
+    }
+  },
+
+  // Fully stops the GPS watch (not just a flag _onLiveFix checks) — the
+  // live dot/accuracy circle genuinely freeze in place, not just the nav
+  // math (rotation/reroute/trim). _liveMarker/_liveCircle are left as-is
+  // so the dot stays visible right where it was.
+  _pauseNav() {
+    if (!this._navActive) return;
+    this._navPaused = true;
+    if (this._watchId != null) {
+      try { navigator.geolocation.clearWatch(this._watchId); } catch (_) {}
+      this._watchId = null;
+    }
+    this._renderNavButtonState();
+    showToast(I18N.t('nav.paused'));
+  },
+
+  _resumeNav() {
+    if (!this._navActive) return;
+    this._navPaused = false;
+    this._startLiveTracking(); // restarts watchPosition where _pauseNav stopped it
+    this._renderNavButtonState();
+    showToast(I18N.t('nav.resumed'));
+  },
+
+  // Long-press on the "Đang đi" button, or the destination reached —
+  // fully stops the trip and rebuilds the plan map back to its pristine
+  // pre-nav state (also exits fullscreen, matching how entering fullscreen
+  // auto-starts tracking).
+  _endNav(opts = {}) {
+    this._navActive = false;
+    this._navPaused = false;
+    this._navOffRoute = false;
+    this._navRoutePoints = [];
+    this._navHeading = null;
+    this._offRouteStreak = 0;
+    this._showOffRouteBanner(false);
+    const wrap = document.getElementById('planMapWrap');
+    if (wrap && wrap.classList.contains('fullscreen')) this._toggleFullscreen();
+    this._initPlanMap(); // fresh map: resets bearing, route, buttons, markers
+    if (!opts.silent) showToast(I18N.t('nav.ended'));
+  },
+
+  _renderNavButtonState() {
+    const btn = document.getElementById('pmapStart');
+    const pauseBtn = document.getElementById('pmapPause');
+    if (!btn) return;
+    btn.classList.toggle('navigating', this._navActive);
+    const label = btn.querySelector('span');
+    if (label) label.textContent = this._navActive ? I18N.t('nav.navigating') : I18N.t('nav.start');
+    if (pauseBtn) {
+      pauseBtn.hidden = !this._navActive;
+      pauseBtn.setAttribute('aria-label', I18N.t(this._navPaused ? 'nav.resumeAria' : 'nav.pauseAria'));
+      pauseBtn.innerHTML = this._navPaused
+        ? `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>`
+        : `<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`;
+    }
+  },
+
+  // Tap = start / recenter / resume. Long-press (HOLD_END_MS) on the
+  // green "Đang đi" button = end the trip. Pointer events (not click)
+  // so touch + mouse share one code path and we can time the hold.
+  _wireNavButtons() {
+    const startBtn = document.getElementById('pmapStart');
+    const pauseBtn = document.getElementById('pmapPause');
+    if (!startBtn) return;
+    this._renderNavButtonState();
+
+    let holdTimer = null;
+    const cancelHold = () => {
+      clearTimeout(holdTimer); holdTimer = null;
+      startBtn.classList.remove('holding');
+    };
+    startBtn.style.setProperty('--hold-ms', `${this.HOLD_END_MS}ms`);
+    startBtn.addEventListener('pointerdown', () => {
+      if (!this._navActive) return; // idle "Bắt đầu" has no long-press behavior
+      startBtn.classList.add('holding');
+      holdTimer = setTimeout(() => {
+        cancelHold();
+        // _endNav() rebuilds the whole map (_initPlanMap), which replaces
+        // THIS button with a fresh element+listeners while the finger may
+        // still be down — a per-closure "longPressed" flag would live on
+        // the old (now-detached) button and never see the trailing click
+        // that lands on the new one. A PlanCtrl-level flag survives the
+        // rebuild regardless of which button instance the click actually
+        // targets. (Caught live-testing: a synthetic long-press + trailing
+        // click immediately re-triggered _startNav() without this.)
+        this._suppressNextClick = true;
+        this._endNav();
+        setTimeout(() => { this._suppressNextClick = false; }, 400);
+      }, this.HOLD_END_MS);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(evt =>
+      startBtn.addEventListener(evt, cancelHold)
+    );
+    startBtn.addEventListener('click', () => {
+      if (this._suppressNextClick) { this._suppressNextClick = false; return; }
+      if (this._navActive) {
+        if (this._navPaused) this._resumeNav();
+        else this._recenterNav();
       } else {
-        showToast(I18N.t('toast.followBlueDot'));
+        this._startNav();
       }
+    });
+
+    if (pauseBtn) {
+      pauseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this._navPaused) this._resumeNav(); else this._pauseNav();
+      });
+    }
+  },
+
+  _showOffRouteBanner(show) {
+    const wrap = document.getElementById('planMapWrap');
+    let el = document.getElementById('pmapOffRoute');
+    if (show) {
+      if (!el && wrap) {
+        el = document.createElement('div');
+        el.id = 'pmapOffRoute';
+        el.className = 'pmap-offroute-banner';
+        el.innerHTML = `<span class="pmap-offroute-icon">↻</span><span>${I18N.t('nav.offRoute')}</span>`;
+        wrap.appendChild(el);
+      }
+    } else if (el) {
+      el.remove();
+    }
+  },
+
+  // Called on every live fix while navigating: if the user has drifted
+  // more than OFF_ROUTE_M from _navRoutePoints for OFF_ROUTE_STREAK
+  // fixes in a row, recompute the route from here to the remaining stops
+  // (dashed immediately via _drawRoute, replaced by the real road route
+  // once OSRM answers — same convention as every other route draw).
+  async _reroute() {
+    if (this._navOffRoute) return;
+    this._navOffRoute = true;
+    this._showOffRouteBanner(true);
+    await this._buildLegRoute();
+    this._navOffRoute = false;
+    this._offRouteStreak = 0;
+    this._showOffRouteBanner(false);
+  },
+
+  // Advances to the next stop once within ARRIVE_M of the current target;
+  // ends the trip (with a completion toast) once the last stop is reached.
+  _checkArrival() {
+    const stops = State.itinerary;
+    const target = stops[this._navLegIndex];
+    if (!target || State.userLat == null) return;
+    const d = this._haversineKm(State.userLat, State.userLng, target.lat, target.lng) * 1000;
+    if (d > this.ARRIVE_M) return;
+    this._navLegIndex++;
+    if (this._navLegIndex >= stops.length) {
+      showToast(I18N.t('nav.tripComplete'));
+      this._endNav({ silent: true });
     } else {
-      showToast(I18N.t('toast.followBlueDot'));
+      showToast(I18N.t('nav.arrivedAt', { name: target.name }));
+      this._buildLegRoute();
     }
   },
 
@@ -1216,6 +1419,63 @@ const PlanCtrl = {
       Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
       Math.sin(dLng / 2) ** 2;
     return 2 * R * Math.asin(Math.sqrt(a));
+  },
+
+  // Forward azimuth in degrees (0=north, 90=east) from point 1 to point 2.
+  _bearingDeg(lat1, lng1, lat2, lng2) {
+    const toRad = d => d * Math.PI / 180, toDeg = r => r * 180 / Math.PI;
+    const φ1 = toRad(lat1), φ2 = toRad(lat2), Δλ = toRad(lng2 - lng1);
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+  },
+
+  // Exponential smoothing across the shortest angular path (so 350°→10°
+  // interpolates through 360°/0°, not the long way through 180°) — keeps
+  // the map rotation from visibly snapping/jittering between fixes.
+  _smoothHeading(newHeading) {
+    if (this._navHeading == null) return newHeading;
+    const diff = ((newHeading - this._navHeading + 540) % 360) - 180;
+    return (this._navHeading + diff * 0.35 + 360) % 360;
+  },
+
+  // Small local equirectangular projection (meters, flat-earth) — plenty
+  // accurate at the scale of one route leg, much cheaper than doing
+  // real great-circle math per segment.
+  _toXY(lat, lng, refLat) {
+    const R = 6371000, toRad = d => d * Math.PI / 180;
+    return { x: R * toRad(lng) * Math.cos(toRad(refLat)), y: R * toRad(lat) };
+  },
+
+  // Perpendicular distance (meters) from (lat,lng) to the closest point
+  // on polyline `pts`, plus which segment/fraction it falls on — used
+  // both for off-route detection and for trimming the drawn line.
+  _closestPointOnRoute(lat, lng, pts) {
+    if (!pts || pts.length < 2) return null;
+    const p = this._toXY(lat, lng, lat);
+    let best = null;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = this._toXY(pts[i][0], pts[i][1], lat);
+      const b = this._toXY(pts[i + 1][0], pts[i + 1][1], lat);
+      const abx = b.x - a.x, aby = b.y - a.y;
+      const len2 = abx * abx + aby * aby;
+      let t = len2 > 0 ? ((p.x - a.x) * abx + (p.y - a.y) * aby) / len2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      const cx = a.x + abx * t, cy = a.y + aby * t;
+      const distM = Math.hypot(p.x - cx, p.y - cy);
+      if (!best || distM < best.distM) best = { distM, segIndex: i, t };
+    }
+    return best;
+  },
+
+  // Cuts everything BEHIND the user off the route array, so what's drawn
+  // is only the path still ahead — the projected point itself becomes
+  // the new start, followed by the untouched remainder of the polyline.
+  _trimRouteAhead(pts, closest) {
+    const { segIndex, t } = closest;
+    const a = pts[segIndex], b = pts[segIndex + 1];
+    const projected = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+    return [projected, ...pts.slice(segIndex + 1)];
   },
 
   _startLiveTracking() {
@@ -1244,6 +1504,7 @@ const PlanCtrl = {
 
   _onLiveFix(pos) {
     const { latitude: lat, longitude: lng, accuracy } = pos.coords;
+    const prevLat = State.userLat, prevLng = State.userLng;
     State.userLat = lat; State.userLng = lng;
     if (!State.planMap) return;
     if (!this._liveMarker) {
@@ -1265,6 +1526,43 @@ const PlanCtrl = {
         this._liveCircle.setLatLng([lat, lng]).setRadius(accuracy);
       }
     }
+
+    // Everything below is nav-specific (heading/rotation, off-route/
+    // reroute, trimming, arrival) — only while a trip is active and not
+    // paused.
+    if (!this._navActive || this._navPaused) return;
+
+    // Heading from displacement between fixes (chosen over device compass
+    // — no extra permission prompt, consistent outdoors). Ignore tiny/
+    // jittery moves so standing still doesn't spin the map at random.
+    if (prevLat != null && prevLng != null) {
+      const movedM = this._haversineKm(prevLat, prevLng, lat, lng) * 1000;
+      if (movedM > 3) {
+        const raw = this._bearingDeg(prevLat, prevLng, lat, lng);
+        this._navHeading = this._smoothHeading(raw);
+        if (State.planMap.setBearing) State.planMap.setBearing(-this._navHeading);
+      }
+    }
+
+    if (this._navRoutePoints.length >= 2) {
+      const closest = this._closestPointOnRoute(lat, lng, this._navRoutePoints);
+      if (closest) {
+        if (closest.distM > this.OFF_ROUTE_M) {
+          this._offRouteStreak++;
+          if (this._offRouteStreak >= this.OFF_ROUTE_STREAK && !this._navOffRoute) {
+            this._reroute();
+          }
+        } else {
+          this._offRouteStreak = 0;
+          if (!this._navOffRoute) {
+            this._navRoutePoints = this._trimRouteAhead(this._navRoutePoints, closest);
+            if (this._routeLayer) this._routeLayer.setLatLngs(this._navRoutePoints);
+          }
+        }
+      }
+    }
+
+    this._checkArrival();
   },
 };
 
