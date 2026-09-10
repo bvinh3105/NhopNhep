@@ -1,21 +1,25 @@
-// Cloudflare Pages Function — proxies + edge-caches Gemini restaurant search
-// for the SHARED/default API key path only (a user's own key still calls
-// Google directly from the browser in js/gemini.js — that's their personal
-// quota, no shared benefit from routing it through here).
-// Path: /api/gemini-search  (from functions/api/gemini-search.js)
+// ⚠️ DORMANT — built and deployed 2026-09-10, then REVERTED same day and
+// disconnected from the client (js/gemini.js no longer calls this route).
+// Kept in the repo only as a documented dead end — nothing currently
+// requests /api/gemini-search.
 //
-// Why this exists (2026-09-10): the shared key's free-tier quota is small
-// (~1,000-1,500 requests/day total, shared across EVERY visitor of the
-// app) and a public launch spike can burn through it in the first hour.
-// Moving the call server-side lets us cache identical/nearby searches at
-// the edge for 30 minutes — many users scanning the same city/area within
-// that window now share ONE real Gemini call instead of each spending
-// their own unit of the shared daily quota. Same mechanism as
+// ORIGINAL GOAL: proxy + edge-cache Gemini restaurant search for the
+// shared/default API key path, so many users scanning the same area during
+// a launch-day traffic spike would share ONE real Gemini call instead of
+// each spending a unit of the small shared free-tier quota (~1,000-1,500
+// req/day total, across EVERY visitor) — same mechanism as the working
 // functions/api/overpass.js, just for AI results instead of map data.
 //
-// Bonus: the API key now lives as a real Cloudflare secret (GEMINI_API_KEY)
-// instead of the fragmented-string-in-client-JS trick — closes the
-// "obfuscated but not actually secret" gap flagged in the product audit.
+// WHY IT'S DISABLED: verified live and 100% reproducible — Cloudflare
+// executes Pages Functions for Vietnam-origin requests (confirmed via
+// request.cf: country "VN", region "Hanoi") at its Hong Kong colo (HKG),
+// and Gemini's API hard-rejects any call whose network origin is Hong
+// Kong: `400 FAILED_PRECONDITION "User location is not supported for the
+// API use."` Calling directly from the user's own browser (the original,
+// restored approach) avoids this entirely, since the real network origin
+// is wherever the user actually is, not Cloudflare's edge routing choice.
+// Revisit only if Cloudflare adds a Vietnam/SEA compute PoP that isn't
+// HKG, or Google lifts the Hong Kong restriction.
 
 const MODEL = 'gemini-flash-lite-latest';
 const EDGE_CACHE_TTL = 1800; // 30 min — restaurant existence doesn't change
@@ -84,7 +88,13 @@ export async function onRequest(context) {
   try {
     items = await callGemini(env.GEMINI_API_KEY, prompt, temperature);
   } catch (e) {
-    return json({ error: 'Gemini call failed', detail: String(e.message || e) }, 502);
+    // Temporary diagnostic (2026-09-10): include which Cloudflare edge PoP
+    // handled this so we can tell whether a Gemini geo-restriction error is
+    // specific to one colo or affects the PoPs real users actually hit.
+    return json({
+      error: 'Gemini call failed', detail: String(e.message || e),
+      _diag: { colo: request.cf?.colo, country: request.cf?.country, region: request.cf?.region },
+    }, 502);
   }
 
   const respBody = JSON.stringify(items);

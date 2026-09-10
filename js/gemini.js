@@ -1,19 +1,23 @@
 /* ═══════════════════════════════════════════════
-   GEMINI AI
-   Two key sources, in order:
-     1) User's own key in localStorage (Settings → Gemini AI) — calls
-        Google directly from the browser (Gemini's REST API supports CORS),
-        same as always. It's the user's personal quota; nothing to gain by
-        proxying/caching it.
-     2) Built-in shared key — as of 2026-09-10 this path goes through
-        /api/gemini-search (a Cloudflare Pages Function, see
-        functions/api/gemini-search.js) instead of calling Google directly.
-        The key itself now lives server-side as a real Cloudflare secret,
-        and results are edge-cached for 30 min so a launch-day traffic
-        spike doesn't burn the shared free-tier quota in the first hour —
-        see that file's header comment for the full reasoning. The
-        fragmented key below is kept ONLY as a last-resort fallback if the
-        proxy itself is ever unreachable (see _call()'s fallback branch).
+   GEMINI AI — client-side direct call
+   The Gemini REST API supports CORS, so we call Google directly from
+   the browser. Two key sources, in order:
+     1) User's own key in localStorage (Settings → Gemini AI)
+     2) Built-in shared key (fragmented below), HTTP-referrer restricted
+        on Google Cloud Console to nhopnhep.pages.dev + localhost.
+
+   Tried (2026-09-10) and REVERTED: routing the shared-key path through a
+   Cloudflare Pages Function (functions/api/gemini-search.js) to edge-cache
+   results and stop shipping the key to the client. Confirmed dead end —
+   Cloudflare executes Workers/Pages Functions for Vietnam-origin traffic
+   at its Hong Kong colo (HKG), and Gemini's API hard-rejects ANY request
+   whose network origin is Hong Kong with "User location is not supported
+   for the API use." (verified live, 100% reproducible across repeated
+   calls; see git history around this date for the full proxy code if
+   Cloudflare's Vietnam routing or Google's restriction ever changes).
+   Calling directly from the user's own browser avoids this entirely,
+   since the browser's real network origin is wherever the user actually
+   is, not Cloudflare's edge routing.
 ═══════════════════════════════════════════════ */
 
 // Built-in shared key, split so GitHub secret-scanning doesn't auto-revoke.
@@ -141,45 +145,7 @@ const Gemini = {
   },
 
   // ── Tìm quán gần vị trí (dùng trong scan) ─────────────────────────────
-  // Two paths, chosen by which key is in play:
-  //  - User's OWN key: build the prompt here and call Google directly, as
-  //    before — it's their personal quota, nothing to share/cache.
-  //  - Shared/default key: route through /api/gemini-search instead. That
-  //    Function builds the SAME prompt server-side and edge-caches the
-  //    result for 30 min, so many users scanning the same area within a
-  //    launch-day spike share ONE real Gemini call instead of each burning
-  //    a unit of the small shared daily quota. Falls through to the OSM
-  //    path in scan() on any failure, same as before — this never makes
-  //    the feature less resilient, only (usually) less quota-hungry.
   async findQuan(lat, lng, radius, opts = {}) {
-    if (!this.usingCustomKey()) {
-      try {
-        const res = await fetch('/api/gemini-search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            lat, lng, radius,
-            categories: opts.categories || [],
-            dish: opts.dish || '',
-            limit: opts.limit || 20,
-          }),
-          signal: AbortSignal.timeout(12000),
-        });
-        if (!res.ok) {
-          const detail = await res.text().catch(() => '');
-          throw new Error(`Gemini proxy ${res.status}: ${detail.slice(0, 150)}`);
-        }
-        const arr = await res.json();
-        return normalizeQuanArray(arr);
-      } catch (e) {
-        // Proxy itself unreachable/misconfigured (not the same as Gemini
-        // saying "no results") — fall through to calling Google directly
-        // with the embedded shared key below, so a Cloudflare Function
-        // outage doesn't also take down AI search, just its caching.
-        console.warn('[Gemini] proxy unreachable, falling back to direct call:', e.message);
-      }
-    }
-
     const catHint = opts.categories?.length
       ? `Chỉ tìm loại: ${opts.categories.join(', ')}`
       : 'Nhà hàng, vỉa hè, ăn vặt, cà phê';
