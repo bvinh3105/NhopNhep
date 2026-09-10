@@ -2727,11 +2727,20 @@ const CommunityAddModal = {
     if (!box || !name || this._pickedLat == null || this._pickedLng == null) return;
     const match = await Community.findSimilarNearby(name, this._pickedLat, this._pickedLng, this._editingId);
     if (!match) { box.classList.add('hidden'); return; }
-    const authorName = (match.expand && match.expand.created_by && match.expand.created_by.name) || I18N.t('common.anonymous');
+    const author = match.expand && match.expand.created_by;
+    const authorName = (author && author.name) || I18N.t('common.anonymous');
     const rootId = Community.resolveRootId(match);
+    const thumbUrl = Community.thumbnailUrl(match, '160x160');
     box.classList.remove('hidden');
+    // Khung "phát hiện có người quen" — cố tình KHÔNG dùng tông đỏ cảnh báo
+    // (đã thử, người dùng thấy giống lỗi hệ thống) — dùng avatar + ảnh thật
+    // của bài kia để cảm giác giống 1 gợi ý xã hội ("bạn X đã đăng rồi") hơn
+    // là 1 cảnh báo trùng lặp.
     box.innerHTML = `
-      <div class="dup-check-text">${I18N.t('addQuan.dupPrompt', { name: escapeHtml(match.name), author: escapeHtml(authorName) })}</div>
+      <div class="dup-check-head">
+        ${thumbUrl ? `<span class="dup-check-thumb" style="background-image:url('${escapeHtml(thumbUrl)}')"></span>` : `<span class="dup-check-avatar">${authorAvatar(author)}</span>`}
+        <div class="dup-check-text">${I18N.t('addQuan.dupPrompt', { avatar: authorAvatar(author), author: escapeHtml(authorName), name: escapeHtml(match.name) })}</div>
+      </div>
       <div class="dup-check-actions">
         <button type="button" class="dup-check-yes" id="cfDupYes">${I18N.t('addQuan.dupYes')}</button>
         <button type="button" class="dup-check-no" id="cfDupNo">${I18N.t('addQuan.dupNo')}</button>
