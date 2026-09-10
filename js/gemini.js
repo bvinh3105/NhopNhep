@@ -1,11 +1,19 @@
 /* ═══════════════════════════════════════════════
-   GEMINI AI — client-side direct call
-   The Gemini REST API supports CORS, so we call Google directly from
-   the browser. No serverless proxy needed (Cloudflare Functions were
-   unreliable). Two key sources, in order:
-     1) User's own key in localStorage (Settings → Gemini AI)
-     2) Built-in shared key (fragmented below), HTTP-referrer restricted
-        on Google Cloud Console to nhopnhep.pages.dev + localhost.
+   GEMINI AI
+   Two key sources, in order:
+     1) User's own key in localStorage (Settings → Gemini AI) — calls
+        Google directly from the browser (Gemini's REST API supports CORS),
+        same as always. It's the user's personal quota; nothing to gain by
+        proxying/caching it.
+     2) Built-in shared key — as of 2026-09-10 this path goes through
+        /api/gemini-search (a Cloudflare Pages Function, see
+        functions/api/gemini-search.js) instead of calling Google directly.
+        The key itself now lives server-side as a real Cloudflare secret,
+        and results are edge-cached for 30 min so a launch-day traffic
+        spike doesn't burn the shared free-tier quota in the first hour —
+        see that file's header comment for the full reasoning. The
+        fragmented key below is kept ONLY as a last-resort fallback if the
+        proxy itself is ever unreachable (see _call()'s fallback branch).
 ═══════════════════════════════════════════════ */
 
 // Built-in shared key, split so GitHub secret-scanning doesn't auto-revoke.
@@ -21,6 +29,26 @@ const _kfrag = ['AQ.Ab8R', 'N6JCbUoWpz', 'JvFMkd88FT', 'NULcPpuZjl', '9Ck3AULxBF
 // Hosts allowed to use the built-in key. Everything else must supply its
 // own key via Settings. Keep in sync with the Google Cloud referrer list.
 const _allowedHosts = ['nhopnhep.pages.dev', 'nhopnhep.netlify.app', 'localhost', '127.0.0.1'];
+
+// Shared by both findQuan() paths (proxy response and direct-call response)
+// — takes the raw {name,address,cat,price,lat,lng,rating,desc} objects
+// Gemini/the proxy returns and shapes them into what the rest of the app
+// expects (id, clamped rating, length-capped strings, the _gemini flag).
+function normalizeQuanArray(arr) {
+  return (arr || [])
+    .filter(x => x?.name && typeof x.lat === 'number' && typeof x.lng === 'number')
+    .map((x, i) => ({
+      id: 2e13 + (Date.now() % 1e9) + i,
+      name: String(x.name).slice(0, 60),
+      address: x.address ? String(x.address).slice(0, 120) : '',
+      cat: ['restaurant', 'street', 'snack', 'cafe'].includes(x.cat) ? x.cat : 'restaurant',
+      price: String(x.price || '—').slice(0, 30),
+      lat: x.lat, lng: x.lng,
+      rating: Math.max(3.5, Math.min(5.0, parseFloat(x.rating) || 4.3)),
+      desc: String(x.desc || '').slice(0, 140),
+      _gemini: true,
+    }));
+}
 
 const Gemini = {
   // 'flash-lite' is the fast tier (~4s). The non-lite Flash alias resolves
@@ -113,7 +141,45 @@ const Gemini = {
   },
 
   // ── Tìm quán gần vị trí (dùng trong scan) ─────────────────────────────
+  // Two paths, chosen by which key is in play:
+  //  - User's OWN key: build the prompt here and call Google directly, as
+  //    before — it's their personal quota, nothing to share/cache.
+  //  - Shared/default key: route through /api/gemini-search instead. That
+  //    Function builds the SAME prompt server-side and edge-caches the
+  //    result for 30 min, so many users scanning the same area within a
+  //    launch-day spike share ONE real Gemini call instead of each burning
+  //    a unit of the small shared daily quota. Falls through to the OSM
+  //    path in scan() on any failure, same as before — this never makes
+  //    the feature less resilient, only (usually) less quota-hungry.
   async findQuan(lat, lng, radius, opts = {}) {
+    if (!this.usingCustomKey()) {
+      try {
+        const res = await fetch('/api/gemini-search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            lat, lng, radius,
+            categories: opts.categories || [],
+            dish: opts.dish || '',
+            limit: opts.limit || 20,
+          }),
+          signal: AbortSignal.timeout(12000),
+        });
+        if (!res.ok) {
+          const detail = await res.text().catch(() => '');
+          throw new Error(`Gemini proxy ${res.status}: ${detail.slice(0, 150)}`);
+        }
+        const arr = await res.json();
+        return normalizeQuanArray(arr);
+      } catch (e) {
+        // Proxy itself unreachable/misconfigured (not the same as Gemini
+        // saying "no results") — fall through to calling Google directly
+        // with the embedded shared key below, so a Cloudflare Function
+        // outage doesn't also take down AI search, just its caching.
+        console.warn('[Gemini] proxy unreachable, falling back to direct call:', e.message);
+      }
+    }
+
     const catHint = opts.categories?.length
       ? `Chỉ tìm loại: ${opts.categories.join(', ')}`
       : 'Nhà hàng, vỉa hè, ăn vặt, cà phê';
@@ -195,19 +261,7 @@ Quy tắc: lat/lng gần đúng khu vực quán. address ghi rõ tên đường/
       }
     }
 
-    return arr
-      .filter(x => x?.name && typeof x.lat === 'number' && typeof x.lng === 'number')
-      .map((x, i) => ({
-        id: 2e13 + (Date.now() % 1e9) + i,
-        name: String(x.name).slice(0, 60),
-        address: x.address ? String(x.address).slice(0, 120) : '',
-        cat: ['restaurant', 'street', 'snack', 'cafe'].includes(x.cat) ? x.cat : 'restaurant',
-        price: String(x.price || '—').slice(0, 30),
-        lat: x.lat, lng: x.lng,
-        rating: Math.max(3.5, Math.min(5.0, parseFloat(x.rating) || 4.3)),
-        desc: String(x.desc || '').slice(0, 140),
-        _gemini: true,
-      }));
+    return normalizeQuanArray(arr);
   },
 
   // ── Gợi ý 1 quán hay nhất từ danh sách (bonus) ────────────────────────
