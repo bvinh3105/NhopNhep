@@ -12,6 +12,10 @@ const TabNav = {
   switchTo(tab) {
     if (State.currentTab === tab) return;
     State.currentTab = tab;
+    // Tab change hides every modal — an open modal from the prior tab
+    // has no legitimate reason to hang around and just stacks over the
+    // new screen's contents (verified user-facing bug 2026-09-11).
+    document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show'));
     document.querySelectorAll('.tab-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.tab === tab);
     });

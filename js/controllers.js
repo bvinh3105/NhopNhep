@@ -2397,8 +2397,18 @@ const SavedListModal = {
       return;
     }
     body.innerHTML = `<div class="social-grid">${items.map(x => communityGridCellHtml(x)).join('')}</div>`;
-    // Same tap-to-open wiring as the community feed
-    wireCardDetail(body, items);
+    // Same tap-to-open wiring as the community feed. Close saved-list
+    // first so the detail modal isn't stacked on top of it (bug fix
+    // 2026-09-11 — nested modals looked broken).
+    body.querySelectorAll('.comm-r-card[data-id]').forEach(cardEl => {
+      cardEl.addEventListener('click', (e) => {
+        if (e.target.closest('button')) return;
+        const r = items.find(x => x.id === cardEl.dataset.id);
+        if (!r) return;
+        this._close();
+        CommunityDetailModal.open(r);
+      });
+    });
   },
 
   _close() {
