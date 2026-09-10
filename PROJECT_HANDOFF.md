@@ -106,9 +106,10 @@ Thư mục: `G:\0. Home_Vinh\Projects\NhopNhep-community-server\` (nằm ngoài 
 - **Superuser**: email/password nằm trong `README.md` của thư mục community-server (đã đổi 1 lần sau khi phát hiện lộ qua tunnel công khai — xem CHANGELOG/README ở đó, KHÔNG chép lại ở đây).
 - Dữ liệu thật hiện tại: rất ít (3 quán cộng đồng, vài chục KB) — quy mô còn rất sớm.
 
-**Watchdog bug đã phát hiện (chưa fix, chỉ workaround)** — 2026-09-10 19:05:
-- `NhopNhep-Watchdog` phát hiện tunnel `dice-impressed-historical-internet` chết, spawn tunnel mới `decreased-subject-multimedia-wolf` thành công (log "URL tunnel moi: ..." xuất hiện), NHƯNG dừng ngang không tiếp tục bump cache version + git commit/push + wrangler deploy như các lần trước (log không có dòng "Cache version: v=... -> v=..." và "DA TU PHUC HOI XONG"). Phải fix tay: bump `js/community.js` DEFAULT_URL + `functions/api/log.js` PB_URL, commit, push, wrangler deploy.
-- Chưa root-cause được. Nghi: `Bat-TOAN-BO-Auto.ps1` prompt gì đó và hang, hoặc wrangler needs interactive auth, hoặc script chỉ update `community.js` không biết về `functions/api/log.js` mới. Cần grep script và thêm bước update log.js.
+**Watchdog bug — ĐÃ FIX phần 2/3, còn 1/3 chưa root-cause** — phát hiện 2026-09-10 19:05, fix phần coordination 2026-09-11:
+- Sự cố gốc: `NhopNhep-Watchdog` phát hiện tunnel `dice-impressed-historical-internet` chết, spawn tunnel mới `decreased-subject-multimedia-wolf` thành công (log "URL tunnel moi: ..." xuất hiện), NHƯNG dừng ngang không tiếp tục bump cache version + git commit/push + wrangler deploy như các lần trước. Phải fix tay lần đó.
+- **Đã fix**: cả `Bat-TOAN-BO-Auto.ps1` (watchdog) và `Bat-TOAN-BO.ps1` (script thủ công) giờ ĐỀU cập nhật `functions/api/log.js` PB_URL song song với `js/community.js` DEFAULT_URL mỗi khi tunnel rotate — không còn phải nhớ sửa tay 2 chỗ nữa. Đã test script watchdog chạy sạch (no-op khi khoẻ, không lỗi).
+- **CHƯA root-cause**: lý do script dừng ngang giữa chừng lần đó (không tiếp tục bump version/commit/deploy) vẫn chưa rõ — nghi ngờ ban đầu (wrangler cần interactive auth, hoặc script không biết log.js) chỉ đúng 1 phần (thiếu log.js đã fix), phần "dừng ngang" gốc có thể là nguyên nhân khác (transient network lúc đó, hoặc git/wrangler timeout) chưa tái hiện lại được để xác nhận. Nếu thấy watchdog log dừng giữa chừng lần nữa (có dòng "URL tunnel moi" nhưng không có "DA TU PHUC HOI XONG"), xem `last-deploy.log`/`quicktunnel.log` lúc đó để tìm nguyên nhân thật.
 
 **Điều CHƯA làm dù đã khuyến nghị** (từ chính README của community-server):
 - [ ] Viết Privacy Policy
@@ -123,7 +124,7 @@ Xếp theo mức độ quan trọng, không phải thứ tự thời gian:
 
 1. **Không có mô hình doanh thu** — chưa có bất kỳ tích hợp thanh toán/subscription/quảng cáo nào.
 2. **Traffic-level analytics chưa gắn** — custom event tracking (business events) đã có (xem mục 3 "Analytics"), nhưng chưa gắn Cloudflare Web Analytics beacon (pageview/geo/vitals — miễn phí, chỉ cần paste 1 script tag vào `<head>`). Placeholder + comment đã sẵn trong `index.html`.
-3. **Watchdog stop mid-cycle khi tunnel rotate** — xem mục 4 chi tiết. Cần grep `Bat-TOAN-BO-Auto.ps1` fix bước bump cache + deploy, và thêm `functions/api/log.js` vào list file cần update URL.
+3. **Watchdog stop mid-cycle khi tunnel rotate** — phần "quên update log.js" đã fix 2026-09-11 (cả 2 script giờ tự update cả 2 file). Phần "tại sao dừng ngang" gốc vẫn chưa root-cause — xem mục 4 chi tiết, theo dõi nếu tái diễn.
 4. **Quota Gemini dùng chung nhỏ và dễ cạn** (~1.000-1.500 request/ngày CHUNG toàn app) — khi cạn thì tự rớt về OSM (không sập, chỉ kém chính xác hơn). Đã thêm cơ chế "cooldown 3h" để không lãng phí request thử lại vô ích khi biết đã cạn. Giải pháp thật (nâng gói trả phí) CHƯA làm.
 5. **Nhánh OSM-only vẫn hardcode giá kiểu VNĐ** ("40k-80k") bất kể vùng thật — phần region-aware chỉ áp dụng cho nhánh Gemini, chưa lan sang OSM.
 6. **Không có push notification, không service worker** — dù là PWA, không dùng được offline.
@@ -141,7 +142,7 @@ Xếp theo mức độ quan trọng, không phải thứ tự thời gian:
 - **Luôn** bump `?v=NNNN` (sed replace toàn bộ trong `index.html`) trước khi deploy có sửa code — nếu không CDN cache bản cũ.
 - **Luôn** test sống qua Claude Browser pane (`preview_start` name `NhopNhep`, port 5557) TRƯỚC khi deploy — đặc biệt với thay đổi UI, phải chụp ảnh/đọc DOM xác nhận, không chỉ đoán.
 - Quy trình deploy chuẩn: sửa code → syntax check → bump version → test local → `git add -A && git commit` (message tiếng Anh, mô tả kỹ WHY không chỉ WHAT) → `git push origin master` → `npx wrangler pages deploy . --project-name=nhopnhep --branch=master --commit-dirty=true` → `curl` xác nhận production đã lên bản mới.
-- **Khi Cloudflare tunnel rotate** (mỗi lần cloudflared restart, URL đổi): phải cập nhật URL trong CẢ 2 file — `js/community.js` (`DEFAULT_URL`) và `functions/api/log.js` (`PB_URL`) — rồi bump version + deploy như trên. Watchdog tự động chỉ update file đầu (còn bug, mục 4). Nếu chỉ update 1 file: hoặc analytics chết (log.js còn URL cũ) hoặc community chết (community.js còn URL cũ).
+- **Khi Cloudflare tunnel rotate** (mỗi lần cloudflared restart, URL đổi): cả 2 file cần URL mới — `js/community.js` (`DEFAULT_URL`) và `functions/api/log.js` (`PB_URL`). Từ 2026-09-11, cả watchdog VÀ script thủ công đều tự cập nhật ĐỦ CẢ 2 file + bump version + deploy — không cần nhớ sửa tay nữa (trừ khi gặp lại bug "dừng ngang" chưa root-cause ở mục 4, lúc đó vẫn phải kiểm tra tay).
 - Commit message: tiếng Anh, có ngữ cảnh đầy đủ (không chỉ "fix bug"), kết thúc bằng `Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>` hoặc `Claude Opus 4.7`, tuỳ model đang dùng.
 - i18n: mọi string tiếng Việt hiển thị cho user PHẢI qua `I18N.t('key')`, thêm key ở CẢ 2 khối `vi`/`en` trong `js/i18n.js`. String trong PROMPT gửi cho Gemini thì KHÔNG cần i18n (AI luôn nhận prompt tiếng Việt, chỉ output mới cần đúng ngôn ngữ vùng miền).
 - Trước khi thử lại "proxy Gemini qua Cloudflare Function" — ĐỌC comment đầu file `functions/api/gemini-search.js` trước, đã có người thử và thất bại vì lý do hạ tầng (Cloudflare routes VN traffic qua Hong Kong, Gemini chặn Hong Kong), không phải lỗi code.
@@ -181,4 +182,4 @@ Không thiếu người chơi lớn (ShopeeFood/GrabFood ~95% thị phần giao 
 1. **Gắn Cloudflare Web Analytics beacon** (pageview/geo/vitals) — 5 phút việc: `dash.cloudflare.com > Web Analytics > Add site > nhopnhep.pages.dev > copy script tag > paste vào slot commented sẵn trong `<head>` của `index.html`. Custom event tracking (business layer) đã chạy sang PocketBase; đây là mảnh còn thiếu để hiểu top-of-funnel (traffic + bounce + geography).
 2. **Quyết định mô hình doanh thu** — giờ đã có custom event data để nhìn (`analytics_events` trong PB Admin, filter `event="scan"` etc), có thể xem trước data 1-2 tuần để hiểu behavior thật trước khi commit.
 3. **Nâng cấp Gemini API lên gói trả phí** (rẻ, theo lượng dùng) trước khi push công khai rộng rãi — quota miễn phí hiện tại quá nhỏ so với 1 bài đăng lan truyền.
-4. **Fix watchdog stop mid-cycle + dạy nó update `functions/api/log.js`** — mục 4 chi tiết. Nếu tunnel rotate mà chỉ auto-sửa `community.js`, analytics sẽ 502 im lặng cho tới khi có người bump `log.js` tay.
+4. ~~Dạy watchdog update `functions/api/log.js`~~ — **đã fix 2026-09-11**. Còn lại: root-cause tại sao lần đó script dừng ngang giữa chừng (xem mục 4) nếu nó tái diễn.

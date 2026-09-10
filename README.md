@@ -142,7 +142,7 @@ Xem đầy đủ + xếp ưu tiên trong [`PROJECT_HANDOFF.md`](./PROJECT_HANDOF
 
 - [ ] Chưa có mô hình doanh thu
 - [ ] Custom event tracking đã có (7 event → PocketBase); chưa gắn Cloudflare Web Analytics beacon cho traffic/geo/vitals
-- [ ] Watchdog stop mid-cycle khi tunnel rotate — hiện phải bump URL trong `js/community.js` + `functions/api/log.js` bằng tay
+- [x] ~~Watchdog quên update `functions/api/log.js` khi tunnel rotate~~ — đã fix 2026-09-11, xem `PROJECT_HANDOFF.md` mục 4 cho phần còn lại chưa root-cause
 - [ ] Quota Gemini dùng chung nhỏ, dễ cạn khi traffic cao
 - [ ] Nhánh OSM-only vẫn hardcode giá kiểu VNĐ bất kể vùng thật
 - [ ] Chưa có push notification / offline (service worker)
