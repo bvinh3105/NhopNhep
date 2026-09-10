@@ -54,22 +54,30 @@ const Analytics = {
       console.debug('[Analytics] (dev) skipped', event, props);
       return;
     }
-    if (typeof Community === 'undefined' || !Community.BASE_URL) return;
+    // Community is optional now — user_id enrichment only. sessionId
+    // is the identity when it's missing.
+    const user_id = (typeof Community !== 'undefined' && Community.currentUser?.id) || null;
+    const is_guest = !(typeof Community !== 'undefined' && Community.isLoggedIn && Community.isLoggedIn());
 
     const body = {
       event: String(event).slice(0, 40),
       session_id: this.sessionId,
-      user_id: Community.currentUser?.id || null,
-      is_guest: !Community.isLoggedIn(),
+      user_id,
+      is_guest,
       props: this._sanitizeProps(props),
       ua: (navigator.userAgent || '').slice(0, 200),
       referrer: (document.referrer || '').slice(0, 200),
     };
 
-    // sendBeacon is best for fire-and-forget — survives page unload,
-    // doesn't cost a real fetch's resources. Falls back to keepalive
-    // fetch for older browsers or when Blob-typed beacon is rejected.
-    const url = `${Community.BASE_URL}/api/collections/${this.COLLECTION}/records`;
+    // POST to a same-origin Cloudflare Function proxy instead of the
+    // PocketBase collection URL directly. Cross-origin beacons to a
+    // trycloudflare tunnel with "analytics" in the path were being
+    // swallowed by every browser ad blocker / Enhanced Tracking
+    // Protection / Brave shields (verified 2026-09-10: 0 browser
+    // events collected while server-side curl worked fine). Same-
+    // origin request looks like an ordinary app call and slips past
+    // all of that.
+    const url = '/api/log';
     try {
       if (navigator.sendBeacon) {
         const blob = new Blob([JSON.stringify(body)], { type: 'application/json' });
