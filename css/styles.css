@@ -242,13 +242,15 @@ input,textarea,select{font-family:var(--font-body)}
   /* Top padding clears both the scale-pop bounce AND the "sắp có" badge
      that overhangs a chip's top (-8px). Left/bottom give bounce room.
      Negative margin keeps the row's outer footprint unchanged. */
-  padding:12px 1.25rem 8px 6px;margin:-10px 0 -6px -6px;scrollbar-width:none;
+  padding:12px 2.2rem 8px 6px;margin:-10px 0 -6px -6px;scrollbar-width:none;
   -webkit-overflow-scrolling:touch;
-  /* Right-edge fade — signals "there's more, keep scrolling" without
-     stealing focus. Falls off the last chip once you've reached the
-     end, matching iOS-style overflow scroll. */
-  -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
-          mask-image:linear-gradient(to right, #000 calc(100% - 24px), transparent 100%);
+  /* Right-edge fade — signals "there's more, keep scrolling". Narrow
+     (12px) + wider right padding above so the last chip has breathing
+     room and doesn't render half-transparent behind the fade (Vinh
+     flagged 2026-09-11: chip "Cà phê" was being clipped). Fade drops
+     off when .at-end is added by wireScrollMasks in app.js. */
+  -webkit-mask-image:linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
+          mask-image:linear-gradient(to right, #000 calc(100% - 12px), transparent 100%);
 }
 .cat-chips::-webkit-scrollbar{display:none}
 .cat-chips.at-end{-webkit-mask-image:none;mask-image:none}
@@ -1349,9 +1351,17 @@ body.map-full .tabbar{transform:translateY(105%)}
   display:block;font-family:var(--font-display);font-size:1.2rem;font-weight:900;
   color:var(--primary);line-height:1;
 }
-.social-stat span{
+/* Direct child only — otherwise the label rule was accidentally hitting
+   <span data-star-total> nested inside <b> and painting the star count
+   as a small grey uppercase label instead of a big red display number. */
+.social-stat > span{
   display:block;font-size:.62rem;color:var(--text2);margin-top:.2rem;
   font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+}
+/* And the count-badge span inside <b> should keep the parent styling. */
+.social-stat b span{
+  font:inherit;color:inherit;letter-spacing:normal;text-transform:none;
+  display:inline;font-size:inherit;font-weight:inherit;
 }
 
 .social-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:transparent}
