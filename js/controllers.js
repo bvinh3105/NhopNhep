@@ -1555,11 +1555,18 @@ const ProfileCtrl = {
     if (headerEl) headerEl.innerHTML = header;
 
     if (!items.length) {
+      // Empty state — logged-in users get a direct CTA to the community
+      // add-quán modal. Guests just see the message (no post permission).
+      const loggedIn = Community.isLoggedIn();
       list.innerHTML = `<div class="empty-my-r">
         <div class="em-icon">📝</div>
         <div class="em-msg">${I18N.t('em.noRestaurantsYet')}</div>
         <div class="em-sub">${I18N.t('em.postToSeeHere')}</div>
+        ${loggedIn ? `<button class="em-cta" id="emCtaPostFirst" type="button">＋ ${I18N.t('em.postFirst')}</button>` : ''}
       </div>`;
+      if (loggedIn) {
+        document.getElementById('emCtaPostFirst')?.addEventListener('click', () => CommunityAddModal.open());
+      }
       return;
     }
 

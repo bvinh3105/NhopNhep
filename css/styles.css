@@ -795,13 +795,36 @@ body.map-full .tabbar{transform:translateY(105%)}
 }
 .my-r-del:active{background:var(--primary);color:var(--cream);border-color:var(--primary-2)}
 
+/* Empty state on the profile grid — dropped the dashed box + paper
+   background because it felt "disconnected" from the hero above; now
+   it's an illustration-style placeholder that flows out of the hero
+   directly. CTA button gets the user to the community post form in
+   one tap instead of forcing them to hunt for it. */
 .empty-my-r{
-  padding:2rem 1rem;text-align:center;background:var(--paper);
-  border:2px dashed var(--text2);border-radius:var(--radius);color:var(--text3);
+  padding:2.5rem 1.5rem 3rem;text-align:center;background:transparent;
+  border:none;border-radius:0;color:var(--text3);
 }
-.empty-my-r .em-icon{font-size:2.5rem;margin-bottom:.4rem}
-.empty-my-r .em-msg{font-family:var(--font-display);font-size:.95rem;font-weight:800;color:var(--text2);font-style:italic}
-.empty-my-r .em-sub{font-size:.75rem;color:var(--text3);margin-top:.3rem;font-weight:500}
+.empty-my-r .em-icon{
+  font-size:3rem;margin-bottom:.55rem;line-height:1;
+  filter:grayscale(.25) opacity(.75);
+}
+.empty-my-r .em-msg{
+  font-family:var(--font-display);font-size:1.1rem;font-weight:900;
+  color:var(--text);font-style:italic;letter-spacing:-.2px;
+}
+.empty-my-r .em-sub{
+  font-size:.8rem;color:var(--text2);margin-top:.4rem;font-weight:500;
+  line-height:1.5;max-width:22rem;margin-left:auto;margin-right:auto;
+}
+.empty-my-r .em-cta{
+  display:inline-flex;align-items:center;gap:.4rem;margin-top:1.1rem;
+  padding:.65rem 1.3rem;background:var(--primary);color:var(--cream);
+  border:2px solid var(--text);border-radius:24px;
+  box-shadow:3px 3px 0 var(--text);cursor:pointer;
+  font-family:var(--font-display);font-weight:900;font-style:italic;
+  font-size:.92rem;letter-spacing:.3px;transition:all .12s;
+}
+.empty-my-r .em-cta:active{transform:translate(1px,1px);box-shadow:1.5px 1.5px 0 var(--text)}
 
 /* Data Management */
 .data-actions{ display:flex;gap:.5rem;margin-top:.6rem; }
@@ -1289,19 +1312,47 @@ body.map-full .tabbar{transform:translateY(105%)}
 .post-caption{font-size:.85rem;line-height:1.5;color:var(--text)}
 .post-caption b{font-weight:900}
 
-/* ── Social profile header + grid (Quán của tôi / UserQuanModal) ──────── */
-.social-profile-header{padding:1.1rem 1rem 1.3rem;text-align:center}
-.social-avatar{
-  width:74px;height:74px;margin:0 auto .6rem;border-radius:50%;border:3px solid var(--text);
-  background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:2.1rem;
+/* ── Social profile header + grid (Quán của tôi / UserQuanModal) ────────
+   Hero has a warm gradient "cover" background that fades into the
+   cream page ground, giving the identity block visual weight without
+   feeling detached. Stats sit in a bordered card so they read as one
+   unit and anchor the eye between hero and content. */
+.social-profile-header{
+  padding:1.4rem 1rem 1.5rem;text-align:center;position:relative;
+  background:linear-gradient(180deg,
+    var(--primary-tint) 0%,
+    color-mix(in srgb, var(--primary-tint) 40%, var(--cream)) 60%,
+    var(--cream) 100%);
+  border-radius:0 0 24px 24px;
+  margin:0 -1.1rem .3rem;
 }
-.social-name{font-family:var(--font-display);font-weight:900;font-size:1.05rem;color:var(--text)}
-.social-tagline{font-size:.78rem;color:var(--text3);margin-top:.2rem}
-.social-stats{display:flex;justify-content:center;margin-top:.75rem}
-.social-stat{flex:1;max-width:110px;padding:0 .5rem}
+.social-avatar{
+  width:84px;height:84px;margin:0 auto .7rem;border-radius:50%;border:3px solid var(--text);
+  background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:2.3rem;
+  box-shadow:2.5px 3px 0 var(--text);
+}
+.social-name{
+  font-family:var(--font-display);font-weight:900;font-size:1.2rem;color:var(--text);
+  letter-spacing:-.2px;line-height:1.15;
+}
+.social-tagline{
+  font-size:.78rem;color:var(--text2);margin-top:.25rem;font-weight:600;
+}
+.social-stats{
+  display:flex;justify-content:center;margin:1rem auto 0;max-width:320px;
+  background:var(--white);border:2px solid var(--text);border-radius:16px;
+  box-shadow:2px 2px 0 var(--text);padding:.55rem .3rem;
+}
+.social-stat{flex:1;padding:0 .5rem}
 .social-stat+.social-stat{border-left:1.5px solid var(--line-2)}
-.social-stat b{display:block;font-size:1rem;font-weight:900;color:var(--text)}
-.social-stat span{display:block;font-size:.66rem;color:var(--text3);margin-top:.1rem}
+.social-stat b{
+  display:block;font-family:var(--font-display);font-size:1.2rem;font-weight:900;
+  color:var(--primary);line-height:1;
+}
+.social-stat span{
+  display:block;font-size:.62rem;color:var(--text2);margin-top:.2rem;
+  font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+}
 
 .social-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:transparent}
 .grid-cell{
