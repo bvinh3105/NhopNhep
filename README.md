@@ -17,6 +17,7 @@ PWA giải quyết câu hỏi "hôm nay ăn gì?": quét quanh vị trí thật 
 ### Quét & tìm quán (tab **Nhóp Nhép**)
 - GPS live tracking hoặc gõ địa chỉ · bán kính 500m–5km · 4 danh mục (🍽️ Nhà hàng · 🍜 Vỉa hè · 🧆 Ăn vặt · ☕ Cà phê)
 - Tìm theo tên món/quán cụ thể (accent-insensitive) · lọc rating tối thiểu
+- 3 nguồn dữ liệu chọn được: 🌐 Địa điểm công khai (OSM/OpenStreetMap) · ⭐ Của tôi (localStorage) · 👥 Cộng đồng (quán do người khác đăng trên PocketBase)
 - **AI (Gemini) + OpenStreetMap đua song song** — nguồn nào xong trước thắng; riêng tìm theo tên/món thì merge cả 2 nguồn để tăng độ phủ
 - AI tự suy luận quốc gia/thành phố thật từ GPS (không mặc định Việt Nam), tự đổi tiền tệ/định dạng địa chỉ theo vùng
 - Kết quả xáo ngẫu nhiên mỗi lần quét — chống phân tích liệt não, không phải sắp theo rating
@@ -28,14 +29,24 @@ PWA giải quyết câu hỏi "hôm nay ăn gì?": quét quanh vị trí thật 
 - Lịch sử chuyến đã đi + "đi lại" (replay) từ vị trí hiện tại
 
 ### Cộng đồng
+- **Khách vãng lai (chưa login) vào cũng thấy** 10 quán mới nhất (không bị chặn bởi form login); nút "Đăng nhập" nhỏ ở top-right header khi muốn tham gia
 - Feed kiểu Instagram: avatar + tên + thời gian tương đối + carousel ảnh vuốt được (tối đa 4 ảnh/bài) + nút ♥ + caption + tag/hashtag
 - Lưới hồ sơ 3 cột (quán của bạn + xem hồ sơ người khác) kèm số liệu quán đã đăng / ★ nhận được / follower
 - Đăng quán: tên, danh mục, giá, mô tả, vị trí (chọn trên map), tối đa 4 ảnh (tự nén WebP), tag + hashtag, 3 mức riêng tư (riêng tư/bạn bè/công khai)
 - Follow 1 chiều kiểu Twitter, không cần đối phương chấp nhận
+- **🔖 Lưu quán** (bookmark, localStorage per browser — không cần login) · **📋 Sao chép link** đến 1 quán cụ thể (dạng `nhopnhep.pages.dev/?q=<id>`, app tự mở modal chi tiết khi ai đó mở link)
 
 ### Cá nhân
-- Avatar emoji (18 lựa chọn, đồng bộ lên server để người khác thấy được) · tên · sở thích danh mục/tầm giá
+- Layout Instagram-style: 1 identity block ở giữa (avatar community + username + 3 stat posts/stars/followers), filter tabs, grid ảnh quán đã đăng
+- Top-right: **⚙️ Cài đặt** (avatar picker, tên, ngôn ngữ, sở thích, bạn bè) và **🔖 Quán đã lưu** (list bookmark, tap để mở chi tiết)
+- Avatar emoji (18 lựa chọn, đồng bộ lên server để người khác thấy được)
 - Song ngữ Việt/Anh toàn app, đổi tức thời không cần reload
+
+### Analytics (observability)
+- Custom event tracking → PocketBase collection `analytics_events` — 7 event: `app_open`, `scan`, `plan_built`, `detail_open`, `add_quán`, `login`/`register`, `follow`
+- POST qua same-origin proxy `/api/log` (Cloudflare Function) — bypass ad blocker/tracking protection (verified: cross-origin bị chặn silent)
+- Xem records/filter/export CSV thẳng trong PocketBase Admin UI
+- Cloudflare Web Analytics beacon: placeholder sẵn trong `<head>` — cần paste token khi gắn
 
 ### PWA
 - Cài được vào màn hình chính (manifest + icon SVG) — **chưa có offline/service worker**
@@ -44,7 +55,7 @@ PWA giải quyết câu hỏi "hôm nay ăn gì?": quét quanh vị trí thật 
 
 ## 🛠 Tech stack
 
-Vanilla HTML/CSS/JS — **không framework, không build step**. 13 module `js/*.js` load tuần tự qua `<script>` trong `index.html` (xem thứ tự phụ thuộc trong `PROJECT_HANDOFF.md`).
+Vanilla HTML/CSS/JS — **không framework, không build step**. 14 module `js/*.js` load tuần tự qua `<script>` trong `index.html` (xem thứ tự phụ thuộc trong `PROJECT_HANDOFF.md`).
 
 - **Leaflet 1.9** — bản đồ
 - **Google Gemini API** (`gemini-flash-lite-latest`) — gọi trực tiếp từ browser, key dùng chung (embedded, giới hạn theo hostname) + tuỳ chọn key riêng người dùng tự thêm
@@ -103,11 +114,13 @@ NhopNhep/
 │   ├── geocoder.js           Photon — autocomplete/reverse geocode
 │   ├── map.js / gps.js / locationPicker.js   Leaflet, GPS, chọn vị trí
 │   ├── i18n.js                engine song ngữ VI/EN
-│   ├── state.js               state toàn cục + persist localStorage
-│   ├── utils.js               CATEGORIES, helpers dùng chung
+│   ├── state.js               state toàn cục + persist localStorage (bao gồm savedPosts bookmark)
+│   ├── utils.js               CATEGORIES, helpers dùng chung, allRestaurants()
+│   ├── analytics.js           custom event tracking → /api/log → PocketBase
 │   └── security.js            chặn devtools/right-click cơ bản
 ├── functions/api/
 │   ├── overpass.js          proxy + cache Overpass (đang dùng)
+│   ├── log.js               same-origin proxy cho analytics beacon (đang dùng)
 │   └── gemini-search.js     DORMANT — đọc comment đầu file trước khi động vào
 ├── PROJECT_HANDOFF.md       ← bối cảnh đầy đủ, đọc trước khi phát triển tiếp
 └── README.md
@@ -128,10 +141,11 @@ Warm cream palette (`#FBF3D9`) + deep tomato red (`#B92626`) + orange accent (`#
 Xem đầy đủ + xếp ưu tiên trong [`PROJECT_HANDOFF.md`](./PROJECT_HANDOFF.md) mục 5. Tóm tắt nhanh:
 
 - [ ] Chưa có mô hình doanh thu
-- [ ] Chưa có analytics/telemetry — đang "bay mù" hoàn toàn
+- [ ] Custom event tracking đã có (7 event → PocketBase); chưa gắn Cloudflare Web Analytics beacon cho traffic/geo/vitals
+- [ ] Watchdog stop mid-cycle khi tunnel rotate — hiện phải bump URL trong `js/community.js` + `functions/api/log.js` bằng tay
 - [ ] Quota Gemini dùng chung nhỏ, dễ cạn khi traffic cao
 - [ ] Nhánh OSM-only vẫn hardcode giá kiểu VNĐ bất kể vùng thật
 - [ ] Chưa có push notification / offline (service worker)
 - [ ] Chưa có bình luận / activity feed cho cộng đồng
-- [ ] Chưa có report/kiểm duyệt nội dung cộng đồng
+- [ ] Chưa có menu 3-chấm chặn user / báo cáo bài (Phase 2 — cần backend)
 - [ ] Backend tự host trên máy cá nhân — vẫn là 1 điểm-lỗi-vật-lý dù đã có backup + watchdog tự phục hồi
