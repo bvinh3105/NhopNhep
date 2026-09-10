@@ -170,6 +170,14 @@ const HomeCtrl = {
 
   async scan() {
     if (this._scanning) return;
+    // Analytics — fire before network so we count intent, not success
+    if (typeof Analytics !== 'undefined') Analytics.track('scan', {
+      radius: State.radius,
+      cats: [...State.activeCats],
+      srcs: [...State.activeSrcs],
+      has_dish: !!(State.activeDish && State.activeDish.trim()),
+      min_rating: State.minRating || 0,
+    });
 
     // Auto-geocode typed address if location not explicitly set
     const locInput = document.getElementById('locInput');
@@ -833,6 +841,12 @@ const PlanCtrl = {
       State.profile.trips = history.length;
     }
     Storage.save();
+    if (typeof Analytics !== 'undefined') Analytics.track('plan_built', {
+      stops: State.itinerary.length,
+      // Whether user was assembling a fresh plan or replaying a saved
+      // one — different intent, want to be able to split in the dashboard.
+      replay: !!customStops,
+    });
   },
 
   show() {
@@ -1577,6 +1591,11 @@ const DetailModal = {
 
   open(r) {
     this._current = r;
+    if (typeof Analytics !== 'undefined') Analytics.track('detail_open', {
+      source: r._gemini ? 'gemini' : (r._community ? 'community' : (r.id >= 1e13 ? 'osm' : 'mine')),
+      has_image: !!r.image,
+      has_coords: r.lat != null && r.lng != null,
+    });
     const cat = CATEGORIES[r.cat] || { label: '—', color: '#888', icon: '🍽️' };
     const body = document.getElementById('detailBody');
     const escape = (s) => String(s || '').replace(/[&<>"']/g, c => (
@@ -1941,6 +1960,11 @@ function wireFollowButtons(container, onChange) {
       const r = isFollowing ? await Community.removeFriend(id) : await Community.addFriend(id);
       btn.disabled = false;
       if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+      if (typeof Analytics !== 'undefined' && !isFollowing) {
+        // Only the follow direction — unfollow is negative engagement,
+        // separate metric later if we ever need to look at churn.
+        Analytics.track('follow', {});
+      }
       btn.classList.toggle('following', !isFollowing);
       btn.textContent = !isFollowing ? I18N.t('follow.following') : I18N.t('follow.notFollowing');
       showToast(!isFollowing ? I18N.t('toast.nowFollowing') : I18N.t('toast.unfollowed'));
@@ -2088,6 +2112,9 @@ const CommunityCtrl = {
     btn.disabled = false; btn.textContent = original;
 
     if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+    if (typeof Analytics !== 'undefined') {
+      Analytics.track(this._mode === 'register' ? 'register' : 'login', {});
+    }
     showToast(this._mode === 'register' ? I18N.t('toast.registered') : I18N.t('toast.loginSuccess'));
     document.getElementById('cAuthPassword').value = '';
     // One-time backfill: this account's avatar_emoji field didn't exist
@@ -2171,6 +2198,12 @@ const CommunityDetailModal = {
 
   open(r) {
     this._current = r;
+    if (typeof Analytics !== 'undefined') Analytics.track('detail_open', {
+      source: 'community',
+      has_image: !!(r.photos && r.photos.length),
+      has_coords: !!(r.location && (r.location.lat !== 0 || r.location.lon !== 0)),
+      visibility: r.visibility || '',
+    });
     const catKey = COMMUNITY_PB_TO_CAT[r.category] || 'restaurant';
     const cat = CATEGORIES[catKey];
     const priceLabel = COMMUNITY_PRICE_LABEL[r.price_range] || '';
@@ -2614,6 +2647,15 @@ const CommunityAddModal = {
     btn.disabled = false; btn.textContent = original;
 
     if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+    if (typeof Analytics !== 'undefined') Analytics.track('add_quán', {
+      cat: this._selectedCat,
+      price: this._selectedPrice,
+      visibility: this._selectedVisibility,
+      photo_count: orderedFiles.length,
+      tag_count: this._tags.length,
+      hashtag_count: this._hashtags.length,
+      has_coords: lat != null && lng != null,
+    });
     showToast(I18N.t('toast.postedName', { name }));
     this.close();
     CommunityCtrl._loadList('');

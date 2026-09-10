@@ -49,6 +49,10 @@ function boot() {
   UserQuanModal.init();
   wireScrollMasks();
 
+  // Fire-and-forget one app_open event per page load. Skipped on
+  // localhost by Analytics itself so dev noise doesn't hit prod stats.
+  if (typeof Analytics !== 'undefined') Analytics.boot();
+
   // Community._fetch() fires this on any 401 (expired/revoked token) so
   // whichever screen is open re-renders immediately instead of silently
   // keeping stale "logged in" UI until the user happens to switch tabs.
