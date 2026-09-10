@@ -1294,7 +1294,7 @@ body.map-full .tabbar{transform:translateY(105%)}
   background:var(--cream-2);color:var(--text2);border:1.5px solid var(--line-2);
 }
 .comm-r-chip.hashtag{background:var(--primary-tint);color:var(--primary-2)}
-.comm-r-footer{display:flex;align-items:center;justify-content:space-between;margin-top:.65rem;padding-top:.6rem;border-top:1.5px dashed var(--line-2)}
+.comm-r-footer{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-top:.65rem;padding-top:.6rem;border-top:1.5px dashed var(--line-2)}
 .comm-r-author{font-size:.7rem;color:var(--text3);font-weight:600}
 
 /* ── Feed post (Instagram-style, Cộng đồng browse tab) ────────────────── */
