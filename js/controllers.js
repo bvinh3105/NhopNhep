@@ -1499,7 +1499,7 @@ const ProfileCtrl = {
         avatar: State.profile.avatar,
         name: State.profile.name || I18N.t('profile.namePlaceholder'),
         tagline: I18N.t('profile.tagline'),
-        postCount: 0, starCount: 0, followerCount: 0,
+        postCount: 0, starCount: 0, followerCount: 0, followingCount: 0,
       });
       // Stat elements were removed from main profile — guard against
       // any lingering reference (e.g. hidden diagnostic HTML).
@@ -1517,7 +1517,12 @@ const ProfileCtrl = {
     this._myRestaurants = r.ok ? r.data.items : [];
     // Old #statMyR was removed — count is shown in the community header
     // (rendered by _renderMyRestaurants below via the postCount slot).
-    this._myFollowerCount = await Community.followerCount(Community.currentUser.id);
+    const [followerCount, friendsRes] = await Promise.all([
+      Community.followerCount(Community.currentUser.id),
+      Community.myFriends(),
+    ]);
+    this._myFollowerCount = followerCount;
+    this._myFollowingCount = (friendsRes.ok && friendsRes.data.friends) ? friendsRes.data.friends.length : 0;
     this._renderMyRestaurants();
     this._loadMyScore();
   },
@@ -1549,6 +1554,7 @@ const ProfileCtrl = {
       postCount: this._myRestaurants.length,
       starCount: `<span data-star-total>${this._myStarTotal ?? '···'}</span>`,
       followerCount: this._myFollowerCount ?? '···',
+      followingCount: this._myFollowingCount ?? '···',
     });
     // Header lands ABOVE filter tabs in dedicated container so layout
     // matches Instagram-style profile (identity → tabs → grid).
@@ -1873,7 +1879,13 @@ function communityGridCellHtml(r) {
 
 // Profile header shared by "Quán của tôi" and UserQuanModal — avatar, name,
 // tagline, 3 stats (posts/stars/followers), optional follow button slot.
-function communityProfileHeaderHtml({ avatar, name, tagline, postCount, starCount, followerCount, followBtn }) {
+// followingCount: CHỦ ĐỘNG chỉ truyền vào khi render header của CHÍNH CHỦ
+// (ProfileCtrl) — không truyền ở UserQuanModal (xem profile người khác).
+// "Đang theo dõi ai" là thông tin riêng tư, không public như 3 số kia.
+function communityProfileHeaderHtml({ avatar, name, tagline, postCount, starCount, followerCount, followingCount, followBtn }) {
+  const followingStat = followingCount != null
+    ? `<div class="social-stat" data-stat="following" role="button" tabindex="0"><b>${followingCount}</b><span>${I18N.t('social.following')}</span></div>`
+    : '';
   return `<div class="social-profile-header">
     <div class="social-avatar">${avatar}</div>
     <div class="social-name">${escapeHtml(name)}</div>
@@ -1882,6 +1894,7 @@ function communityProfileHeaderHtml({ avatar, name, tagline, postCount, starCoun
       <div class="social-stat" data-stat="posts"><b>${postCount}</b><span>${I18N.t('social.posts')}</span></div>
       <div class="social-stat" data-stat="stars"><b>${starCount}</b><span>${I18N.t('social.stars')}</span></div>
       <div class="social-stat" data-stat="followers" role="button" tabindex="0"><b>${followerCount}</b><span>${I18N.t('social.followers')}</span></div>
+      ${followingStat}
     </div>
     ${followBtn || ''}
   </div>`;
@@ -2518,6 +2531,82 @@ const FollowerListModal = {
 };
 
 /* ═══════════════════════════════════════════════
+   FOLLOWING LIST MODAL — opened by tapping the "ĐANG THEO DÕI" stat in
+   the OWN profile hero only (communityProfileHeaderHtml never renders this
+   stat for anyone else's profile — see followingCount comment there).
+   Ai mình đang theo dõi là riêng tư: dùng Community.myFriends(), hàm này
+   LUÔN đọc friends của Community.currentUser.id, không nhận userId từ bên
+   ngoài — nên modal này về nguyên tắc không có đường nào để lộ ra "X đang
+   theo dõi ai" cho người khác, kể cả nếu lỡ wire nhầm ở chỗ khác.
+═══════════════════════════════════════════════ */
+const FollowingListModal = {
+  init() {
+    const modal = document.getElementById('followingListModal');
+    document.getElementById('followingListClose')?.addEventListener('click', () => this._close());
+    modal?.addEventListener('click', (e) => { if (e.target === modal) this._close(); });
+
+    const header = document.getElementById('myRProfileHeader');
+    if (header) {
+      header.addEventListener('click', (e) => {
+        const stat = e.target.closest('.social-stat[data-stat="following"]');
+        if (stat) this.open();
+      });
+    }
+  },
+
+  async open() {
+    if (!Community.isLoggedIn() || !Community.currentUser) {
+      showToast(I18N.t('toast.needLogin'));
+      return;
+    }
+    const modal = document.getElementById('followingListModal');
+    const body = document.getElementById('followingListBody');
+    const countEl = document.getElementById('followingListCount');
+    modal.classList.add('show');
+    body.innerHTML = `<div class="list-empty"><div class="list-empty-icon">⏳</div><div class="list-empty-msg">${I18N.t('em.loading')}</div></div>`;
+    countEl.textContent = '···';
+
+    const r = await Community.myFriends();
+    if (!r.ok) {
+      body.innerHTML = `<div class="list-empty">
+        <div class="list-empty-icon">😕</div>
+        <div class="list-empty-msg">${I18N.t('em.loadFail')}</div>
+        <div class="list-empty-sub">${escapeHtml(r.error || '')}</div>
+      </div>`;
+      return;
+    }
+    const items = (r.data && r.data.expand && r.data.expand.friends) || [];
+    countEl.textContent = I18N.t('following.count', { n: items.length });
+    if (!items.length) {
+      body.innerHTML = `<div class="list-empty">
+        <div class="list-empty-icon">👋</div>
+        <div class="list-empty-msg">${I18N.t('following.emptyMsg')}</div>
+        <div class="list-empty-sub">${I18N.t('following.emptySub')}</div>
+      </div>`;
+      return;
+    }
+    body.innerHTML = items.map(u => `
+      <div class="follower-row" data-user-id="${u.id}" data-user-name="${escapeHtml(u.name || u.email || '')}" role="button" tabindex="0">
+        <div class="follower-avatar">${authorAvatar(u)}</div>
+        <div class="follower-name">${escapeHtml(u.name || u.email || I18N.t('common.anonymous'))}</div>
+      </div>
+    `).join('');
+
+    // Tap a following row → open their UserQuanModal (public quán feed)
+    body.querySelectorAll('.follower-row').forEach(row => {
+      row.addEventListener('click', () => {
+        this._close();
+        UserQuanModal.open(row.dataset.userId, row.dataset.userName);
+      });
+    });
+  },
+
+  _close() {
+    document.getElementById('followingListModal').classList.remove('show');
+  },
+};
+
+/* ═══════════════════════════════════════════════
    SAVED LIST MODAL — bookmarks (localStorage-only, per browser).
    Opened by the 🔖 icon at top-right of the profile screen.
    Rendered as a community-style grid, tap opens CommunityDetailModal.
@@ -2639,6 +2728,8 @@ const UserQuanModal = {
     const starCounts = await Promise.all(items.map(x => Community.voteCount(x.id)));
     const starTotal = starCounts.reduce((a, b) => a + b, 0);
 
+    // followingCount CỐ Ý không truyền — ai người này đang theo dõi là
+    // riêng tư, chỉ chính chủ mới xem được (xem communityProfileHeaderHtml).
     const header = communityProfileHeaderHtml({
       avatar, name: displayName, tagline: '',
       postCount: items.length, starCount: starTotal, followerCount,
