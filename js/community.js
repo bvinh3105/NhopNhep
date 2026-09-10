@@ -96,12 +96,35 @@ const Community = {
   },
 
   // ── Auth ────────────────────────────────────────────────────────────────
-  async register(email, password, name) {
-    const r = await this._fetch('/api/collections/users/records', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, passwordConfirm: password, name: name || '' }),
-    });
+  // Goes through the same-origin Cloudflare Pages Function /api/register
+  // (NOT through _fetch(), whose BASE_URL points at PocketBase's own
+  // tunnel — this needs the app's own origin instead, same pattern as
+  // functions/api/log.js) so a Turnstile token gets verified server-side
+  // before PocketBase ever sees the request. Added 2026-09-11 — direct
+  // client->PocketBase registration had zero bot protection (no CAPTCHA,
+  // no email verification), confirmed exploitable by scripting throwaway
+  // accounts in seconds.
+  async register(email, password, name, turnstileToken) {
+    let r;
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 15000);
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name: name || '', turnstileToken }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      const data = await res.json().catch(() => null);
+      r = res.ok
+        ? { ok: true, data }
+        : { ok: false, status: res.status, error: (data && data.message) || I18N.t('err.connectionGeneric') };
+    } catch (e) {
+      r = e.name === 'AbortError'
+        ? { ok: false, status: 'timeout', error: I18N.t('err.serverSlow') }
+        : { ok: false, status: 0, error: I18N.t('err.serverUnreachable') };
+    }
     if (!r.ok) return r;
     return this.login(email, password); // auto sign-in right after signup
   },

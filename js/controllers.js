@@ -2457,6 +2457,7 @@ const CommunityCtrl = {
   _renderAuthMode() {
     const isRegister = this._mode === 'register';
     document.getElementById('communityNameGroup').classList.toggle('hidden', !isRegister);
+    document.getElementById('communityTurnstileGroup').classList.toggle('hidden', !isRegister);
     document.getElementById('communityAuthSubmit').textContent = isRegister ? I18N.t('community.register') : I18N.t('community.signIn');
     document.getElementById('communityAuthToggle').textContent = isRegister
       ? I18N.t('community.toLogin') : I18N.t('community.toRegister');
@@ -2469,13 +2470,25 @@ const CommunityCtrl = {
     if (!email || !password) { showToast(I18N.t('toast.fillEmailPassword')); return; }
     if (this._mode === 'register' && password.length < 8) { showToast(I18N.t('toast.passwordMin8')); return; }
 
+    // Bot check only gates NEW account creation — login stays untouched.
+    let turnstileToken = null;
+    if (this._mode === 'register') {
+      turnstileToken = window.turnstile?.getResponse('communityTurnstile') || null;
+      if (!turnstileToken) { showToast(I18N.t('toast.turnstileRequired')); return; }
+    }
+
     const btn = document.getElementById('communityAuthSubmit');
     const original = btn.textContent;
     btn.disabled = true; btn.textContent = I18N.t('auth.processing');
     const r = this._mode === 'register'
-      ? await Community.register(email, password, name)
+      ? await Community.register(email, password, name, turnstileToken)
       : await Community.login(email, password);
     btn.disabled = false; btn.textContent = original;
+
+    // Turnstile tokens are single-use — always reset after an attempt so
+    // a retry (this one failing, or the next registration this same page
+    // load) gets a fresh token instead of silently reusing a spent one.
+    if (this._mode === 'register') window.turnstile?.reset('communityTurnstile');
 
     if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
     if (typeof Analytics !== 'undefined') {
