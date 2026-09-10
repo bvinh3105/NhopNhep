@@ -1873,9 +1873,9 @@ function communityProfileHeaderHtml({ avatar, name, tagline, postCount, starCoun
     <div class="social-name">${escapeHtml(name)}</div>
     ${tagline ? `<div class="social-tagline">${tagline}</div>` : ''}
     <div class="social-stats">
-      <div class="social-stat"><b>${postCount}</b><span>${I18N.t('social.posts')}</span></div>
-      <div class="social-stat"><b>${starCount}</b><span>${I18N.t('social.stars')}</span></div>
-      <div class="social-stat"><b>${followerCount}</b><span>${I18N.t('social.followers')}</span></div>
+      <div class="social-stat" data-stat="posts"><b>${postCount}</b><span>${I18N.t('social.posts')}</span></div>
+      <div class="social-stat" data-stat="stars"><b>${starCount}</b><span>${I18N.t('social.stars')}</span></div>
+      <div class="social-stat" data-stat="followers" role="button" tabindex="0"><b>${followerCount}</b><span>${I18N.t('social.followers')}</span></div>
     </div>
     ${followBtn || ''}
   </div>`;
@@ -2356,6 +2356,79 @@ const CommunityDetailModal = {
 
   close() {
     document.getElementById('communityDetailModal').classList.remove('show');
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   FOLLOWER LIST MODAL — tap the "FOLLOWER" stat in profile hero.
+═══════════════════════════════════════════════ */
+const FollowerListModal = {
+  init() {
+    const modal = document.getElementById('followerListModal');
+    document.getElementById('followerListClose')?.addEventListener('click', () => this._close());
+    modal?.addEventListener('click', (e) => { if (e.target === modal) this._close(); });
+
+    // Delegated click on the profile hero — the stat cards are rendered
+    // fresh every _renderMyRestaurants so binding once here catches
+    // every re-render without wiring individually.
+    const header = document.getElementById('myRProfileHeader');
+    if (header) {
+      header.addEventListener('click', (e) => {
+        const stat = e.target.closest('.social-stat[data-stat="followers"]');
+        if (stat) this.open();
+      });
+    }
+  },
+
+  async open() {
+    if (!Community.isLoggedIn() || !Community.currentUser) {
+      showToast(I18N.t('toast.needLogin'));
+      return;
+    }
+    const modal = document.getElementById('followerListModal');
+    const body = document.getElementById('followerListBody');
+    const countEl = document.getElementById('followerListCount');
+    modal.classList.add('show');
+    body.innerHTML = `<div class="list-empty"><div class="list-empty-icon">⏳</div><div class="list-empty-msg">${I18N.t('em.loading')}</div></div>`;
+    countEl.textContent = '···';
+
+    const r = await Community.followerList(Community.currentUser.id);
+    if (!r.ok) {
+      body.innerHTML = `<div class="list-empty">
+        <div class="list-empty-icon">😕</div>
+        <div class="list-empty-msg">${I18N.t('em.loadFail')}</div>
+        <div class="list-empty-sub">${escapeHtml(r.error || '')}</div>
+      </div>`;
+      return;
+    }
+    const items = (r.data && r.data.items) || [];
+    countEl.textContent = I18N.t('follower.count', { n: items.length });
+    if (!items.length) {
+      body.innerHTML = `<div class="list-empty">
+        <div class="list-empty-icon">👋</div>
+        <div class="list-empty-msg">${I18N.t('follower.emptyMsg')}</div>
+        <div class="list-empty-sub">${I18N.t('follower.emptySub')}</div>
+      </div>`;
+      return;
+    }
+    body.innerHTML = items.map(u => `
+      <div class="follower-row" data-user-id="${u.id}" data-user-name="${escapeHtml(u.name || u.email || '')}" role="button" tabindex="0">
+        <div class="follower-avatar">${authorAvatar(u)}</div>
+        <div class="follower-name">${escapeHtml(u.name || u.email || I18N.t('common.anonymous'))}</div>
+      </div>
+    `).join('');
+
+    // Tap a follower row → open their UserQuanModal (public quán feed)
+    body.querySelectorAll('.follower-row').forEach(row => {
+      row.addEventListener('click', () => {
+        this._close();
+        UserQuanModal.open(row.dataset.userId, row.dataset.userName);
+      });
+    });
+  },
+
+  _close() {
+    document.getElementById('followerListModal').classList.remove('show');
   },
 };
 

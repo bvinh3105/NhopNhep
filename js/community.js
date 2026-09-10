@@ -357,6 +357,13 @@ const Community = {
     return r.ok ? r.data.totalItems : 0;
   },
 
+  // The actual follower LIST — same filter as followerCount, but returns
+  // the user records. Used by the followers-tap modal in the profile.
+  async followerList(userId, page = 1, perPage = 50) {
+    const filter = `friends.id?="${userId}"`;
+    return this._fetch(`/api/collections/users/records?perPage=${perPage}&page=${page}&filter=${encodeURIComponent(filter)}&sort=-updated`);
+  },
+
   // Push the local emoji-avatar pick up to this user's record so OTHER
   // people's feed/profile views can show it (the picker itself was
   // localStorage-only before this). Best-effort — a failure here just
