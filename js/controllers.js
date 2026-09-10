@@ -2080,7 +2080,7 @@ const CommunityCtrl = {
           results.innerHTML = items.map(u => `
             <div class="go-item follow-row">
               <span class="follow-name" data-user-id="${u.id}" data-user-name="${escapeHtml(u.name || I18N.t('common.anonymous'))}">👤 ${escapeHtml(u.name || I18N.t('common.anonymous'))}</span>
-              ${followBtnHtml(u.id, u.name || I18N.t('common.anonymous'), followingIds.has(u.id))}
+              ${followBtnHtml(u.id, u.name || I18N.t('common.anonymous'), followingIds.has(u.id), (u.friends || []).includes(Community.currentUser?.id))}
             </div>`).join('');
           wireProfileLinks(results);
           wireFollowButtons(results, () => this._renderFriends());
@@ -2583,18 +2583,21 @@ const UserQuanModal = {
     const followSlot = document.getElementById('userQuanFollowSlot');
     followSlot.innerHTML = '';
     const isSelf = Community.currentUser && userId === Community.currentUser.id;
-    if (Community.currentUser && !isSelf) {
-      const friendsRes = await Community.myFriends();
-      const following = !!(friendsRes.ok && (friendsRes.data.friends || []).includes(userId));
-      followSlot.innerHTML = followBtnHtml(userId, userName || I18N.t('common.thisPerson'), following);
-      wireFollowButtons(followSlot, () => CommunityCtrl._renderFriends());
-    }
-
-    const [userRes, listRes, followerCount] = await Promise.all([
+    const [userRes, listRes, followerCount, friendsRes] = await Promise.all([
       Community.getUser(userId),
       Community.listRestaurants({ filter: `created_by="${userId}"` }),
       Community.followerCount(userId),
+      (Community.currentUser && !isSelf) ? Community.myFriends() : Promise.resolve(null),
     ]);
+    if (Community.currentUser && !isSelf) {
+      const following = !!(friendsRes && friendsRes.ok && (friendsRes.data.friends || []).includes(userId));
+      // userRes.data.friends là danh sách người NGƯỜI NÀY theo dõi — users.viewRule
+      // mở cho mọi người đăng nhập (migration 1725700005) nên đọc thẳng field này
+      // để biết "họ có theo dõi mình không" mà không cần thêm request nào.
+      const theyFollowMe = !!(userRes.ok && (userRes.data.friends || []).includes(Community.currentUser.id));
+      followSlot.innerHTML = followBtnHtml(userId, userName || I18N.t('common.thisPerson'), following, theyFollowMe);
+      wireFollowButtons(followSlot, () => CommunityCtrl._renderFriends());
+    }
     if (!listRes.ok) {
       body.innerHTML = `<div class="empty-comm"><div class="em-icon">😕</div><div class="em-msg">${I18N.t('em.loadFail')}</div></div>`;
       return;
