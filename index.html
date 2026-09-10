@@ -16,7 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800;9..144,900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<link rel="stylesheet" href="css/styles.css?v=2492">
+<link rel="stylesheet" href="css/styles.css?v=2493">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -254,40 +254,26 @@
       <button class="community-toggle-link" id="communityAuthBack" type="button" data-i18n="community.backToBrowse">← Xem quán trước</button>
     </div>
 
-    <!-- Main content — visible to guests AND logged-in users. Guests get
-         a top CTA banner + capped 10 items; logged-in users get the "+
-         Đăng quán" button, search box, and full list. -->
+    <!-- (Guest CTA banners removed per Vinh's request 2026-09-11 — felt
+         intrusive. Sign-up entry point kept as the small "Đăng nhập"
+         button rendered next to the tab title in psec-head below, so
+         guests still have a way to reach the auth form when they want it.) -->
+
+    <!-- Main content — visible to guests AND logged-in users. Guests see
+         the 10 newest quán (capped); logged-in users see the "+ Đăng
+         quán" button, search box, and full list. -->
     <div id="communityMain">
       <div class="profile-section">
         <div class="psec-head">
           <div class="psec-title" data-i18n="community.restaurants">Quán <em>cộng đồng</em></div>
+          <!-- Guest sees "Đăng nhập" (opens auth form). Logged-in user sees "+ Đăng quán". -->
+          <button class="add-btn hidden" id="communityGuestSignIn" type="button" data-i18n="community.signIn">Đăng nhập</button>
           <button class="add-btn hidden" id="communityAddBtn" data-i18n="community.post">＋ Đăng quán</button>
         </div>
-
-        <!-- Guest CTA banner — hidden when logged in -->
-        <div id="communityGuestBanner" class="guest-cta hidden">
-          <div class="guest-cta-icon">🔒</div>
-          <div class="guest-cta-body">
-            <div class="guest-cta-title" data-i18n="community.guestCtaTitle">Đang xem 10 quán mới nhất</div>
-            <div class="guest-cta-sub" data-i18n="community.guestCtaSub">Đăng ký miễn phí để xem toàn bộ · đăng quán riêng · theo dõi bạn bè.</div>
-          </div>
-          <button class="btn-save guest-cta-btn" id="communityGuestSignIn" data-i18n="community.guestCtaBtn">Đăng ký</button>
-        </div>
-
         <div class="form-group hidden" id="communitySearchGroup">
           <input class="form-input" id="communitySearchInput" type="text" data-i18n="community.searchPlaceholder" data-i18n-attr="placeholder" placeholder="🔎 Tìm theo tên, thẻ, hashtag…" autocomplete="off">
         </div>
         <div class="comm-r-list" id="communityList"></div>
-
-        <!-- Bottom CTA — nudge to sign up after the last card -->
-        <div id="communityGuestBottomCta" class="guest-cta guest-cta-bottom hidden">
-          <div class="guest-cta-icon">✨</div>
-          <div class="guest-cta-body">
-            <div class="guest-cta-title" data-i18n="community.guestBottomTitle">Cả cộng đồng còn nhiều quán ngon</div>
-            <div class="guest-cta-sub" data-i18n="community.guestBottomSub">Tạo tài khoản để xem tiếp, đăng quán của bạn, và không bỏ lỡ chuyến ăn của bạn bè.</div>
-          </div>
-          <button class="btn-save guest-cta-btn" id="communityGuestSignInBottom" data-i18n="community.guestCtaBtn">Đăng ký</button>
-        </div>
       </div>
     </div>
 
@@ -567,20 +553,20 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2492"></script>
-<script src="js/i18n.js?v=2492"></script>
-<script src="js/utils.js?v=2492"></script>
-<script src="js/state.js?v=2492"></script>
-<script src="js/poi.js?v=2492"></script>
-<script src="js/geocoder.js?v=2492"></script>
-<script src="js/gemini.js?v=2492"></script>
-<script src="js/community.js?v=2492"></script>
-<script src="js/analytics.js?v=2492"></script>
-<script src="js/map.js?v=2492"></script>
-<script src="js/gps.js?v=2492"></script>
-<script src="js/locationPicker.js?v=2492"></script>
-<script src="js/controllers.js?v=2492"></script>
-<script src="js/app.js?v=2492"></script>
+<script src="js/security.js?v=2493"></script>
+<script src="js/i18n.js?v=2493"></script>
+<script src="js/utils.js?v=2493"></script>
+<script src="js/state.js?v=2493"></script>
+<script src="js/poi.js?v=2493"></script>
+<script src="js/geocoder.js?v=2493"></script>
+<script src="js/gemini.js?v=2493"></script>
+<script src="js/community.js?v=2493"></script>
+<script src="js/analytics.js?v=2493"></script>
+<script src="js/map.js?v=2493"></script>
+<script src="js/gps.js?v=2493"></script>
+<script src="js/locationPicker.js?v=2493"></script>
+<script src="js/controllers.js?v=2493"></script>
+<script src="js/app.js?v=2493"></script>
 
 </body>
 </html>

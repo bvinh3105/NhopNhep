@@ -133,11 +133,6 @@ const I18N = {
       'community.post': '＋ Đăng quán',
       'community.searchPlaceholder': '🔎 Tìm theo tên, thẻ, hashtag…',
       'community.backToBrowse': '← Xem quán trước',
-      'community.guestCtaTitle': 'Đang xem 10 quán mới nhất',
-      'community.guestCtaSub': 'Đăng ký miễn phí để xem toàn bộ · đăng quán riêng · theo dõi bạn bè.',
-      'community.guestCtaBtn': 'Đăng ký',
-      'community.guestBottomTitle': 'Cả cộng đồng còn nhiều quán ngon',
-      'community.guestBottomSub': 'Tạo tài khoản để xem tiếp, đăng quán của bạn và không bỏ lỡ chuyến ăn của bạn bè.',
       // ── Tab bar ──
       'tab.profile': 'Cá nhân', 'tab.community': 'Cộng đồng',
       // ── Common (dùng lại khắp modal) ──
@@ -414,11 +409,6 @@ const I18N = {
       'community.post': '＋ Post a place',
       'community.searchPlaceholder': '🔎 Search by name, tag, hashtag…',
       'community.backToBrowse': '← Back to browsing',
-      'community.guestCtaTitle': 'Showing the 10 newest quán',
-      'community.guestCtaSub': 'Sign up (free) to see them all · post your own · follow friends.',
-      'community.guestCtaBtn': 'Sign up',
-      'community.guestBottomTitle': "There's a lot more the community has shared",
-      'community.guestBottomSub': "Create an account to keep browsing, post your own quán, and don't miss your friends' food trips.",
       'tab.profile': 'Profile', 'tab.community': 'Community',
       'common.close': 'Close', 'common.cancel': 'Cancel',
       'common.openMaps': '🗺 Open Google Maps',

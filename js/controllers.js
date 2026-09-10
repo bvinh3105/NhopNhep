@@ -2016,19 +2016,16 @@ const CommunityCtrl = {
       this._searchDebounce = setTimeout(() => this._loadList(search.value.trim()), 350);
     });
 
-    // Guest CTA banners — top + bottom — both open the auth form.
-    const openAuth = () => {
+    // Small "Đăng nhập" header button (guest only) opens the auth form.
+    // Defaults to login mode — the button label says "Đăng nhập", so
+    // that's what the user expects to land on.
+    document.getElementById('communityGuestSignIn')?.addEventListener('click', () => {
       document.getElementById('communityAuth').classList.remove('hidden');
       document.getElementById('communityMain').classList.add('hidden');
-      // Default to register mode: the whole point of the guest preview
-      // is to convert them to accounts, so lead with the account-
-      // creation form. They can still switch to login via the toggle.
-      this._mode = 'register';
+      this._mode = 'login';
       this._renderAuthMode();
       document.getElementById('cAuthEmail')?.focus();
-    };
-    document.getElementById('communityGuestSignIn')?.addEventListener('click', openAuth);
-    document.getElementById('communityGuestSignInBottom')?.addEventListener('click', openAuth);
+    });
 
     // "Xem quán trước" link in auth form → back to browse-first view
     document.getElementById('communityAuthBack')?.addEventListener('click', () => {
@@ -2158,8 +2155,8 @@ const CommunityCtrl = {
     // Toggle features that only make sense once signed in
     document.getElementById('communityAddBtn').classList.toggle('hidden', !loggedIn);
     document.getElementById('communitySearchGroup').classList.toggle('hidden', !loggedIn);
-    document.getElementById('communityGuestBanner').classList.toggle('hidden', loggedIn);
-    document.getElementById('communityGuestBottomCta').classList.toggle('hidden', loggedIn);
+    // Small "Đăng nhập" header button — visible only to guests
+    document.getElementById('communityGuestSignIn').classList.toggle('hidden', loggedIn);
     this._loadList('');
   },
 
