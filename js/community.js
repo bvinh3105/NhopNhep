@@ -209,6 +209,19 @@ const Community = {
     return this.photoUrl(record, filename, thumb);
   },
 
+  // Toàn bộ ảnh của 1 quán (tối đa 4) — dùng cho carousel trong feed, thay vì
+  // chỉ ảnh đại diện. Sắp thumbnail lên đầu nếu có, để carousel bắt đầu đúng
+  // ảnh mà thumbnailUrl() cũng đang dùng làm ảnh bìa.
+  photoUrls(record, thumb = '800x0') {
+    if (!record || !record.photos || !record.photos.length) return [];
+    const files = [...record.photos];
+    if (record.thumbnail && files.includes(record.thumbnail)) {
+      files.splice(files.indexOf(record.thumbnail), 1);
+      files.unshift(record.thumbnail);
+    }
+    return files.map(f => this.photoUrl(record, f, thumb));
+  },
+
   // ── Tags & hashtags ──────────────────────────────────────────────────────
   // Thẻ tự do người dùng gõ tay, hiển thị nguyên văn — "ăn nhẹ", "nhẹ bụng"...
   normalizeTags(tags) {
@@ -332,6 +345,39 @@ const Community = {
   async myFriends() {
     if (!this.isLoggedIn()) return { ok: true, data: { items: [] } };
     return this._fetch(`/api/collections/users/records/${this.currentUser.id}?expand=friends`);
+  },
+
+  // How many people have ME in THEIR friends list — a "follower count".
+  // `users.listRule` is open to any logged-in member (needed so people can
+  // search each other to add as friends — see migration 1725700005), so a
+  // filtered list query works here without any new backend permission.
+  async followerCount(userId) {
+    const filter = `friends.id?="${userId}"`;
+    const r = await this._fetch(`/api/collections/users/records?perPage=1&filter=${encodeURIComponent(filter)}`);
+    return r.ok ? r.data.totalItems : 0;
+  },
+
+  // Push the local emoji-avatar pick up to this user's record so OTHER
+  // people's feed/profile views can show it (the picker itself was
+  // localStorage-only before this). Best-effort — a failure here just
+  // means the avatar stays local for now, nothing else breaks.
+  async updateAvatar(avatar) {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    const r = await this._fetch(`/api/collections/users/records/${this.currentUser.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ avatar_emoji: avatar }),
+    });
+    if (r.ok) this.currentUser = r.data;
+    return r;
+  },
+
+  // Fetch another member's public record directly (name, avatar_emoji) —
+  // needed for UserQuanModal's profile header even when that person has
+  // zero visible posts (so there's no restaurant record to read
+  // expand.created_by from instead).
+  async getUser(userId) {
+    return this._fetch(`/api/collections/users/records/${userId}`);
   },
 
   async _setFriends(ids) {

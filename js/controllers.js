@@ -1341,6 +1341,10 @@ const ProfileCtrl = {
       document.getElementById('avatarBtn').textContent = a;
       picker.querySelectorAll('.avatar-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.avatar === a));
       Storage.save();
+      // Best-effort push to the server too — the picker used to be
+      // localStorage-only, so other people's feed/profile views had no way
+      // to see your chosen avatar. Silent no-op if not logged in.
+      if (Community.isLoggedIn()) Community.updateAvatar(a);
     });
 
     // Ngôn ngữ — đổi xong áp lại bản dịch + báo cho các màn đang render
@@ -1429,6 +1433,7 @@ const ProfileCtrl = {
     const r = await Community.myRestaurants();
     this._myRestaurants = r.ok ? r.data.items : [];
     document.getElementById('statMyR').textContent = this._myRestaurants.length;
+    this._myFollowerCount = await Community.followerCount(Community.currentUser.id);
     this._renderMyRestaurants();
     this._loadMyScore();
   },
@@ -1436,8 +1441,14 @@ const ProfileCtrl = {
   async _loadMyScore() {
     const counts = await Promise.all(this._myRestaurants.map(r => Community.voteCount(r.id)));
     const total = counts.reduce((a, b) => a + b, 0);
+    this._myStarTotal = total;
     const el = document.getElementById('statScore');
     if (el) el.textContent = total;
+    // Header was already drawn with a "…" placeholder star count before this
+    // resolved (votes need their own round-trip per restaurant) — patch it
+    // in now that the real total is known.
+    const headerStat = document.querySelector('#myRestaurantList .social-stat span[data-star-total]');
+    if (headerStat) headerStat.textContent = total;
   },
 
   _renderMyRestaurants() {
@@ -1446,8 +1457,17 @@ const ProfileCtrl = {
       ? this._myRestaurants
       : this._myRestaurants.filter(r => COMMUNITY_PB_TO_CAT[r.category] === this._myRFilter);
 
+    const header = communityProfileHeaderHtml({
+      avatar: State.profile.avatar,
+      name: Community.currentUser?.name || State.profile.name || I18N.t('profile.namePlaceholder'),
+      tagline: I18N.t('profile.tagline'),
+      postCount: this._myRestaurants.length,
+      starCount: `<span data-star-total>${this._myStarTotal ?? '···'}</span>`,
+      followerCount: this._myFollowerCount ?? '···',
+    });
+
     if (!items.length) {
-      list.innerHTML = `<div class="empty-my-r">
+      list.innerHTML = header + `<div class="empty-my-r">
         <div class="em-icon">📝</div>
         <div class="em-msg">${I18N.t('em.noRestaurantsYet')}</div>
         <div class="em-sub">${I18N.t('em.postToSeeHere')}</div>
@@ -1455,35 +1475,8 @@ const ProfileCtrl = {
       return;
     }
 
-    list.innerHTML = items.map(r => communityCardHtml(r, { footer: 'owner' })).join('');
+    list.innerHTML = header + `<div class="social-grid">${items.map(r => communityGridCellHtml(r)).join('')}</div>`;
     wireCardDetail(list, items);
-
-    items.forEach(r => {
-      Community.voteCount(r.id).then(n => {
-        const el = document.getElementById(`myRScore-${r.id}`);
-        if (el) el.textContent = `★ ${n}`;
-      });
-    });
-
-    list.querySelectorAll('[data-edit-id]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const r = this._myRestaurants.find(x => x.id === btn.dataset.editId);
-        if (r) CommunityAddModal.open(r);
-      });
-    });
-    list.querySelectorAll('[data-del-id]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        const r = this._myRestaurants.find(x => x.id === btn.dataset.delId);
-        if (!r) return;
-        if (!confirm(`Xoá quán "${r.name}"? Không thể hoàn tác.`)) return;
-        const res = await Community.deleteRestaurant(r.id);
-        if (!res.ok) { showToast(`⚠️ ${res.error}`); return; }
-        showToast(I18N.t('toast.restaurantDeleted'));
-        this._loadMyRestaurants();
-      });
-    });
   },
 };
 
@@ -1714,21 +1707,24 @@ const COMMUNITY_PRICE_LABEL = {
 };
 const COMMUNITY_VIS_BADGE = { private: '🔒', friends: '👥', public: '🌍' };
 
-// Card markup shared by 3 places that all list community restaurants:
-// browse (Cộng đồng tab), "Quán của tôi" (Cá nhân tab), and a user's public
-// list (UserQuanModal). `footer` picks which actions show bottom-right:
-//   'vote'  — 👤 tác giả (mở UserQuanModal) + nút ☆ sao (mặc định)
-//   'owner' — ★ điểm (chỉ đọc) + nút ✏️ Sửa / 🗑 Xoá (tab Cá nhân, đã là chủ)
-// Card + author button click wiring lives with each caller (they know which
-// modal to open), not here — this only builds the HTML string.
-function communityCardHtml(r, { footer = 'vote' } = {}) {
+// Instagram-style feed post — used ONLY by the Cộng đồng browse tab
+// (CommunityCtrl._renderList). Profile-type views ("Quán của tôi",
+// UserQuanModal) use communityGridCellHtml() instead — see that function.
+// Author avatar/edit-delete is handled elsewhere (CommunityDetailModal
+// branches on ownership when a card is tapped), so this is pure display.
+function communityCardHtml(r) {
   const catKey = COMMUNITY_PB_TO_CAT[r.category] || 'restaurant';
   const cat = CATEGORIES[catKey];
   const priceLabel = COMMUNITY_PRICE_LABEL[r.price_range] || '';
-  const thumbUrl = Community.thumbnailUrl(r, '500x360');
-  const cover = thumbUrl
-    ? `<div class="comm-r-cover" style="background-image:url('${escapeHtml(thumbUrl)}')"></div>`
-    : `<div class="comm-r-cover" style="background:${cat.color}22">${cat.icon}</div>`;
+  const photos = Community.photoUrls(r, '640x640');
+  const carousel = photos.length
+    ? `<div class="post-carousel" data-id="${r.id}">
+         <div class="post-carousel-track">
+           ${photos.map(url => `<div class="post-photo" style="background-image:url('${escapeHtml(url)}')"></div>`).join('')}
+         </div>
+         ${photos.length > 1 ? `<div class="post-dots">${photos.map((_, i) => `<span class="post-dot${i === 0 ? ' active' : ''}"></span>`).join('')}</div>` : ''}
+       </div>`
+    : `<div class="post-carousel"><div class="post-carousel-track"><div class="post-photo post-photo-empty" style="background:${cat.color}22">${cat.icon}</div></div></div>`;
   const tagsHtml = (r.tags || []).map(t => `<span class="comm-r-chip">${escapeHtml(t)}</span>`).join('');
   const hashHtml = (r.hashtags || []).map(h => `<span class="comm-r-chip hashtag">#${escapeHtml(h)}</span>`).join('');
   const visBadge = COMMUNITY_VIS_BADGE[r.visibility] || '';
@@ -1736,60 +1732,105 @@ function communityCardHtml(r, { footer = 'vote' } = {}) {
   const authorName = (author && author.name) || I18N.t('common.anonymous');
   const authorId = (author && author.id) || r.created_by || '';
 
-  const footerHtml = footer === 'owner'
-    ? `<span class="comm-r-author" id="myRScore-${r.id}">★ …</span>
-       <div style="display:flex;gap:.4rem">
-         <button class="data-btn" data-edit-id="${r.id}">✏️ Sửa</button>
-         <button class="my-r-del" data-del-id="${r.id}" title="${I18N.t('myR.delete')}">🗑</button>
-       </div>`
-    : `<button class="comm-r-author" type="button" data-user-id="${authorId}" data-user-name="${escapeHtml(authorName)}">👤 ${escapeHtml(authorName)}</button>
-       <button class="vote-btn" data-id="${r.id}"><span class="vote-ico">☆</span><span class="vote-count">···</span></button>`;
-
-  return `<div class="comm-r-card" data-id="${r.id}">
-    ${cover}
-    <div class="comm-r-body">
-      <div class="comm-r-name">${escapeHtml(r.name)}</div>
-      <div class="comm-r-meta">${cat.icon} ${cat.label}${priceLabel ? ' · ' + priceLabel : ''} · ${visBadge}</div>
-      ${r.description ? `<div class="comm-r-desc">${escapeHtml(r.description)}</div>` : ''}
+  return `<div class="post-card comm-r-card" data-id="${r.id}">
+    <div class="post-head">
+      <button class="post-avatar" type="button" data-user-id="${authorId}" data-user-name="${escapeHtml(authorName)}">${authorAvatar(author)}</button>
+      <div class="post-head-info">
+        <button class="post-author-name" type="button" data-user-id="${authorId}" data-user-name="${escapeHtml(authorName)}">${escapeHtml(authorName)}</button>
+        <div class="post-meta-line">${timeAgo(r.created)} · ${visBadge}</div>
+      </div>
+    </div>
+    ${carousel}
+    <div class="post-body">
+      <div class="post-actions">
+        <button class="heart-btn" data-id="${r.id}"><span class="heart-ico">♡</span></button>
+        <span class="heart-count">···</span>
+        <span class="post-cat-pill" style="color:${cat.color};background:${cat.color}18">${cat.icon} ${cat.label}${priceLabel ? ' · ' + priceLabel : ''}</span>
+      </div>
+      <div class="post-caption"><b>${escapeHtml(r.name)}</b>${r.description ? ' ' + escapeHtml(r.description) : ''}</div>
       ${(tagsHtml || hashHtml) ? `<div class="comm-r-chips">${tagsHtml}${hashHtml}</div>` : ''}
-      <div class="comm-r-footer">${footerHtml}</div>
     </div>
   </div>`;
 }
 
-// Wires ☆ vote buttons scoped to `container` — NOT global document, because
-// a card for the same restaurant can appear in more than one list at once
-// (e.g. the browse list underneath + UserQuanModal open on top of it).
-function wireVoteButtons(container) {
-  container.querySelectorAll('.vote-btn[data-id]').forEach(btn => {
-    btn.addEventListener('click', async () => {
+// Square grid cell for profile-type views ("Quán của tôi", UserQuanModal) —
+// tap opens CommunityDetailModal (wireCardDetail() already matches on
+// .comm-r-card[data-id], kept here so that wiring works unchanged).
+function communityGridCellHtml(r) {
+  const catKey = COMMUNITY_PB_TO_CAT[r.category] || 'restaurant';
+  const cat = CATEGORIES[catKey];
+  const thumbUrl = Community.thumbnailUrl(r, '400x400');
+  return thumbUrl
+    ? `<div class="grid-cell comm-r-card" data-id="${r.id}" style="background-image:url('${escapeHtml(thumbUrl)}')"></div>`
+    : `<div class="grid-cell comm-r-card" data-id="${r.id}" style="background:${cat.color}22">${cat.icon}</div>`;
+}
+
+// Profile header shared by "Quán của tôi" and UserQuanModal — avatar, name,
+// tagline, 3 stats (posts/stars/followers), optional follow button slot.
+function communityProfileHeaderHtml({ avatar, name, tagline, postCount, starCount, followerCount, followBtn }) {
+  return `<div class="social-profile-header">
+    <div class="social-avatar">${avatar}</div>
+    <div class="social-name">${escapeHtml(name)}</div>
+    ${tagline ? `<div class="social-tagline">${tagline}</div>` : ''}
+    <div class="social-stats">
+      <div class="social-stat"><b>${postCount}</b><span>${I18N.t('social.posts')}</span></div>
+      <div class="social-stat"><b>${starCount}</b><span>${I18N.t('social.stars')}</span></div>
+      <div class="social-stat"><b>${followerCount}</b><span>${I18N.t('social.followers')}</span></div>
+    </div>
+    ${followBtn || ''}
+  </div>`;
+}
+
+// Wires left/right swipe scroll → active-dot sync for every .post-carousel
+// with more than 1 photo inside `container`. Native horizontal scroll-snap
+// does the actual swipe; this just keeps the dots in sync with it.
+function wireCarousels(container) {
+  container.querySelectorAll('.post-carousel').forEach(carousel => {
+    const track = carousel.querySelector('.post-carousel-track');
+    const dots = carousel.querySelectorAll('.post-dot');
+    if (!track || dots.length < 2) return;
+    track.addEventListener('scroll', () => {
+      const idx = Math.round(track.scrollLeft / track.clientWidth);
+      dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+    }, { passive: true });
+  });
+}
+
+
+// Heart button (feed posts) — same underlying vote mechanism as ☆, just a
+// separate wiring since the feed's icon/classes are ♡/♥ not ☆/★.
+function wireHeartButtons(container) {
+  container.querySelectorAll('.heart-btn[data-id]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
       const id = btn.dataset.id;
       btn.disabled = true;
       const r = await Community.toggleVote(id);
       btn.disabled = false;
       if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
-      _loadVoteState(btn.dataset.id, container);
+      _loadHeartState(id, container);
     });
-    _loadVoteState(btn.dataset.id, container);
+    _loadHeartState(btn.dataset.id, container);
   });
 }
-// Kiểu GitHub: bấm ★ để "star" một quán, càng nhiều sao càng ngon. Vẫn dùng
-// đúng cơ chế vote (unique restaurant+user) phía server, chỉ đổi icon.
-async function _loadVoteState(restaurantId, container) {
+async function _loadHeartState(restaurantId, container) {
   const [mine, count] = await Promise.all([
     Community.myVote(restaurantId),
     Community.voteCount(restaurantId),
   ]);
-  const btn = container.querySelector(`.vote-btn[data-id="${restaurantId}"]`);
+  const btn = container.querySelector(`.heart-btn[data-id="${restaurantId}"]`);
   if (!btn) return;
   btn.classList.toggle('voted', !!mine);
-  btn.querySelector('.vote-ico').textContent = mine ? '★' : '☆';
-  btn.querySelector('.vote-count').textContent = count;
+  btn.querySelector('.heart-ico').textContent = mine ? '♥' : '♡';
+  const countEl = btn.parentElement.querySelector('.heart-count');
+  if (countEl) countEl.textContent = count;
 }
 
 // "👤 tên tác giả" — bấm mở UserQuanModal xem hết quán người đó đã đăng.
+// Matches both the old list-card author button and the feed post's
+// avatar/name buttons (all three carry data-user-id the same way).
 function wireAuthorButtons(container) {
-  container.querySelectorAll('.comm-r-author[data-user-id]').forEach(btn => {
+  container.querySelectorAll('.comm-r-author[data-user-id], .post-avatar[data-user-id], .post-author-name[data-user-id]').forEach(btn => {
     if (!btn.dataset.userId) return;
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1975,6 +2016,11 @@ const CommunityCtrl = {
     if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
     showToast(this._mode === 'register' ? I18N.t('toast.registered') : I18N.t('toast.loginSuccess'));
     document.getElementById('cAuthPassword').value = '';
+    // One-time backfill: this account's avatar_emoji field didn't exist
+    // until this session's redesign, so anyone who already picked an
+    // emoji locally (or just registered, which never sets one) needs it
+    // pushed up once so their posts show the right avatar to others.
+    if (!r.data.avatar_emoji) Community.updateAvatar(State.profile.avatar);
     this.render();
   },
 
@@ -2019,9 +2065,10 @@ const CommunityCtrl = {
           </div>`;
       return;
     }
-    list.innerHTML = items.map(r => communityCardHtml(r, { footer: 'vote' })).join('');
-    wireVoteButtons(list);
+    list.innerHTML = items.map(r => communityCardHtml(r)).join('');
+    wireHeartButtons(list);
     wireAuthorButtons(list);
+    wireCarousels(list);
     wireCardDetail(list, items);
   },
 };
@@ -2054,9 +2101,12 @@ const CommunityDetailModal = {
     const cat = CATEGORIES[catKey];
     const priceLabel = COMMUNITY_PRICE_LABEL[r.price_range] || '';
     const visBadge = COMMUNITY_VIS_BADGE[r.visibility] || '';
-    const photos = r.photos || [];
-    const photoStrip = photos.length
-      ? `<div class="detail-photo-strip">${photos.map(f => `<img src="${Community.photoUrl(r, f, '700x500')}" alt="${escapeHtml(r.name)}" loading="lazy">`).join('')}</div>`
+    const photos = Community.photoUrls(r, '800x800');
+    const carousel = photos.length
+      ? `<div class="post-carousel" style="border-radius:var(--radius);overflow:hidden;margin-bottom:.7rem">
+           <div class="post-carousel-track">${photos.map(url => `<div class="post-photo" style="background-image:url('${escapeHtml(url)}')"></div>`).join('')}</div>
+           ${photos.length > 1 ? `<div class="post-dots">${photos.map((_, i) => `<span class="post-dot${i === 0 ? ' active' : ''}"></span>`).join('')}</div>` : ''}
+         </div>`
       : '';
     const tagsHtml = (r.tags || []).map(t => `<span class="comm-r-chip">${escapeHtml(t)}</span>`).join('');
     const hashHtml = (r.hashtags || []).map(h => `<span class="comm-r-chip hashtag">#${escapeHtml(h)}</span>`).join('');
@@ -2064,9 +2114,20 @@ const CommunityDetailModal = {
     const authorName = (author && author.name) || I18N.t('common.anonymous');
     const authorId = (author && author.id) || r.created_by || '';
     const addressHtml = r.address ? `<div class="detail-address">🏠 ${escapeHtml(r.address)}</div>` : '';
+    const isOwner = !!(Community.currentUser && (r.created_by === Community.currentUser.id || authorId === Community.currentUser.id));
+
+    const footerHtml = isOwner
+      ? `<button class="data-btn" id="cdmEdit">✏️ Sửa</button>
+         <button class="my-r-del" id="cdmDelete" title="${I18N.t('myR.delete')}">🗑</button>`
+      : `<button class="post-avatar" type="button" data-user-id="${authorId}" data-user-name="${escapeHtml(authorName)}" style="width:30px;height:30px;font-size:1rem">${authorAvatar(author)}</button>
+         <button class="comm-r-author" type="button" data-user-id="${authorId}" data-user-name="${escapeHtml(authorName)}">${escapeHtml(authorName)}</button>
+         <div style="margin-left:auto;display:flex;align-items:center;gap:.35rem">
+           <button class="heart-btn" data-id="${r.id}"><span class="heart-ico">♡</span></button>
+           <span class="heart-count">···</span>
+         </div>`;
 
     document.getElementById('communityDetailBody').innerHTML = `
-      ${photoStrip}
+      ${carousel}
       <div class="detail-cat-wrap">
         <span class="detail-cat" style="color:${cat.color};background:${cat.color}18">${cat.icon} ${cat.label}</span>
         ${priceLabel ? `<span class="detail-cat" style="color:var(--text2);background:var(--cream-2)">${priceLabel}</span>` : ''}
@@ -2077,13 +2138,25 @@ const CommunityDetailModal = {
       ${(tagsHtml || hashHtml) ? `<div class="comm-r-chips" style="margin-bottom:.6rem">${tagsHtml}${hashHtml}</div>` : ''}
       ${addressHtml}
       <div class="comm-r-footer" style="border-top:1.5px dashed var(--line-2);margin-top:.9rem;padding-top:.7rem">
-        <button class="comm-r-author" type="button" data-user-id="${authorId}" data-user-name="${escapeHtml(authorName)}">👤 ${escapeHtml(authorName)}</button>
-        <button class="vote-btn" data-id="${r.id}"><span class="vote-ico">☆</span><span class="vote-count">···</span></button>
+        ${footerHtml}
       </div>
     `;
     const body = document.getElementById('communityDetailBody');
-    wireVoteButtons(body);
-    wireAuthorButtons(body);
+    wireCarousels(body);
+    if (isOwner) {
+      document.getElementById('cdmEdit').addEventListener('click', () => { this.close(); CommunityAddModal.open(r); });
+      document.getElementById('cdmDelete').addEventListener('click', async () => {
+        if (!confirm(I18N.t('myR.confirmDelete', { name: r.name }))) return;
+        const res = await Community.deleteRestaurant(r.id);
+        if (!res.ok) { showToast(`⚠️ ${res.error}`); return; }
+        showToast(I18N.t('toast.restaurantDeleted'));
+        this.close();
+        ProfileCtrl._loadMyRestaurants();
+      });
+    } else {
+      wireHeartButtons(body);
+      wireAuthorButtons(body);
+    }
 
     const hasLoc = r.location && (r.location.lat !== 0 || r.location.lon !== 0);
     const mapsBtn = document.getElementById('communityDetailMaps');
@@ -2120,26 +2193,40 @@ const UserQuanModal = {
     // Nút Theo dõi ngay trong profile — không hiện với chính mình.
     const followSlot = document.getElementById('userQuanFollowSlot');
     followSlot.innerHTML = '';
-    if (Community.currentUser && userId !== Community.currentUser.id) {
+    const isSelf = Community.currentUser && userId === Community.currentUser.id;
+    if (Community.currentUser && !isSelf) {
       const friendsRes = await Community.myFriends();
       const following = !!(friendsRes.ok && (friendsRes.data.friends || []).includes(userId));
       followSlot.innerHTML = followBtnHtml(userId, userName || I18N.t('common.thisPerson'), following);
       wireFollowButtons(followSlot, () => CommunityCtrl._renderFriends());
     }
 
-    const r = await Community.listRestaurants({ filter: `created_by="${userId}"` });
-    if (!r.ok) {
+    const [userRes, listRes, followerCount] = await Promise.all([
+      Community.getUser(userId),
+      Community.listRestaurants({ filter: `created_by="${userId}"` }),
+      Community.followerCount(userId),
+    ]);
+    if (!listRes.ok) {
       body.innerHTML = `<div class="empty-comm"><div class="em-icon">😕</div><div class="em-msg">${I18N.t('em.loadFail')}</div></div>`;
       return;
     }
-    document.getElementById('userQuanCount').textContent = I18N.t('userQuan.count', { n: r.data.items.length });
-    if (!r.data.items.length) {
-      body.innerHTML = `<div class="empty-comm"><div class="em-icon">🍽️</div><div class="em-msg">${I18N.t('em.noneVisible')}</div></div>`;
+    const items = listRes.data.items;
+    const avatar = authorAvatar(userRes.ok ? userRes.data : null);
+    const displayName = (userRes.ok && userRes.data.name) || userName || I18N.t('common.thisPerson');
+    const starCounts = await Promise.all(items.map(x => Community.voteCount(x.id)));
+    const starTotal = starCounts.reduce((a, b) => a + b, 0);
+
+    const header = communityProfileHeaderHtml({
+      avatar, name: displayName, tagline: '',
+      postCount: items.length, starCount: starTotal, followerCount,
+    });
+
+    if (!items.length) {
+      body.innerHTML = header + `<div class="empty-comm"><div class="em-icon">🍽️</div><div class="em-msg">${I18N.t('em.noneVisible')}</div></div>`;
       return;
     }
-    body.innerHTML = r.data.items.map(x => communityCardHtml(x, { footer: 'vote' })).join('');
-    wireVoteButtons(body);
-    wireCardDetail(body, r.data.items);
+    body.innerHTML = header + `<div class="social-grid">${items.map(x => communityGridCellHtml(x)).join('')}</div>`;
+    wireCardDetail(body, items);
   },
 
   close() {

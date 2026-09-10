@@ -1216,6 +1216,11 @@ body.map-full .tabbar{transform:translateY(105%)}
 
 /* Restaurant card — like my-r-card but with a taller cover photo + chip rows */
 .comm-r-list{display:flex;flex-direction:column;gap:.75rem;padding-bottom:calc(var(--safe-bottom) + 1rem)}
+/* Feed reads as one continuous scroll (posts separated by their own
+   border-bottom divider, not a container gap) — the grid-based profile
+   views (myRestaurantList/userQuanBody) keep the normal .75rem gap between
+   the header block and the grid below it. */
+#communityList.comm-r-list{gap:0}
 .comm-r-card{
   background:var(--white);border:2px solid var(--text);border-radius:var(--radius);
   box-shadow:3px 3px 0 var(--text);overflow:hidden;
@@ -1239,13 +1244,72 @@ body.map-full .tabbar{transform:translateY(105%)}
 .comm-r-footer{display:flex;align-items:center;justify-content:space-between;margin-top:.65rem;padding-top:.6rem;border-top:1.5px dashed var(--line-2)}
 .comm-r-author{font-size:.7rem;color:var(--text3);font-weight:600}
 
-.vote-btn{
-  display:flex;align-items:center;gap:.3rem;padding:.35rem .7rem;border-radius:20px;
-  border:2px solid var(--text);background:var(--white);font-size:.8rem;font-weight:800;
-  color:var(--text);box-shadow:2px 2px 0 var(--text);transition:all .12s;
+/* ── Feed post (Instagram-style, Cộng đồng browse tab) ────────────────── */
+.post-card{
+  border:none;border-radius:0;box-shadow:none;background:var(--white);
+  border-bottom:8px solid var(--cream-3);overflow:visible;
 }
-.vote-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
-.vote-btn.voted{background:var(--primary);color:var(--cream);border-color:var(--primary-2);box-shadow:2px 2px 0 var(--primary-2)}
+.post-head{display:flex;align-items:center;gap:.6rem;padding:.7rem .8rem .5rem}
+.post-avatar{
+  width:38px;height:38px;flex:0 0 auto;border-radius:50%;border:2px solid var(--text);
+  background:var(--cream-2);display:flex;align-items:center;justify-content:center;
+  font-size:1.2rem;cursor:pointer;
+}
+.post-head-info{flex:1;min-width:0;text-align:left}
+.post-author-name{
+  display:block;font-weight:800;font-size:.88rem;color:var(--text);background:none;border:none;
+  padding:0;text-align:left;cursor:pointer;
+}
+.post-meta-line{font-size:.72rem;color:var(--text3);margin-top:.1rem}
+
+.post-carousel{position:relative;width:100%;aspect-ratio:1/1;background:var(--cream-2)}
+.post-carousel-track{
+  display:flex;width:100%;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;
+  scrollbar-width:none;
+}
+.post-carousel-track::-webkit-scrollbar{display:none}
+.post-photo{
+  flex:0 0 100%;width:100%;height:100%;scroll-snap-align:start;
+  background-size:cover;background-position:center;
+}
+.post-photo-empty{display:flex;align-items:center;justify-content:center;font-size:3rem}
+.post-dots{position:absolute;bottom:10px;left:0;right:0;display:flex;justify-content:center;gap:5px}
+.post-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.55)}
+.post-dot.active{background:var(--white)}
+
+.post-body{padding:.6rem .8rem .8rem}
+.post-actions{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem}
+.heart-btn{
+  border:none;background:none;padding:0;font-size:1.5rem;line-height:1;cursor:pointer;
+  color:var(--text);transition:transform .15s var(--ease-spring);
+}
+.heart-btn:active{transform:scale(1.3)}
+.heart-btn.voted .heart-ico{color:var(--primary)}
+.heart-count{font-size:.85rem;font-weight:800;color:var(--text2)}
+.post-cat-pill{margin-left:auto;font-size:.68rem;font-weight:800;padding:.25rem .6rem;border-radius:20px;white-space:nowrap}
+.post-caption{font-size:.85rem;line-height:1.5;color:var(--text)}
+.post-caption b{font-weight:900}
+
+/* ── Social profile header + grid (Quán của tôi / UserQuanModal) ──────── */
+.social-profile-header{padding:1.1rem 1rem 1.3rem;text-align:center}
+.social-avatar{
+  width:74px;height:74px;margin:0 auto .6rem;border-radius:50%;border:3px solid var(--text);
+  background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:2.1rem;
+}
+.social-name{font-family:var(--font-display);font-weight:900;font-size:1.05rem;color:var(--text)}
+.social-tagline{font-size:.78rem;color:var(--text3);margin-top:.2rem}
+.social-stats{display:flex;justify-content:center;margin-top:.75rem}
+.social-stat{flex:1;max-width:110px;padding:0 .5rem}
+.social-stat+.social-stat{border-left:1.5px solid var(--line-2)}
+.social-stat b{display:block;font-size:1rem;font-weight:900;color:var(--text)}
+.social-stat span{display:block;font-size:.66rem;color:var(--text3);margin-top:.1rem}
+
+.social-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;background:var(--text)}
+.grid-cell{
+  aspect-ratio:1/1;background-color:var(--cream-2);background-size:cover;background-position:center;
+  display:flex;align-items:center;justify-content:center;font-size:1.6rem;cursor:pointer;
+  border:none;border-radius:0;box-shadow:none;
+}
 
 .empty-comm{
   padding:2rem 1rem;text-align:center;background:var(--paper);

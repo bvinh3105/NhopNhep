@@ -278,3 +278,32 @@ function parseOpeningHours(hoursStr) {
   // Couldn't parse — return raw string
   return { isOpen: null, label: '', detail: '', raw: s };
 }
+
+/* ═══════════════════════════════════════════════
+   RELATIVE TIME — "2 giờ trước" style, for community feed posts
+═══════════════════════════════════════════════ */
+// PocketBase's `created` field is UTC like "2026-09-10 08:15:23.000Z"
+// (space instead of 'T' — needs normalizing before Date can parse it).
+function timeAgo(dateStr) {
+  if (!dateStr) return '';
+  const then = new Date(String(dateStr).replace(' ', 'T'));
+  if (isNaN(then)) return '';
+  const diffSec = Math.max(0, Math.floor((Date.now() - then.getTime()) / 1000));
+  if (diffSec < 60) return I18N.t('time.justNow');
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return I18N.t('time.minutesAgo', { n: diffMin });
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return I18N.t('time.hoursAgo', { n: diffHr });
+  const diffDay = Math.floor(diffHr / 24);
+  if (diffDay < 30) return I18N.t('time.daysAgo', { n: diffDay });
+  const diffMonth = Math.floor(diffDay / 30);
+  if (diffMonth < 12) return I18N.t('time.monthsAgo', { n: diffMonth });
+  return I18N.t('time.yearsAgo', { n: Math.floor(diffMonth / 12) });
+}
+
+// Emoji avatar for a community author record — falls back to a default
+// for accounts created before the avatar_emoji field existed, or anyone
+// who hasn't opened the avatar picker yet.
+function authorAvatar(author) {
+  return (author && author.avatar_emoji) || '🍜';
+}
