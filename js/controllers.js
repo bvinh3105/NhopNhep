@@ -1812,7 +1812,12 @@ const COMMUNITY_VIS_BADGE = { private: '🔒', friends: '👥', public: '🌍' }
 // UserQuanModal) use communityGridCellHtml() instead — see that function.
 // Author avatar/edit-delete is handled elsewhere (CommunityDetailModal
 // branches on ownership when a card is tapped), so this is pure display.
-function communityCardHtml(r) {
+// `groupCount` — số bài KHÁC cùng nhóm "cùng 1 quán" ĐÃ NẰM SẴN trong danh
+// sách đang render (tính ở nơi gọi, từ dữ liệu đã tải, KHÔNG gọi thêm API
+// nào — xem CommunityCtrl._renderList()). Chỉ là tín hiệu ước lượng rẻ cho
+// feed; con số chính xác đầy đủ (kể cả bài ngoài danh sách này) nằm ở
+// CommunityDetailModal khi bấm vào xem.
+function communityCardHtml(r, groupCount = 0) {
   const catKey = COMMUNITY_PB_TO_CAT[r.category] || 'restaurant';
   const cat = CATEGORIES[catKey];
   const priceLabel = COMMUNITY_PRICE_LABEL[r.price_range] || '';
@@ -1849,6 +1854,7 @@ function communityCardHtml(r) {
       </div>
       <div class="post-caption"><b>${escapeHtml(r.name)}</b>${r.description ? ' ' + escapeHtml(r.description) : ''}</div>
       ${(tagsHtml || hashHtml) ? `<div class="comm-r-chips">${tagsHtml}${hashHtml}</div>` : ''}
+      ${groupCount > 0 ? `<div class="dup-group-hint">🔗 ${I18N.t('post.alsoPostedBy', { n: groupCount })}</div>` : ''}
     </div>
   </div>`;
 }
@@ -2205,7 +2211,15 @@ const CommunityCtrl = {
           </div>`;
       return;
     }
-    list.innerHTML = items.map(r => communityCardHtml(r)).join('');
+    // Đếm "cùng nhóm" NGAY TRÊN danh sách đã tải sẵn — không gọi thêm API
+    // nào. Chỉ nhóm những bài đã cùng nằm trong `items` (đã được server lọc
+    // đúng quyền xem của người này), nên không có đường rò rỉ nào mới.
+    const groupCounts = new Map();
+    items.forEach(r => {
+      const root = Community.resolveRootId(r);
+      groupCounts.set(root, (groupCounts.get(root) || 0) + 1);
+    });
+    list.innerHTML = items.map(r => communityCardHtml(r, (groupCounts.get(Community.resolveRootId(r)) || 1) - 1)).join('');
     wireHeartButtons(list);
     wireAuthorButtons(list);
     wireCarousels(list);
@@ -2324,12 +2338,14 @@ const CommunityDetailModal = {
       ${r.description ? `<div class="detail-desc">${escapeHtml(r.description)}</div>` : ''}
       ${(tagsHtml || hashHtml) ? `<div class="comm-r-chips" style="margin-bottom:.6rem">${tagsHtml}${hashHtml}</div>` : ''}
       ${addressHtml}
+      <div id="cdmLinkedGroup"></div>
       <div class="comm-r-footer" style="border-top:1.5px dashed var(--line-2);margin-top:.9rem;padding-top:.7rem">
         ${footerHtml}
       </div>
     `;
     const body = document.getElementById('communityDetailBody');
     wireCarousels(body);
+    this._loadLinkedGroup(r);
     if (isOwner) {
       document.getElementById('cdmEdit').addEventListener('click', () => { this.close(); CommunityAddModal.open(r); });
       document.getElementById('cdmDelete').addEventListener('click', async () => {
@@ -2352,6 +2368,44 @@ const CommunityDetailModal = {
 
     this._syncSaveBtn();
     document.getElementById('communityDetailModal').classList.add('show');
+  },
+
+  // Truy vấn CHÍNH XÁC toàn bộ nhóm "cùng 1 quán" (kể cả bài không nằm
+  // trong danh sách vừa mở modal này từ đâu ra) — 1 lần gọi riêng vì đây
+  // là hành động chủ động của người dùng (bấm vào xem hẳn 1 quán), không
+  // phải render hàng loạt như feed. Vẫn qua getLinkedGroup() → tôn trọng
+  // đúng quyền xem hiện có, không lộ gì thêm.
+  async _loadLinkedGroup(r) {
+    const slot = document.getElementById('cdmLinkedGroup');
+    if (!slot) return;
+    const rootId = Community.resolveRootId(r);
+    const group = await Community.getLinkedGroup(rootId);
+    const others = group.filter(x => x.id !== r.id);
+    if (!others.length) { slot.innerHTML = ''; return; }
+    const counts = await Promise.all(others.map(x => Community.voteCount(x.id)));
+    const mine = await Community.voteCount(r.id);
+    const total = mine + counts.reduce((a, b) => a + b, 0);
+    slot.innerHTML = `
+      <div class="linked-group-box">
+        <div class="linked-group-title">🔗 ${I18N.t('post.groupTitle', { n: others.length })} · ★ ${total}</div>
+        <div class="linked-group-list">
+          ${others.map(x => {
+            const a = x.expand && x.expand.created_by;
+            const aName = (a && a.name) || I18N.t('common.anonymous');
+            const thumb = Community.thumbnailUrl(x, '120x120');
+            return `<button type="button" class="linked-group-item" data-id="${x.id}">
+              <span class="linked-group-thumb" style="${thumb ? `background-image:url('${escapeHtml(thumb)}')` : ''}"></span>
+              <span class="linked-group-author">${authorAvatar(a)} ${escapeHtml(aName)}</span>
+            </button>`;
+          }).join('')}
+        </div>
+      </div>`;
+    slot.querySelectorAll('.linked-group-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = others.find(x => x.id === btn.dataset.id);
+        if (target) this.open(target);
+      });
+    });
   },
 
   close() {
@@ -2586,6 +2640,8 @@ const CommunityAddModal = {
   _editingId: null,      // null = đăng quán mới; có giá trị = đang sửa quán này
   _editingRecord: null,
   _existingPhotos: [],   // URL ảnh đã có sẵn trên server, khi đang sửa
+  _linkedTo: null,       // id gốc nhóm nếu người đăng xác nhận "cùng quán với..."
+  _dupCheckTimer: null,
 
   init() {
     document.getElementById('cfCatPicker').addEventListener('click', (e) => {
@@ -2645,6 +2701,48 @@ const CommunityAddModal = {
       }
       document.getElementById('cfLocSearch').value = r.name;
       Geocoder.hide(document.getElementById('cfLocSuggest'));
+      this._scheduleDupCheck();
+    });
+
+    // Tên hoặc vị trí đổi → quán "gần giống" tìm được trước đó không còn
+    // chắc đúng nữa, phải hỏi lại xem có xác nhận trùng hay không.
+    document.getElementById('cfName').addEventListener('input', () => this._scheduleDupCheck());
+  },
+
+  // Debounce 600ms — tránh gọi listRestaurants() (tải hết quán) sau MỖI
+  // phím gõ. Chỉ chạy khi đã có cả tên lẫn vị trí, và chỉ khi đăng MỚI
+  // (sửa quán có sẵn không cần hỏi lại "có phải cùng quán với chính nó không").
+  _scheduleDupCheck() {
+    if (this._editingId) return;
+    clearTimeout(this._dupCheckTimer);
+    this._linkedTo = null;
+    const box = document.getElementById('cfDupCheck');
+    if (box) box.classList.add('hidden');
+    this._dupCheckTimer = setTimeout(() => this._runDupCheck(), 600);
+  },
+
+  async _runDupCheck() {
+    const name = document.getElementById('cfName').value.trim();
+    const box = document.getElementById('cfDupCheck');
+    if (!box || !name || this._pickedLat == null || this._pickedLng == null) return;
+    const match = await Community.findSimilarNearby(name, this._pickedLat, this._pickedLng, this._editingId);
+    if (!match) { box.classList.add('hidden'); return; }
+    const authorName = (match.expand && match.expand.created_by && match.expand.created_by.name) || I18N.t('common.anonymous');
+    const rootId = Community.resolveRootId(match);
+    box.classList.remove('hidden');
+    box.innerHTML = `
+      <div class="dup-check-text">${I18N.t('addQuan.dupPrompt', { name: escapeHtml(match.name), author: escapeHtml(authorName) })}</div>
+      <div class="dup-check-actions">
+        <button type="button" class="dup-check-yes" id="cfDupYes">${I18N.t('addQuan.dupYes')}</button>
+        <button type="button" class="dup-check-no" id="cfDupNo">${I18N.t('addQuan.dupNo')}</button>
+      </div>`;
+    document.getElementById('cfDupYes').addEventListener('click', () => {
+      this._linkedTo = rootId;
+      box.innerHTML = `<div class="dup-check-text dup-check-confirmed">${I18N.t('addQuan.dupConfirmed', { name: escapeHtml(match.name) })}</div>`;
+    });
+    document.getElementById('cfDupNo').addEventListener('click', () => {
+      this._linkedTo = null;
+      box.classList.add('hidden');
     });
   },
 
@@ -2757,6 +2855,10 @@ const CommunityAddModal = {
 
     document.getElementById('cfName').value = record ? record.name : '';
     document.getElementById('cfDesc').value = record ? (record.description || '') : '';
+    this._linkedTo = null;
+    clearTimeout(this._dupCheckTimer);
+    const dupBox = document.getElementById('cfDupCheck');
+    if (dupBox) { dupBox.classList.add('hidden'); dupBox.innerHTML = ''; }
     const loc = document.getElementById('cfLocSearch');
     if (loc) loc.value = record ? (record.address || '') : '';
     const locSug = document.getElementById('cfLocSuggest');
@@ -2799,6 +2901,7 @@ const CommunityAddModal = {
         this._pickedLat = lat;
         this._pickedLng = lng;
         LocationPicker.setMarker('communityPickerMap', 'communityPickerMarker', lat, lng, this._selectedCat);
+        this._scheduleDupCheck();
       });
       if (hasLoc) LocationPicker.setMarker('communityPickerMap', 'communityPickerMarker', record.location.lat, record.location.lon, this._selectedCat);
     }, 250);
@@ -2870,6 +2973,7 @@ const CommunityAddModal = {
       tags: this._tags,
       hashtags: this._hashtags,
       photoFiles: orderedFiles,
+      linkedTo: this._linkedTo,
     });
 
     btn.disabled = false; btn.textContent = original;

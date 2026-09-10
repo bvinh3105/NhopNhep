@@ -159,7 +159,7 @@ const Community = {
 
   // photoFiles: tối đa 4 ảnh (giới hạn server-side qua maxSelect). Ảnh đầu
   // tiên tự động thành thumbnail — đổi sau bằng setThumbnail().
-  async createRestaurant({ name, category, priceRange, description, address, lat, lng, tags = [], hashtags = [], visibility = 'public', photoFiles = [] }) {
+  async createRestaurant({ name, category, priceRange, description, address, lat, lng, tags = [], hashtags = [], visibility = 'public', photoFiles = [], linkedTo = null }) {
     if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin')};
     const fd = new FormData();
     fd.append('name', name);
@@ -172,6 +172,9 @@ const Community = {
     fd.append('created_by', this.currentUser.id);
     fd.append('tags', JSON.stringify(this.normalizeTags(tags)));
     fd.append('hashtags', JSON.stringify(this.normalizeHashtags(hashtags)));
+    // "Cùng 1 quán với..." — người đăng tự xác nhận (xem findSimilarNearby),
+    // không bao giờ tự động gán. Đã làm phẳng về gốc nhóm ở nơi gọi (client).
+    if (linkedTo) fd.append('linked_to', linkedTo);
     const files = photoFiles.slice(0, 4); // khớp maxSelect=4 phía server
     for (const file of files) {
       const blob = await this.compressImage(file);
@@ -298,6 +301,50 @@ const Community = {
       });
     }
     return { ok: true, data: { ...all.data, items, totalItems: items.length } };
+  },
+
+  // ── "Cùng 1 quán" liên kết nhẹ (linked_to) ────────────────────────────────
+  // Không đổi mô hình vote/riêng tư đang có — mỗi bài vẫn độc lập hoàn
+  // toàn. `linked_to` chỉ là 1 nhãn tuỳ chọn người đăng tự xác nhận, KHÔNG
+  // BAO GIỜ tự động gán. Mọi hàm dưới đây chỉ đọc qua listRestaurants() —
+  // tức LUÔN đi qua đúng listRule phía server, không mở đường xem mới nào.
+
+  // "Gốc nhóm" của 1 bài — chính nó nếu chưa liên kết, hoặc bài nó trỏ tới.
+  resolveRootId(r) {
+    return (r && r.linked_to) || (r && r.id) || null;
+  },
+
+  // Tìm bài GẦN GIỐNG mà NGƯỜI GỌI vốn đã có quyền xem (dùng đúng
+  // listRestaurants() — server tự lọc theo visibility, không có gì mới ở
+  // đây). So khớp: tên sau khi bỏ dấu/hoa-thường chứa nhau (2 chiều) +
+  // trong bán kính ~80m. Chỉ trả về GỢI Ý — không tự gán, người đăng phải
+  // tự xác nhận. `excludeId` để không tự khớp với chính bài đang sửa.
+  async findSimilarNearby(name, lat, lng, excludeId = null) {
+    const nName = this._normalize(name);
+    if (!nName || lat == null || lng == null) return null;
+    const all = await this.listRestaurants({ perPage: 200 });
+    if (!all.ok) return null;
+    const MAX_DIST_M = 80; // haversine() returns METERS — 80m đủ hẹp để 2 quán khác tên gần nhau hiếm khi lọt qua
+    let best = null, bestDist = Infinity;
+    for (const r of all.data.items) {
+      if (r.id === excludeId) continue;
+      if (!r.location) continue;
+      const rName = this._normalize(r.name);
+      if (!rName) continue;
+      const nameMatches = rName.includes(nName) || nName.includes(rName);
+      if (!nameMatches) continue;
+      const dist = haversine(lat, lng, r.location.lat, r.location.lon);
+      if (dist <= MAX_DIST_M && dist < bestDist) { best = r; bestDist = dist; }
+    }
+    return best;
+  },
+
+  // Toàn bộ bài trong 1 nhóm (gốc + mọi bài trỏ vào gốc) mà NGƯỜI GỌI vốn
+  // đã có quyền xem — vẫn qua listRestaurants(), không có đường đọc mới.
+  async getLinkedGroup(rootId) {
+    if (!rootId) return [];
+    const r = await this.listRestaurants({ filter: `id="${rootId}" || linked_to="${rootId}"`, perPage: 50 });
+    return r.ok ? r.data.items : [];
   },
 
   // ── Stars ("càng nhiều sao càng ngon", kiểu GitHub) ──────────────────────

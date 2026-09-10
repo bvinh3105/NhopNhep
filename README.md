@@ -35,6 +35,7 @@ PWA giải quyết câu hỏi "hôm nay ăn gì?": quét quanh vị trí thật 
 - Đăng quán: tên, danh mục, giá, mô tả, vị trí (chọn trên map), tối đa 4 ảnh (tự nén WebP), tag + hashtag, 3 mức riêng tư (riêng tư/bạn bè/công khai)
 - Follow 1 chiều kiểu Twitter, không cần đối phương chấp nhận
 - **🔖 Lưu quán** (bookmark, localStorage per browser — không cần login) · **📋 Sao chép link** đến 1 quán cụ thể (dạng `nhopnhep.pages.dev/?q=<id>`, app tự mở modal chi tiết khi ai đó mở link)
+- **🔗 "Cùng 1 quán"**: nhiều người đăng trùng 1 quán ngoài đời thật (vd 1 quán đang viral) được liên kết lại thay vì tách rời — người đăng tự xác nhận lúc đăng bài (không tự động), hiển thị gộp luôn tôn trọng đúng quyền riêng tư của từng bài
 
 ### Cá nhân
 - Layout Instagram-style: 1 identity block ở giữa (avatar community + username + 3 stat posts/stars/followers), filter tabs, grid ảnh quán đã đăng

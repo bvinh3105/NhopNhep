@@ -928,6 +928,19 @@ body.map-full .tabbar{transform:translateY(105%)}
   font-weight:600;font-style:italic;
 }
 
+.dup-check-box{
+  margin-top:.6rem;padding:.65rem .8rem;border-radius:12px;
+  background:var(--primary-tint);border:1.5px solid var(--primary);
+}
+.dup-check-text{font-size:.78rem;color:var(--primary-3);line-height:1.45;font-weight:600}
+.dup-check-text.dup-check-confirmed{color:#2e9e5b}
+.dup-check-actions{display:flex;gap:.5rem;margin-top:.5rem}
+.dup-check-yes,.dup-check-no{
+  flex:1;padding:.4rem .5rem;border-radius:10px;border:2px solid var(--text);
+  font-size:.74rem;font-weight:800;cursor:pointer;background:var(--white);
+}
+.dup-check-yes{background:var(--primary);color:var(--cream);border-color:var(--primary-2)}
+
 .form-actions{display:flex;gap:.5rem;margin-top:1rem}
 .btn-cancel{
   flex:1;padding:.8rem;border-radius:14px;background:var(--white);
@@ -1313,6 +1326,20 @@ body.map-full .tabbar{transform:translateY(105%)}
 .post-cat-pill{margin-left:auto;font-size:.68rem;font-weight:800;padding:.25rem .6rem;border-radius:20px;white-space:nowrap}
 .post-caption{font-size:.85rem;line-height:1.5;color:var(--text)}
 .post-caption b{font-weight:900}
+.dup-group-hint{font-size:.72rem;color:var(--accent-2);font-weight:700;margin-top:.4rem}
+
+.linked-group-box{margin-top:.7rem;padding:.65rem .7rem;border-radius:12px;background:var(--cream-2);border:1.5px solid var(--line-2)}
+.linked-group-title{font-size:.76rem;font-weight:800;color:var(--accent-2);margin-bottom:.5rem}
+.linked-group-list{display:flex;gap:.5rem;overflow-x:auto}
+.linked-group-item{
+  flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:.3rem;
+  width:64px;background:none;border:none;cursor:pointer;
+}
+.linked-group-thumb{
+  width:52px;height:52px;border-radius:10px;background:var(--cream-3) center/cover no-repeat;
+  border:1.5px solid var(--text);display:block;
+}
+.linked-group-author{font-size:.62rem;color:var(--text2);font-weight:600;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:64px}
 
 /* ── Social profile header + grid (Quán của tôi / UserQuanModal) ────────
    Hero has a warm gradient "cover" background that fades into the
