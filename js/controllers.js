@@ -2016,6 +2016,26 @@ const CommunityCtrl = {
       this._searchDebounce = setTimeout(() => this._loadList(search.value.trim()), 350);
     });
 
+    // Guest CTA banners — top + bottom — both open the auth form.
+    const openAuth = () => {
+      document.getElementById('communityAuth').classList.remove('hidden');
+      document.getElementById('communityMain').classList.add('hidden');
+      // Default to register mode: the whole point of the guest preview
+      // is to convert them to accounts, so lead with the account-
+      // creation form. They can still switch to login via the toggle.
+      this._mode = 'register';
+      this._renderAuthMode();
+      document.getElementById('cAuthEmail')?.focus();
+    };
+    document.getElementById('communityGuestSignIn')?.addEventListener('click', openAuth);
+    document.getElementById('communityGuestSignInBottom')?.addEventListener('click', openAuth);
+
+    // "Xem quán trước" link in auth form → back to browse-first view
+    document.getElementById('communityAuthBack')?.addEventListener('click', () => {
+      document.getElementById('communityAuth').classList.add('hidden');
+      document.getElementById('communityMain').classList.remove('hidden');
+    });
+
     this._initFriendSearch();
     this._renderAuthMode();
   },
@@ -2125,18 +2145,33 @@ const CommunityCtrl = {
     this.render();
   },
 
+  // Cap for anonymous browse-first preview. Small enough to feel like
+  // a taste, big enough to prove the community's alive.
+  GUEST_CAP: 10,
+
   render() {
     const loggedIn = Community.isLoggedIn();
-    document.getElementById('communityAuth').classList.toggle('hidden', loggedIn);
-    document.getElementById('communityMain').classList.toggle('hidden', !loggedIn);
-    if (!loggedIn) return;
+    // Main content shows always now — guests get the browse-first view
+    // with capped list + CTA banners; auth form only pops up on demand.
+    document.getElementById('communityAuth').classList.add('hidden');
+    document.getElementById('communityMain').classList.remove('hidden');
+    // Toggle features that only make sense once signed in
+    document.getElementById('communityAddBtn').classList.toggle('hidden', !loggedIn);
+    document.getElementById('communitySearchGroup').classList.toggle('hidden', !loggedIn);
+    document.getElementById('communityGuestBanner').classList.toggle('hidden', loggedIn);
+    document.getElementById('communityGuestBottomCta').classList.toggle('hidden', loggedIn);
     this._loadList('');
   },
 
   async _loadList(query) {
     const list = document.getElementById('communityList');
     list.innerHTML = `<div class="empty-comm"><div class="em-icon">⏳</div><div class="em-msg">${I18N.t('em.loading')}</div></div>`;
-    const r = query ? await Community.searchRestaurants(query) : await Community.listRestaurants();
+    const loggedIn = Community.isLoggedIn();
+    // Guests: browse-first preview capped to GUEST_CAP (10) newest quán,
+    // no search box. Logged-in users: full list + search.
+    const r = query
+      ? await Community.searchRestaurants(query)
+      : await Community.listRestaurants({ perPage: loggedIn ? 50 : this.GUEST_CAP });
     if (!r.ok) {
       list.innerHTML = `<div class="empty-comm">
         <div class="em-icon">😕</div><div class="em-msg">${I18N.t('em.loadFail')}</div>

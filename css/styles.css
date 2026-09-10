@@ -1207,6 +1207,36 @@ body.map-full .tabbar{transform:translateY(105%)}
 }
 .community-toggle-link:active{opacity:.6}
 
+/* Guest CTA banner — shown on Cộng đồng tab when not logged in. Sits
+   above the (capped) list and after it, nudging sign-up without
+   blocking the browse-first experience the user asked for. */
+.guest-cta{
+  display:flex;align-items:center;gap:.75rem;
+  padding:.8rem .85rem;margin-bottom:.9rem;
+  background:linear-gradient(135deg, var(--primary-tint) 0%, var(--cream-2) 100%);
+  border:2px solid var(--text);border-radius:var(--radius);
+  box-shadow:3px 3px 0 var(--primary-2);
+}
+.guest-cta-bottom{margin-top:1rem;margin-bottom:calc(var(--safe-bottom) + 1rem)}
+.guest-cta-icon{font-size:1.6rem;flex-shrink:0;line-height:1}
+.guest-cta-body{flex:1;min-width:0}
+.guest-cta-title{
+  font-family:var(--font-display);font-weight:900;font-style:italic;
+  font-size:.92rem;color:var(--text);line-height:1.2;
+}
+.guest-cta-sub{
+  font-size:.72rem;color:var(--text2);margin-top:.15rem;
+  font-weight:600;line-height:1.35;
+}
+.guest-cta-btn{
+  flex-shrink:0;padding:.55rem .9rem;font-size:.78rem;
+  border-radius:20px;box-shadow:2px 2px 0 var(--text);
+  border:2px solid var(--text);background:var(--primary);color:var(--cream);
+  font-family:var(--font-display);font-weight:900;font-style:italic;
+  cursor:pointer;transition:all .12s;
+}
+.guest-cta-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+
 .community-welcome-sub{font-size:.75rem;color:var(--text3);margin-top:.1rem;font-weight:600}
 
 /* Restaurant card — like my-r-card but with a taller cover photo + chip rows */
