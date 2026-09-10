@@ -56,7 +56,7 @@ html,body{height:100%;overflow:hidden;background:var(--cream);color:var(--text);
 
 /* Desktop / wide screen: center app in a phone-shaped column */
 @media (min-width:560px){
-  html{background:#2A1810;background-image:radial-gradient(circle at 20% 30%,#5F0F0F 0%,#2A1810 50%,#0A0603 100%)}
+  html{background:#2A1810}
   body{
     max-width:440px;margin:0 auto;position:relative;background:var(--cream);
     box-shadow:0 0 40px rgba(0,0,0,.6),0 0 0 1.5px var(--primary-2);
