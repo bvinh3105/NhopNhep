@@ -317,6 +317,14 @@ input,textarea,select{font-family:var(--font-body)}
 }
 .follow-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
 .follow-btn.following{background:var(--primary);color:var(--cream);border-color:var(--primary-2);box-shadow:2px 2px 0 var(--primary-2)}
+/* Theo dõi lẫn nhau (mutual) — kiểu TikTok: nhãn "Bạn bè" tách biệt hẳn với
+   "Đang theo dõi" 1 chiều, để lộ rõ đây là quan hệ 2 chiều. */
+.follow-btn.mutual{background:var(--accent-2);color:var(--white);border-color:var(--text);box-shadow:2px 2px 0 var(--text)}
+/* Wrap giữ nút + tag "Đã theo dõi bạn" xếp dọc, canh phải — luôn khai báo
+   gap tường minh (bài học từ bug .comm-r-footer: margin-left:auto ăn hết
+   chỗ trống, đừng để justify-content 1 mình lo khoảng cách). */
+.follow-btn-wrap{display:inline-flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0}
+.follows-you-tag{font-size:.62rem;font-weight:700;color:var(--text3);background:var(--cream-2);border-radius:8px;padding:.1rem .45rem;white-space:nowrap}
 .go-empty{padding:.75rem;text-align:center;font-size:.78rem;color:var(--text3);font-style:italic}
 
 .loc-input{

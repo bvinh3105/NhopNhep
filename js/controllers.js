@@ -1960,8 +1960,20 @@ function wireCardDetail(container, items) {
 // "Theo dõi" = kết bạn, 1 chiều kiểu Twitter — bấm là xong ngay, không cần
 // đối phương đồng ý (xem UserQuanModal/CommunityAddModal cho cách "bạn bè"
 // dùng để lọc quán visibility="friends").
-function followBtnHtml(userId, userName, following) {
-  return `<button type="button" class="follow-btn${following ? ' following' : ''}" data-user-id="${userId}" data-user-name="${escapeHtml(userName)}">${following ? I18N.t('follow.following') : I18N.t('follow.notFollowing')}</button>`;
+// theyFollowMe: đã biết trước lúc render (đọc thẳng field `friends` của đối
+// phương — users.viewRule/listRule mở cho mọi người đăng nhập, xem migration
+// 1725700005 — nên không tốn thêm request nào). Dùng để mô phỏng cơ chế
+// TikTok: theo dõi lẫn nhau → "🤝 Bạn bè"; họ theo dõi mình trước → gợi ý
+// "Theo dõi lại" kèm tag "Đã theo dõi bạn".
+function followBtnHtml(userId, userName, following, theyFollowMe = false) {
+  const mutual = following && theyFollowMe;
+  const label = mutual ? I18N.t('follow.mutual')
+    : following ? I18N.t('follow.following')
+    : theyFollowMe ? I18N.t('follow.followBack')
+    : I18N.t('follow.notFollowing');
+  const cls = mutual ? ' following mutual' : (following ? ' following' : '');
+  const tag = (!following && theyFollowMe) ? `<span class="follows-you-tag">${I18N.t('follow.followsYou')}</span>` : '';
+  return `<span class="follow-btn-wrap">${tag}<button type="button" class="follow-btn${cls}" data-user-id="${userId}" data-user-name="${escapeHtml(userName)}" data-they-follow-me="${theyFollowMe ? '1' : '0'}">${label}</button></span>`;
 }
 function wireFollowButtons(container, onChange) {
   container.querySelectorAll('.follow-btn[data-user-id]').forEach(btn => {
@@ -1969,18 +1981,37 @@ function wireFollowButtons(container, onChange) {
       e.stopPropagation();
       const id = btn.dataset.userId;
       const isFollowing = btn.classList.contains('following');
+      const theyFollowMe = btn.dataset.theyFollowMe === '1';
       btn.disabled = true;
       const r = isFollowing ? await Community.removeFriend(id) : await Community.addFriend(id);
       btn.disabled = false;
       if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
-      if (typeof Analytics !== 'undefined' && !isFollowing) {
+      const nowFollowing = !isFollowing;
+      if (typeof Analytics !== 'undefined' && nowFollowing) {
         // Only the follow direction — unfollow is negative engagement,
         // separate metric later if we ever need to look at churn.
         Analytics.track('follow', {});
       }
-      btn.classList.toggle('following', !isFollowing);
-      btn.textContent = !isFollowing ? I18N.t('follow.following') : I18N.t('follow.notFollowing');
-      showToast(!isFollowing ? I18N.t('toast.nowFollowing') : I18N.t('toast.unfollowed'));
+      const nowMutual = nowFollowing && theyFollowMe;
+      btn.classList.toggle('following', nowFollowing);
+      btn.classList.toggle('mutual', nowMutual);
+      btn.textContent = nowMutual ? I18N.t('follow.mutual')
+        : nowFollowing ? I18N.t('follow.following')
+        : theyFollowMe ? I18N.t('follow.followBack')
+        : I18N.t('follow.notFollowing');
+      // Tag "Đã theo dõi bạn" chỉ có ý nghĩa khi MÌNH chưa theo dõi lại —
+      // theo dõi xong (dù chưa chắc mutual do theyFollowMe có thể sai lệch
+      // nhẹ nếu đối phương vừa bỏ theo dõi mình) thì ẩn tag đi.
+      const wrap = btn.closest('.follow-btn-wrap');
+      const existingTag = wrap && wrap.querySelector('.follows-you-tag');
+      if (wrap) {
+        if (!nowFollowing && theyFollowMe && !existingTag) {
+          wrap.insertAdjacentHTML('afterbegin', `<span class="follows-you-tag">${I18N.t('follow.followsYou')}</span>`);
+        } else if (nowFollowing && existingTag) {
+          existingTag.remove();
+        }
+      }
+      showToast(nowMutual ? I18N.t('toast.nowMutual') : nowFollowing ? I18N.t('toast.nowFollowing') : I18N.t('toast.unfollowed'));
       if (onChange) onChange();
     });
   });
