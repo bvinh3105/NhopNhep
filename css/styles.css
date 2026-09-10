@@ -264,13 +264,8 @@ input,textarea,select{font-family:var(--font-body)}
 .cat-chip[data-cat="street"].active{background:var(--accent);border-color:var(--accent-2);box-shadow:2px 2px 0 var(--accent-2)}
 .cat-chip[data-cat="snack"].active{background:var(--cat-snack);border-color:#A8365F;box-shadow:2px 2px 0 #A8365F}
 .cat-chip[data-cat="cafe"].active{background:var(--cat-cafe);border-color:#5A3B24;box-shadow:2px 2px 0 #5A3B24}
-.cat-chip[data-src="community"]{opacity:.55;position:relative}
-.cat-chip[data-src="community"]::after{
-  content:'sắp có';position:absolute;top:-8px;right:-4px;
-  font-family:var(--font-display);font-style:italic;font-size:.55rem;font-weight:800;
-  background:var(--accent);color:var(--white);padding:1px 6px;border-radius:8px;
-  border:1.5px solid var(--text);letter-spacing:.3px;
-}
+/* Community source chip — was flagged "sắp có" until the PocketBase
+   backend went live. Now a normal, selectable source. */
 
 /* Radius chips */
 .radius-chips{display:flex;gap:.5rem}

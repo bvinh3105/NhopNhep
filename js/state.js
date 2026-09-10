@@ -29,6 +29,7 @@ const State = {
   },
   userRestaurants: [],  // user-added
   osmRestaurants: [],   // fetched from OpenStreetMap
+  communityRestaurants: [], // fetched from PocketBase, adapted to app shape
   lastScanSource: 'osm',
 };
 

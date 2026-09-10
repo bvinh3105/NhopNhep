@@ -27,15 +27,11 @@ const HomeCtrl = {
       MapHome.updateRadius();
     });
 
-    // Source chips
+    // Source chips (osm/mine/community — community is live now)
     document.getElementById('srcChips').addEventListener('click', e => {
       const chip = e.target.closest('.cat-chip');
       if (!chip) return;
       const src = chip.dataset.src;
-      if (src === 'community') {
-        showToast(I18N.t('toast.ratingSoon'));
-        return;
-      }
       if (State.activeSrcs.has(src)) {
         if (State.activeSrcs.size === 1) { showToast(I18N.t('toast.needOneSrc')); return; }
         State.activeSrcs.delete(src);
@@ -206,6 +202,7 @@ const HomeCtrl = {
     if (hit && Date.now() - hit.ts < this._SCAN_TTL) {
       State.osmRestaurants = hit.items;
       State.lastScanSource = hit.source;
+      await this._fetchCommunityForScan();
       this._doScan();
       showToast(I18N.t('toast.fromCache'), 1800);
       return;
@@ -305,10 +302,11 @@ const HomeCtrl = {
 
     State.osmRestaurants = items;
     State.lastScanSource = source;
+    await this._fetchCommunityForScan();
     // Data-source name is intentionally dev-only (devtools console) — never
     // shown in the UI. Users shouldn't need to know/care which map backend
     // answered a given scan.
-    console.debug('[scan] source:', source, '· items:', items.length);
+    console.debug('[scan] source:', source, '· items:', items.length, '· community:', State.communityRestaurants.length);
     ov.style.display = 'none';
     this._scanning = false;
 
@@ -331,9 +329,70 @@ const HomeCtrl = {
   },
 
   _srcOf(r) {
+    if (r._community) return 'community';
     if (r._gemini) return 'osm';   // treat gemini as part of "osm" source bucket
     if (r.id >= 1e13) return 'osm';
     return 'mine';
+  },
+
+  // Adapt a raw PocketBase restaurant record into the shape the rest of
+  // the app expects (numeric id, .lat/.lng, .cat, .price string, .desc,
+  // .address, .image thumbnail, _community flag, _pb original for the
+  // CommunityDetailModal to reopen with full context).
+  _communityToAppRestaurant(pb) {
+    if (!pb || !pb.id) return null;
+    const cat = COMMUNITY_PB_TO_CAT[pb.category] || 'restaurant';
+    const hasLoc = pb.location && (pb.location.lat !== 0 || pb.location.lon !== 0);
+    // Numeric id in the 4e13 range so ResultsCtrl parseInt() works AND
+    // it doesn't collide with OSM (1e13) or Gemini (2e13). Derived from
+    // the PB record id so re-scans keep the same id for the same quán.
+    let h = 0;
+    for (let i = 0; i < pb.id.length; i++) h = ((h << 5) - h + pb.id.charCodeAt(i)) | 0;
+    const numId = 4e13 + (Math.abs(h) % 1e12);
+    const priceLbl = (typeof COMMUNITY_PRICE_LABEL === 'object'
+      ? COMMUNITY_PRICE_LABEL[pb.price_range] : '') || '—';
+    let image = null;
+    try { image = Community.thumbnailUrl(pb, '400x400') || null; } catch (_) {}
+    return {
+      id: numId,
+      name: pb.name || '',
+      cat,
+      price: priceLbl,
+      desc: pb.description || '',
+      address: pb.address || '',
+      lat: hasLoc ? pb.location.lat : null,
+      lng: hasLoc ? pb.location.lon : null,
+      rating: 5.0,
+      image,
+      _community: true,
+      _pb: pb, // raw record so CommunityDetailModal.open(_pb) has everything
+    };
+  },
+
+  // Pull community-posted quán so scan results include them alongside
+  // OSM/Gemini. Called on every scan (cache-hit path included) so a
+  // freshly posted quán appears immediately. If community source is
+  // switched off, clears the list — cheaper than fetching to discard.
+  async _fetchCommunityForScan() {
+    if (!State.activeSrcs.has('community')
+        || typeof Community === 'undefined'
+        || !Community.BASE_URL) {
+      State.communityRestaurants = [];
+      return;
+    }
+    try {
+      const r = await Community.listRestaurants({ perPage: 100 });
+      if (r.ok && Array.isArray(r.data?.items)) {
+        State.communityRestaurants = r.data.items
+          .map(pb => this._communityToAppRestaurant(pb))
+          .filter(Boolean);
+      } else {
+        State.communityRestaurants = [];
+      }
+    } catch (e) {
+      console.warn('[Community scan] failed:', e?.message || e);
+      State.communityRestaurants = [];
+    }
   },
 
   // Accent-insensitive Vietnamese matcher — "pho" matches "Phở",
@@ -666,10 +725,14 @@ const ResultsCtrl = {
         return;
       }
 
-      // Card body → open detail modal
+      // Card body → open detail modal. Community results get the rich
+      // community modal (photos/votes/tags), everything else gets the
+      // plain DetailModal.
       const r = State.filteredResults.find(x => x.id === id)
         || (Array.isArray(State.results) ? State.results.find(x => x.id === id) : null);
-      if (r) DetailModal.open(r);
+      if (!r) return;
+      if (r._community && r._pb) CommunityDetailModal.open(r._pb);
+      else DetailModal.open(r);
     });
 
     document.getElementById('restaurantGrid').addEventListener('keydown', e => {
@@ -679,7 +742,9 @@ const ResultsCtrl = {
       e.preventDefault();
       const id = parseInt(card.dataset.id);
       const r = State.filteredResults.find(x => x.id === id);
-      if (r) DetailModal.open(r);
+      if (!r) return;
+      if (r._community && r._pb) CommunityDetailModal.open(r._pb);
+      else DetailModal.open(r);
     });
     document.getElementById('planBtn').addEventListener('click', () => {
       PlanCtrl._returnTo = 'results';

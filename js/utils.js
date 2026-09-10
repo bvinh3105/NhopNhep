@@ -161,7 +161,11 @@ function fmtClock(d) {
 }
 
 function allRestaurants() {
-  return [...State.userRestaurants, ...State.osmRestaurants];
+  return [
+    ...State.userRestaurants,
+    ...State.osmRestaurants,
+    ...State.communityRestaurants,
+  ];
 }
 
 /* ═══════════════════════════════════════════════
