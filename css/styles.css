@@ -1321,6 +1321,26 @@ body.map-full .tabbar{transform:translateY(105%)}
   cursor:pointer;z-index:6;transition:transform .12s var(--ease-spring),box-shadow .12s;
 }
 .settings-gear:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+/* Second gear slot — bookmark 🔖 sits to the LEFT of the settings gear
+   with a gap. Same style, different offset. */
+.settings-gear.settings-gear-2{right:calc(.9rem + 2.4rem + .5rem)}
+
+/* Quick action bar in detail modals — 2 secondary actions above the
+   primary Đóng/Google Maps row. Neutral background, subtle border so
+   they don't compete with the primary btn-save color. */
+.detail-quick-actions{
+  display:flex;gap:.5rem;margin-top:.6rem;
+}
+.quick-action-btn{
+  flex:1;padding:.55rem .5rem;font-size:.78rem;font-weight:700;
+  border:1.5px solid var(--text);background:var(--paper);color:var(--text);
+  border-radius:12px;box-shadow:2px 2px 0 var(--text);
+  cursor:pointer;transition:all .12s;display:inline-flex;
+  align-items:center;justify-content:center;gap:.35rem;
+  font-family:var(--font-body);
+}
+.quick-action-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.quick-action-btn.on{background:var(--primary);color:var(--cream);border-color:var(--text)}
 
 .empty-comm{
   padding:2rem 1rem;text-align:center;background:var(--paper);

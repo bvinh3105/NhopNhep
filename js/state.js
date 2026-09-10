@@ -30,6 +30,7 @@ const State = {
   userRestaurants: [],  // user-added
   osmRestaurants: [],   // fetched from OpenStreetMap
   communityRestaurants: [], // fetched from PocketBase, adapted to app shape
+  savedPosts: new Set(), // community post IDs the user bookmarked (localStorage-scoped, per browser)
   lastScanSource: 'osm',
 };
 
@@ -48,6 +49,7 @@ const Storage = {
         tripHistory: State.profile.tripHistory || [],
       },
       userRestaurants: State.userRestaurants,
+      savedPosts: [...State.savedPosts],
     };
     try { localStorage.setItem(this.KEY, JSON.stringify(data)); } catch(e) { console.warn(e); }
   },
@@ -64,6 +66,7 @@ const Storage = {
         State.profile.tripHistory = Array.isArray(data.profile.tripHistory) ? data.profile.tripHistory : [];
       }
       State.userRestaurants = data.userRestaurants || [];
+      State.savedPosts = new Set(Array.isArray(data.savedPosts) ? data.savedPosts : []);
     } catch(e) { console.warn(e); }
   },
 

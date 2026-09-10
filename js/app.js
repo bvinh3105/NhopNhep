@@ -47,7 +47,17 @@ function boot() {
   CommunityAddModal.init();
   CommunityDetailModal.init();
   UserQuanModal.init();
+  SavedListModal.init();
   wireScrollMasks();
+
+  // Deep-link handler: ?q=<pb_id> auto-opens the community detail
+  // modal for that quán. Used by the "Sao chép link" button in the
+  // detail modal so shared links land on the right screen.
+  const urlQ = new URLSearchParams(location.search).get('q');
+  if (urlQ) {
+    // Delay slightly so all controllers/modals are ready to render.
+    setTimeout(() => SavedListModal.openFromLink(urlQ), 400);
+  }
 
   // Fire-and-forget one app_open event per page load. Skipped on
   // localhost by Analytics itself so dev noise doesn't hit prod stats.

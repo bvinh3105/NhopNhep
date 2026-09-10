@@ -2226,6 +2226,47 @@ const CommunityDetailModal = {
       if (!hasLoc) { showToast(I18N.t('toast.noLocationYet')); return; }
       window.open(gmapsUrl({ name: r.name, address: r.address, lat: r.location.lat, lng: r.location.lon }), '_blank', 'noopener');
     });
+
+    // Save/unsave (bookmark) — localStorage-only per browser
+    document.getElementById('communityDetailSave').addEventListener('click', () => {
+      const r = this._current;
+      if (!r || !r.id) return;
+      const wasSaved = State.savedPosts.has(r.id);
+      if (wasSaved) State.savedPosts.delete(r.id);
+      else State.savedPosts.add(r.id);
+      Storage.save();
+      this._syncSaveBtn();
+      showToast(I18N.t(wasSaved ? 'toast.postUnsaved' : 'toast.postSaved'));
+    });
+
+    // Copy shareable link — the boot handler in app.js reads ?q=<id>
+    // and auto-opens this modal on load.
+    document.getElementById('communityDetailCopy').addEventListener('click', async () => {
+      const r = this._current;
+      if (!r || !r.id) return;
+      const url = `${location.origin}/?q=${encodeURIComponent(r.id)}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast(I18N.t('toast.linkCopied'));
+      } catch (e) {
+        // Older browsers / permission denied: fallback via a hidden input
+        const ta = document.createElement('textarea');
+        ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); showToast(I18N.t('toast.linkCopied')); }
+        catch (_) { showToast(I18N.t('toast.linkCopyFail')); }
+        document.body.removeChild(ta);
+      }
+    });
+  },
+
+  _syncSaveBtn() {
+    const btn = document.getElementById('communityDetailSave');
+    if (!btn || !this._current) return;
+    const on = State.savedPosts.has(this._current.id);
+    btn.classList.toggle('on', on);
+    const short = btn.querySelector('[data-i18n]');
+    if (short) short.textContent = I18N.t(on ? 'detail.savedShort' : 'detail.saveShort');
   },
 
   open(r) {
@@ -2302,11 +2343,76 @@ const CommunityDetailModal = {
     mapsBtn.disabled = !hasLoc;
     mapsBtn.style.opacity = hasLoc ? '' : '.5';
 
+    this._syncSaveBtn();
     document.getElementById('communityDetailModal').classList.add('show');
   },
 
   close() {
     document.getElementById('communityDetailModal').classList.remove('show');
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   SAVED LIST MODAL — bookmarks (localStorage-only, per browser).
+   Opened by the 🔖 icon at top-right of the profile screen.
+   Rendered as a community-style grid, tap opens CommunityDetailModal.
+═══════════════════════════════════════════════ */
+const SavedListModal = {
+  init() {
+    const modal = document.getElementById('savedListModal');
+    document.getElementById('savedListBtn')?.addEventListener('click', () => this.open());
+    document.getElementById('savedListClose')?.addEventListener('click', () => this._close());
+    modal?.addEventListener('click', (e) => { if (e.target === modal) this._close(); });
+  },
+
+  async open() {
+    const modal = document.getElementById('savedListModal');
+    const body = document.getElementById('savedListBody');
+    const countEl = document.getElementById('savedListCount');
+    const ids = [...State.savedPosts];
+    countEl.textContent = I18N.t('saved.count', { n: ids.length });
+    modal.classList.add('show');
+
+    if (ids.length === 0) {
+      body.innerHTML = `<div class="list-empty">
+        <div class="list-empty-icon">🔖</div>
+        <div class="list-empty-msg">${I18N.t('saved.emptyMsg')}</div>
+        <div class="list-empty-sub">${I18N.t('saved.emptySub')}</div>
+      </div>`;
+      return;
+    }
+    body.innerHTML = `<div class="list-empty"><div class="list-empty-icon">⏳</div><div class="list-empty-msg">${I18N.t('em.loading')}</div></div>`;
+
+    // Fetch each saved record from PocketBase in parallel. Silently
+    // drops IDs that 404 (post was deleted by owner after being saved).
+    const results = await Promise.all(ids.map(id => Community._fetch(`/api/collections/restaurants/records/${id}?expand=created_by`)));
+    const items = results.filter(r => r.ok && r.data).map(r => r.data);
+
+    if (items.length === 0) {
+      body.innerHTML = `<div class="list-empty">
+        <div class="list-empty-icon">📭</div>
+        <div class="list-empty-msg">${I18N.t('saved.allGoneMsg')}</div>
+        <div class="list-empty-sub">${I18N.t('saved.allGoneSub')}</div>
+      </div>`;
+      return;
+    }
+    body.innerHTML = `<div class="social-grid">${items.map(x => communityGridCellHtml(x)).join('')}</div>`;
+    // Same tap-to-open wiring as the community feed
+    wireCardDetail(body, items);
+  },
+
+  _close() {
+    document.getElementById('savedListModal').classList.remove('show');
+  },
+
+  // Called on boot when URL has ?q=<pb_id> — fetches that quán and
+  // opens CommunityDetailModal so a shared link lands directly on the
+  // right modal instead of the app's home page.
+  async openFromLink(id) {
+    if (!id || typeof Community === 'undefined' || !Community.BASE_URL) return;
+    const r = await Community._fetch(`/api/collections/restaurants/records/${id}?expand=created_by`);
+    if (r.ok && r.data) CommunityDetailModal.open(r.data);
+    else showToast(I18N.t('toast.linkExpired'));
   },
 };
 
