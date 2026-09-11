@@ -263,6 +263,19 @@ input,textarea,select{font-family:var(--font-body)}
 }
 .cat-chips::-webkit-scrollbar{display:none}
 .cat-chips.at-end{-webkit-mask-image:none;mask-image:none}
+/* #catChips (home "Tôi muốn ăn") is the primary category toggle - all 4
+   options must always be plainly visible, never scroll-hidden behind the
+   fade. Vinh flagged 2026-09-11 that on narrow phones (375px) the 4 chips
+   - worse in EN, where "Street food" is longer than "Vỉa hè" - overflow
+   the row width, so the inherited .cat-chips scroll-fade mask kicked in
+   and read as a blur/rendering glitch on this all-important control, not
+   a "scroll for more" hint. Wrap instead of scroll+fade here so nothing
+   on this row is ever hidden or faded, regardless of viewport or locale. */
+#catChips{
+  flex-wrap:wrap;overflow-x:visible;
+  -webkit-mask-image:none;mask-image:none;
+  padding-right:6px;
+}
 .cat-chip{
   display:flex;align-items:center;gap:.3rem;padding:.5rem .85rem;border-radius:24px;
   border:2px solid var(--text);background:var(--white);color:var(--text);
