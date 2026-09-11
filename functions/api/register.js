@@ -15,7 +15,7 @@
 // tunnel rotates. See PROJECT_HANDOFF section 4 for the watchdog that
 // normally handles this (patches all three files — Bat-TOAN-BO*.ps1).
 
-const PB_URL = 'https://resolution-appliance-laser-wolf.trycloudflare.com';
+const PB_URL = 'https://revised-wilson-resort-searching.trycloudflare.com';
 const TURNSTILE_ACTION = 'register';
 // The exact hostnames the Turnstile widget was registered for (Cloudflare
 // dashboard/widget-create) — not sensitive, unlike TURNSTILE_SECRET, so
@@ -31,22 +31,34 @@ function jsonError(status, message) {
 
 export async function onRequestPost(context) {
   const { request, env } = context;
+  const t0  = Date.now();
+  const ip  = request.headers.get('CF-Connecting-IP') || '-';
+  const cf  = request.cf || {};
+  // Compact structured logger — all register events tagged [api] so they
+  // can be filtered together in CF Workers Real-time Logs alongside log.js.
+  const apiLog = (status, note) => console.log(JSON.stringify({
+    ev:'api_call', ep:'register', status, note,
+    ip, cc:cf.country, co:cf.colo, ms:Date.now()-t0,
+  }));
 
   let body;
   try {
     body = await request.json();
   } catch (_) {
+    apiLog(400, 'bad_json');
     return jsonError(400, 'Yêu cầu không hợp lệ');
   }
 
   const { email, password, name, turnstileToken } = body || {};
-  if (!email || !password) return jsonError(400, 'Thiếu email hoặc mật khẩu');
+  if (!email || !password) { apiLog(400, 'missing_fields'); return jsonError(400, 'Thiếu email hoặc mật khẩu'); }
   if (typeof turnstileToken !== 'string' || !turnstileToken || turnstileToken.length > 2048) {
+    apiLog(403, 'no_token');
     return jsonError(403, 'Xác thực chống bot thất bại, thử lại nhé');
   }
   if (!env.TURNSTILE_SECRET) {
     // Misconfigured deploy (secret not set yet) — fail closed, never skip
     // verification just because the secret is missing.
+    apiLog(500, 'no_secret');
     return jsonError(500, 'Server chưa cấu hình xong, thử lại sau');
   }
 
@@ -70,6 +82,7 @@ export async function onRequestPost(context) {
     if (!vr.ok) throw new Error(`siteverify ${vr.status}`);
     verify = await vr.json();
   } catch (_) {
+    apiLog(403, 'turnstile_network_err');
     return jsonError(403, 'Không xác thực được, thử lại nhé');
   }
 
@@ -78,12 +91,13 @@ export async function onRequestPost(context) {
     verify.action !== TURNSTILE_ACTION ||
     !EXPECTED_HOSTNAMES.has(verify.hostname)
   ) {
+    // Log bot-challenge failures — a spike here = bot activity or widget misconfiguration.
+    apiLog(403, `turnstile_fail:success=${verify.success},action=${verify.action},host=${verify.hostname}`);
     return jsonError(403, 'Xác thực chống bot thất bại, thử lại nhé');
   }
 
-  // Verified — forward the real registration to PocketBase, proxying its
-  // exact status/body through so existing client error handling (reads
-  // data.message, e.g. "email đã tồn tại") keeps working unchanged.
+  // Turnstile passed — forward the real registration to PocketBase.
+  // Proxy its exact status/body so client error handling keeps working.
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 12000);
@@ -95,11 +109,14 @@ export async function onRequestPost(context) {
     });
     clearTimeout(timer);
     const text = await upstream.text();
+    // Log outcome: 200 = new account created, 4xx = email taken / validation fail.
+    apiLog(upstream.status, upstream.ok ? 'registered' : 'pb_rejected');
     return new Response(text, {
       status: upstream.status,
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (_) {
+    apiLog(502, 'pb_unreachable');
     return jsonError(502, 'Không kết nối được server cộng đồng');
   }
 }

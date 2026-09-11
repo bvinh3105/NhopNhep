@@ -15,17 +15,21 @@
 // updated together whenever the tunnel rotates. See PROJECT_HANDOFF
 // section 4 for the watchdog that normally handles this.
 
-const PB_URL = 'https://resolution-appliance-laser-wolf.trycloudflare.com';
+const PB_URL = 'https://revised-wilson-resort-searching.trycloudflare.com';
 const COLLECTION = 'analytics_events';
 const MAX_BODY = 8 * 1024; // 8 KB — a single event is ~500 bytes tops
 
 export async function onRequestPost(context) {
   const { request } = context;
+  const t0 = Date.now();
+  const ip = request.headers.get('CF-Connecting-IP') || '-';
+  const cf = request.cf || {};
 
   // Guard: cheap body-size cap so an anonymous caller can't stream
   // arbitrary payload through us.
   const cl = parseInt(request.headers.get('content-length') || '0', 10);
   if (cl > MAX_BODY) {
+    console.log(JSON.stringify({ ev:'api_call', ep:'log', status:413, ip, cc:cf.country, co:cf.colo, ms:Date.now()-t0 }));
     return new Response(JSON.stringify({ error: 'payload too large' }), {
       status: 413,
       headers: { 'Content-Type': 'application/json' },
@@ -38,6 +42,7 @@ export async function onRequestPost(context) {
     if (!body || body.length > MAX_BODY) throw new Error('empty or too large');
     JSON.parse(body); // shape check — refuse non-JSON early
   } catch (e) {
+    console.log(JSON.stringify({ ev:'api_call', ep:'log', status:400, ip, cc:cf.country, co:cf.colo, ms:Date.now()-t0 }));
     return new Response(JSON.stringify({ error: 'invalid body' }), {
       status: 400,
       headers: { 'Content-Type': 'application/json' },
@@ -57,8 +62,11 @@ export async function onRequestPost(context) {
     clearTimeout(timer);
     // Don't leak upstream body/status details back — the client fires
     // and forgets, and PocketBase error bodies aren't safe to expose.
-    return new Response(null, { status: upstream.ok ? 204 : 502 });
+    const status = upstream.ok ? 204 : 502;
+    console.log(JSON.stringify({ ev:'api_call', ep:'log', status, ip, cc:cf.country, co:cf.colo, ms:Date.now()-t0 }));
+    return new Response(null, { status });
   } catch (_) {
+    console.log(JSON.stringify({ ev:'api_call', ep:'log', status:502, ip, cc:cf.country, co:cf.colo, ms:Date.now()-t0 }));
     return new Response(null, { status: 502 });
   }
 }

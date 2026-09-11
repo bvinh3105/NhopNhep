@@ -101,4 +101,57 @@ function boot() {
   }
 }
 
+/* ═══════════════════════════════════════════════
+   CRASH REPORTER
+   Captures unhandled JS errors and Promise
+   rejections on the user's device, then forwards
+   them to /api/error-report so they show up in
+   Cloudflare Workers Real-time Logs (filter "[crash]")
+   and PocketBase error_logs (best-effort).
+   Hard-capped at 5 reports per session — never floods.
+═══════════════════════════════════════════════ */
+(function initCrashReporter() {
+  const ENDPOINT = '/api/error-report';
+  // Version tag — update this when bumping v= in index.html so error
+  // reports can be correlated with the exact deployed build.
+  const VER = 'v2526';
+  let _n = 0; // per-session counter
+
+  function send(payload) {
+    if (_n >= 5) return; // 5-per-session cap
+    _n++;
+    const body = JSON.stringify({ ...payload, ver: VER, href: location.pathname });
+    try {
+      if (navigator.sendBeacon) {
+        // sendBeacon survives page unload — best for crash-during-navigation.
+        navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'application/json' }));
+      } else {
+        fetch(ENDPOINT, {
+          method: 'POST', body,
+          headers: { 'Content-Type': 'application/json' },
+          keepalive: true,
+        }).catch(() => {});
+      }
+    } catch (_) { /* crash reporter must never itself throw */ }
+  }
+
+  window.addEventListener('error', (e) => {
+    send({
+      kind: 'js_error',
+      msg:  (e.message  || 'unknown').slice(0, 200),
+      src:  (e.filename || '').replace(location.origin, '').slice(0, 100),
+      line: e.lineno,
+      col:  e.colno,
+    });
+  });
+
+  window.addEventListener('unhandledrejection', (e) => {
+    const r = e.reason;
+    send({
+      kind: 'promise_rejection',
+      msg:  (r?.message || String(r) || 'unhandled rejection').slice(0, 200),
+    });
+  });
+})();
+
 document.addEventListener('DOMContentLoaded', boot);

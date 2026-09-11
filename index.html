@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
@@ -6,63 +6,63 @@
 <meta name="theme-color" content="#FBF3D9">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Nhóp Nhép — Random quán ăn</title>
+<title>NhÃ³p NhÃ©p â€” Random quÃ¡n Äƒn</title>
 <link rel="icon" type="image/svg+xml" href="/icon.svg">
 <link rel="apple-touch-icon" href="/icon.svg">
 <link rel="manifest" href="/manifest.json">
-<meta name="description" content="Random quán ăn gần bạn · Lên lịch trình tự động cho chuyến đi ăn.">
+<meta name="description" content="Random quÃ¡n Äƒn gáº§n báº¡n Â· LÃªn lá»‹ch trÃ¬nh tá»± Ä‘á»™ng cho chuyáº¿n Ä‘i Äƒn.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,800;9..144,900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- Patches L.Map to support rotation (heading-up nav mode, PlanCtrl) —
+<!-- Patches L.Map to support rotation (heading-up nav mode, PlanCtrl) â€”
      JS-only, monkey-patches Leaflet core, no separate CSS needed. Pinned
      version, peerDependency is leaflet ^1.9.3 (compatible with 1.9.4 above). -->
 <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate.js"></script>
-<!-- Cloudflare Turnstile — bot check on the community register form only
+<!-- Cloudflare Turnstile â€” bot check on the community register form only
      (CommunityCtrl._submitAuth, see js/controllers.js). Widget renders
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2525">
+<link rel="stylesheet" href="css/styles.css?v=2526">
 
-<!-- ═══════════════════════════════════════════════
-     Cloudflare Web Analytics — paste beacon here when Vinh sets it up
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+     Cloudflare Web Analytics â€” paste beacon here when Vinh sets it up
      at dash.cloudflare.com > Web Analytics > Add site > copy <script>.
      Free, no cost against CF workers quota. Handles pageviews, geo,
      referrer, device, and core web vitals passively. Custom business
-     events (scan/plan_built/etc) go through js/analytics.js → PocketBase.
-═══════════════════════════════════════════════ -->
+     events (scan/plan_built/etc) go through js/analytics.js â†’ PocketBase.
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <!-- <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "PASTE_YOUR_TOKEN_HERE"}'></script> -->
 
 </head>
 <body>
 
-<!-- ═══════════════════════════════════════════════
-     MARQUEE RIBBON — always visible
-═══════════════════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+     MARQUEE RIBBON â€” always visible
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="ribbon">
   <div class="ribbon-track">
-    <span>NHÓP NHÉP</span><span data-i18n="ribbon.eat">ĂN THÔI</span><span data-i18n="ribbon.good">QUÁN NGON</span><span data-i18n="ribbon.near">Ở GẦN</span>
-    <span>NHÓP NHÉP</span><span data-i18n="ribbon.eat">ĂN THÔI</span><span data-i18n="ribbon.good">QUÁN NGON</span><span data-i18n="ribbon.near">Ở GẦN</span>
+    <span>NHÃ“P NHÃ‰P</span><span data-i18n="ribbon.eat">Ä‚N THÃ”I</span><span data-i18n="ribbon.good">QUÃN NGON</span><span data-i18n="ribbon.near">á»ž Gáº¦N</span>
+    <span>NHÃ“P NHÃ‰P</span><span data-i18n="ribbon.eat">Ä‚N THÃ”I</span><span data-i18n="ribbon.good">QUÃN NGON</span><span data-i18n="ribbon.near">á»ž Gáº¦N</span>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     HOME SCREEN (Nhóp Nhép tab main)
-═══════════════════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+     HOME SCREEN (NhÃ³p NhÃ©p tab main)
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div id="homeScreen" class="screen">
 
   <!-- Hero -->
   <div class="home-hero">
     <div class="hero-row">
       <div>
-        <div class="hero-title" id="heroTitle">Nhóp <em>Nhép</em> 🍜</div>
-        <div class="hero-tagline" id="heroTagline" data-i18n="hero.tagline">vi vu cùng <em>Vinh</em> và <em>Thảo</em> ♥</div>
-        <div class="hero-sub" data-i18n="hero.sub">Random quán ngon · Lên lịch tự động</div>
+        <div class="hero-title" id="heroTitle">NhÃ³p <em>NhÃ©p</em> ðŸœ</div>
+        <div class="hero-tagline" id="heroTagline" data-i18n="hero.tagline">vi vu cÃ¹ng <em>Vinh</em> vÃ  <em>Tháº£o</em> â™¥</div>
+        <div class="hero-sub" data-i18n="hero.sub">Random quÃ¡n ngon Â· LÃªn lá»‹ch tá»± Ä‘á»™ng</div>
       </div>
-      <div class="hero-badge" id="scanCountBadge" data-i18n="hero.badge">✦ Quét để tìm</div>
+      <div class="hero-badge" id="scanCountBadge" data-i18n="hero.badge">âœ¦ QuÃ©t Ä‘á»ƒ tÃ¬m</div>
     </div>
   </div>
 
@@ -71,8 +71,8 @@
     <div id="mainMap"></div>
     <div class="scanning-overlay" id="scanOverlay" style="display:none">
       <div class="scanning-spinner"></div>
-      <div class="scanning-txt" data-i18n="scanning.text">Đang tìm quán ngon…</div>
-      <div class="scanning-sub" id="scanSub">⏱ 0s</div>
+      <div class="scanning-txt" data-i18n="scanning.text">Äang tÃ¬m quÃ¡n ngonâ€¦</div>
+      <div class="scanning-sub" id="scanSub">â± 0s</div>
     </div>
   </div>
 
@@ -80,39 +80,39 @@
   <div id="homeSheet">
 
     <!-- Categories -->
-    <div class="row-label" data-i18n="home.wantToEat">Tôi muốn ăn</div>
+    <div class="row-label" data-i18n="home.wantToEat">TÃ´i muá»‘n Äƒn</div>
     <div class="cat-chips" id="catChips">
-      <button class="cat-chip active" data-cat="restaurant">🍽️ <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
-      <button class="cat-chip active" data-cat="street">🍜 <span data-i18n="catLabel.street">Vỉa hè</span></button>
-      <button class="cat-chip active" data-cat="snack">🧆 <span data-i18n="catLabel.snack">Ăn vặt</span></button>
-      <button class="cat-chip active" data-cat="cafe">☕ <span data-i18n="catLabel.cafe">Cà phê</span></button>
+      <button class="cat-chip active" data-cat="restaurant">ðŸ½ï¸ <span data-i18n="catLabel.restaurant">NhÃ  hÃ ng</span></button>
+      <button class="cat-chip active" data-cat="street">ðŸœ <span data-i18n="catLabel.street">Vá»‰a hÃ¨</span></button>
+      <button class="cat-chip active" data-cat="snack">ðŸ§† <span data-i18n="catLabel.snack">Ä‚n váº·t</span></button>
+      <button class="cat-chip active" data-cat="cafe">â˜• <span data-i18n="catLabel.cafe">CÃ  phÃª</span></button>
     </div>
 
-    <!-- Dish search — compact input; chip gợi ý hiện khi focus -->
-    <div class="row-label mini" data-i18n="home.findDish">Tìm <em>món / quán</em> · tuỳ chọn</div>
+    <!-- Dish search â€” compact input; chip gá»£i Ã½ hiá»‡n khi focus -->
+    <div class="row-label mini" data-i18n="home.findDish">TÃ¬m <em>mÃ³n / quÃ¡n</em> Â· tuá»³ chá»n</div>
     <div class="loc-row-wrap">
       <div class="loc-row">
-        <input id="dishInput" class="loc-input" type="text" data-i18n="home.dishPlaceholder" data-i18n-attr="placeholder" placeholder="VD: phở, bánh mì, tên quán… (bỏ trống = mọi món)" autocomplete="off" spellcheck="false" maxlength="60">
-        <button class="loc-gps-btn" id="dishClearBtn" data-i18n="home.clearDish" data-i18n-attr="title" title="Xoá bộ lọc món" style="display:none">✕</button>
+        <input id="dishInput" class="loc-input" type="text" data-i18n="home.dishPlaceholder" data-i18n-attr="placeholder" placeholder="VD: phá»Ÿ, bÃ¡nh mÃ¬, tÃªn quÃ¡nâ€¦ (bá» trá»‘ng = má»i mÃ³n)" autocomplete="off" spellcheck="false" maxlength="60">
+        <button class="loc-gps-btn" id="dishClearBtn" data-i18n="home.clearDish" data-i18n-attr="title" title="XoÃ¡ bá»™ lá»c mÃ³n" style="display:none">âœ•</button>
       </div>
       <div class="dish-suggest" id="dishSuggest">
-        <button class="dish-chip" data-dish="phở">🍜 Phở</button>
-        <button class="dish-chip" data-dish="bún">🍲 Bún</button>
-        <button class="dish-chip" data-dish="bánh mì">🥖 Bánh mì</button>
-        <button class="dish-chip" data-dish="cơm">🍚 Cơm</button>
-        <button class="dish-chip" data-dish="nướng">🍢 Nướng</button>
-        <button class="dish-chip" data-dish="lẩu">🥘 Lẩu</button>
-        <button class="dish-chip" data-dish="trà sữa">🧋 Trà sữa</button>
-        <button class="dish-chip" data-dish="cà phê">☕ Cà phê</button>
-        <button class="dish-chip" data-dish="pizza">🍕 Pizza</button>
-        <button class="dish-chip" data-dish="sushi">🍣 Sushi</button>
-        <button class="dish-chip" data-dish="chè">🍧 Chè</button>
-        <button class="dish-chip" data-dish="kem">🍦 Kem</button>
+        <button class="dish-chip" data-dish="phá»Ÿ">ðŸœ Phá»Ÿ</button>
+        <button class="dish-chip" data-dish="bÃºn">ðŸ² BÃºn</button>
+        <button class="dish-chip" data-dish="bÃ¡nh mÃ¬">ðŸ¥– BÃ¡nh mÃ¬</button>
+        <button class="dish-chip" data-dish="cÆ¡m">ðŸš CÆ¡m</button>
+        <button class="dish-chip" data-dish="nÆ°á»›ng">ðŸ¢ NÆ°á»›ng</button>
+        <button class="dish-chip" data-dish="láº©u">ðŸ¥˜ Láº©u</button>
+        <button class="dish-chip" data-dish="trÃ  sá»¯a">ðŸ§‹ TrÃ  sá»¯a</button>
+        <button class="dish-chip" data-dish="cÃ  phÃª">â˜• CÃ  phÃª</button>
+        <button class="dish-chip" data-dish="pizza">ðŸ• Pizza</button>
+        <button class="dish-chip" data-dish="sushi">ðŸ£ Sushi</button>
+        <button class="dish-chip" data-dish="chÃ¨">ðŸ§ ChÃ¨</button>
+        <button class="dish-chip" data-dish="kem">ðŸ¦ Kem</button>
       </div>
     </div>
 
     <!-- Radius -->
-    <div class="row-label" data-i18n="home.radius">Bán kính tìm kiếm</div>
+    <div class="row-label" data-i18n="home.radius">BÃ¡n kÃ­nh tÃ¬m kiáº¿m</div>
     <div class="radius-chips" id="radiusChips">
       <button class="radius-chip" data-r="500">500m</button>
       <button class="radius-chip active" data-r="1000">1 km</button>
@@ -120,95 +120,95 @@
       <button class="radius-chip" data-r="5000">5 km</button>
     </div>
 
-    <!-- Advanced filters — collapsed by default -->
+    <!-- Advanced filters â€” collapsed by default -->
     <button class="advanced-toggle" id="advToggle" type="button" aria-expanded="false">
-      <span data-i18n="home.advancedFilters">⚙️ Bộ lọc <em>nâng cao</em></span>
-      <span class="chevron">▾</span>
+      <span data-i18n="home.advancedFilters">âš™ï¸ Bá»™ lá»c <em>nÃ¢ng cao</em></span>
+      <span class="chevron">â–¾</span>
     </button>
     <div class="advanced-body" id="advBody">
-      <div class="row-label mini" data-i18n="home.dataSource">Nguồn dữ liệu</div>
+      <div class="row-label mini" data-i18n="home.dataSource">Nguá»“n dá»¯ liá»‡u</div>
       <div class="cat-chips" id="srcChips">
-        <button class="cat-chip active" data-src="osm">🌐 <span data-i18n="src.osm">Địa điểm công khai</span></button>
-        <button class="cat-chip active" data-src="mine">⭐ <span data-i18n="src.mine">Của tôi</span></button>
-        <button class="cat-chip" data-src="community">👥 <span data-i18n="src.community">Cộng đồng</span></button>
+        <button class="cat-chip active" data-src="osm">ðŸŒ <span data-i18n="src.osm">Äá»‹a Ä‘iá»ƒm cÃ´ng khai</span></button>
+        <button class="cat-chip active" data-src="mine">â­ <span data-i18n="src.mine">Cá»§a tÃ´i</span></button>
+        <button class="cat-chip" data-src="community">ðŸ‘¥ <span data-i18n="src.community">Cá»™ng Ä‘á»“ng</span></button>
       </div>
-      <div class="row-label mini" data-i18n="home.rating">Đánh giá</div>
+      <div class="row-label mini" data-i18n="home.rating">ÄÃ¡nh giÃ¡</div>
       <div class="radius-chips" id="minRatingChips">
-        <button class="radius-chip active" data-rating="0"><span data-i18n="filter.all">Tất cả</span></button>
-        <button class="radius-chip" data-rating="3.5">3.5★</button>
-        <button class="radius-chip" data-rating="4">4★</button>
-        <button class="radius-chip" data-rating="4.5">4.5★</button>
+        <button class="radius-chip active" data-rating="0"><span data-i18n="filter.all">Táº¥t cáº£</span></button>
+        <button class="radius-chip" data-rating="3.5">3.5â˜…</button>
+        <button class="radius-chip" data-rating="4">4â˜…</button>
+        <button class="radius-chip" data-rating="4.5">4.5â˜…</button>
       </div>
     </div>
 
     <!-- Location -->
-    <div class="row-label" data-i18n="home.startPoint">Điểm xuất phát</div>
+    <div class="row-label" data-i18n="home.startPoint">Äiá»ƒm xuáº¥t phÃ¡t</div>
     <div class="loc-row-wrap">
       <div class="loc-row">
-        <input id="locInput" class="loc-input" type="text" data-i18n="home.locPlaceholder" data-i18n-attr="placeholder" placeholder="Gõ địa chỉ, tên đường, quán… hoặc dùng GPS" autocomplete="off" spellcheck="false">
-        <button class="loc-gps-btn" id="gpsBtn" data-i18n="home.gpsTitle" data-i18n-attr="title" title="Bật GPS · nhấn giữ để tracking liên tục">📍</button>
+        <input id="locInput" class="loc-input" type="text" data-i18n="home.locPlaceholder" data-i18n-attr="placeholder" placeholder="GÃµ Ä‘á»‹a chá»‰, tÃªn Ä‘Æ°á»ng, quÃ¡nâ€¦ hoáº·c dÃ¹ng GPS" autocomplete="off" spellcheck="false">
+        <button class="loc-gps-btn" id="gpsBtn" data-i18n="home.gpsTitle" data-i18n-attr="title" title="Báº­t GPS Â· nháº¥n giá»¯ Ä‘á»ƒ tracking liÃªn tá»¥c">ðŸ“</button>
       </div>
       <div class="geocode-suggest" id="locSuggest"></div>
     </div>
     <div class="gps-hint" id="gpsHint"></div>
 
     <!-- Scan CTA -->
-    <button class="scan-btn" id="scanBtn" data-i18n="home.scanNow">🔍 Quét <em>ngay</em>!</button>
+    <button class="scan-btn" id="scanBtn" data-i18n="home.scanNow">ðŸ” QuÃ©t <em>ngay</em>!</button>
 
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      RESULTS SCREEN
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div id="resultsScreen" class="screen hidden">
   <div class="results-topbar">
-    <button class="back-btn" id="resultsBack">←</button>
+    <button class="back-btn" id="resultsBack">â†</button>
     <div style="flex:1;min-width:0">
-      <div class="results-title" id="resultsTitle" data-i18n="results.nearby">Quán gần đây</div>
+      <div class="results-title" id="resultsTitle" data-i18n="results.nearby">QuÃ¡n gáº§n Ä‘Ã¢y</div>
       <div class="results-sub" id="resultsSub"></div>
     </div>
-    <button class="reshuffle-btn" id="reshuffleBtn" data-i18n="results.reshuffle">🔀 Xáo lại</button>
+    <button class="reshuffle-btn" id="reshuffleBtn" data-i18n="results.reshuffle">ðŸ”€ XÃ¡o láº¡i</button>
   </div>
 
   <div class="cat-tabs" id="catTabs">
-    <button class="cat-tab active" data-filter="all"><span data-i18n="filter.all">Tất cả</span></button>
-    <button class="cat-tab" data-filter="restaurant">🍽️ <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
-    <button class="cat-tab" data-filter="street">🍜 <span data-i18n="catLabel.street">Vỉa hè</span></button>
-    <button class="cat-tab" data-filter="snack">🧆 <span data-i18n="catLabel.snack">Ăn vặt</span></button>
-    <button class="cat-tab" data-filter="cafe">☕ <span data-i18n="catLabel.cafe">Cà phê</span></button>
+    <button class="cat-tab active" data-filter="all"><span data-i18n="filter.all">Táº¥t cáº£</span></button>
+    <button class="cat-tab" data-filter="restaurant">ðŸ½ï¸ <span data-i18n="catLabel.restaurant">NhÃ  hÃ ng</span></button>
+    <button class="cat-tab" data-filter="street">ðŸœ <span data-i18n="catLabel.street">Vá»‰a hÃ¨</span></button>
+    <button class="cat-tab" data-filter="snack">ðŸ§† <span data-i18n="catLabel.snack">Ä‚n váº·t</span></button>
+    <button class="cat-tab" data-filter="cafe">â˜• <span data-i18n="catLabel.cafe">CÃ  phÃª</span></button>
   </div>
 
   <div class="restaurant-grid" id="restaurantGrid"></div>
 
   <div class="results-action">
-    <button class="action-btn" id="planBtn" disabled data-i18n="results.schedule">Lên lịch</button>
+    <button class="action-btn" id="planBtn" disabled data-i18n="results.schedule">LÃªn lá»‹ch</button>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      PLAN SCREEN
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div id="planScreen" class="screen hidden">
   <div class="plan-topbar">
-    <button class="back-btn" id="planBack">←</button>
-    <div class="plan-title" data-i18n="plan.title">Lịch trình hôm nay</div>
+    <button class="back-btn" id="planBack">â†</button>
+    <div class="plan-title" data-i18n="plan.title">Lá»‹ch trÃ¬nh hÃ´m nay</div>
   </div>
   <div class="plan-summary" id="planSummary"></div>
   <div id="planMapWrap"><div id="planMap"></div></div>
   <div class="timeline" id="timeline"></div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      PROFILE / PERSONAL SCREEN
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div id="profileScreen" class="screen hidden">
-  <!-- Settings gear — replaces the old avatar-tap gesture. Opens accountModal
-       which now holds Avatar/Tên/Ngôn ngữ/Bạn bè/Sở thích/Dữ liệu/Gemini AI. -->
-  <button class="settings-gear" id="settingsGearBtn" type="button" data-i18n="profile.settings" data-i18n-attr="title" title="Cài đặt">⚙️</button>
-  <button class="settings-gear settings-gear-2" id="savedListBtn" type="button" data-i18n="saved.openTitle" data-i18n-attr="title" title="Quán đã lưu">🔖</button>
+  <!-- Settings gear â€” replaces the old avatar-tap gesture. Opens accountModal
+       which now holds Avatar/TÃªn/NgÃ´n ngá»¯/Báº¡n bÃ¨/Sá»Ÿ thÃ­ch/Dá»¯ liá»‡u/Gemini AI. -->
+  <button class="settings-gear" id="settingsGearBtn" type="button" data-i18n="profile.settings" data-i18n-attr="title" title="CÃ i Ä‘áº·t">âš™ï¸</button>
+  <button class="settings-gear settings-gear-2" id="savedListBtn" type="button" data-i18n="saved.openTitle" data-i18n-attr="title" title="QuÃ¡n Ä‘Ã£ lÆ°u">ðŸ”–</button>
   <div class="profile-scroll">
-    <!-- Quán community section — the community profile header (avatar,
+    <!-- QuÃ¡n community section â€” the community profile header (avatar,
          name, 3 social stats) is rendered inline into #myRestaurantList
          by ProfileCtrl._renderMyRestaurants(), so we don't need a
          separate local hero on top anymore. -->
@@ -217,45 +217,45 @@
            rendered here by ProfileCtrl._renderMyRestaurants(). -->
       <div id="myRProfileHeader"></div>
       <div class="cat-chips" id="myRFilterChips" style="margin-top:.6rem">
-        <button class="cat-chip active" data-filter="all"><span data-i18n="filter.all">Tất cả</span></button>
-        <button class="cat-chip" data-filter="restaurant">🍽️ <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
-        <button class="cat-chip" data-filter="street">🍜 <span data-i18n="catLabel.street">Vỉa hè</span></button>
-        <button class="cat-chip" data-filter="snack">🧆 <span data-i18n="catLabel.snack">Ăn vặt</span></button>
-        <button class="cat-chip" data-filter="cafe">☕ <span data-i18n="catLabel.cafe">Cà phê</span></button>
+        <button class="cat-chip active" data-filter="all"><span data-i18n="filter.all">Táº¥t cáº£</span></button>
+        <button class="cat-chip" data-filter="restaurant">ðŸ½ï¸ <span data-i18n="catLabel.restaurant">NhÃ  hÃ ng</span></button>
+        <button class="cat-chip" data-filter="street">ðŸœ <span data-i18n="catLabel.street">Vá»‰a hÃ¨</span></button>
+        <button class="cat-chip" data-filter="snack">ðŸ§† <span data-i18n="catLabel.snack">Ä‚n váº·t</span></button>
+        <button class="cat-chip" data-filter="cafe">â˜• <span data-i18n="catLabel.cafe">CÃ  phÃª</span></button>
       </div>
       <div class="comm-r-list" id="myRestaurantList" style="margin-top:.7rem"></div>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      COMMUNITY SCREEN
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div id="communityScreen" class="screen hidden">
   <div class="profile-scroll">
 
-    <!-- Auth form — hidden by default. Guests see the browse-first layout
+    <!-- Auth form â€” hidden by default. Guests see the browse-first layout
          below; the auth form only appears when the guest CTA banner or
          a locked action explicitly opens it. -->
     <div id="communityAuth" class="profile-section hidden">
       <div class="psec-head">
-        <div class="psec-title" data-i18n="community.title">Cộng <em>đồng</em></div>
+        <div class="psec-title" data-i18n="community.title">Cá»™ng <em>Ä‘á»“ng</em></div>
       </div>
-      <p class="ai-hint" data-i18n="community.signInHint">Đăng nhập để xem quán cả nhóm chia sẻ và đăng quán của bạn.</p>
+      <p class="ai-hint" data-i18n="community.signInHint">ÄÄƒng nháº­p Ä‘á»ƒ xem quÃ¡n cáº£ nhÃ³m chia sáº» vÃ  Ä‘Äƒng quÃ¡n cá»§a báº¡n.</p>
 
       <div class="form-group hidden" id="communityNameGroup">
-        <label class="form-label" data-i18n="community.displayName">Tên hiển thị</label>
-        <input class="form-input" id="cAuthName" type="text" data-i18n="community.namePlaceholder" data-i18n-attr="placeholder" placeholder="Tên bạn muốn hiện với mọi người" maxlength="30">
+        <label class="form-label" data-i18n="community.displayName">TÃªn hiá»ƒn thá»‹</label>
+        <input class="form-input" id="cAuthName" type="text" data-i18n="community.namePlaceholder" data-i18n-attr="placeholder" placeholder="TÃªn báº¡n muá»‘n hiá»‡n vá»›i má»i ngÆ°á»i" maxlength="30">
       </div>
       <div class="form-group">
         <label class="form-label" data-i18n="community.email">Email</label>
         <input class="form-input" id="cAuthEmail" type="email" placeholder="ban@email.com" autocomplete="username">
       </div>
       <div class="form-group">
-        <label class="form-label" data-i18n="community.password">Mật khẩu</label>
+        <label class="form-label" data-i18n="community.password">Máº­t kháº©u</label>
         <div class="ai-key-row">
-          <input class="form-input" id="cAuthPassword" type="password" data-i18n="community.passwordPlaceholder" data-i18n-attr="placeholder" placeholder="Ít nhất 8 ký tự" autocomplete="current-password">
-          <button class="ai-key-toggle" id="cAuthPasswordToggle" data-i18n="community.togglePassword" data-i18n-attr="title" title="Hiện/ẩn mật khẩu" type="button">👁</button>
+          <input class="form-input" id="cAuthPassword" type="password" data-i18n="community.passwordPlaceholder" data-i18n-attr="placeholder" placeholder="Ãt nháº¥t 8 kÃ½ tá»±" autocomplete="current-password">
+          <button class="ai-key-toggle" id="cAuthPasswordToggle" data-i18n="community.togglePassword" data-i18n-attr="title" title="Hiá»‡n/áº©n máº­t kháº©u" type="button">ðŸ‘</button>
         </div>
       </div>
 
@@ -263,29 +263,29 @@
         <div class="cf-turnstile" id="communityTurnstile" data-sitekey="0x4AAAAAAEvamwVLTYTX0-jM" data-action="register"></div>
       </div>
 
-      <button class="btn-save" id="communityAuthSubmit" style="width:100%" data-i18n="community.signIn">Đăng nhập</button>
-      <button class="community-toggle-link" id="communityAuthToggle" type="button" data-i18n="community.toRegister">Chưa có tài khoản? Đăng ký</button>
-      <button class="community-toggle-link" id="communityAuthBack" type="button" data-i18n="community.backToBrowse">← Xem quán trước</button>
+      <button class="btn-save" id="communityAuthSubmit" style="width:100%" data-i18n="community.signIn">ÄÄƒng nháº­p</button>
+      <button class="community-toggle-link" id="communityAuthToggle" type="button" data-i18n="community.toRegister">ChÆ°a cÃ³ tÃ i khoáº£n? ÄÄƒng kÃ½</button>
+      <button class="community-toggle-link" id="communityAuthBack" type="button" data-i18n="community.backToBrowse">â† Xem quÃ¡n trÆ°á»›c</button>
     </div>
 
-    <!-- (Guest CTA banners removed per Vinh's request 2026-09-11 — felt
-         intrusive. Sign-up entry point kept as the small "Đăng nhập"
+    <!-- (Guest CTA banners removed per Vinh's request 2026-09-11 â€” felt
+         intrusive. Sign-up entry point kept as the small "ÄÄƒng nháº­p"
          button rendered next to the tab title in psec-head below, so
          guests still have a way to reach the auth form when they want it.) -->
 
-    <!-- Main content — visible to guests AND logged-in users. Guests see
-         the 10 newest quán (capped); logged-in users see the "+ Đăng
-         quán" button, search box, and full list. -->
+    <!-- Main content â€” visible to guests AND logged-in users. Guests see
+         the 10 newest quÃ¡n (capped); logged-in users see the "+ ÄÄƒng
+         quÃ¡n" button, search box, and full list. -->
     <div id="communityMain">
       <div class="profile-section">
         <div class="psec-head">
-          <div class="psec-title" data-i18n="community.restaurants">Quán <em>cộng đồng</em></div>
-          <!-- Guest sees "Đăng nhập" (opens auth form). Logged-in user sees "+ Đăng quán". -->
-          <button class="add-btn hidden" id="communityGuestSignIn" type="button" data-i18n="community.signIn">Đăng nhập</button>
-          <button class="add-btn hidden" id="communityAddBtn" data-i18n="community.post">＋ Đăng quán</button>
+          <div class="psec-title" data-i18n="community.restaurants">QuÃ¡n <em>cá»™ng Ä‘á»“ng</em></div>
+          <!-- Guest sees "ÄÄƒng nháº­p" (opens auth form). Logged-in user sees "+ ÄÄƒng quÃ¡n". -->
+          <button class="add-btn hidden" id="communityGuestSignIn" type="button" data-i18n="community.signIn">ÄÄƒng nháº­p</button>
+          <button class="add-btn hidden" id="communityAddBtn" data-i18n="community.post">ï¼‹ ÄÄƒng quÃ¡n</button>
         </div>
         <div class="form-group hidden" id="communitySearchGroup">
-          <input class="form-input" id="communitySearchInput" type="text" data-i18n="community.searchPlaceholder" data-i18n-attr="placeholder" placeholder="🔎 Tìm theo tên, thẻ, hashtag…" autocomplete="off">
+          <input class="form-input" id="communitySearchInput" type="text" data-i18n="community.searchPlaceholder" data-i18n-attr="placeholder" placeholder="ðŸ”Ž TÃ¬m theo tÃªn, tháº», hashtagâ€¦" autocomplete="off">
         </div>
         <div class="comm-r-list" id="communityList"></div>
       </div>
@@ -294,233 +294,233 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      BOTTOM TAB BAR
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="tabbar">
   <button class="tab-btn" data-tab="profile">
-    <div class="tab-ico">👤</div>
-    <div data-i18n="tab.profile">Cá nhân</div>
+    <div class="tab-ico">ðŸ‘¤</div>
+    <div data-i18n="tab.profile">CÃ¡ nhÃ¢n</div>
   </button>
   <button class="tab-btn active" data-tab="home">
-    <div class="tab-ico">🍜</div>
-    <div>Nhóp Nhép</div>
+    <div class="tab-ico">ðŸœ</div>
+    <div>NhÃ³p NhÃ©p</div>
   </button>
   <button class="tab-btn" data-tab="community">
-    <div class="tab-ico">👥</div>
-    <div data-i18n="tab.community">Cộng đồng</div>
+    <div class="tab-ico">ðŸ‘¥</div>
+    <div data-i18n="tab.community">Cá»™ng Ä‘á»“ng</div>
   </button>
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     TRIP HISTORY MODAL — past itineraries
-═══════════════════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+     TRIP HISTORY MODAL â€” past itineraries
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="modal-overlay" id="tripsModal">
   <div class="modal-sheet list-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" data-i18n="trips.title">Chuyến <em>ăn đã đi</em></div>
-    <div class="modal-sub" id="tripsCount">0 chuyến</div>
+    <div class="modal-title" data-i18n="trips.title">Chuyáº¿n <em>Äƒn Ä‘Ã£ Ä‘i</em></div>
+    <div class="modal-sub" id="tripsCount">0 chuyáº¿n</div>
     <div class="list-modal-body" id="tripsBody"></div>
     <div class="form-actions">
-      <button class="btn-cancel" id="tripsClose" data-i18n="common.close">Đóng</button>
+      <button class="btn-cancel" id="tripsClose" data-i18n="common.close">ÄÃ³ng</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      RESTAURANT DETAIL MODAL
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="modal-overlay" id="detailModal">
   <div class="modal-sheet detail-sheet">
     <div class="modal-handle"></div>
     <div id="detailBody"></div>
     <div class="form-actions">
-      <button class="btn-cancel" id="detailClose" data-i18n="common.close">Đóng</button>
-      <button class="btn-save" id="detailMaps" data-i18n="common.openMaps">🗺 Mở Google Maps</button>
+      <button class="btn-cancel" id="detailClose" data-i18n="common.close">ÄÃ³ng</button>
+      <button class="btn-save" id="detailMaps" data-i18n="common.openMaps">ðŸ—º Má»Ÿ Google Maps</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
      COMMUNITY ADD RESTAURANT MODAL
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="modal-overlay" id="communityAddModal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" data-i18n="addQuan.title">Đăng quán <em>cộng đồng</em> 👥</div>
-    <div class="modal-sub" data-i18n="addQuan.sub">Chia sẻ quán ngon cho cả nhóm</div>
+    <div class="modal-title" data-i18n="addQuan.title">ÄÄƒng quÃ¡n <em>cá»™ng Ä‘á»“ng</em> ðŸ‘¥</div>
+    <div class="modal-sub" data-i18n="addQuan.sub">Chia sáº» quÃ¡n ngon cho cáº£ nhÃ³m</div>
 
     <div class="form-group">
-      <label class="form-label" data-i18n="addQuan.name">Tên quán</label>
-      <input class="form-input" id="cfName" type="text" data-i18n="addQuan.namePlaceholder" data-i18n-attr="placeholder" placeholder="VD: Bún bò Huế Bà Khế" maxlength="60">
+      <label class="form-label" data-i18n="addQuan.name">TÃªn quÃ¡n</label>
+      <input class="form-input" id="cfName" type="text" data-i18n="addQuan.namePlaceholder" data-i18n-attr="placeholder" placeholder="VD: BÃºn bÃ² Huáº¿ BÃ  Kháº¿" maxlength="60">
     </div>
 
     <div class="form-group">
-      <label class="form-label" data-i18n="addQuan.category">Loại quán</label>
+      <label class="form-label" data-i18n="addQuan.category">Loáº¡i quÃ¡n</label>
       <div class="cat-picker" id="cfCatPicker">
-        <button class="cat-pick-btn active" data-cat="restaurant">🍽️ <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
-        <button class="cat-pick-btn" data-cat="street">🍜 <span data-i18n="catLabel.street">Vỉa hè</span></button>
-        <button class="cat-pick-btn" data-cat="snack">🧆 <span data-i18n="catLabel.snack">Ăn vặt</span></button>
-        <button class="cat-pick-btn" data-cat="cafe">☕ <span data-i18n="catLabel.cafe">Cà phê</span></button>
+        <button class="cat-pick-btn active" data-cat="restaurant">ðŸ½ï¸ <span data-i18n="catLabel.restaurant">NhÃ  hÃ ng</span></button>
+        <button class="cat-pick-btn" data-cat="street">ðŸœ <span data-i18n="catLabel.street">Vá»‰a hÃ¨</span></button>
+        <button class="cat-pick-btn" data-cat="snack">ðŸ§† <span data-i18n="catLabel.snack">Ä‚n váº·t</span></button>
+        <button class="cat-pick-btn" data-cat="cafe">â˜• <span data-i18n="catLabel.cafe">CÃ  phÃª</span></button>
       </div>
     </div>
 
     <div class="form-group">
-      <label class="form-label" data-i18n="addQuan.priceRange">Mức giá</label>
+      <label class="form-label" data-i18n="addQuan.priceRange">Má»©c giÃ¡</label>
       <div class="cat-picker" id="cfPricePicker">
-        <button class="cat-pick-btn active" data-price="binh_dan">💸 <span data-i18n="priceLabel.cheap">Bình dân</span></button>
-        <button class="cat-pick-btn" data-price="tam_trung">💰 <span data-i18n="priceLabel.mid">Tầm trung</span></button>
-        <button class="cat-pick-btn" data-price="sang_chanh" style="grid-column:span 2">✨ <span data-i18n="priceLabel.premium">Sang chảnh</span></button>
+        <button class="cat-pick-btn active" data-price="binh_dan">ðŸ’¸ <span data-i18n="priceLabel.cheap">BÃ¬nh dÃ¢n</span></button>
+        <button class="cat-pick-btn" data-price="tam_trung">ðŸ’° <span data-i18n="priceLabel.mid">Táº§m trung</span></button>
+        <button class="cat-pick-btn" data-price="sang_chanh" style="grid-column:span 2">âœ¨ <span data-i18n="priceLabel.premium">Sang cháº£nh</span></button>
       </div>
     </div>
 
     <div class="form-group">
-      <label class="form-label" data-i18n="addQuan.visibility">Độ mở</label>
+      <label class="form-label" data-i18n="addQuan.visibility">Äá»™ má»Ÿ</label>
       <div class="cat-picker" id="cfVisibilityPicker">
-        <button class="cat-pick-btn" data-vis="private">🔒 <span data-i18n="visLabel.private">Riêng tư</span></button>
-        <button class="cat-pick-btn" data-vis="friends">👥 <span data-i18n="visLabel.friends">Bạn bè</span></button>
-        <button class="cat-pick-btn active" data-vis="public" style="grid-column:span 2">🌍 <span data-i18n="visLabel.public">Công khai</span></button>
+        <button class="cat-pick-btn" data-vis="private">ðŸ”’ <span data-i18n="visLabel.private">RiÃªng tÆ°</span></button>
+        <button class="cat-pick-btn" data-vis="friends">ðŸ‘¥ <span data-i18n="visLabel.friends">Báº¡n bÃ¨</span></button>
+        <button class="cat-pick-btn active" data-vis="public" style="grid-column:span 2">ðŸŒ <span data-i18n="visLabel.public">CÃ´ng khai</span></button>
       </div>
     </div>
 
     <div class="form-group">
-      <label class="form-label" data-i18n="addQuan.desc">Mô tả</label>
-      <textarea class="form-textarea" id="cfDesc" data-i18n="addQuan.descPlaceholder" data-i18n-attr="placeholder" placeholder="Món đặc trưng, view quán, lưu ý gì đó cho cả nhóm…" maxlength="500"></textarea>
+      <label class="form-label" data-i18n="addQuan.desc">MÃ´ táº£</label>
+      <textarea class="form-textarea" id="cfDesc" data-i18n="addQuan.descPlaceholder" data-i18n-attr="placeholder" placeholder="MÃ³n Ä‘áº·c trÆ°ng, view quÃ¡n, lÆ°u Ã½ gÃ¬ Ä‘Ã³ cho cáº£ nhÃ³mâ€¦" maxlength="500"></textarea>
     </div>
 
     <div class="form-group">
-      <label class="form-label" data-i18n="addQuan.location">Vị trí quán</label>
+      <label class="form-label" data-i18n="addQuan.location">Vá»‹ trÃ­ quÃ¡n</label>
       <div class="loc-row-wrap">
         <input class="form-input" id="cfLocSearch" type="text" data-i18n="addQuan.locPlaceholder" data-i18n-attr="placeholder"
-          placeholder="VD: 16 Trần Hưng Đạo · hoặc chỉ 'phố + quận'" autocomplete="off" spellcheck="false">
+          placeholder="VD: 16 Tráº§n HÆ°ng Äáº¡o Â· hoáº·c chá»‰ 'phá»‘ + quáº­n'" autocomplete="off" spellcheck="false">
         <div class="geocode-suggest" id="cfLocSuggest"></div>
       </div>
       <div id="communityPickerMap" style="margin-top:.55rem"></div>
-      <div class="picker-hint" data-i18n="addQuan.pickerHint">Chọn dropdown nếu có · hoặc nhấn thẳng lên bản đồ</div>
+      <div class="picker-hint" data-i18n="addQuan.pickerHint">Chá»n dropdown náº¿u cÃ³ Â· hoáº·c nháº¥n tháº³ng lÃªn báº£n Ä‘á»“</div>
       <div id="cfDupCheck" class="dup-check-box hidden"></div>
     </div>
 
     <div class="form-group">
-      <label class="form-label"><span data-i18n="addQuan.tags">Thẻ</span> <span style="opacity:.6;font-weight:600;text-transform:none;font-style:normal" data-i18n="addQuan.tagsHint">(vd: ăn nhẹ, nhẹ bụng…)</span></label>
-      <input class="form-input" id="cfTagInput" type="text" data-i18n="addQuan.tagPlaceholder" data-i18n-attr="placeholder" placeholder="Gõ thẻ rồi nhấn Enter…" maxlength="30">
+      <label class="form-label"><span data-i18n="addQuan.tags">Tháº»</span> <span style="opacity:.6;font-weight:600;text-transform:none;font-style:normal" data-i18n="addQuan.tagsHint">(vd: Äƒn nháº¹, nháº¹ bá»¥ngâ€¦)</span></label>
+      <input class="form-input" id="cfTagInput" type="text" data-i18n="addQuan.tagPlaceholder" data-i18n-attr="placeholder" placeholder="GÃµ tháº» rá»“i nháº¥n Enterâ€¦" maxlength="30">
       <div class="chip-tag-list" id="cfTagList"></div>
     </div>
 
     <div class="form-group">
-      <label class="form-label"><span data-i18n="addQuan.hashtags">Hashtag</span> <span style="opacity:.6;font-weight:600;text-transform:none;font-style:normal" data-i18n="addQuan.hashtagsHint">(để dễ tìm kiếm)</span></label>
-      <input class="form-input" id="cfHashtagInput" type="text" data-i18n="addQuan.hashtagPlaceholder" data-i18n-attr="placeholder" placeholder="Gõ hashtag rồi nhấn Enter…" maxlength="24">
+      <label class="form-label"><span data-i18n="addQuan.hashtags">Hashtag</span> <span style="opacity:.6;font-weight:600;text-transform:none;font-style:normal" data-i18n="addQuan.hashtagsHint">(Ä‘á»ƒ dá»… tÃ¬m kiáº¿m)</span></label>
+      <input class="form-input" id="cfHashtagInput" type="text" data-i18n="addQuan.hashtagPlaceholder" data-i18n-attr="placeholder" placeholder="GÃµ hashtag rá»“i nháº¥n Enterâ€¦" maxlength="24">
       <div class="chip-tag-list" id="cfHashtagList"></div>
     </div>
 
     <div class="form-group">
-      <label class="form-label"><span data-i18n="addQuan.photos">Ảnh quán</span> <span style="opacity:.6;font-weight:600;text-transform:none;font-style:normal" data-i18n="addQuan.photosHint">(tối đa 4 · nhấn ⭐ để chọn ảnh đại diện)</span></label>
+      <label class="form-label"><span data-i18n="addQuan.photos">áº¢nh quÃ¡n</span> <span style="opacity:.6;font-weight:600;text-transform:none;font-style:normal" data-i18n="addQuan.photosHint">(tá»‘i Ä‘a 4 Â· nháº¥n â­ Ä‘á»ƒ chá»n áº£nh Ä‘áº¡i diá»‡n)</span></label>
       <input type="file" id="cfPhotoInput" accept="image/png,image/jpeg,image/webp" multiple style="display:none">
       <div class="photo-picker-grid" id="cfPhotoGrid">
-        <button class="photo-slot photo-slot-empty" id="cfPhotoAddBtn" type="button">＋<br><span style="font-size:.65rem" data-i18n="addQuan.addPhoto">Thêm ảnh</span></button>
+        <button class="photo-slot photo-slot-empty" id="cfPhotoAddBtn" type="button">ï¼‹<br><span style="font-size:.65rem" data-i18n="addQuan.addPhoto">ThÃªm áº£nh</span></button>
       </div>
     </div>
 
     <div class="form-actions">
-      <button class="btn-cancel" id="cfCancel" data-i18n="common.cancel">Huỷ</button>
-      <button class="btn-save" id="cfSave" data-i18n="addQuan.submit">📤 Đăng quán</button>
+      <button class="btn-cancel" id="cfCancel" data-i18n="common.cancel">Huá»·</button>
+      <button class="btn-save" id="cfSave" data-i18n="addQuan.submit">ðŸ“¤ ÄÄƒng quÃ¡n</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     COMMUNITY RESTAURANT DETAIL — full photos + info for 1 quán
-═══════════════════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+     COMMUNITY RESTAURANT DETAIL â€” full photos + info for 1 quÃ¡n
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="modal-overlay" id="communityDetailModal">
   <div class="modal-sheet detail-sheet">
     <div class="modal-handle"></div>
     <div id="communityDetailBody"></div>
     <div class="detail-quick-actions">
-      <button type="button" class="quick-action-btn" id="communityDetailSave" data-i18n="detail.save" data-i18n-attr="title" title="Lưu vào 'Đã lưu'">🔖 <span data-i18n="detail.saveShort">Lưu</span></button>
-      <button type="button" class="quick-action-btn" id="communityDetailCopy" data-i18n="detail.copyLink" data-i18n-attr="title" title="Sao chép link đến quán này">📋 <span data-i18n="detail.copyLinkShort">Sao chép link</span></button>
+      <button type="button" class="quick-action-btn" id="communityDetailSave" data-i18n="detail.save" data-i18n-attr="title" title="LÆ°u vÃ o 'ÄÃ£ lÆ°u'">ðŸ”– <span data-i18n="detail.saveShort">LÆ°u</span></button>
+      <button type="button" class="quick-action-btn" id="communityDetailCopy" data-i18n="detail.copyLink" data-i18n-attr="title" title="Sao chÃ©p link Ä‘áº¿n quÃ¡n nÃ y">ðŸ“‹ <span data-i18n="detail.copyLinkShort">Sao chÃ©p link</span></button>
     </div>
     <div class="form-actions">
-      <button class="btn-cancel" id="communityDetailClose" data-i18n="common.close">Đóng</button>
-      <button class="btn-save" id="communityDetailMaps" data-i18n="common.openMaps">🗺 Mở Google Maps</button>
+      <button class="btn-cancel" id="communityDetailClose" data-i18n="common.close">ÄÃ³ng</button>
+      <button class="btn-save" id="communityDetailMaps" data-i18n="common.openMaps">ðŸ—º Má»Ÿ Google Maps</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     FOLLOWER LIST MODAL — opened by tapping the "FOLLOWER" stat in
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+     FOLLOWER LIST MODAL â€” opened by tapping the "FOLLOWER" stat in
      the profile hero. Shows users who have this user in their friends
      array.
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="modal-overlay" id="followerListModal">
   <div class="modal-sheet list-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" data-i18n="follower.title">Người <em>theo dõi</em></div>
+    <div class="modal-title" data-i18n="follower.title">NgÆ°á»i <em>theo dÃµi</em></div>
     <div class="modal-sub" id="followerListCount">0</div>
     <div class="list-modal-body" id="followerListBody"></div>
     <div class="form-actions">
-      <button class="btn-cancel" id="followerListClose" data-i18n="common.close">Đóng</button>
+      <button class="btn-cancel" id="followerListClose" data-i18n="common.close">ÄÃ³ng</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     FOLLOWING LIST MODAL — opened by tapping the "ĐANG THEO DÕI" stat.
-     Riêng tư: chỉ chính chủ mở được, vì nó chỉ hiện trong #myRProfileHeader
-     (hồ sơ của CHÍNH MÌNH) — communityProfileHeaderHtml không bao giờ vẽ
-     stat này khi xem hồ sơ người khác (UserQuanModal).
-═══════════════════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+     FOLLOWING LIST MODAL â€” opened by tapping the "ÄANG THEO DÃ•I" stat.
+     RiÃªng tÆ°: chá»‰ chÃ­nh chá»§ má»Ÿ Ä‘Æ°á»£c, vÃ¬ nÃ³ chá»‰ hiá»‡n trong #myRProfileHeader
+     (há»“ sÆ¡ cá»§a CHÃNH MÃŒNH) â€” communityProfileHeaderHtml khÃ´ng bao giá» váº½
+     stat nÃ y khi xem há»“ sÆ¡ ngÆ°á»i khÃ¡c (UserQuanModal).
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="modal-overlay" id="followingListModal">
   <div class="modal-sheet list-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" data-i18n="following.title">Đang <em>theo dõi</em></div>
+    <div class="modal-title" data-i18n="following.title">Äang <em>theo dÃµi</em></div>
     <div class="modal-sub" id="followingListCount">0</div>
     <div class="list-modal-body" id="followingListBody"></div>
     <div class="form-actions">
-      <button class="btn-cancel" id="followingListClose" data-i18n="common.close">Đóng</button>
+      <button class="btn-cancel" id="followingListClose" data-i18n="common.close">ÄÃ³ng</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     SAVED POSTS MODAL — bookmarks list, opened by the 🔖 icon
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+     SAVED POSTS MODAL â€” bookmarks list, opened by the ðŸ”– icon
      in the profile screen top-right.
-═══════════════════════════════════════════════ -->
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="modal-overlay" id="savedListModal">
   <div class="modal-sheet list-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" data-i18n="saved.title">Quán <em>đã lưu</em></div>
-    <div class="modal-sub" id="savedListCount">0 quán</div>
+    <div class="modal-title" data-i18n="saved.title">QuÃ¡n <em>Ä‘Ã£ lÆ°u</em></div>
+    <div class="modal-sub" id="savedListCount">0 quÃ¡n</div>
     <div class="list-modal-body" id="savedListBody"></div>
     <div class="form-actions">
-      <button class="btn-cancel" id="savedListClose" data-i18n="common.close">Đóng</button>
+      <button class="btn-cancel" id="savedListClose" data-i18n="common.close">ÄÃ³ng</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     USER QUÁN MODAL — every quán one person has posted (that I can see)
-═══════════════════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+     USER QUÃN MODAL â€” every quÃ¡n one person has posted (that I can see)
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="modal-overlay" id="userQuanModal">
   <div class="modal-sheet list-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="userQuanTitle">Quán <em>của</em>...</div>
-    <div class="modal-sub" id="userQuanCount">0 quán</div>
+    <div class="modal-title" id="userQuanTitle">QuÃ¡n <em>cá»§a</em>...</div>
+    <div class="modal-sub" id="userQuanCount">0 quÃ¡n</div>
     <div id="userQuanFollowSlot" style="text-align:center;margin-bottom:.75rem"></div>
     <div class="comm-r-list" id="userQuanBody" style="padding-bottom:1rem"></div>
     <div class="form-actions">
-      <button class="btn-cancel" id="userQuanClose" data-i18n="common.close">Đóng</button>
+      <button class="btn-cancel" id="userQuanClose" data-i18n="common.close">ÄÃ³ng</button>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     ACCOUNT MODAL — avatar, tên, bạn bè, đăng xuất.
-     Mở bằng cách chạm vào avatar ở tab Cá nhân — gom mọi thứ "chỉnh sửa
-     tài khoản" vào 1 chỗ thay vì để rải ngay trên màn hình chính.
-═══════════════════════════════════════════════ -->
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+     ACCOUNT MODAL â€” avatar, tÃªn, báº¡n bÃ¨, Ä‘Äƒng xuáº¥t.
+     Má»Ÿ báº±ng cÃ¡ch cháº¡m vÃ o avatar á»Ÿ tab CÃ¡ nhÃ¢n â€” gom má»i thá»© "chá»‰nh sá»­a
+     tÃ i khoáº£n" vÃ o 1 chá»— thay vÃ¬ Ä‘á»ƒ ráº£i ngay trÃªn mÃ n hÃ¬nh chÃ­nh.
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
 <div class="modal-overlay" id="accountModal">
   <div class="modal-sheet list-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" data-i18n="account.title">Tài khoản <em>của tôi</em></div>
+    <div class="modal-title" data-i18n="account.title">TÃ i khoáº£n <em>cá»§a tÃ´i</em></div>
 
     <div class="form-group">
       <label class="form-label" data-i18n="account.avatar">Avatar</label>
@@ -528,83 +528,83 @@
     </div>
 
     <div class="form-group">
-      <label class="form-label" data-i18n="community.displayName">Tên hiển thị</label>
-      <input class="form-input" id="profileNameInput" type="text" data-i18n="profile.namePlaceholder" data-i18n-attr="placeholder" placeholder="Tên của bạn…" maxlength="30">
+      <label class="form-label" data-i18n="community.displayName">TÃªn hiá»ƒn thá»‹</label>
+      <input class="form-input" id="profileNameInput" type="text" data-i18n="profile.namePlaceholder" data-i18n-attr="placeholder" placeholder="TÃªn cá»§a báº¡nâ€¦" maxlength="30">
     </div>
 
-    <!-- Ngôn ngữ -->
+    <!-- NgÃ´n ngá»¯ -->
     <div class="form-group">
-      <label class="form-label" data-i18n="account.language">Ngôn ngữ</label>
+      <label class="form-label" data-i18n="account.language">NgÃ´n ngá»¯</label>
       <div class="cat-picker" id="langPicker">
-        <button class="cat-pick-btn" data-lang="vi">🇻🇳 Tiếng Việt</button>
-        <button class="cat-pick-btn" data-lang="en">🇬🇧 English</button>
+        <button class="cat-pick-btn" data-lang="vi">ðŸ‡»ðŸ‡³ Tiáº¿ng Viá»‡t</button>
+        <button class="cat-pick-btn" data-lang="en">ðŸ‡¬ðŸ‡§ English</button>
       </div>
     </div>
 
-    <!-- Sở thích (moved from profile main — hiếm khi thay, hợp với settings) -->
+    <!-- Sá»Ÿ thÃ­ch (moved from profile main â€” hiáº¿m khi thay, há»£p vá»›i settings) -->
     <div class="form-group">
-      <label class="form-label" data-i18n="profile.prefs">Sở thích</label>
+      <label class="form-label" data-i18n="profile.prefs">Sá»Ÿ thÃ­ch</label>
       <div class="pref-chips" id="prefChips">
-        <button class="pref-chip" data-pref="restaurant">🍽️ <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
-        <button class="pref-chip" data-pref="street">🍜 <span data-i18n="catLabel.street">Vỉa hè</span></button>
-        <button class="pref-chip" data-pref="snack">🧆 <span data-i18n="catLabel.snack">Ăn vặt</span></button>
-        <button class="pref-chip" data-pref="cafe">☕ <span data-i18n="catLabel.cafe">Cà phê</span></button>
-        <button class="pref-chip" data-pref="cheap">💸 <span data-i18n="priceLabel.cheap">Bình dân</span></button>
-        <button class="pref-chip" data-pref="premium">✨ <span data-i18n="priceLabel.premium">Sang chảnh</span></button>
+        <button class="pref-chip" data-pref="restaurant">ðŸ½ï¸ <span data-i18n="catLabel.restaurant">NhÃ  hÃ ng</span></button>
+        <button class="pref-chip" data-pref="street">ðŸœ <span data-i18n="catLabel.street">Vá»‰a hÃ¨</span></button>
+        <button class="pref-chip" data-pref="snack">ðŸ§† <span data-i18n="catLabel.snack">Ä‚n váº·t</span></button>
+        <button class="pref-chip" data-pref="cafe">â˜• <span data-i18n="catLabel.cafe">CÃ  phÃª</span></button>
+        <button class="pref-chip" data-pref="cheap">ðŸ’¸ <span data-i18n="priceLabel.cheap">BÃ¬nh dÃ¢n</span></button>
+        <button class="pref-chip" data-pref="premium">âœ¨ <span data-i18n="priceLabel.premium">Sang cháº£nh</span></button>
       </div>
     </div>
 
-    <!-- Dữ liệu — hidden per request. Elements kept for JS wiring in
+    <!-- Dá»¯ liá»‡u â€” hidden per request. Elements kept for JS wiring in
          ProfileCtrl.init() (exportDataBtn/importDataBtn/importFileInput).
          Remove .hidden to bring back. -->
     <div class="form-group hidden">
-      <label class="form-label" data-i18n="profile.dataSection">Dữ liệu</label>
+      <label class="form-label" data-i18n="profile.dataSection">Dá»¯ liá»‡u</label>
       <div class="data-actions">
-        <button class="data-btn" id="exportDataBtn" data-i18n="profile.exportData">📤 Xuất dữ liệu</button>
-        <button class="data-btn import" id="importDataBtn" data-i18n="profile.importData">📥 Nhập dữ liệu</button>
+        <button class="data-btn" id="exportDataBtn" data-i18n="profile.exportData">ðŸ“¤ Xuáº¥t dá»¯ liá»‡u</button>
+        <button class="data-btn import" id="importDataBtn" data-i18n="profile.importData">ðŸ“¥ Nháº­p dá»¯ liá»‡u</button>
       </div>
       <input type="file" id="importFileInput" accept=".json">
     </div>
 
-    <!-- Gemini AI — hidden per request, same reasoning: default shared
+    <!-- Gemini AI â€” hidden per request, same reasoning: default shared
          key already covers 99% of users; power-users who want a personal
          key can be shown this again by removing .hidden. -->
     <div class="form-group hidden">
-      <label class="form-label">Gemini AI <span class="ai-status" id="aiStatus" style="text-transform:none">●</span></label>
-      <p class="ai-hint" style="margin-top:0" data-i18n="profile.geminiHint">Tìm quán thông minh bằng AI. Mặc định đã có key dùng chung — bạn có thể dùng key riêng để không giới hạn lượt.</p>
+      <label class="form-label">Gemini AI <span class="ai-status" id="aiStatus" style="text-transform:none">â—</span></label>
+      <p class="ai-hint" style="margin-top:0" data-i18n="profile.geminiHint">TÃ¬m quÃ¡n thÃ´ng minh báº±ng AI. Máº·c Ä‘á»‹nh Ä‘Ã£ cÃ³ key dÃ¹ng chung â€” báº¡n cÃ³ thá»ƒ dÃ¹ng key riÃªng Ä‘á»ƒ khÃ´ng giá»›i háº¡n lÆ°á»£t.</p>
       <div class="ai-key-row">
-        <input class="form-input" id="geminiKeyInput" type="password" data-i18n="profile.keyPlaceholder" data-i18n-attr="placeholder" placeholder="Dán API key của bạn (tùy chọn)…" autocomplete="off" spellcheck="false">
-        <button class="ai-key-toggle" id="geminiKeyToggle" data-i18n="profile.toggleKey" data-i18n-attr="title" title="Hiện/ẩn key" type="button">👁</button>
+        <input class="form-input" id="geminiKeyInput" type="password" data-i18n="profile.keyPlaceholder" data-i18n-attr="placeholder" placeholder="DÃ¡n API key cá»§a báº¡n (tÃ¹y chá»n)â€¦" autocomplete="off" spellcheck="false">
+        <button class="ai-key-toggle" id="geminiKeyToggle" data-i18n="profile.toggleKey" data-i18n-attr="title" title="Hiá»‡n/áº©n key" type="button">ðŸ‘</button>
       </div>
       <div class="ai-key-actions">
-        <button class="data-btn" id="geminiKeySave" data-i18n="profile.saveKey">💾 Lưu key</button>
-        <button class="data-btn import" id="geminiKeyClear" data-i18n="profile.clearKey">↺ Dùng key mặc định</button>
+        <button class="data-btn" id="geminiKeySave" data-i18n="profile.saveKey">ðŸ’¾ LÆ°u key</button>
+        <button class="data-btn import" id="geminiKeyClear" data-i18n="profile.clearKey">â†º DÃ¹ng key máº·c Ä‘á»‹nh</button>
       </div>
-      <a class="ai-getkey" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" data-i18n="profile.getKey">Lấy key miễn phí tại Google AI Studio →</a>
+      <a class="ai-getkey" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" data-i18n="profile.getKey">Láº¥y key miá»…n phÃ­ táº¡i Google AI Studio â†’</a>
     </div>
 
-    <!-- Tài khoản cộng đồng + Bạn bè — chỉ hiện khi đã đăng nhập (ở tab Cộng đồng) -->
+    <!-- TÃ i khoáº£n cá»™ng Ä‘á»“ng + Báº¡n bÃ¨ â€” chá»‰ hiá»‡n khi Ä‘Ã£ Ä‘Äƒng nháº­p (á»Ÿ tab Cá»™ng Ä‘á»“ng) -->
     <div class="profile-section" id="profileLoggedOutHint" style="padding:0 0 .9rem">
-      <p class="ai-hint" data-i18n="account.loggedOutHint">Đăng nhập ở tab Cộng đồng để xem bạn bè và quán bạn đã đăng.</p>
+      <p class="ai-hint" data-i18n="account.loggedOutHint">ÄÄƒng nháº­p á»Ÿ tab Cá»™ng Ä‘á»“ng Ä‘á»ƒ xem báº¡n bÃ¨ vÃ  quÃ¡n báº¡n Ä‘Ã£ Ä‘Äƒng.</p>
     </div>
     <div id="profileLoggedIn" class="hidden">
       <div class="profile-section" style="padding:0 0 .9rem">
         <div class="psec-head">
           <div>
-            <div class="psec-title" id="communityWelcome" data-i18n="account.hello">Chào <em>bạn</em></div>
-            <div class="community-welcome-sub" data-i18n="account.communitySub">Cộng đồng nhỏ — cùng nhau chọn quán</div>
+            <div class="psec-title" id="communityWelcome" data-i18n="account.hello">ChÃ o <em>báº¡n</em></div>
+            <div class="community-welcome-sub" data-i18n="account.communitySub">Cá»™ng Ä‘á»“ng nhá» â€” cÃ¹ng nhau chá»n quÃ¡n</div>
           </div>
-          <button class="data-btn" id="communityLogout" data-i18n="account.signOut">Đăng xuất</button>
+          <button class="data-btn" id="communityLogout" data-i18n="account.signOut">ÄÄƒng xuáº¥t</button>
         </div>
       </div>
 
       <div class="profile-section" style="padding:0">
         <div class="psec-head">
-          <div class="psec-title" data-i18n="account.friends">Bạn <em>bè</em></div>
+          <div class="psec-title" data-i18n="account.friends">Báº¡n <em>bÃ¨</em></div>
         </div>
-        <p class="ai-hint" data-i18n="account.friendsHint">Quán bạn đăng ở chế độ "Bạn bè" sẽ chỉ hiện với những người bạn thêm ở đây.</p>
+        <p class="ai-hint" data-i18n="account.friendsHint">QuÃ¡n báº¡n Ä‘Äƒng á»Ÿ cháº¿ Ä‘á»™ "Báº¡n bÃ¨" sáº½ chá»‰ hiá»‡n vá»›i nhá»¯ng ngÆ°á»i báº¡n thÃªm á»Ÿ Ä‘Ã¢y.</p>
         <div class="loc-row-wrap">
-          <input class="form-input" id="friendSearchInput" type="text" data-i18n="account.friendSearchPlaceholder" data-i18n-attr="placeholder" placeholder="🔎 Tìm theo tên hoặc email…" autocomplete="off">
+          <input class="form-input" id="friendSearchInput" type="text" data-i18n="account.friendSearchPlaceholder" data-i18n-attr="placeholder" placeholder="ðŸ”Ž TÃ¬m theo tÃªn hoáº·c emailâ€¦" autocomplete="off">
           <div class="geocode-suggest" id="friendSearchResults"></div>
         </div>
         <div class="chip-tag-list" id="friendList" style="margin-top:.7rem"></div>
@@ -612,7 +612,7 @@
     </div>
 
     <div class="form-actions">
-      <button class="btn-cancel" id="accountModalClose" data-i18n="common.close">Đóng</button>
+      <button class="btn-cancel" id="accountModalClose" data-i18n="common.close">ÄÃ³ng</button>
     </div>
   </div>
 </div>
@@ -620,23 +620,25 @@
 <!-- Toast -->
 <div id="toast"></div>
 
-<!-- ═══════════════════════════════════════════════
-     SCRIPTS — loaded in dependency order
-═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2525"></script>
-<script src="js/i18n.js?v=2525"></script>
-<script src="js/utils.js?v=2525"></script>
-<script src="js/state.js?v=2525"></script>
-<script src="js/poi.js?v=2525"></script>
-<script src="js/geocoder.js?v=2525"></script>
-<script src="js/gemini.js?v=2525"></script>
-<script src="js/community.js?v=2525"></script>
-<script src="js/analytics.js?v=2525"></script>
-<script src="js/map.js?v=2525"></script>
-<script src="js/gps.js?v=2525"></script>
-<script src="js/locationPicker.js?v=2525"></script>
-<script src="js/controllers.js?v=2525"></script>
-<script src="js/app.js?v=2525"></script>
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+     SCRIPTS â€” loaded in dependency order
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<script src="js/security.js?v=2526"></script>
+<script src="js/i18n.js?v=2526"></script>
+<script src="js/utils.js?v=2526"></script>
+<script src="js/state.js?v=2526"></script>
+<script src="js/poi.js?v=2526"></script>
+<script src="js/geocoder.js?v=2526"></script>
+<script src="js/gemini.js?v=2526"></script>
+<script src="js/community.js?v=2526"></script>
+<script src="js/analytics.js?v=2526"></script>
+<script src="js/map.js?v=2526"></script>
+<script src="js/gps.js?v=2526"></script>
+<script src="js/locationPicker.js?v=2526"></script>
+<script src="js/controllers.js?v=2526"></script>
+<script src="js/app.js?v=2526"></script>
 
 </body>
 </html>
+
+
