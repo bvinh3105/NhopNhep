@@ -56,13 +56,19 @@ const Analytics = {
     }
     // Community is optional now — user_id enrichment only. sessionId
     // is the identity when it's missing.
-    const user_id = (typeof Community !== 'undefined' && Community.currentUser?.id) || null;
+    const cu = (typeof Community !== 'undefined' && Community.currentUser) || null;
+    const user_id   = cu?.id   || null;
+    // user_name = display name chosen by user (not email — lower sensitivity,
+    // but makes analytics searchable: filter user_name="bachvinhtran" without
+    // having to look up the opaque PocketBase record ID first).
+    const user_name = cu?.name ? String(cu.name).slice(0, 40) : null;
     const is_guest = !(typeof Community !== 'undefined' && Community.isLoggedIn && Community.isLoggedIn());
 
     const body = {
       event: String(event).slice(0, 40),
       session_id: this.sessionId,
       user_id,
+      user_name,
       is_guest,
       props: this._sanitizeProps(props),
       ua: (navigator.userAgent || '').slice(0, 200),
