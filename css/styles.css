@@ -1097,13 +1097,14 @@ body.map-full .tabbar{transform:translateY(105%)}
 
 /* Toast */
 #toast{
-  position:fixed;bottom:calc(var(--tab-h) + var(--safe-bottom) + 1rem);left:50%;
-  transform:translateX(-50%) translateY(1rem);
+  position:fixed;top:calc(var(--ribbon-h) + .6rem);left:50%;
+  transform:translateX(-50%) translateY(-1.2rem);
   background:var(--text);color:var(--cream);
-  padding:.65rem 1.2rem;border-radius:24px;font-size:.85rem;font-weight:700;
-  box-shadow:0 6px 20px rgba(42,24,16,.35);border:2px solid var(--primary);
-  pointer-events:none;z-index:999;opacity:0;transition:opacity .25s,transform .25s;
-  white-space:nowrap;
+  padding:.6rem 1.15rem;border-radius:24px;font-size:.85rem;font-weight:700;
+  box-shadow:0 4px 18px rgba(42,24,16,.28);border:2px solid var(--primary);
+  pointer-events:none;z-index:999;opacity:0;
+  transition:opacity .22s ease,transform .22s ease;
+  white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis;
 }
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
