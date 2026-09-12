@@ -383,6 +383,25 @@ input,textarea,select{font-family:var(--font-body)}
 .scan-btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--text)}
 .scan-btn:disabled{opacity:.5;pointer-events:none;box-shadow:2px 2px 0 var(--text)}
 
+/* Scan button — loading / scanning state */
+.scan-btn.scanning{
+  pointer-events:none;
+  animation:scan-btn-pulse 1.4s ease-in-out infinite;
+  /* keep box-shadow base so pulse layers on top */
+}
+@keyframes scan-btn-pulse{
+  0%,100%{box-shadow:4px 4px 0 var(--text),0 0 0 0 var(--primary-glow,rgba(185,38,38,.0))}
+  50%{box-shadow:4px 4px 0 var(--text),0 0 0 9px var(--primary-glow,rgba(185,38,38,.18))}
+}
+/* Small inline spinner inside the button */
+.scan-btn .btn-spinner{
+  width:18px;height:18px;flex-shrink:0;
+  border:2.5px solid rgba(255,255,255,.35);
+  border-top-color:#fff;
+  border-radius:50%;
+  animation:spin .65s linear infinite;
+}
+
 /* GPS pulse marker */
 .user-marker-inner{
   width:18px;height:18px;border-radius:50%;background:var(--primary);

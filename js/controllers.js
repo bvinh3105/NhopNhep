@@ -222,6 +222,15 @@ const HomeCtrl = {
     const txt = ov.querySelector('.scanning-txt');
     ov.style.display = 'flex';
 
+    // Button loading state — gives instant feedback even before the map
+    // overlay appears (users on small screens may have scrolled past it).
+    const scanBtn = document.getElementById('scanBtn');
+    const _origBtnHTML = scanBtn ? scanBtn.innerHTML : '';
+    if (scanBtn) {
+      scanBtn.innerHTML = '<span class="btn-spinner"></span>Đang quét…';
+      scanBtn.classList.add('scanning');
+    }
+
     const setTxt = (msg) => { if (txt) txt.textContent = msg; };
     const sub = document.getElementById('scanSub');
     const setSubTxt = (msg) => { if (sub) sub.textContent = msg; };
@@ -317,6 +326,12 @@ const HomeCtrl = {
     console.debug('[scan] source:', source, '· items:', items.length, '· community:', State.communityRestaurants.length);
     ov.style.display = 'none';
     this._scanning = false;
+
+    // Restore button to original label
+    if (scanBtn) {
+      scanBtn.innerHTML = _origBtnHTML;
+      scanBtn.classList.remove('scanning');
+    }
 
     // ── Toast kết quả ───────────────────────────────────────────────────
     if (items.length) {
