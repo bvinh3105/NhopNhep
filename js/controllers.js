@@ -2147,7 +2147,10 @@ function communityCardHtml(r, groupCount = 0) {
   const hashHtml = (r.hashtags || []).map(h => `<span class="comm-r-chip hashtag">#${escapeHtml(h)}</span>`).join('');
   const visBadge = COMMUNITY_VIS_BADGE[r.visibility] || '';
   const author = r.expand && r.expand.created_by;
-  const authorName = (author && author.name) || I18N.t('common.anonymous');
+  // Fallback: if users.viewRule blocks expand, show own name on own posts
+  const _cu = typeof Community !== 'undefined' && Community.currentUser;
+  const _isMine = _cu && (r.created_by === _cu.id);
+  const authorName = (author && author.name) || (_isMine && _cu.name) || I18N.t('common.anonymous');
   const authorId = (author && author.id) || r.created_by || '';
 
   return `<div class="post-card comm-r-card" data-id="${r.id}">
@@ -2684,7 +2687,9 @@ const CommunityDetailModal = {
     const tagsHtml = (r.tags || []).map(t => `<span class="comm-r-chip">${escapeHtml(t)}</span>`).join('');
     const hashHtml = (r.hashtags || []).map(h => `<span class="comm-r-chip hashtag">#${escapeHtml(h)}</span>`).join('');
     const author = r.expand && r.expand.created_by;
-    const authorName = (author && author.name) || I18N.t('common.anonymous');
+    const _cu2 = typeof Community !== 'undefined' && Community.currentUser;
+    const _isMine2 = _cu2 && (r.created_by === _cu2.id);
+    const authorName = (author && author.name) || (_isMine2 && _cu2.name) || I18N.t('common.anonymous');
     const authorId = (author && author.id) || r.created_by || '';
     const addressHtml = r.address ? `<div class="detail-address">🏠 ${escapeHtml(r.address)}</div>` : '';
     const isOwner = !!(Community.currentUser && (r.created_by === Community.currentUser.id || authorId === Community.currentUser.id));
@@ -3181,7 +3186,9 @@ const CommunityAddModal = {
     const match = await Community.findSimilarNearby(name, this._pickedLat, this._pickedLng, this._editingId);
     if (!match) { box.classList.add('hidden'); return; }
     const author = match.expand && match.expand.created_by;
-    const authorName = (author && author.name) || I18N.t('common.anonymous');
+    const _cu3 = typeof Community !== 'undefined' && Community.currentUser;
+    const _isMine3 = _cu3 && (match.created_by === _cu3.id);
+    const authorName = (author && author.name) || (_isMine3 && _cu3.name) || I18N.t('common.anonymous');
     const rootId = Community.resolveRootId(match);
     const thumbUrl = Community.thumbnailUrl(match, '160x160');
     box.classList.remove('hidden');
