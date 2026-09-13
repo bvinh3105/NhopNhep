@@ -227,7 +227,7 @@ const Community = {
 
   // photoFiles: tối đa 4 ảnh (giới hạn server-side qua maxSelect). Ảnh đầu
   // tiên tự động thành thumbnail — đổi sau bằng setThumbnail().
-  async createRestaurant({ name, category, priceRange, description, address, lat, lng, tags = [], hashtags = [], visibility = 'public', photoFiles = [], linkedTo = null }) {
+  async createRestaurant({ name, category, priceRange, description, address, lat, lng, tags = [], hashtags = [], visibility = 'public', photoFiles = [], linkedTo = null, onProgress = null }) {
     if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin')};
     const fd = new FormData();
     fd.append('name', name);
@@ -244,10 +244,23 @@ const Community = {
     // không bao giờ tự động gán. Đã làm phẳng về gốc nhóm ở nơi gọi (client).
     if (linkedTo) fd.append('linked_to', linkedTo);
     const files = photoFiles.slice(0, 4); // khớp maxSelect=4 phía server
-    for (const file of files) {
-      const blob = await this.compressImage(file);
-      fd.append('photos', blob, (file.name || 'photo').replace(/\.\w+$/, '') + '.webp');
+    for (let i = 0; i < files.length; i++) {
+      // Nén chạy trên main thread nên màn hình đứng hình vài giây với ảnh
+      // 12MP — báo tiến độ để người dùng biết máy đang làm việc chứ không
+      // phải treo. yield 1 nhịp trước mỗi ảnh để chữ kịp vẽ ra.
+      if (onProgress) { onProgress('compress', i + 1, files.length); await new Promise(r => setTimeout(r, 0)); }
+      let blob;
+      try {
+        blob = await this.compressImage(files[i]);
+      } catch (e) {
+        // Hỏng 1 ảnh thì dừng cả bài, nhưng nói rõ ảnh nào — bỏ lặng lẽ
+        // rồi đăng thiếu ảnh còn tệ hơn (người dùng không hề biết).
+        return { ok: false, status: 'image', error: e.message || I18N.t('err.imageUnreadable') };
+      }
+      if (!blob || !blob.size) return { ok: false, status: 'image', error: `${I18N.t('err.imageUnreadable')}: ${files[i].name || ''}` };
+      fd.append('photos', blob, (files[i].name || 'photo').replace(/\.\w+$/, '') + '.webp');
     }
+    if (onProgress) onProgress('upload', files.length, files.length);
     // Scale timeout with photo count — home upload bandwidth through the
     // tunnel is the bottleneck, not PocketBase itself. 20s base + 15s/photo,
     // capped at 90s so a truly dead server still fails within a sane wait.
@@ -269,6 +282,28 @@ const Community = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ thumbnail: filename }),
     });
+  },
+
+  // Xoá 1 ảnh khỏi quán đã đăng. Cú pháp "<field>-" của PocketBase xoá đúng
+  // file được nêu tên và giữ nguyên các file còn lại (đã kiểm chứng trên
+  // chính instance này 2026-09-13) — an toàn hơn hẳn việc gửi lại cả mảng
+  // photos, vốn dễ xoá nhầm ảnh vừa được thêm từ một tab khác.
+  // Ảnh bị xoá là mất hẳn trên server, nên nơi gọi phải hỏi lại trước.
+  async deletePhoto(restaurantId, filename) {
+    const r = await this._fetch(`/api/collections/restaurants/records/${restaurantId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 'photos-': [filename] }),
+    });
+    if (!r.ok) return r;
+    // Vừa xoá đúng ảnh đang làm bìa → bìa trỏ vào file không còn tồn tại,
+    // danh sách sẽ hiện ô ảnh vỡ. Đẩy bìa về ảnh đầu còn lại (hoặc rỗng).
+    if (r.data && r.data.thumbnail === filename) {
+      const next = (r.data.photos && r.data.photos[0]) || '';
+      const t = await this.setThumbnail(restaurantId, next);
+      if (t.ok) r.data = t.data;
+    }
+    return r;
   },
 
   photoUrl(record, filename, thumb = '800x0') {
@@ -536,24 +571,54 @@ const Community = {
   // Resizes to maxWidth and re-encodes as WebP. Drawing to <canvas> and
   // re-exporting drops all EXIF — including the GPS tag phones embed — so
   // this doubles as our privacy step, not just a disk-space one.
+  // Trần dung lượng sau khi nén. Ảnh 1600px nhiều chi tiết ra ~1MB, nhân 4
+  // ảnh = 4MB đẩy qua tunnel bằng đường upload nhà — đo được 12s cho 2.1MB
+  // (2026-09-13). Vượt ngưỡng thì mã lại 1 lần ở chất lượng thấp hơn: ảnh
+  // đồ ăn xem trên điện thoại gần như không thấy khác, mà thời gian up giảm
+  // hẳn. Chỉ đụng vào ảnh nặng bất thường, ảnh bình thường giữ nguyên nét.
+  MAX_PHOTO_BYTES: 800 * 1024,
+
+  // KHÔNG BAO GIỜ reject "trần trụi": trước đây ảnh không decode được (file
+  // hỏng, HEIC lọt lưới, hoặc máy hết RAM khi mở ảnh 12MP) làm lỗi văng
+  // xuyên createRestaurant() ra _save(), khiến dòng trả nút về trạng thái
+  // thường không chạy — nút kẹt ở "Đang đăng…" vĩnh viễn, không báo gì.
+  // Đó chính là triệu chứng "lag xong ko up được". Giờ lỗi được gói lại
+  // kèm TÊN FILE để người dùng biết đúng ảnh nào cần bỏ ra.
   compressImage(file, maxWidth = 1600, quality = 0.82) {
     return new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(file);
+      const fail = () => reject(new Error(`${I18N.t('err.imageUnreadable')}: ${file.name || 'ảnh'}`));
+      let url;
+      try { url = URL.createObjectURL(file); } catch (_) { return fail(); }
       const img = new Image();
       img.onload = () => {
         URL.revokeObjectURL(url);
-        const scale = Math.min(1, maxWidth / img.width);
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob((blob) => {
-          if (blob) return resolve(blob);
-          canvas.toBlob((jpegBlob) => resolve(jpegBlob), 'image/jpeg', quality); // WebP unsupported
-        }, 'image/webp', quality);
+        try {
+          const scale = Math.min(1, maxWidth / img.width);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return fail();
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          // toBlob trả null khi codec không có (WebP trên Safari cũ) HOẶC
+          // khi canvas vượt giới hạn bộ nhớ của máy — phải kiểm tra cả 2
+          // tầng, tầng cuối mới được bỏ cuộc.
+          canvas.toBlob((webp) => {
+            if (webp) return this._shrinkIfHuge(canvas, webp, resolve);
+            canvas.toBlob((jpeg) => {
+              if (jpeg) return this._shrinkIfHuge(canvas, jpeg, resolve);
+              fail(); // cả WebP lẫn JPEG đều không mã hoá được
+            }, 'image/jpeg', quality);
+          }, 'image/webp', quality);
+        } catch (_) { fail(); }
       };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(I18N.t('err.imageUnreadable'))); };
+      img.onerror = () => { URL.revokeObjectURL(url); fail(); };
       img.src = url;
     });
+  },
+
+  _shrinkIfHuge(canvas, blob, resolve) {
+    if (blob.size <= this.MAX_PHOTO_BYTES) return resolve(blob);
+    canvas.toBlob((smaller) => resolve(smaller && smaller.size < blob.size ? smaller : blob), 'image/webp', 0.62);
   },
 };

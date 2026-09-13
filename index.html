@@ -25,7 +25,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2559">
+<link rel="stylesheet" href="css/styles.css?v=2561">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -433,6 +433,13 @@
   </div>
 </div>
 
+<!-- Xem ảnh cỡ lớn — dùng khi sửa bài, để nhìn rõ ảnh nào trước khi xoá
+     (ô ảnh trong lưới là 200x200 đã cắt, nhiều khi không phân biệt nổi) -->
+<div class="photo-view" id="photoView" hidden>
+  <img id="photoViewImg" alt="">
+  <button type="button" class="photo-view-close" id="photoViewClose" aria-label="Đóng">✕</button>
+</div>
+
 <!-- ═══════════════════════════════════════════════
      COMMUNITY RESTAURANT DETAIL — full photos + info for 1 quán
 ═══════════════════════════════════════════════ -->
@@ -629,20 +636,20 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2559"></script>
-<script src="js/i18n.js?v=2559"></script>
-<script src="js/utils.js?v=2559"></script>
-<script src="js/state.js?v=2559"></script>
-<script src="js/poi.js?v=2559"></script>
-<script src="js/geocoder.js?v=2559"></script>
-<script src="js/gemini.js?v=2559"></script>
-<script src="js/community.js?v=2559"></script>
-<script src="js/analytics.js?v=2559"></script>
-<script src="js/map.js?v=2559"></script>
-<script src="js/gps.js?v=2559"></script>
-<script src="js/locationPicker.js?v=2559"></script>
-<script src="js/controllers.js?v=2559"></script>
-<script src="js/app.js?v=2559"></script>
+<script src="js/security.js?v=2561"></script>
+<script src="js/i18n.js?v=2561"></script>
+<script src="js/utils.js?v=2561"></script>
+<script src="js/state.js?v=2561"></script>
+<script src="js/poi.js?v=2561"></script>
+<script src="js/geocoder.js?v=2561"></script>
+<script src="js/gemini.js?v=2561"></script>
+<script src="js/community.js?v=2561"></script>
+<script src="js/analytics.js?v=2561"></script>
+<script src="js/map.js?v=2561"></script>
+<script src="js/gps.js?v=2561"></script>
+<script src="js/locationPicker.js?v=2561"></script>
+<script src="js/controllers.js?v=2561"></script>
+<script src="js/app.js?v=2561"></script>
 
 </body>
 </html>

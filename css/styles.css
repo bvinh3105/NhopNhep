@@ -1411,6 +1411,29 @@ body.map-full .tabbar{transform:translateY(105%)}
 .community-welcome-sub{font-size:.75rem;color:var(--text3);margin-top:.1rem;font-weight:600}
 
 /* Restaurant card — like my-r-card but with a taller cover photo + chip rows */
+/* Xem ảnh cỡ lớn (chế độ sửa bài). z-index trên cả modal-overlay vì nó
+   được mở TỪ trong modal sửa quán. */
+.photo-view{
+  position:fixed;inset:0;z-index:1200;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(24,14,9,.92);padding:1.2rem;
+  animation:photo-view-in .18s ease-out;
+}
+/* BẮT BUỘC: display:flex ở trên đè mất display:none mặc định của thuộc
+   tính [hidden]. Thiếu dòng này thì sau khi đóng, overlay vẫn nằm đó
+   trong suốt, phủ kín inset:0 ở z-index 1200 và nuốt mọi cú chạm của
+   toàn app cho tới khi tải lại trang. */
+.photo-view[hidden]{display:none}
+.photo-view img{max-width:100%;max-height:100%;border-radius:12px;border:2px solid var(--cream)}
+.photo-view-close{
+  position:absolute;top:calc(var(--safe-top) + .7rem);right:.9rem;
+  width:38px;height:38px;border-radius:50%;cursor:pointer;
+  background:var(--cream);color:var(--text);border:2px solid var(--text);
+  font-size:1rem;font-weight:800;line-height:1;
+}
+@keyframes photo-view-in{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.photo-view{animation:none}}
+
 /* "N quán mới" — hiện khi poller thấy bài mới LÚC người dùng đang cuộn
    giữa feed.
    Dock cao 0px: pill nằm absolute bên trong nên KHÔNG chiếm chỗ trong

@@ -3194,6 +3194,36 @@ const UserQuanModal = {
 /* ═══════════════════════════════════════════════
    COMMUNITY ADD RESTAURANT MODAL
 ═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   PHOTO VIEW — xem 1 ảnh cỡ lớn. Dùng khi sửa bài để nhìn rõ ảnh trước
+   khi quyết định xoá. Cố ý tối giản: 1 ảnh, không vuốt, không zoom —
+   carousel trong bài đã lo phần xem nhiều ảnh rồi.
+═══════════════════════════════════════════════ */
+const PhotoView = {
+  init() {
+    const ov = document.getElementById('photoView');
+    if (!ov) return;
+    ov.addEventListener('click', () => this.close()); // bấm đâu cũng đóng
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !ov.hidden) this.close();
+    });
+  },
+  open(url) {
+    const ov = document.getElementById('photoView');
+    const img = document.getElementById('photoViewImg');
+    if (!ov || !img || !url) return;
+    img.src = url;
+    ov.hidden = false;
+  },
+  close() {
+    const ov = document.getElementById('photoView');
+    if (!ov) return;
+    ov.hidden = true;
+    // Nhả ảnh để không giữ ảnh gốc (có thể vài MB) trong bộ nhớ.
+    document.getElementById('photoViewImg').src = '';
+  },
+};
+
 const CommunityAddModal = {
   _selectedCat: 'restaurant',
   _selectedPrice: 'binh_dan',
@@ -3525,8 +3555,9 @@ const CommunityAddModal = {
   _renderPhotoGrid() {
     const grid = document.getElementById('cfPhotoGrid');
 
-    // Chế độ sửa: chỉ xem ảnh có sẵn + đổi thumbnail, không thêm/xoá ảnh ở
-    // đây (giữ đơn giản — đổi ảnh đầy đủ thì đăng quán mới).
+    // Chế độ sửa: ảnh đã nằm trên server nên thao tác ở đây tác động NGAY
+    // (không chờ bấm "Cập nhật") — bấm ảnh để xem cỡ lớn, ⭐ đổi bìa,
+    // ✕ xoá hẳn. Thêm ảnh mới vẫn phải đăng bài mới.
     if (this._editingId) {
       if (!this._existingPhotos.length) {
         grid.innerHTML = `<div style="grid-column:span 4;font-size:.78rem;color:var(--text3)">${I18N.t('photo.none')}</div>`;
@@ -3536,10 +3567,39 @@ const CommunityAddModal = {
       grid.innerHTML = this._existingPhotos.map((url, i) => {
         const filename = filenames[i];
         const starActive = filename && filename === this._editingRecord.thumbnail ? ' active' : '';
-        return `<div class="photo-slot" style="background-image:url('${url}')">
-          <button type="button" class="photo-thumb-star${starActive}" data-filename="${filename}" title="${I18N.t('photo.setCover')}">⭐</button>
+        return `<div class="photo-slot" style="background-image:url('${url}')" data-view="${escapeHtml(filename)}" title="${I18N.t('photo.tapToView')}">
+          <button type="button" class="photo-slot-remove" data-del="${escapeHtml(filename)}" title="${I18N.t('photo.delete')}">✕</button>
+          <button type="button" class="photo-thumb-star${starActive}" data-filename="${escapeHtml(filename)}" title="${I18N.t('photo.setCover')}">⭐</button>
         </div>`;
       }).join('');
+
+      grid.querySelectorAll('[data-view]').forEach(slot => {
+        slot.addEventListener('click', () => {
+          // Xem bản to thật (thumb=0x0 = ảnh gốc) — ô trong lưới chỉ 200x200
+          // đã cắt vuông, không đủ để chắc chắn mình sắp xoá đúng ảnh nào.
+          PhotoView.open(Community.photoUrl(this._editingRecord, slot.dataset.view, '0x0'));
+        });
+      });
+
+      grid.querySelectorAll('.photo-slot-remove').forEach(b => {
+        b.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const filename = b.dataset.del;
+          // Xoá ảnh trên server là không lấy lại được → phải hỏi, cùng kiểu
+          // với xoá cả quán ở tab Cá nhân.
+          if (!confirm(I18N.t('photo.confirmDelete'))) return;
+          b.disabled = true;
+          const r = await Community.deletePhoto(this._editingId, filename);
+          b.disabled = false;
+          if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+          this._editingRecord = r.data;
+          this._existingPhotos = (r.data.photos || []).map(f => Community.photoUrl(r.data, f, '200x200'));
+          this._renderPhotoGrid();
+          ProfileCtrl._loadMyRestaurants();
+          showToast(I18N.t('toast.photoDeleted'));
+        });
+      });
+
       grid.querySelectorAll('.photo-thumb-star').forEach(b => {
         b.addEventListener('click', async (e) => {
           e.stopPropagation();
@@ -3736,21 +3796,37 @@ const CommunityAddModal = {
       ? [this._photoFiles[this._thumbIndex], ...this._photoFiles.filter((_, i) => i !== this._thumbIndex)]
       : this._photoFiles;
 
-    const r = await Community.createRestaurant({
-      name,
-      category: COMMUNITY_CAT_TO_PB[this._selectedCat],
-      priceRange: this._selectedPrice,
-      visibility: this._selectedVisibility,
-      description: desc,
-      address: addressText,
-      lat, lng,
-      tags: this._tags,
-      hashtags: this._hashtags,
-      photoFiles: orderedFiles,
-      linkedTo: this._linkedTo,
-    });
-
-    btn.disabled = false; btn.textContent = original;
+    // try/finally là lưới an toàn BẮT BUỘC: trước đây chỉ cần compressImage()
+    // ném lỗi (ảnh hỏng / máy hết RAM) là dòng trả nút bên dưới không chạy,
+    // nút kẹt "Đang đăng…" mãi mãi và người dùng không nhận được lời giải
+    // thích nào. Giờ dù hỏng ở đâu nút cũng luôn bấm lại được.
+    let r;
+    try {
+      r = await Community.createRestaurant({
+        name,
+        category: COMMUNITY_CAT_TO_PB[this._selectedCat],
+        priceRange: this._selectedPrice,
+        visibility: this._selectedVisibility,
+        description: desc,
+        address: addressText,
+        lat, lng,
+        tags: this._tags,
+        hashtags: this._hashtags,
+        photoFiles: orderedFiles,
+        linkedTo: this._linkedTo,
+        // Nén ảnh khoá main thread vài giây với ảnh lớn — nói rõ đang làm gì
+        // thay vì để nút đứng im khiến người dùng tưởng máy treo.
+        onProgress: (phase, i, total) => {
+          btn.textContent = phase === 'compress'
+            ? I18N.t('addQuan.compressing', { i, total })
+            : I18N.t('addQuan.uploading');
+        },
+      });
+    } catch (e) {
+      r = { ok: false, error: (e && e.message) || I18N.t('err.connectionGeneric') };
+    } finally {
+      btn.disabled = false; btn.textContent = original;
+    }
 
     if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
     if (typeof Analytics !== 'undefined') Analytics.track('add_quán', {
