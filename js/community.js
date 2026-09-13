@@ -62,13 +62,22 @@ const Community = {
   //    no in-app way to clear itself since the settings field was hidden —
   //    self-heal once by falling back to DEFAULT_URL on a real connection
   //    failure instead of staying permanently dead for that one browser.
+  // timeoutMs: override the default 12s — needed for multipart photo
+  // uploads (createRestaurant), which go browser → Cloudflare Tunnel →
+  // home machine → PocketBase. That extra hop rides on the home
+  // connection's UPLOAD bandwidth (often 5-20x slower than download on
+  // residential lines), so a few compressed photos can genuinely take
+  // 20-40s — 12s was tripping "server chậm" on real uploads, not actual
+  // slowness (confirmed 2026-09-13: user hit this posting a normal quán
+  // with photos on ordinary home wifi).
   async _fetch(path, opts = {}, _retried = false) {
-    const headers = Object.assign({}, opts.headers);
+    const { timeoutMs, ...fetchOpts } = opts;
+    const headers = Object.assign({}, fetchOpts.headers);
     if (this.token) headers['Authorization'] = this.token;
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 12000);
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs || 12000);
     try {
-      const res = await fetch(`${this.BASE_URL}${path}`, Object.assign({}, opts, { headers, signal: ctrl.signal }));
+      const res = await fetch(`${this.BASE_URL}${path}`, Object.assign({}, fetchOpts, { headers, signal: ctrl.signal }));
       clearTimeout(timer);
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -216,7 +225,11 @@ const Community = {
       const blob = await this.compressImage(file);
       fd.append('photos', blob, (file.name || 'photo').replace(/\.\w+$/, '') + '.webp');
     }
-    const r = await this._fetch('/api/collections/restaurants/records', { method: 'POST', body: fd });
+    // Scale timeout with photo count — home upload bandwidth through the
+    // tunnel is the bottleneck, not PocketBase itself. 20s base + 15s/photo,
+    // capped at 90s so a truly dead server still fails within a sane wait.
+    const uploadTimeout = Math.min(90000, 20000 + files.length * 15000);
+    const r = await this._fetch('/api/collections/restaurants/records', { method: 'POST', body: fd, timeoutMs: uploadTimeout });
     if (r.ok && r.data.photos && r.data.photos.length) {
       // Set thumbnail mặc định = ảnh đầu tiên vừa upload (tên file server sinh ra
       // chỉ biết được sau khi tạo record xong, nên phải PATCH thêm 1 lần).
