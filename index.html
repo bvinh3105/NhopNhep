@@ -25,7 +25,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2557">
+<link rel="stylesheet" href="css/styles.css?v=2558">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -350,6 +350,11 @@
     <div class="modal-title" data-i18n="addQuan.title">Đăng quán <em>cộng đồng</em> 👥</div>
     <div class="modal-sub" data-i18n="addQuan.sub">Chia sẻ quán ngon cho cả nhóm</div>
 
+    <div class="draft-banner hidden" id="cfDraftBanner">
+      <span class="draft-banner-text" data-i18n="addQuan.draftRestored">📝 Đã khôi phục bản nháp chưa đăng</span>
+      <button type="button" class="draft-banner-discard" id="cfDraftDiscard" data-i18n="addQuan.draftDiscard">Xoá nháp</button>
+    </div>
+
     <div class="form-group">
       <label class="form-label" data-i18n="addQuan.name">Tên quán</label>
       <input class="form-input" id="cfName" type="text" data-i18n="addQuan.namePlaceholder" data-i18n-attr="placeholder" placeholder="VD: Bún bò Huế Bà Khế" maxlength="60">
@@ -623,20 +628,20 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2557"></script>
-<script src="js/i18n.js?v=2557"></script>
-<script src="js/utils.js?v=2557"></script>
-<script src="js/state.js?v=2557"></script>
-<script src="js/poi.js?v=2557"></script>
-<script src="js/geocoder.js?v=2557"></script>
-<script src="js/gemini.js?v=2557"></script>
-<script src="js/community.js?v=2557"></script>
-<script src="js/analytics.js?v=2557"></script>
-<script src="js/map.js?v=2557"></script>
-<script src="js/gps.js?v=2557"></script>
-<script src="js/locationPicker.js?v=2557"></script>
-<script src="js/controllers.js?v=2557"></script>
-<script src="js/app.js?v=2557"></script>
+<script src="js/security.js?v=2558"></script>
+<script src="js/i18n.js?v=2558"></script>
+<script src="js/utils.js?v=2558"></script>
+<script src="js/state.js?v=2558"></script>
+<script src="js/poi.js?v=2558"></script>
+<script src="js/geocoder.js?v=2558"></script>
+<script src="js/gemini.js?v=2558"></script>
+<script src="js/community.js?v=2558"></script>
+<script src="js/analytics.js?v=2558"></script>
+<script src="js/map.js?v=2558"></script>
+<script src="js/gps.js?v=2558"></script>
+<script src="js/locationPicker.js?v=2558"></script>
+<script src="js/controllers.js?v=2558"></script>
+<script src="js/app.js?v=2558"></script>
 
 </body>
 </html>

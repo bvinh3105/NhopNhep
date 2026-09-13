@@ -3112,6 +3112,16 @@ const CommunityAddModal = {
   _linkedTo: null,       // id gốc nhóm nếu người đăng xác nhận "cùng quán với..."
   _dupCheckTimer: null,
 
+  // ── Bản nháp ────────────────────────────────────────────────────────
+  // Form này dài (tên, mô tả, vị trí, thẻ, hashtag, tối đa 4 ảnh) nên
+  // lỡ bấm ra ngoài overlay là mất sạch — lý do có draft. Chỉ áp dụng
+  // cho ĐĂNG MỚI: sửa quán đã đăng thì bản gốc vẫn nằm trên server.
+  DRAFT_KEY: 'community_add_draft',
+  DRAFT_TTL: 7 * 24 * 3600 * 1000, // 7 ngày — quá hạn thì coi như bỏ
+  _draftTimer: null,
+  _openSeq: 0,           // chống race: nạp ảnh nháp xong thì modal đã đổi
+  _dbPromise: null,
+
   init() {
     document.getElementById('cfCatPicker').addEventListener('click', (e) => {
       const btn = e.target.closest('.cat-pick-btn');
@@ -3119,6 +3129,7 @@ const CommunityAddModal = {
       document.querySelectorAll('#cfCatPicker .cat-pick-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       this._selectedCat = btn.dataset.cat;
+      this._scheduleDraftSave();
     });
 
     document.getElementById('cfPricePicker').addEventListener('click', (e) => {
@@ -3127,6 +3138,7 @@ const CommunityAddModal = {
       document.querySelectorAll('#cfPricePicker .cat-pick-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       this._selectedPrice = btn.dataset.price;
+      this._scheduleDraftSave();
     });
 
     document.getElementById('cfVisibilityPicker').addEventListener('click', (e) => {
@@ -3135,6 +3147,7 @@ const CommunityAddModal = {
       document.querySelectorAll('#cfVisibilityPicker .cat-pick-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       this._selectedVisibility = btn.dataset.vis;
+      this._scheduleDraftSave();
     });
 
     document.getElementById('cfCancel').addEventListener('click', () => this.close());
@@ -3152,6 +3165,8 @@ const CommunityAddModal = {
       });
       e.target.value = '';
       this._renderPhotoGrid();
+      this._saveDraftPhotos();
+      this._scheduleDraftSave();
     });
 
     // Tag/hashtag arrays are mutated in place (never reassigned) so these
@@ -3171,11 +3186,163 @@ const CommunityAddModal = {
       document.getElementById('cfLocSearch').value = r.name;
       Geocoder.hide(document.getElementById('cfLocSuggest'));
       this._scheduleDupCheck();
+      this._scheduleDraftSave();
     });
 
     // Tên hoặc vị trí đổi → quán "gần giống" tìm được trước đó không còn
     // chắc đúng nữa, phải hỏi lại xem có xác nhận trùng hay không.
-    document.getElementById('cfName').addEventListener('input', () => this._scheduleDupCheck());
+    document.getElementById('cfName').addEventListener('input', () => {
+      this._scheduleDupCheck();
+      this._scheduleDraftSave();
+    });
+    // Mô tả + ô địa chỉ: gõ tay cũng phải vào nháp (địa chỉ có thể được
+    // nhập thẳng mà không chọn gợi ý nào — _save() vẫn geocode từ nó).
+    document.getElementById('cfDesc').addEventListener('input', () => this._scheduleDraftSave());
+    document.getElementById('cfLocSearch').addEventListener('input', () => this._scheduleDraftSave());
+
+    document.getElementById('cfDraftDiscard').addEventListener('click', () => {
+      this._clearDraft();
+      // Mở lại form từ đầu — nháp vừa xoá nên open() sẽ dựng form trắng,
+      // chắc chắn hơn là reset thủ công từng field một.
+      this.open();
+      showToast(I18N.t('toast.draftDiscarded'));
+    });
+  },
+
+  // ── Draft: lưu trữ ──────────────────────────────────────────────────
+  // Chữ + lựa chọn → localStorage (đồng bộ, không bao giờ mất giữa chừng).
+  // Ảnh → IndexedDB, vì File không JSON hoá được, và nhét 4 ảnh dạng
+  // base64 vào localStorage thì vượt quota ~5MB ngay.
+  _db() {
+    if (this._dbPromise) return this._dbPromise;
+    this._dbPromise = new Promise((resolve) => {
+      let req;
+      try { req = indexedDB.open('nhopnhep_draft', 1); }
+      catch (_) { return resolve(null); }
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('photos')) db.createObjectStore('photos');
+      };
+      req.onerror = () => resolve(null);
+      req.onblocked = () => resolve(null);
+      req.onsuccess = () => resolve(req.result);
+    });
+    return this._dbPromise;
+  },
+
+  // Mọi lỗi IndexedDB (tab ẩn danh, quota, trình duyệt chặn) đều trả null
+  // chứ không throw — phần chữ của bản nháp phải sống độc lập với ảnh.
+  async _idb(mode, fn) {
+    const db = await this._db();
+    if (!db) return null;
+    return new Promise((resolve) => {
+      try {
+        const op = fn(db.transaction('photos', mode).objectStore('photos'));
+        if (!op) return resolve(null);
+        op.onsuccess = () => resolve(op.result);
+        op.onerror = () => resolve(null);
+      } catch (_) { resolve(null); }
+    });
+  },
+
+  _draftIsEmpty() {
+    const val = (id) => (document.getElementById(id)?.value || '').trim();
+    return !val('cfName') && !val('cfDesc') && !val('cfLocSearch')
+      && !this._tags.length && !this._hashtags.length
+      && !this._photoFiles.length && this._pickedLat == null;
+  },
+
+  _scheduleDraftSave() {
+    if (this._editingId) return;
+    clearTimeout(this._draftTimer);
+    this._draftTimer = setTimeout(() => this._saveDraft(), 400);
+  },
+
+  _saveDraft() {
+    if (this._editingId) return;
+    // Form trắng = người dùng chủ động xoá hết → bỏ luôn nháp cũ, chứ
+    // không ghi đè bằng 1 bản nháp rỗng rồi lần sau hiện banner vô nghĩa.
+    if (this._draftIsEmpty()) { this._clearDraft(); return; }
+    try {
+      localStorage.setItem(this.DRAFT_KEY, JSON.stringify({
+        v: 1,
+        at: Date.now(),
+        userId: (Community.currentUser && Community.currentUser.id) || '',
+        name: document.getElementById('cfName').value,
+        desc: document.getElementById('cfDesc').value,
+        address: document.getElementById('cfLocSearch')?.value || '',
+        lat: this._pickedLat, lng: this._pickedLng,
+        cat: this._selectedCat, price: this._selectedPrice, vis: this._selectedVisibility,
+        tags: [...this._tags], hashtags: [...this._hashtags],
+        thumbIndex: this._thumbIndex,
+      }));
+    } catch (_) { /* hết quota / chặn storage — nháp chỉ là tiện ích, bỏ qua */ }
+  },
+
+  // Tách riêng khỏi _saveDraft(): ghi ảnh chỉ chạy khi tập ảnh thật sự
+  // đổi, không chạy theo mỗi phím gõ.
+  _saveDraftPhotos() {
+    if (this._editingId) return;
+    if (!this._photoFiles.length) return this._idb('readwrite', s => s.delete('current'));
+    return this._idb('readwrite', s => s.put(this._photoFiles.slice(0, 4), 'current'));
+  },
+
+  _loadDraft() {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(this.DRAFT_KEY) || 'null'); } catch (_) { return null; }
+    if (!d || d.v !== 1 || !d.at) return null;
+    if (Date.now() - d.at > this.DRAFT_TTL) { this._clearDraft(); return null; }
+    // Máy dùng chung: không bao giờ bày nháp của tài khoản khác ra.
+    const uid = (Community.currentUser && Community.currentUser.id) || '';
+    if (d.userId && d.userId !== uid) return null;
+    return d;
+  },
+
+  _clearDraft() {
+    try { localStorage.removeItem(this.DRAFT_KEY); } catch (_) {}
+    this._idb('readwrite', s => s.delete('current'));
+  },
+
+  _applyDraft(d, seq) {
+    document.getElementById('cfName').value = d.name || '';
+    document.getElementById('cfDesc').value = d.desc || '';
+    const loc = document.getElementById('cfLocSearch');
+    if (loc) loc.value = d.address || '';
+    this._pickedLat = typeof d.lat === 'number' ? d.lat : null;
+    this._pickedLng = typeof d.lng === 'number' ? d.lng : null;
+
+    this._selectedCat = d.cat || 'restaurant';
+    this._selectedPrice = d.price || 'binh_dan';
+    this._selectedVisibility = d.vis || 'public';
+    document.querySelectorAll('#cfCatPicker .cat-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.cat === this._selectedCat));
+    document.querySelectorAll('#cfPricePicker .cat-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.price === this._selectedPrice));
+    document.querySelectorAll('#cfVisibilityPicker .cat-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.vis === this._selectedVisibility));
+
+    this._tags.length = 0; (d.tags || []).forEach(t => this._tags.push(t));
+    this._hashtags.length = 0; (d.hashtags || []).forEach(h => this._hashtags.push(h));
+    this._renderChipList('cfTagList', this._tags, false);
+    this._renderChipList('cfHashtagList', this._hashtags, true);
+
+    const banner = document.getElementById('cfDraftBanner');
+    if (banner) banner.classList.remove('hidden');
+    this._restoreDraftPhotos(d.thumbIndex || 0, seq);
+  },
+
+  async _restoreDraftPhotos(thumbIndex, seq) {
+    const files = await this._idb('readonly', s => s.get('current'));
+    // Chờ IndexedDB xong thì modal có thể đã đóng, mở lại, hoặc chuyển
+    // sang chế độ sửa — lúc đó nhét ảnh nháp vào là sai màn hình.
+    if (seq !== this._openSeq || this._editingId) return;
+    if (!files || !files.length) return;
+    this._photoPreviewUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch(_) {} });
+    this._photoFiles.length = 0;
+    this._photoPreviewUrls.length = 0;
+    files.slice(0, 4).forEach(f => {
+      this._photoFiles.push(f);
+      this._photoPreviewUrls.push(URL.createObjectURL(f));
+    });
+    this._thumbIndex = Math.max(0, Math.min(thumbIndex, this._photoFiles.length - 1));
+    this._renderPhotoGrid();
   },
 
   // Debounce 600ms — tránh gọi listRestaurants() (tải hết quán) sau MỖI
@@ -3240,6 +3407,7 @@ const CommunityAddModal = {
       if (arr.length >= max) { showToast(I18N.t('toast.maxTagsOrHashtags', { max, kind: I18N.t(hashtag ? 'kind.hashtag' : 'kind.tag') })); return; }
       arr.push(val);
       this._renderChipList(listId, arr, hashtag);
+      this._scheduleDraftSave();
     });
   },
 
@@ -3250,6 +3418,7 @@ const CommunityAddModal = {
       b.addEventListener('click', () => {
         arr.splice(parseInt(b.dataset.i), 1);
         this._renderChipList(listId, arr, hashtag);
+        this._scheduleDraftSave();
       });
     });
   },
@@ -3310,6 +3479,8 @@ const CommunityAddModal = {
         if (this._thumbIndex === idx) this._thumbIndex = 0;
         else if (this._thumbIndex > idx) this._thumbIndex--;
         this._renderPhotoGrid();
+        this._saveDraftPhotos();
+        this._scheduleDraftSave();
       });
     });
     grid.querySelectorAll('.photo-thumb-star').forEach(b => {
@@ -3317,6 +3488,7 @@ const CommunityAddModal = {
         e.stopPropagation();
         this._thumbIndex = parseInt(b.dataset.idx);
         this._renderPhotoGrid();
+        this._scheduleDraftSave();
       });
     });
   },
@@ -3326,6 +3498,11 @@ const CommunityAddModal = {
     if (!Community.isLoggedIn()) { showToast(I18N.t('toast.needLoginBang')); return; }
     const modal = document.getElementById('communityAddModal');
     modal.classList.add('show');
+
+    const seq = ++this._openSeq; // mốc để phần nạp ảnh nháp biết còn hợp lệ
+    clearTimeout(this._draftTimer);
+    const draftBanner = document.getElementById('cfDraftBanner');
+    if (draftBanner) draftBanner.classList.add('hidden');
 
     this._editingId = record ? record.id : null;
     this._editingRecord = record;
@@ -3373,8 +3550,16 @@ const CommunityAddModal = {
     this._existingPhotos = record ? (record.photos || []).map(f => Community.photoUrl(record, f, '200x200')) : [];
     this._renderPhotoGrid();
 
-    const center = hasLoc
-      ? [record.location.lat, record.location.lon]
+    // Đăng mới + có nháp còn hạn → phủ lên form trắng vừa dựng ở trên.
+    // Phải đặt sau toàn bộ phần reset, nếu không sẽ bị chính nó xoá lại.
+    const draft = record ? null : this._loadDraft();
+    if (draft) this._applyDraft(draft, seq);
+
+    // Ghim/căn bản đồ theo _pickedLat/_pickedLng — giá trị này lúc này đã
+    // được set từ record (sửa), từ nháp (khôi phục), hoặc null (đăng mới).
+    const hasPin = this._pickedLat != null && this._pickedLng != null;
+    const center = hasPin
+      ? [this._pickedLat, this._pickedLng]
       : [State.userLat || 21.0285, State.userLng || 105.8542];
     setTimeout(() => {
       LocationPicker.initMap('communityPickerMap', 'communityPickerMap', 'communityPickerMarker', center, (lat, lng) => {
@@ -3382,15 +3567,25 @@ const CommunityAddModal = {
         this._pickedLng = lng;
         LocationPicker.setMarker('communityPickerMap', 'communityPickerMarker', lat, lng, this._selectedCat);
         this._scheduleDupCheck();
+        this._scheduleDraftSave();
       });
-      if (hasLoc) LocationPicker.setMarker('communityPickerMap', 'communityPickerMarker', record.location.lat, record.location.lon, this._selectedCat);
+      if (hasPin) LocationPicker.setMarker('communityPickerMap', 'communityPickerMarker', this._pickedLat, this._pickedLng, this._selectedCat);
     }, 250);
   },
 
-  close() {
+  // saveDraft=false khi đóng vì vừa đăng xong — lúc đó form vẫn còn đầy
+  // chữ, lưu lại sẽ thành nháp ma của chính bài vừa đăng.
+  close({ saveDraft = true } = {}) {
+    // Lưu ngay tại đây, không đợi debounce: đây CHÍNH LÀ lúc người dùng
+    // lỡ bấm ra ngoài overlay và cần giữ lại những gì đã nhập.
+    clearTimeout(this._draftTimer);
+    const keep = saveDraft && !this._editingId && !this._draftIsEmpty();
+    if (keep) this._saveDraft();
+
     document.getElementById('communityAddModal').classList.remove('show');
     this._editingId = null;
     this._editingRecord = null;
+    if (keep) showToast(I18N.t('toast.draftSaved'));
     setTimeout(() => LocationPicker.teardownMap('communityPickerMap'), 300);
   },
 
@@ -3469,7 +3664,8 @@ const CommunityAddModal = {
       has_coords: lat != null && lng != null,
     });
     showToast(I18N.t('toast.postedName', { name }));
-    this.close();
+    this._clearDraft();
+    this.close({ saveDraft: false });
     CommunityCtrl._loadList('');
   },
 };

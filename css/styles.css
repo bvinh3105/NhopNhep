@@ -1081,6 +1081,24 @@ body.map-full .tabbar{transform:translateY(105%)}
 }
 .dup-check-yes{background:var(--primary);color:var(--cream);border-color:var(--primary-2)}
 
+/* Bản nháp đã khôi phục — cố tình dùng tông xanh "đã giúp bạn giữ lại",
+   KHÔNG dùng tông đỏ/cam như .dup-check-box (đó là khung cần người dùng
+   quyết định); đây chỉ là thông báo kèm 1 lối thoát để làm lại từ đầu. */
+.draft-banner{
+  display:flex;align-items:center;gap:.55rem;
+  margin:.15rem 0 .9rem;padding:.55rem .7rem;border-radius:14px;
+  background:#E4F3E8;border:2px solid var(--text);
+  box-shadow:2px 2px 0 #2e9e5b;
+}
+.draft-banner-text{flex:1;font-size:.78rem;font-weight:700;color:var(--text);line-height:1.35}
+.draft-banner-discard{
+  flex:0 0 auto;padding:.36rem .62rem;border-radius:10px;
+  border:2px solid var(--text);background:var(--white);
+  font-size:.72rem;font-weight:800;color:var(--text);cursor:pointer;
+  transition:transform .12s;
+}
+.draft-banner-discard:active{transform:translate(1px,1px)}
+
 .form-actions{display:flex;gap:.5rem;margin-top:1rem}
 .btn-cancel{
   flex:1;padding:.8rem;border-radius:14px;background:var(--white);
