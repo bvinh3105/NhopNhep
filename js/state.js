@@ -27,6 +27,14 @@ const State = {
     trips: 0,
     tripHistory: [], // [{ id, at, stops: [{ id, name, cat, price, address, lat, lng }] }]
   },
+  // Lộ trình người dùng CHỦ ĐỘNG lưu, khác hẳn tripHistory:
+  //  - tripHistory tự ghi mọi lần lên lịch và bị cắt còn 50 chuyến gần nhất,
+  //    nên lộ trình định đi tháng sau dễ bị các lần dùng hằng ngày đẩy văng.
+  //  - savedTrips có TÊN do người dùng đặt và không bao giờ bị tự xoá.
+  //  - Mỗi lộ trình mang theo điểm xuất phát riêng, nên mở lại ở nhà (cách
+  //    đó 500km, chưa bật GPS) vẫn dựng đúng đường đi tại nơi sắp tới.
+  // [{ id, name, at, origin: { lat, lng, label }, stops: [...] }]
+  savedTrips: [],
   userRestaurants: [],  // user-added
   osmRestaurants: [],   // fetched from OpenStreetMap
   communityRestaurants: [], // fetched from PocketBase, adapted to app shape
@@ -50,6 +58,7 @@ const Storage = {
       },
       userRestaurants: State.userRestaurants,
       savedPosts: [...State.savedPosts],
+      savedTrips: State.savedTrips || [],
     };
     try { localStorage.setItem(this.KEY, JSON.stringify(data)); } catch(e) { console.warn(e); }
   },
@@ -67,6 +76,7 @@ const Storage = {
       }
       State.userRestaurants = data.userRestaurants || [];
       State.savedPosts = new Set(Array.isArray(data.savedPosts) ? data.savedPosts : []);
+      State.savedTrips = Array.isArray(data.savedTrips) ? data.savedTrips : [];
     } catch(e) { console.warn(e); }
   },
 
@@ -83,6 +93,9 @@ const Storage = {
         trips: State.profile.trips,
       },
       userRestaurants: State.userRestaurants,
+      // Lộ trình đã lưu đi theo bản sao lưu — người dùng bỏ công lên lịch
+      // cho chuyến đi sắp tới, đổi máy mà mất thì quá phí.
+      savedTrips: State.savedTrips || [],
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -110,6 +123,12 @@ const Storage = {
       }
       if (data.userRestaurants) {
         State.userRestaurants = data.userRestaurants;
+      }
+      // Gộp thêm chứ không ghi đè: nhập bản sao lưu cũ không được xoá mất
+      // lộ trình vừa lên trên máy này. Trùng id thì giữ bản đang có.
+      if (Array.isArray(data.savedTrips)) {
+        const have = new Set((State.savedTrips || []).map(t => t.id));
+        State.savedTrips = [...(State.savedTrips || []), ...data.savedTrips.filter(t => t && !have.has(t.id))];
       }
       this.save();
       showToast(I18N.t('state.imported'));

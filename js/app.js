@@ -46,6 +46,7 @@ function boot() {
   CommunityCtrl.init();
   CommunityAddModal.init();
   PhotoView.init();
+  SavedTripsModal.init();
   CommunityDetailModal.init();
   UserQuanModal.init();
   SavedListModal.init();

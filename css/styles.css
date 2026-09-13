@@ -1643,6 +1643,40 @@ body.map-full .tabbar{transform:translateY(105%)}
 /* Second gear slot — bookmark 🔖 sits to the LEFT of the settings gear
    with a gap. Same style, different offset. */
 .settings-gear.settings-gear-2{right:calc(.9rem + 2.4rem + .5rem)}
+/* Slot thứ ba — 🗺️ lộ trình đã lưu, tiếp tục dịch sang trái cùng nhịp. */
+.settings-gear.settings-gear-3{right:calc(.9rem + (2.4rem + .5rem) * 2)}
+
+/* Nút 💾 lưu lộ trình trên thanh tiêu đề màn Lịch trình. Đặt sát mép phải,
+   đối xứng với nút ← bên trái. */
+.plan-save-btn{
+  margin-left:auto;flex:0 0 auto;
+  width:2.3rem;height:2.3rem;border-radius:50%;
+  background:var(--white);border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
+  display:flex;align-items:center;justify-content:center;font-size:1.05rem;cursor:pointer;
+  transition:transform .12s,box-shadow .12s;
+}
+.plan-save-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.plan-save-btn.saved{background:var(--primary)}
+
+/* Thẻ 1 lộ trình đã lưu */
+.strip-item{
+  border:2px solid var(--text);border-radius:14px;background:var(--white);
+  box-shadow:2px 2px 0 var(--text);padding:.7rem .8rem;margin-bottom:.7rem;
+}
+.strip-head{display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem}
+.strip-name{flex:1;font-weight:800;font-size:.92rem;color:var(--text);line-height:1.25}
+.strip-meta{font-size:.72rem;color:var(--text3);font-weight:600;margin-bottom:.5rem}
+.strip-origin{font-size:.74rem;color:var(--text2);font-weight:700;margin-bottom:.5rem}
+.strip-stops{display:flex;flex-direction:column;gap:.3rem;margin-bottom:.6rem}
+.strip-stop{font-size:.78rem;color:var(--text2);display:flex;gap:.4rem;align-items:baseline}
+.strip-stop b{color:var(--primary);font-weight:800;flex:0 0 auto}
+.strip-actions{display:flex;gap:.45rem}
+.strip-go,.strip-del{
+  padding:.42rem .7rem;border-radius:10px;border:2px solid var(--text);
+  font-size:.76rem;font-weight:800;cursor:pointer;background:var(--white);color:var(--text);
+}
+.strip-go{flex:1;background:var(--primary);color:var(--cream);border-color:var(--primary-2)}
+.strip-go:active,.strip-del:active{transform:translate(1px,1px)}
 
 /* Quick action bar in detail modals — 2 secondary actions above the
    primary Đóng/Google Maps row. Neutral background, subtle border so

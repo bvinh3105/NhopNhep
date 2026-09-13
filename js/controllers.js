@@ -790,14 +790,21 @@ const PlanCtrl = {
   // từ chính chuyến đó (đã lưu đủ id/tên/toạ độ/loại) thay vì tra lại
   // State.selected + allRestaurants(), vì id của kết quả AI (Gemini) chỉ
   // dùng 1 lần, lần quét sau sẽ không còn khớp id cũ nữa.
-  buildItinerary(customStops) {
+  // origin (tuỳ chọn): điểm xuất phát để sắp thứ tự các điểm dừng. Mặc định
+  // là vị trí hiện tại, NHƯNG lộ trình đã lưu truyền vào điểm xuất phát của
+  // chính nó — người dùng lên lịch cho Đà Nẵng từ lúc còn ở Hà Nội thì phải
+  // tính đường trong Đà Nẵng, chứ không phải từ chỗ đang đứng.
+  buildItinerary(customStops, origin) {
+    const from = (origin && origin.lat != null && origin.lng != null)
+      ? origin
+      : { lat: State.userLat, lng: State.userLng };
     const stops = customStops
-      ? customStops.map(r => ({ ...r, _dist: haversine(State.userLat, State.userLng, r.lat, r.lng) }))
+      ? customStops.map(r => ({ ...r, _dist: haversine(from.lat, from.lng, r.lat, r.lng) }))
       : allRestaurants()
           .filter(r => State.selected.has(r.id))
-          .map(r => ({ ...r, _dist: haversine(State.userLat, State.userLng, r.lat, r.lng) }));
+          .map(r => ({ ...r, _dist: haversine(from.lat, from.lng, r.lat, r.lng) }));
 
-    let current = { lat: State.userLat, lng: State.userLng };
+    let current = { lat: from.lat, lng: from.lng };
     const ordered = [];
     const remaining = [...stops];
     while (remaining.length) {
@@ -888,6 +895,60 @@ const PlanCtrl = {
     }
     this._returnTo = 'profile';
     this.buildItinerary(trip.stops.map(s => ({ ...s })));
+    this.show();
+  },
+
+  // ── Lưu lộ trình để đi sau ──────────────────────────────────────────
+  // Khác "Đi lại" ở trên: lộ trình lưu mang theo ĐIỂM XUẤT PHÁT của chính
+  // nó, nên mở lại lúc còn ở nhà vẫn dựng đúng đường tại nơi sắp tới —
+  // không đòi GPS, không tính đường từ chỗ đang đứng.
+  saveCurrentTrip() {
+    if (!State.itinerary.length) { showToast(I18N.t('savedTrip.nothingToSave')); return; }
+    const suggested = I18N.t('savedTrip.defaultName', {
+      place: (document.getElementById('locInput')?.value || '').trim().split(',')[0] || I18N.t('savedTrip.unnamedPlace'),
+    });
+    const name = (prompt(I18N.t('savedTrip.namePrompt'), suggested) || '').trim();
+    if (!name) return; // bấm Huỷ hoặc để trống = không lưu
+
+    State.savedTrips = State.savedTrips || [];
+    State.savedTrips.unshift({
+      id: Date.now(),
+      name: name.slice(0, 60),
+      at: new Date().toISOString(),
+      // Chụp lại điểm xuất phát ĐANG dùng, kèm nhãn người dùng đã gõ, để
+      // sau này còn biết lộ trình này thuộc vùng nào.
+      origin: {
+        lat: State.userLat, lng: State.userLng,
+        label: (document.getElementById('locInput')?.value || '').trim().slice(0, 80),
+      },
+      stops: State.itinerary.map(s => ({
+        id: s.id, name: s.name, cat: s.cat, price: s.price,
+        address: s.address || null, lat: s.lat, lng: s.lng,
+      })),
+    });
+    Storage.save();
+    const btn = document.getElementById('planSaveBtn');
+    if (btn) { btn.classList.add('saved'); setTimeout(() => btn.classList.remove('saved'), 1200); }
+    showToast(I18N.t('savedTrip.saved', { name }));
+    if (typeof Analytics !== 'undefined') Analytics.track('trip_saved', { stops: State.itinerary.length });
+  },
+
+  openSavedTrip(trip) {
+    this._returnTo = 'profile';
+    // Dùng điểm xuất phát của lộ trình. Nếu người dùng ĐÃ tới nơi (GPS bật
+    // và ở trong bán kính 30km) thì lấy vị trí thật — lúc đó đường đi từ
+    // chỗ đang đứng mới đúng thứ mình cần.
+    // haversine() trả về MÉT (R = 6371000), không phải km — hằng số đặt tên
+    // theo đơn vị để khỏi lặp lại nhầm lẫn này.
+    const ARRIVED_RADIUS_M = 30000; // 30km: coi như đã tới vùng của lộ trình
+    const o = trip.origin || {};
+    let from = (o.lat != null && o.lng != null) ? o : null;
+    if (State.userLat != null && State.userLng != null) {
+      if (!from || haversine(State.userLat, State.userLng, from.lat, from.lng) < ARRIVED_RADIUS_M) {
+        from = { lat: State.userLat, lng: State.userLng };
+      }
+    }
+    this.buildItinerary(trip.stops.map(s => ({ ...s })), from);
     this.show();
   },
 
@@ -1145,6 +1206,7 @@ const PlanCtrl = {
   NAV_ICON_PLAY: '<path d="M8 5v14l11-7z" fill="currentColor"/>',
 
   init() {
+    document.getElementById('planSaveBtn')?.addEventListener('click', () => this.saveCurrentTrip());
     document.getElementById('planBack').addEventListener('click', () => {
       this._stopLiveTracking();
       document.getElementById('planMapWrap')?.classList.remove('fullscreen');
@@ -3195,6 +3257,77 @@ const UserQuanModal = {
    COMMUNITY ADD RESTAURANT MODAL
 ═══════════════════════════════════════════════ */
 /* ═══════════════════════════════════════════════
+   SAVED TRIPS — lộ trình người dùng tự lưu để đi sau.
+   Tách hẳn khỏi "Chuyến ăn đã đi" (tripsModal): cái kia là nhật ký tự
+   ghi và bị cắt còn 50 mục, cái này có tên và tồn tại tới khi tự xoá.
+═══════════════════════════════════════════════ */
+const SavedTripsModal = {
+  init() {
+    document.getElementById('savedTripsBtn')?.addEventListener('click', () => this.open());
+    document.getElementById('savedTripsClose')?.addEventListener('click', () => this.close());
+    document.getElementById('savedTripsModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'savedTripsModal') this.close();
+    });
+  },
+
+  open() {
+    document.getElementById('savedTripsModal').classList.add('show');
+    this.render();
+  },
+  close() { document.getElementById('savedTripsModal').classList.remove('show'); },
+
+  render() {
+    const trips = State.savedTrips || [];
+    document.getElementById('savedTripsCount').textContent = I18N.t('savedTrip.count', { n: trips.length });
+    const body = document.getElementById('savedTripsBody');
+    if (!trips.length) {
+      body.innerHTML = `
+        <div class="list-empty">
+          <div class="list-empty-icon">🗺️</div>
+          <div class="list-empty-msg">${I18N.t('savedTrip.empty')}</div>
+          <div class="list-empty-sub">${I18N.t('savedTrip.emptySub')}</div>
+        </div>`;
+      return;
+    }
+    body.innerHTML = trips.map(t => {
+      const when = new Date(t.at);
+      const dateLabel = `${String(when.getDate()).padStart(2,'0')}/${String(when.getMonth()+1).padStart(2,'0')}/${when.getFullYear()}`;
+      const stops = (t.stops || []).map((s, i) =>
+        `<div class="strip-stop"><b>${i + 1}</b><span>${escapeHtml(s.name)}</span></div>`).join('');
+      const origin = t.origin && t.origin.label
+        ? `<div class="strip-origin">📍 ${escapeHtml(t.origin.label)}</div>` : '';
+      return `
+        <div class="strip-item" data-trip="${t.id}">
+          <div class="strip-head"><div class="strip-name">${escapeHtml(t.name)}</div></div>
+          <div class="strip-meta">${I18N.t('savedTrip.meta', { n: (t.stops || []).length, date: dateLabel })}</div>
+          ${origin}
+          <div class="strip-stops">${stops}</div>
+          <div class="strip-actions">
+            <button type="button" class="strip-go" data-go="${t.id}">${I18N.t('savedTrip.go')}</button>
+            <button type="button" class="strip-del" data-del="${t.id}">${I18N.t('savedTrip.delete')}</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    body.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => {
+      const trip = (State.savedTrips || []).find(t => String(t.id) === b.dataset.go);
+      if (!trip) return;
+      this.close();
+      PlanCtrl.openSavedTrip(trip);
+    }));
+    body.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+      const trip = (State.savedTrips || []).find(t => String(t.id) === b.dataset.del);
+      if (!trip) return;
+      if (!confirm(I18N.t('savedTrip.confirmDelete', { name: trip.name }))) return;
+      State.savedTrips = State.savedTrips.filter(t => String(t.id) !== b.dataset.del);
+      Storage.save();
+      this.render();
+      showToast(I18N.t('savedTrip.deleted'));
+    }));
+  },
+};
+
+/* ═══════════════════════════════════════════════
    PHOTO VIEW — xem 1 ảnh cỡ lớn. Dùng khi sửa bài để nhìn rõ ảnh trước
    khi quyết định xoá. Cố ý tối giản: 1 ảnh, không vuốt, không zoom —
    carousel trong bài đã lo phần xem nhiều ảnh rồi.
@@ -3286,13 +3419,17 @@ const CommunityAddModal = {
 
     document.getElementById('cfPhotoInput').addEventListener('change', (e) => {
       const files = Array.from(e.target.files || []);
+      e.target.value = ''; // reset sớm để chọn LẠI cùng file vẫn kích hoạt change
+      // Đang sửa quán đã đăng: ảnh phải đi thẳng lên server ngay, giống ⭐
+      // và ✕ ở cùng lưới. Gom vào _photoFiles như lúc đăng mới sẽ chẳng bao
+      // giờ được gửi đi, vì _save() ở nhánh sửa chỉ PATCH phần chữ.
+      if (this._editingId) { this._addPhotosToEdited(files); return; }
       const room = 4 - this._photoFiles.length;
       if (files.length > room) showToast(I18N.t('toast.tooManyPhotos', { room }));
       files.slice(0, room).forEach(f => {
         this._photoFiles.push(f);
         this._photoPreviewUrls.push(URL.createObjectURL(f));
       });
-      e.target.value = '';
       this._renderPhotoGrid();
       this._saveDraftPhotos();
       this._scheduleDraftSave();
@@ -3552,6 +3689,41 @@ const CommunityAddModal = {
     });
   },
 
+  // Thêm ảnh cho quán ĐANG SỬA — tải lên ngay, không đợi bấm "Cập nhật".
+  async _addPhotosToEdited(files) {
+    if (!files.length) return;
+    const room = 4 - this._existingPhotos.length;
+    if (room <= 0) { showToast(I18N.t('toast.photoFull')); return; }
+    if (files.length > room) showToast(I18N.t('toast.tooManyPhotos', { room }));
+
+    const grid = document.getElementById('cfPhotoGrid');
+    const addBtn = document.getElementById('cfPhotoAddBtn');
+    if (addBtn) { addBtn.disabled = true; addBtn.textContent = '⏳'; }
+    // try/finally như ở _save(): nén ảnh có thể ném lỗi, không được để ô
+    // thêm ảnh kẹt ở ⏳ vĩnh viễn.
+    let r;
+    try {
+      r = await Community.addPhotos(this._editingId, files, {
+        existingCount: this._existingPhotos.length,
+        onProgress: (phase, i, total) => {
+          if (!addBtn) return;
+          addBtn.textContent = phase === 'compress' ? `${i}/${total}` : '📤';
+        },
+      });
+    } catch (e) {
+      r = { ok: false, error: (e && e.message) || I18N.t('err.connectionGeneric') };
+    } finally {
+      if (addBtn) addBtn.disabled = false;
+    }
+
+    if (!r.ok) { showToast(`⚠️ ${r.error}`); this._renderPhotoGrid(); return; }
+    this._editingRecord = r.data;
+    this._existingPhotos = (r.data.photos || []).map(f => Community.photoUrl(r.data, f, '200x200'));
+    this._renderPhotoGrid();
+    ProfileCtrl._loadMyRestaurants();
+    showToast(I18N.t('toast.photoAdded', { n: (r.data.photos || []).length }));
+  },
+
   _renderPhotoGrid() {
     const grid = document.getElementById('cfPhotoGrid');
 
@@ -3559,11 +3731,19 @@ const CommunityAddModal = {
     // (không chờ bấm "Cập nhật") — bấm ảnh để xem cỡ lớn, ⭐ đổi bìa,
     // ✕ xoá hẳn. Thêm ảnh mới vẫn phải đăng bài mới.
     if (this._editingId) {
+      const filenames = this._editingRecord.photos || [];
+      // Ô "＋ Thêm ảnh" phải có mặt cả khi quán KHÔNG còn ảnh nào — trước
+      // đây chỉ hiện chữ "chưa có ảnh" rồi dừng, nên xoá hết ảnh xong là
+      // không còn đường nào thêm lại (người dùng báo đúng chỗ này).
+      const addSlotEdit = this._existingPhotos.length < 4
+        ? `<button class="photo-slot photo-slot-empty" id="cfPhotoAddBtn" type="button">＋<br><span style="font-size:.65rem">${I18N.t('addQuan.addPhoto')}</span></button>`
+        : '';
       if (!this._existingPhotos.length) {
-        grid.innerHTML = `<div style="grid-column:span 4;font-size:.78rem;color:var(--text3)">${I18N.t('photo.none')}</div>`;
+        grid.innerHTML = `<div style="grid-column:span 4;font-size:.78rem;color:var(--text3);margin-bottom:.4rem">${I18N.t('photo.none')}</div>` + addSlotEdit;
+        const addBtn0 = document.getElementById('cfPhotoAddBtn');
+        if (addBtn0) addBtn0.addEventListener('click', () => document.getElementById('cfPhotoInput').click());
         return;
       }
-      const filenames = this._editingRecord.photos || [];
       grid.innerHTML = this._existingPhotos.map((url, i) => {
         const filename = filenames[i];
         const starActive = filename && filename === this._editingRecord.thumbnail ? ' active' : '';
@@ -3571,7 +3751,10 @@ const CommunityAddModal = {
           <button type="button" class="photo-slot-remove" data-del="${escapeHtml(filename)}" title="${I18N.t('photo.delete')}">✕</button>
           <button type="button" class="photo-thumb-star${starActive}" data-filename="${escapeHtml(filename)}" title="${I18N.t('photo.setCover')}">⭐</button>
         </div>`;
-      }).join('');
+      }).join('') + addSlotEdit;
+
+      const addBtnEdit = document.getElementById('cfPhotoAddBtn');
+      if (addBtnEdit) addBtnEdit.addEventListener('click', () => document.getElementById('cfPhotoInput').click());
 
       grid.querySelectorAll('[data-view]').forEach(slot => {
         slot.addEventListener('click', () => {

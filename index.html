@@ -25,7 +25,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2561">
+<link rel="stylesheet" href="css/styles.css?v=2565">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -193,6 +193,7 @@
   <div class="plan-topbar">
     <button class="back-btn" id="planBack">←</button>
     <div class="plan-title" data-i18n="plan.title">Lịch trình hôm nay</div>
+    <button class="plan-save-btn" id="planSaveBtn" type="button" data-i18n="savedTrip.saveTitle" data-i18n-attr="title" title="Lưu lộ trình này để đi sau">💾</button>
   </div>
   <div class="plan-summary" id="planSummary"></div>
   <div id="planMapWrap"><div id="planMap"></div></div>
@@ -207,6 +208,7 @@
        which now holds Avatar/Tên/Ngôn ngữ/Bạn bè/Sở thích/Dữ liệu/Gemini AI. -->
   <button class="settings-gear" id="settingsGearBtn" type="button" data-i18n="profile.settings" data-i18n-attr="title" title="Cài đặt">⚙️</button>
   <button class="settings-gear settings-gear-2" id="savedListBtn" type="button" data-i18n="saved.openTitle" data-i18n-attr="title" title="Quán đã lưu">🔖</button>
+  <button class="settings-gear settings-gear-3" id="savedTripsBtn" type="button" data-i18n="savedTrip.openTitle" data-i18n-attr="title" title="Lộ trình đã lưu">🗺️</button>
   <div class="profile-scroll">
     <!-- Quán community section — the community profile header (avatar,
          name, 3 social stats) is rendered inline into #myRestaurantList
@@ -316,6 +318,20 @@
 <!-- ═══════════════════════════════════════════════
      TRIP HISTORY MODAL — past itineraries
 ═══════════════════════════════════════════════ -->
+<!-- Lộ trình đã lưu — khác tripsModal (nhật ký tự động, tự cắt bớt):
+     đây là những lộ trình người dùng tự đặt tên để dành đi sau. -->
+<div class="modal-overlay" id="savedTripsModal">
+  <div class="modal-sheet list-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" data-i18n="savedTrip.title">Lộ trình <em>đã lưu</em> 🗺️</div>
+    <div class="modal-sub" id="savedTripsCount">0 lộ trình</div>
+    <div class="list-modal-body" id="savedTripsBody"></div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="savedTripsClose" data-i18n="common.close">Đóng</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="tripsModal">
   <div class="modal-sheet list-sheet">
     <div class="modal-handle"></div>
@@ -636,20 +652,20 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2561"></script>
-<script src="js/i18n.js?v=2561"></script>
-<script src="js/utils.js?v=2561"></script>
-<script src="js/state.js?v=2561"></script>
-<script src="js/poi.js?v=2561"></script>
-<script src="js/geocoder.js?v=2561"></script>
-<script src="js/gemini.js?v=2561"></script>
-<script src="js/community.js?v=2561"></script>
-<script src="js/analytics.js?v=2561"></script>
-<script src="js/map.js?v=2561"></script>
-<script src="js/gps.js?v=2561"></script>
-<script src="js/locationPicker.js?v=2561"></script>
-<script src="js/controllers.js?v=2561"></script>
-<script src="js/app.js?v=2561"></script>
+<script src="js/security.js?v=2565"></script>
+<script src="js/i18n.js?v=2565"></script>
+<script src="js/utils.js?v=2565"></script>
+<script src="js/state.js?v=2565"></script>
+<script src="js/poi.js?v=2565"></script>
+<script src="js/geocoder.js?v=2565"></script>
+<script src="js/gemini.js?v=2565"></script>
+<script src="js/community.js?v=2565"></script>
+<script src="js/analytics.js?v=2565"></script>
+<script src="js/map.js?v=2565"></script>
+<script src="js/gps.js?v=2565"></script>
+<script src="js/locationPicker.js?v=2565"></script>
+<script src="js/controllers.js?v=2565"></script>
+<script src="js/app.js?v=2565"></script>
 
 </body>
 </html>

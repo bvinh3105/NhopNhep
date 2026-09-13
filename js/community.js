@@ -284,6 +284,43 @@ const Community = {
     });
   },
 
+  // Thêm ảnh vào quán ĐÃ đăng (lúc đang sửa bài). Dùng "<field>+" của
+  // PocketBase để NỐI THÊM — gửi thẳng `photos` sẽ thay sạch mảng cũ, tức
+  // là xoá mất hết ảnh đang có (đã kiểm chứng cả hai cách trên chính
+  // instance này 2026-09-13 trước khi chốt).
+  async addPhotos(restaurantId, files, { existingCount = 0, onProgress = null } = {}) {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    const room = Math.max(0, 4 - existingCount); // maxSelect=4 phía server
+    const list = Array.from(files || []).slice(0, room);
+    if (!list.length) return { ok: false, error: I18N.t('toast.photoFull') };
+
+    const fd = new FormData();
+    for (let i = 0; i < list.length; i++) {
+      if (onProgress) { onProgress('compress', i + 1, list.length); await new Promise(r => setTimeout(r, 0)); }
+      let blob;
+      // Cùng cách xử lý như createRestaurant: ảnh hỏng phải báo rõ tên file
+      // chứ không được để lỗi văng ra làm treo nút.
+      try { blob = await this.compressImage(list[i]); }
+      catch (e) { return { ok: false, status: 'image', error: e.message || I18N.t('err.imageUnreadable') }; }
+      if (!blob || !blob.size) return { ok: false, status: 'image', error: `${I18N.t('err.imageUnreadable')}: ${list[i].name || ''}` };
+      fd.append('photos+', blob, (list[i].name || 'photo').replace(/\.\w+$/, '') + '.webp');
+    }
+    if (onProgress) onProgress('upload', list.length, list.length);
+
+    const timeout = Math.min(90000, 20000 + list.length * 15000);
+    const r = await this._fetch(`/api/collections/restaurants/records/${restaurantId}`, {
+      method: 'PATCH', body: fd, timeoutMs: timeout,
+    });
+    if (!r.ok) return r;
+    // Quán vừa bị xoá hết ảnh rồi thêm lại → chưa có bìa, danh sách sẽ hiện
+    // ô trống. Lấy ảnh đầu tiên làm bìa luôn.
+    if (!r.data.thumbnail && r.data.photos && r.data.photos.length) {
+      const t = await this.setThumbnail(restaurantId, r.data.photos[0]);
+      if (t.ok) r.data = t.data;
+    }
+    return r;
+  },
+
   // Xoá 1 ảnh khỏi quán đã đăng. Cú pháp "<field>-" của PocketBase xoá đúng
   // file được nêu tên và giữ nguyên các file còn lại (đã kiểm chứng trên
   // chính instance này 2026-09-13) — an toàn hơn hẳn việc gửi lại cả mảng
