@@ -210,6 +210,7 @@ const I18N = {
       'err.serverUnreachable': 'Không kết nối được server cộng đồng — server có đang chạy không?',
       'err.needLogin': 'Cần đăng nhập trước',
       'err.imageUnreadable': 'Không đọc được ảnh',
+      'err.registeredLoginFail': 'Tài khoản đã tạo! Server đang bận — hãy đăng nhập lại nhé.',
       // ── Toast rải rác khắp controllers.js ──
       'toast.needOneCat': 'Chọn ít nhất 1 loại nhé!',
       'toast.ratingSoon': '👥 Sắp có · cần backend cho ratings cộng đồng',
@@ -530,6 +531,7 @@ const I18N = {
       'err.serverUnreachable': "Can't reach the community server — is it running?",
       'err.needLogin': 'Please sign in first',
       'err.imageUnreadable': "Couldn't read the image",
+      'err.registeredLoginFail': 'Account created! Server is busy — please sign in manually.',
       'toast.needOneCat': 'Pick at least 1 category!',
       'toast.ratingSoon': '👥 Coming soon · needs a community-ratings backend',
       'toast.needOneSrc': 'Pick at least 1 source!',

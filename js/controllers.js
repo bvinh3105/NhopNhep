@@ -2516,7 +2516,18 @@ const CommunityCtrl = {
     // load) gets a fresh token instead of silently reusing a spent one.
     if (this._mode === 'register') { try { window.turnstile?.reset(turnstileEl); } catch (_) {} }
 
-    if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+    if (!r.ok) {
+      // Special case: account was created but auto-login failed (tunnel blip).
+      // Switch to login mode so the user can immediately sign in manually
+      // without re-filling all the register fields.
+      if (r._registered) {
+        this._mode = 'login';
+        this._renderAuthForm();
+        document.getElementById('cAuthEmail').value = email;
+      }
+      showToast(`⚠️ ${r.error}`);
+      return;
+    }
     if (typeof Analytics !== 'undefined') {
       Analytics.track(this._mode === 'register' ? 'register' : 'login', {});
     }

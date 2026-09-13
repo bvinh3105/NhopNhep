@@ -126,7 +126,20 @@ const Community = {
         : { ok: false, status: 0, error: I18N.t('err.serverUnreachable') };
     }
     if (!r.ok) return r;
-    return this.login(email, password); // auto sign-in right after signup
+    // Auto sign-in right after signup. If login fails (tunnel briefly down,
+    // PocketBase cold-start, etc.) the account IS created — show a friendly
+    // message so the user knows to just sign in manually rather than seeing
+    // the generic "connection error" which implies the whole attempt failed.
+    const loginResult = await this.login(email, password);
+    if (!loginResult.ok) {
+      return {
+        ok: false,
+        status: loginResult.status,
+        error: I18N.t('err.registeredLoginFail'),
+        _registered: true, // account was created; only auto-login failed
+      };
+    }
+    return loginResult;
   },
 
   async login(email, password) {
