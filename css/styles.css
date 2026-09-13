@@ -1411,6 +1411,31 @@ body.map-full .tabbar{transform:translateY(105%)}
 .community-welcome-sub{font-size:.75rem;color:var(--text3);margin-top:.1rem;font-weight:600}
 
 /* Restaurant card — like my-r-card but with a taller cover photo + chip rows */
+/* "N quán mới" — hiện khi poller thấy bài mới LÚC người dùng đang cuộn
+   giữa feed.
+   Dock cao 0px: pill nằm absolute bên trong nên KHÔNG chiếm chỗ trong
+   luồng. Bản đầu để pill sticky thẳng trong luồng thì nó đội list xuống
+   ~47px; Chrome/Firefox có scroll anchoring tự bù nên nhìn không thấy,
+   nhưng Safari KHÔNG hỗ trợ scroll anchoring → trên iPhone nội dung sẽ
+   giật nảy đúng lúc người ta đang đọc. Cao 0 thì không máy nào giật.
+   Sticky (không phải fixed) nên pill bám trong vùng feed, không bao giờ
+   đè lên #toast ở đỉnh màn hình. */
+.new-posts-dock{position:sticky;top:0;height:0;z-index:6;overflow:visible}
+.new-posts-pill{
+  position:absolute;top:.35rem;left:50%;transform:translateX(-50%);
+  padding:.5rem 1rem;border-radius:22px;white-space:nowrap;
+  background:var(--primary);color:var(--cream);
+  border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
+  font-size:.8rem;font-weight:800;cursor:pointer;
+  animation:new-pill-in .26s ease-out;
+}
+.new-posts-pill:active{transform:translateX(-50%) translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+@keyframes new-pill-in{
+  from{opacity:0;transform:translateX(-50%) translateY(-8px)}
+  to{opacity:1;transform:translateX(-50%)}
+}
+@media (prefers-reduced-motion:reduce){.new-posts-pill{animation:none}}
+
 .comm-r-list{display:flex;flex-direction:column;gap:.75rem;padding-bottom:calc(var(--safe-bottom) + 1rem)}
 /* Feed reads as one continuous scroll (posts separated by their own
    border-bottom divider, not a container gap) — the grid-based profile

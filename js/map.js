@@ -24,6 +24,9 @@ const TabNav = {
     document.getElementById('planScreen').classList.add('hidden');
     document.getElementById('profileScreen').classList.add('hidden');
     document.getElementById('communityScreen').classList.add('hidden');
+    // Rời tab Cộng đồng → tắt poller feed. Nhánh 'community' bên dưới gọi
+    // CommunityCtrl.render(), trong đó tự bật lại.
+    if (tab !== 'community') CommunityCtrl._stopLive();
     if (tab === 'home') {
       document.getElementById('homeScreen').classList.remove('hidden');
       setTimeout(() => State.mainMap?.invalidateSize(), 60);

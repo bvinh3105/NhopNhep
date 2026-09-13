@@ -2356,6 +2356,16 @@ const CommunityCtrl = {
   _mode: 'login', // 'login' | 'register'
   _searchDebounce: null,
 
+  // ── Feed tự cập nhật ────────────────────────────────────────────────
+  // Trước đây bài mới của người khác chỉ hiện sau khi F5 — đang xem thì
+  // không biết có gì mới, phải tự đoán mà tải lại.
+  LIVE_POLL_MS: 20000,
+  _liveTimer: null,
+  _liveSig: null,        // chữ ký của lần ĐÃ VẼ gần nhất (null = chưa có mốc)
+  _liveTotal: 0,         // tổng số bài của lần đã vẽ, để tính số bài mới
+  _liveBusy: false,      // chặn chồng request khi mạng chậm hơn chu kỳ poll
+  _pendingNew: 0,
+
   init() {
     document.getElementById('communityAuthToggle').addEventListener('click', () => {
       this._mode = this._mode === 'login' ? 'register' : 'login';
@@ -2376,6 +2386,15 @@ const CommunityCtrl = {
     });
 
     document.getElementById('communityAddBtn').addEventListener('click', () => CommunityAddModal.open());
+
+    document.getElementById('communityNewPill')?.addEventListener('click', () => this._showNewPosts());
+
+    // Rời tab trình duyệt / khoá máy → dừng poll. Quay lại → kiểm tra
+    // NGAY, không đợi hết 20s, vì đó đúng là lúc người dùng nhìn lại feed.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && State.currentTab === 'community') this._startLive();
+      else this._stopLive();
+    });
 
     const search = document.getElementById('communitySearchInput');
     search.addEventListener('input', () => {
@@ -2557,6 +2576,78 @@ const CommunityCtrl = {
     // Small "Đăng nhập" header button — visible only to guests
     document.getElementById('communityGuestSignIn').classList.toggle('hidden', loggedIn);
     this._loadList('');
+    this._startLive();
+  },
+
+  // ── Live: vòng đời poller ───────────────────────────────────────────
+  // Chỉ chạy khi tab Cộng đồng đang mở VÀ trình duyệt đang hiện — không
+  // đốt pin/data nền, và quan trọng hơn: khi người dùng quay lại thì
+  // kiểm tra NGAY, đó mới là lúc họ thật sự cần thấy bài mới.
+  _startLive() {
+    this._stopLive();
+    if (document.visibilityState !== 'visible') return;
+    this._liveTimer = setInterval(() => this._pollLive(), this.LIVE_POLL_MS);
+    this._pollLive();
+  },
+
+  _stopLive() {
+    clearInterval(this._liveTimer);
+    this._liveTimer = null;
+  },
+
+  _isLiveActive() {
+    return State.currentTab === 'community' && document.visibilityState === 'visible';
+  },
+
+  async _pollLive() {
+    if (this._liveBusy || !this._isLiveActive()) return;
+    // Đang tìm kiếm: kết quả là của riêng câu tìm, tráo nó ra dưới tay
+    // người dùng thì khó chịu hơn là để họ tự tìm lại.
+    if ((document.getElementById('communitySearchInput')?.value || '').trim()) return;
+
+    this._liveBusy = true;
+    let probe = null;
+    try { probe = await Community.feedSignature(); }
+    finally { this._liveBusy = false; }
+    // Mất mạng / server ngủ: im lặng bỏ qua, lần poll sau thử lại. Đây là
+    // tiện ích nền, không được phép bắn toast lỗi vào mặt người dùng.
+    if (!probe || !this._isLiveActive()) return;
+
+    if (this._liveSig === null) { // lần đầu sau khi vẽ list → chỉ lấy mốc
+      this._liveSig = probe.sig;
+      this._liveTotal = probe.total;
+      return;
+    }
+    if (probe.sig === this._liveSig) return;
+
+    const delta = probe.total - this._liveTotal;
+    const scroller = document.querySelector('#communityScreen .profile-scroll');
+    const atTop = !scroller || scroller.scrollTop < 80;
+
+    // Ở đỉnh feed thì vẽ lại luôn: không có gì phía trên để bị xê dịch,
+    // bài mới trồi lên đúng chỗ mắt đang nhìn.
+    if (atTop) { this._loadList(''); return; }
+
+    // Đang cuộn giữa feed: KHÔNG tráo nội dung dưới tay người dùng.
+    // Có bài mới → hiện pill để họ tự quyết định lúc nào xem.
+    if (delta > 0) { this._pendingNew = delta; this._renderNewPill(); }
+    // Chỉ sửa/xoá (delta <= 0): không hiện pill ("0 quán mới" vô nghĩa).
+    // Cố tình KHÔNG cập nhật _liveSig để lần poll sau vẫn thấy lệch và
+    // sẽ vẽ lại ngay khi người dùng cuộn về đỉnh.
+  },
+
+  _renderNewPill() {
+    const pill = document.getElementById('communityNewPill');
+    if (!pill) return;
+    if (!this._pendingNew) { pill.classList.add('hidden'); return; }
+    pill.textContent = I18N.t('community.newPosts', { n: this._pendingNew });
+    pill.classList.remove('hidden');
+  },
+
+  _showNewPosts() {
+    const scroller = document.querySelector('#communityScreen .profile-scroll');
+    scroller?.scrollTo({ top: 0, behavior: 'smooth' });
+    this._loadList('');
   },
 
   async _loadList(query) {
@@ -2576,6 +2667,14 @@ const CommunityCtrl = {
       return;
     }
     this._renderList(r.data.items, query);
+
+    // Vừa vẽ xong = mọi thứ đang hiện là mới nhất → dọn pill và đặt lại
+    // mốc. _liveSig=null khiến lần poll ngay sau đây chỉ lấy mốc chứ
+    // không coi là "có thay đổi", nên không bao giờ tự vẽ lại 2 lần.
+    this._pendingNew = 0;
+    this._renderNewPill();
+    this._liveSig = null;
+    if (this._isLiveActive()) this._pollLive();
   },
 
   // query khác rỗng khi đang tìm kiếm — 0 kết quả lúc đó nghĩa là "không

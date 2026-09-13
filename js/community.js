@@ -163,6 +163,29 @@ const Community = {
 
   logout() { this.token = ''; this.currentUser = null; },
 
+  // ── Phát hiện feed có gì mới ─────────────────────────────────────────
+  // Bản gốc định dùng SSE /api/realtime của PocketBase, nhưng Cloudflare
+  // Quick Tunnel nuốt sạch stream: header về đủ (200, text/event-stream)
+  // mà body 0 byte sau 8s, trong khi gọi thẳng 127.0.0.1:8090 thì
+  // PB_CONNECT về ngay lập tức (đo 2026-09-13, thử cả gzip lẫn identity).
+  // Nên thay bằng probe siêu nhẹ: 1 record, 2 field → ~124 byte, so với
+  // ~2.7KB của full list và KHÔNG phình theo số bài.
+  //
+  // Chữ ký gộp 2 tín hiệu để bắt đủ 3 loại thay đổi:
+  //   totalItems  → thêm / xoá bài
+  //   updated mới → sửa bài (PocketBase luôn bump `updated` khi ghi)
+  // Thêm 1 bài + xoá 1 bài giữa 2 lần probe thì totalItems không đổi,
+  // nhưng `updated` đổi → vẫn bắt được.
+  // Mọi rule listRule của server vẫn áp dụng, nên bài riêng tư của người
+  // khác không làm chữ ký của mình nhảy.
+  async feedSignature() {
+    const q = new URLSearchParams({ page: 1, perPage: 1, sort: '-updated', fields: 'id,updated' });
+    const r = await this._fetch(`/api/collections/restaurants/records?${q}`, { timeoutMs: 8000 });
+    if (!r.ok || !r.data) return null;
+    const top = (r.data.items && r.data.items[0]) || null;
+    return { sig: `${r.data.totalItems}|${top ? top.updated : ''}`, total: r.data.totalItems || 0 };
+  },
+
   // ── Restaurants ─────────────────────────────────────────────────────────
   async listRestaurants({ page = 1, perPage = 50, sort = '-created', filter = '' } = {}) {
     const q = new URLSearchParams({ page, perPage, sort, expand: 'created_by' });
