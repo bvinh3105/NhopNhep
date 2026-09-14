@@ -41,7 +41,7 @@
   --safe-bottom:env(safe-area-inset-bottom,0px);
   --safe-top:env(safe-area-inset-top,0px);
   --tab-h:64px;
-  --ribbon-h:calc(var(--safe-top) + 30px);
+  --ribbon-h:var(--safe-top); /* tên biến giữ nguyên (dùng ở .screen/#toast) dù ribbon đã bỏ — khỏi phải sửa mọi nơi dùng */
 
   --font-display:'Fraunces',Georgia,serif;
   --font-body:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
@@ -69,25 +69,6 @@ input,textarea,select{font-family:var(--font-body)}
 /* ─── Screens ─── */
 .screen{position:fixed;top:var(--ribbon-h);bottom:var(--tab-h);left:0;right:0;display:flex;flex-direction:column;overflow:hidden;background:var(--cream)}
 .screen.hidden{display:none}
-
-/* ═══════════════════════════════════════════════
-   MARQUEE RIBBON (top strip)
-═══════════════════════════════════════════════ */
-.ribbon{
-  position:fixed;top:0;left:0;right:0;z-index:150;
-  background:var(--primary);color:var(--cream);
-  padding:calc(var(--safe-top) + 6px) 0 6px;overflow:hidden;font-family:var(--font-display);
-  font-weight:800;font-size:.72rem;letter-spacing:2px;
-  border-bottom:1.5px solid var(--primary-2);
-  transition:transform .32s cubic-bezier(.32,1,.56,1);
-}
-.ribbon-track{display:flex;gap:1.5rem;white-space:nowrap;animation:marquee 24s linear infinite;padding-left:1.5rem}
-.ribbon-track span{display:inline-flex;align-items:center;gap:1.5rem;font-style:italic}
-.ribbon-track span::after{content:'★';color:var(--cream-3);font-style:normal}
-@keyframes marquee{
-  from{transform:translateX(0)}
-  to{transform:translateX(-50%)}
-}
 
 /* ═══════════════════════════════════════════════
    BOTTOM TAB BAR
@@ -537,6 +518,7 @@ input,textarea,select{font-family:var(--font-body)}
   border:2px solid var(--text);color:#fff;
 }
 .r-card.gemini-added .r-rating{color:#7C3AED;font-weight:800}
+.r-ref-note{font-size:.62rem;font-weight:600;font-style:italic;color:var(--text3);opacity:.75}
 @keyframes card-in{ from{opacity:0;transform:translateY(12px) scale(.97)} to{opacity:1;transform:none} }
 
 .r-cat-badge{
@@ -671,14 +653,13 @@ input,textarea,select{font-family:var(--font-body)}
 .pmap-btn.pmap-locate.tracking{background:var(--primary);color:var(--cream);border-color:var(--text)}
 
 /* Fullscreen map — covers everything but the security shield.
-   The <body>.map-full companion class slides the ribbon and tabbar
-   out of view so the map really owns the whole viewport. */
+   The <body>.map-full companion class slides the tabbar out of view
+   so the map really owns the whole viewport. */
 #planMapWrap.fullscreen{
   position:fixed;inset:0;z-index:1500;
   margin:0;border-radius:0;border:none;box-shadow:none;
   height:100vh !important;height:100dvh !important;
 }
-body.map-full .ribbon{transform:translateY(-105%)}
 body.map-full .tabbar{transform:translateY(105%)}
 #planMapWrap.fullscreen .pmap-controls{
   top:calc(env(safe-area-inset-top, 0px) + .8rem);

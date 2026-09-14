@@ -676,16 +676,20 @@ const ResultsCtrl = {
       // naming the data source; that stays dev-only (osm-added CSS class
       // + console.debug in scan()), never surfaced as text to users.
       const ratingLabel = isGemini ? `${r.rating.toFixed(1)} ★` : (isOsm ? '★ —' : `${r.rating} ★`);
+      // Gemini invents price/rating (see prompt) — never verified against a
+      // real source, so both get a visible "reference only" note right on
+      // the card, not just an internal CSS hook nobody outside devtools sees.
+      const refNote = isGemini ? ` <i class="r-ref-note">(${I18N.t('card.refNote')})</i>` : '';
       const hoursBadge = this._renderHoursBadge(r);
       return `<div class="r-card${sel?' selected':''}${flagCls}" data-id="${r.id}" style="animation-delay:${Math.min(i,10)*30}ms" role="button" tabindex="0" title="${I18N.t('card.tapDetail')}">
         <button class="r-check" data-id="${r.id}" title="${I18N.t('card.selectAdd')}" aria-label="${I18N.t('card.select')}" aria-pressed="${sel?'true':'false'}">✓</button>
         <div class="r-cat-badge" style="background:${cat.color}22;color:${cat.color}">${cat.icon} ${cat.label}</div>
         <div class="r-name">${escapeHtml(r.name)}</div>
         ${hoursBadge}
-        <div class="r-price">${priceLabel}</div>
+        <div class="r-price">${priceLabel}${refNote}</div>
         <div class="r-desc">${escapeHtml(r.desc)}</div>
         <div class="r-meta">
-          <span class="r-rating">${ratingLabel}</span>
+          <span class="r-rating">${ratingLabel}${refNote}</span>
           <span class="r-dist">${fmtDist(r._dist)}</span>
         </div>
       </div>`;
@@ -2059,6 +2063,7 @@ const DetailModal = {
         <span>⭐ ${(r.rating ?? 5).toFixed(1)}</span>
         ${r.hours ? `<span>🕒 ${escape(r.hours)}</span>` : ''}
       </div>
+      ${isGemini ? `<div class="detail-demo-note">${I18N.t('detail.geminiRefNote')}</div>` : ''}
       <div class="detail-desc">${escape(r.desc || I18N.t('detail.noDesc'))}</div>
       ${addressHtml}
       ${coordsHtml}
