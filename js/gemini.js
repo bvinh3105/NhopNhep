@@ -32,7 +32,7 @@ const _kfrag = ['AQ.Ab8R', 'N6JCbUoWpz', 'JvFMkd88FT', 'NULcPpuZjl', '9Ck3AULxBF
 
 // Hosts allowed to use the built-in key. Everything else must supply its
 // own key via Settings. Keep in sync with the Google Cloud referrer list.
-const _allowedHosts = ['nhopnhep.pages.dev', 'nhopnhep.netlify.app', 'localhost', '127.0.0.1'];
+const _allowedHosts = ['nhopnhep.pages.dev', 'nhopnhep.netlify.app'];
 
 // Shared by both findQuan() paths (proxy response and direct-call response)
 // — takes the raw {name,address,cat,price,lat,lng,rating,desc} objects
