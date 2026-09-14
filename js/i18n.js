@@ -205,6 +205,7 @@ const I18N = {
       'account.language': 'Ngôn ngữ',
       // ── Thông báo lỗi/toast dùng chung (community.js + controllers.js) ──
       'err.sessionExpired': 'Phiên đăng nhập đã hết hạn — đăng nhập lại nhé',
+      'err.reloginHint': 'thử đăng xuất rồi đăng nhập lại',
       'err.connectionGeneric': 'Lỗi kết nối server cộng đồng',
       'err.serverSlow': 'Server phản hồi chậm — thử lại sau nhé',
       'err.serverUnreachable': 'Không kết nối được server cộng đồng — server có đang chạy không?',
@@ -555,6 +556,7 @@ const I18N = {
       'account.friendSearchPlaceholder': '🔎 Search by name or email…',
       'account.language': 'Language',
       'err.sessionExpired': 'Session expired — please sign in again',
+      'err.reloginHint': 'try signing out then back in',
       'err.connectionGeneric': 'Community server connection error',
       'err.serverSlow': 'Server is responding slowly — try again shortly',
       'err.serverUnreachable': "Can't reach the community server — is it running?",

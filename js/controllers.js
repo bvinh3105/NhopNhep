@@ -4043,7 +4043,15 @@ const CommunityAddModal = {
       btn.disabled = false; btn.textContent = original;
     }
 
-    if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+    if (!r.ok) {
+      // 400 "Failed to create record." thường do token hết hạn — PocketBase
+      // coi user là khách, rule @request.auth.id != '' fail → 400 (không phải 401).
+      const hint = (r.status === 400 && Community.isLoggedIn())
+        ? ` — ${I18N.t('err.reloginHint')}` : '';
+      showToast(`⚠️ ${r.error}${hint}`, hint ? 5000 : 3000);
+      if (r._pbData) console.warn('[CommunityAdd] PB field errors:', r._pbData);
+      return;
+    }
     if (typeof Analytics !== 'undefined') Analytics.track('add_quán', {
       cat: this._selectedCat,
       price: this._selectedPrice,

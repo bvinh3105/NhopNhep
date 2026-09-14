@@ -86,7 +86,11 @@ const Community = {
           document.dispatchEvent(new CustomEvent('community:session-expired'));
           return { ok: false, status: 401, error: I18N.t('err.sessionExpired') };
         }
-        return { ok: false, status: res.status, error: (data && data.message) || I18N.t('err.connectionGeneric') };
+        // 400 từ createRule/updateRule thường do token hết hạn (PocketBase coi
+        // user là khách → rule `@request.auth.id != ''` fail → 400 thay vì 401).
+        // Trả thêm field `_pbData` để caller có thể log chi tiết nếu cần.
+        const msg = (data && data.message) || I18N.t('err.connectionGeneric');
+        return { ok: false, status: res.status, error: msg, _pbData: data && data.data };
       }
       return { ok: true, data };
     } catch(e) {
