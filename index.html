@@ -169,10 +169,26 @@
     <button class="cat-tab" data-filter="cafe">☕ <span data-i18n="catLabel.cafe">Cà phê</span></button>
   </div>
 
+  <button class="rp-fab hidden" id="randomPickBubble" type="button">
+    <span id="rpbIcon">🎲</span>
+  </button>
+
   <div class="restaurant-grid" id="restaurantGrid"></div>
 
   <div class="results-action">
     <button class="action-btn" id="planBtn" disabled data-i18n="results.schedule">Lên lịch</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="randomPickModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="rpModalTitle">🍜 Phở nghe!</div>
+    <div class="modal-sub" id="rpModalSub">Đã lọc 8 quán có Phở gần bạn</div>
+    <div class="rp-modal-actions">
+      <button class="rp-btn rp-btn-retry" id="rpRetryBtn" data-i18n="randomPick.retry">🎲 Chọn lại</button>
+      <button class="rp-btn rp-btn-go" id="rpGoBtn" data-i18n="randomPick.go">Đi thôi →</button>
+    </div>
   </div>
 </div>
 

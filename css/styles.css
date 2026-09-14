@@ -572,6 +572,33 @@ input,textarea,select{font-family:var(--font-body)}
 .action-btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--text)}
 .action-btn:disabled{opacity:.65;pointer-events:none;box-shadow:2px 2px 0 var(--text)}
 
+/* Random pick FAB — round, free-draggable, snaps to a screen corner.
+   position:fixed is contained by body's transform:translateZ(0) in the
+   desktop phone-frame media query above, so it stays inside the frame
+   there too instead of the real browser viewport. */
+.rp-fab{
+  position:fixed;z-index:60;right:16px;bottom:100px;
+  width:54px;height:54px;border-radius:50%;
+  background:var(--primary);color:var(--cream);border:2px solid var(--text);
+  box-shadow:3px 3px 0 var(--text);display:flex;align-items:center;justify-content:center;
+  font-size:1.5rem;line-height:1;cursor:grab;touch-action:none;user-select:none;
+  transition:box-shadow .12s,transform .12s,left .25s ease,top .25s ease,right .25s ease,bottom .25s ease;
+}
+.rp-fab:active{transform:scale(.96)}
+.rp-fab.dragging{transition:none;cursor:grabbing;box-shadow:5px 5px 0 var(--text)}
+.rp-fab.picking{animation:rp-wiggle .28s ease-in-out infinite}
+@keyframes rp-wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-10deg)}75%{transform:rotate(10deg)}}
+
+.rp-modal-actions{display:flex;gap:.6rem;margin-top:.4rem}
+.rp-btn{
+  flex:1;padding:.85rem;border-radius:14px;border:2px solid var(--text);
+  font-family:var(--font-display);font-size:.85rem;font-weight:800;font-style:italic;
+  box-shadow:2px 2px 0 var(--text);transition:all .12s;
+}
+.rp-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.rp-btn-retry{background:var(--white);color:var(--text)}
+.rp-btn-go{background:var(--primary);color:var(--cream)}
+
 .empty-state{
   grid-column:1/-1;display:flex;flex-direction:column;align-items:center;
   justify-content:center;padding:3rem 1rem;gap:.75rem;color:var(--text3);

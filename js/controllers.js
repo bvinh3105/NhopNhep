@@ -587,6 +587,7 @@ const ResultsCtrl = {
       : State.lastScanSource === 'osm' ? ''
       : I18N.t('results.notScanned');
     document.getElementById('resultsSub').textContent = src ? `${fmtDist(State.radius)} · ${src}` : fmtDist(State.radius);
+    this._checkRandomPick();
   },
   _setTabFilter(filter) {
     State.tabFilter = filter;
@@ -707,6 +708,149 @@ const ResultsCtrl = {
     btn.disabled = n === 0;
     btn.textContent = n === 0 ? I18N.t('results.schedule') : I18N.t('results.scheduleN', { n });
   },
+
+  // ── Random dish pick ────────────────────────────────────────────────
+  // Too many results to browse → offer to pick a dish at random and
+  // re-filter down to it, reusing the exact same dish-chip list and
+  // filter logic as the manual "Tìm món" search (HomeCtrl._doScan).
+  RP_THRESHOLD: 15,
+
+  RP_CORNER_KEY: 'nhopnhep_rp_corner',
+  RP_SIDE: 16, RP_TOP: 134, RP_BOTTOM: 100,
+
+  _checkRandomPick() {
+    const fab = document.getElementById('randomPickBubble');
+    if (!fab) return;
+    const show = !this._rpPicking && State.filteredResults.length > this.RP_THRESHOLD;
+    fab.classList.toggle('hidden', !show);
+    if (show) this._resetRandomPickBubble();
+  },
+  _resetRandomPickBubble() {
+    document.getElementById('rpbIcon').textContent = '🎲';
+    const fab = document.getElementById('randomPickBubble');
+    fab.classList.remove('picking');
+    fab.setAttribute('aria-label', I18N.t('randomPick.cta'));
+    fab.title = I18N.t('randomPick.sub');
+  },
+  _dishChipList() {
+    return Array.from(document.querySelectorAll('#dishSuggest .dish-chip')).map(chip => {
+      const label = chip.textContent.trim();
+      const emoji = label.split(' ')[0];
+      return { dish: chip.dataset.dish || '', emoji, name: label.slice(emoji.length).trim() };
+    }).filter(d => d.dish);
+  },
+  _openRandomPick() {
+    if (this._rpPicking) return;
+    const list = this._dishChipList();
+    if (!list.length) return;
+    this._rpPicking = true;
+    const fab = document.getElementById('randomPickBubble');
+    const icon = document.getElementById('rpbIcon');
+    fab.classList.add('picking');
+    let i = 0;
+    const iv = setInterval(() => {
+      icon.textContent = list[i % list.length].emoji;
+      i++;
+    }, 90);
+    setTimeout(() => {
+      clearInterval(iv);
+      fab.classList.remove('picking');
+      const picked = list[Math.floor(Math.random() * list.length)];
+      const dishInput = document.getElementById('dishInput');
+      if (dishInput) dishInput.value = picked.dish;
+      State.activeDish = picked.dish;
+      HomeCtrl._doScan();
+      const n = State.filteredResults.length;
+      const noExactMatch = State.queryUnmatched;
+      document.getElementById('rpModalTitle').textContent =
+        I18N.t('randomPick.resultTitle', { emoji: picked.emoji, name: picked.name });
+      document.getElementById('rpModalSub').textContent = n === 0
+        ? I18N.t('randomPick.resultSubEmpty', { name: picked.name })
+        : noExactMatch
+          ? I18N.t('randomPick.resultSubFallback', { n, name: picked.name })
+          : I18N.t('randomPick.resultSub', { n, name: picked.name });
+      document.getElementById('randomPickModal').classList.add('show');
+      this._rpPicking = false;
+      this._checkRandomPick();
+    }, 1200);
+  },
+  _closeRandomPickModal() {
+    document.getElementById('randomPickModal').classList.remove('show');
+    this._checkRandomPick();
+  },
+
+  // ── FAB free-drag + corner snap ─────────────────────────────────────
+  _applyRpCorner(fab, corner) {
+    fab.style.left = fab.style.top = fab.style.right = fab.style.bottom = '';
+    if (corner[0] === 'l') fab.style.left = this.RP_SIDE + 'px'; else fab.style.right = this.RP_SIDE + 'px';
+    if (corner[1] === 't') fab.style.top = this.RP_TOP + 'px'; else fab.style.bottom = this.RP_BOTTOM + 'px';
+  },
+  _snapRpToCorner(fab) {
+    const rect = fab.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const corner = (cx < window.innerWidth / 2 ? 'l' : 'r') + (cy < window.innerHeight / 2 ? 't' : 'b');
+    this._applyRpCorner(fab, corner);
+    try { localStorage.setItem(this.RP_CORNER_KEY, corner); } catch (_) {}
+  },
+  _initRandomPickDrag() {
+    const fab = document.getElementById('randomPickBubble');
+    let startX = 0, startY = 0, startRect = null, moved = false, pid = null;
+
+    let savedCorner = 'rb';
+    try {
+      const s = localStorage.getItem(this.RP_CORNER_KEY);
+      if (s && /^[lr][tb]$/.test(s)) savedCorner = s;
+    } catch (_) {}
+    this._applyRpCorner(fab, savedCorner);
+
+    const onMove = (e) => {
+      if (pid !== null && e.pointerId !== pid) return;
+      const x = e.clientX, y = e.clientY;
+      if (!moved && Math.hypot(x - startX, y - startY) > 6) {
+        moved = true;
+        fab.classList.add('dragging');
+      }
+      if (!moved) return;
+      const w = fab.offsetWidth, h = fab.offsetHeight;
+      let left = startRect.left + (x - startX);
+      let top = startRect.top + (y - startY);
+      left = Math.max(4, Math.min(window.innerWidth - w - 4, left));
+      top = Math.max(4, Math.min(window.innerHeight - h - 4, top));
+      fab.style.left = left + 'px';
+      fab.style.top = top + 'px';
+      fab.style.right = 'auto';
+      fab.style.bottom = 'auto';
+    };
+    const onEnd = (e) => {
+      if (pid !== null && e.pointerId !== pid) return;
+      pid = null;
+      fab.classList.remove('dragging');
+      if (moved) {
+        this._snapRpToCorner(fab);
+        this._rpJustDragged = true;
+      }
+    };
+    // Pointer capture on the fab itself guarantees pointermove/up/cancel
+    // keep firing on it even if the finger/cursor leaves its bounds or a
+    // browser quirk would otherwise drop the up event mid-drag, so the FAB
+    // never gets stuck in "dragging" state.
+    fab.addEventListener('pointerdown', (e) => {
+      moved = false;
+      pid = e.pointerId;
+      startX = e.clientX; startY = e.clientY;
+      startRect = fab.getBoundingClientRect();
+      fab.setPointerCapture(pid);
+    });
+    fab.addEventListener('pointermove', onMove);
+    fab.addEventListener('pointerup', onEnd);
+    fab.addEventListener('pointercancel', onEnd);
+    fab.addEventListener('click', () => {
+      if (this._rpJustDragged) { this._rpJustDragged = false; return; }
+      this._openRandomPick();
+    });
+  },
+
   init() {
     document.getElementById('resultsBack').addEventListener('click', () => {
       document.getElementById('homeScreen').classList.remove('hidden');
@@ -782,6 +926,16 @@ const ResultsCtrl = {
       PlanCtrl._returnTo = 'results';
       PlanCtrl.buildItinerary();
       PlanCtrl.show();
+    });
+
+    this._initRandomPickDrag();
+    document.getElementById('rpRetryBtn').addEventListener('click', () => {
+      this._closeRandomPickModal();
+      setTimeout(() => this._openRandomPick(), 320);
+    });
+    document.getElementById('rpGoBtn').addEventListener('click', () => this._closeRandomPickModal());
+    document.getElementById('randomPickModal').addEventListener('click', e => {
+      if (e.target.id === 'randomPickModal') this._closeRandomPickModal();
     });
   },
 };
