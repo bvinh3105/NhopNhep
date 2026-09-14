@@ -2717,7 +2717,7 @@ const CommunityCtrl = {
       // without re-filling all the register fields.
       if (r._registered) {
         this._mode = 'login';
-        this._renderAuthForm();
+        this._renderAuthMode();
         document.getElementById('cAuthEmail').value = email;
       }
       showToast(`⚠️ ${r.error}`);
