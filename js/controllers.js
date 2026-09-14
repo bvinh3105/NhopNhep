@@ -170,6 +170,11 @@ const HomeCtrl = {
 
   async scan() {
     if (this._scanning) return;
+    // A fresh real scan invalidates whatever "restore previous list" state
+    // the random-dish-pick FAB was holding for the results-screen back
+    // button — otherwise pressing back after this scan could restore
+    // stale data from before it.
+    ResultsCtrl._rpFilterActive = false;
     // Analytics — fire before network so we count intent, not success
     if (typeof Analytics !== 'undefined') Analytics.track('scan', {
       radius: State.radius,
@@ -744,6 +749,13 @@ const ResultsCtrl = {
     const list = this._dishChipList();
     if (!list.length) return;
     this._rpPicking = true;
+    // Remember the list as it was BEFORE this pick (only on the first pick,
+    // not on a "Chọn lại" retry) so the results-screen back button can
+    // restore it instead of just exiting to the home screen.
+    if (!this._rpFilterActive) {
+      this._rpPrevDish = State.activeDish;
+      this._rpPrevResults = State.filteredResults.slice();
+    }
     const fab = document.getElementById('randomPickBubble');
     const icon = document.getElementById('rpbIcon');
     fab.classList.add('picking');
@@ -771,6 +783,7 @@ const ResultsCtrl = {
           : I18N.t('randomPick.resultSub', { n, name: picked.name });
       document.getElementById('randomPickModal').classList.add('show');
       this._rpPicking = false;
+      this._rpFilterActive = true;
       this._checkRandomPick();
     }, 1200);
   },
@@ -853,6 +866,19 @@ const ResultsCtrl = {
 
   init() {
     document.getElementById('resultsBack').addEventListener('click', () => {
+      // A random dish pick is active → first back tap undoes it and
+      // restores the originally-scanned list instead of leaving the
+      // results screen. A second tap (now that it's cleared) exits normally.
+      if (this._rpFilterActive) {
+        State.activeDish = this._rpPrevDish;
+        State.filteredResults = this._rpPrevResults;
+        this._rpFilterActive = false;
+        const dishInput = document.getElementById('dishInput');
+        if (dishInput) dishInput.value = State.activeDish || '';
+        MapHome.showRestaurants(State.filteredResults);
+        this.show();
+        return;
+      }
       document.getElementById('homeScreen').classList.remove('hidden');
       document.getElementById('resultsScreen').classList.add('hidden');
       setTimeout(() => State.mainMap?.invalidateSize(), 60);
