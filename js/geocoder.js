@@ -48,26 +48,43 @@ const Geocoder = {
     return results;
   },
 
+  // Fallback bias point when the caller has no GPS fix yet: Hoàn Kiếm,
+  // Hà Nội — same coordinate the map preview itself falls back to
+  // (controllers.js CommunityAddModal). A LOT of Vietnamese street names
+  // repeat across many provinces ("Lê Hồng Phong" alone hits Bắc Ninh,
+  // TP.HCM, Hải Phòng, Cần Thơ, Nha Trang…), so searching with zero bias
+  // lets Photon's own ranking surface a result in a random other city —
+  // reads as "wrong" even though the search itself "worked". Almost all
+  // users are in/near Hà Nội, so defaulting the bias there beats no bias
+  // at all; it only matters before the user's first GPS fix or typed
+  // location of this session.
+  DEFAULT_BIAS_LAT: 21.0285,
+  DEFAULT_BIAS_LNG: 105.8542,
+
   async _fetch(q, opts = {}) {
+    const lat = opts.nearLat != null ? opts.nearLat : this.DEFAULT_BIAS_LAT;
+    const lng = opts.nearLng != null ? opts.nearLng : this.DEFAULT_BIAS_LNG;
     const params = new URLSearchParams({
       q: q,
       limit: '8',
       lang: 'default', // Photon uses each place's own local name
+      lat: String(lat),
+      lon: String(lng),
     });
-    // Bias the upstream search to the caller's reference point (usually
-    // the user's GPS fix) when we have one. We used to fall back to a
-    // hardcoded center-of-Vietnam bias + force-append ", Việt Nam" onto
-    // every query when no fix was available yet — that broke address
-    // search for users outside Vietnam (e.g. before they granted GPS),
-    // so now an unbiased global search runs instead in that case.
-    if (opts.nearLat != null && opts.nearLng != null) {
-      params.set('lat', String(opts.nearLat));
-      params.set('lon', String(opts.nearLng));
-    }
-    params.set('q', q);
 
     try {
-      const res = await fetch(`${this.ENDPOINT}?${params}`);
+      // Abort after 8s — on a slow/flaky mobile connection a hung fetch
+      // used to leave the "Đang tìm địa chỉ…" loading state on screen
+      // forever with no way out. Timing out lets it fail into the normal
+      // empty-results UI instead.
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      let res;
+      try {
+        res = await fetch(`${this.ENDPOINT}?${params}`, { signal: ctrl.signal });
+      } finally {
+        clearTimeout(timer);
+      }
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       if (!data.features) return [];
@@ -94,16 +111,16 @@ const Geocoder = {
         };
       });
 
-      // Reorder by real distance to the bias point — Photon's own
-      // ranking sometimes puts far results first when the query text
-      // matches an unrelated place name (e.g. "giao" → "Giao hàng
-      // Bắc Ninh" beating "Hoàn Kiếm" in Hà Nội).
-      if (opts.nearLat != null && opts.nearLng != null) {
-        results.forEach(r => {
-          r._distKm = this._distKm(r.lat, r.lng, opts.nearLat, opts.nearLng);
-        });
-        results.sort((a, b) => a._distKm - b._distKm);
-      }
+      // Reorder by real distance to the bias point (always — either the
+      // caller's real GPS fix, or the Hà Nội fallback above) since
+      // Photon's own ranking sometimes puts far results first when the
+      // query text matches an unrelated place name (e.g. "giao" → "Giao
+      // hàng Bắc Ninh" beating "Hoàn Kiếm" in Hà Nội, or a street name
+      // that repeats across many provinces).
+      results.forEach(r => {
+        r._distKm = this._distKm(r.lat, r.lng, lat, lng);
+      });
+      results.sort((a, b) => a._distKm - b._distKm);
       return results;
     } catch (e) {
       console.warn('[Geocode] failed', e.message);
@@ -123,7 +140,14 @@ const Geocoder = {
       lat: String(lat), lon: String(lng), lang: 'default',
     });
     try {
-      const res = await fetch(url);
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      let res;
+      try {
+        res = await fetch(url, { signal: ctrl.signal });
+      } finally {
+        clearTimeout(timer);
+      }
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       const f = data.features && data.features[0];
