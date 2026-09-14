@@ -793,16 +793,30 @@ const ResultsCtrl = {
   },
 
   // ── FAB free-drag + corner snap ─────────────────────────────────────
+  // Bounds are computed against #resultsScreen, not window.innerWidth/
+  // innerHeight — .screen (and this FAB) are position:fixed, and on the
+  // desktop phone-frame preview (body{transform:translateZ(0)} in the
+  // >=560px media query) that makes BODY their containing block, which is
+  // narrower than the real browser window. Clamping against window size
+  // let the FAB drag past the visible frame into the letterboxed margin,
+  // where it's still technically on-screen but reads as "disappeared".
+  // #resultsScreen shares the same containing-block quirk, so its rect is
+  // always the actual visible app area in both desktop and mobile.
+  _rpScreenRect() {
+    const el = document.getElementById('resultsScreen');
+    return el.getBoundingClientRect();
+  },
   _applyRpCorner(fab, corner) {
     fab.style.left = fab.style.top = fab.style.right = fab.style.bottom = '';
     if (corner[0] === 'l') fab.style.left = this.RP_SIDE + 'px'; else fab.style.right = this.RP_SIDE + 'px';
     if (corner[1] === 't') fab.style.top = this.RP_TOP + 'px'; else fab.style.bottom = this.RP_BOTTOM + 'px';
   },
   _snapRpToCorner(fab) {
+    const screen = this._rpScreenRect();
     const rect = fab.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
-    const corner = (cx < window.innerWidth / 2 ? 'l' : 'r') + (cy < window.innerHeight / 2 ? 't' : 'b');
+    const corner = (cx < screen.left + screen.width / 2 ? 'l' : 'r') + (cy < screen.top + screen.height / 2 ? 't' : 'b');
     this._applyRpCorner(fab, corner);
     try { localStorage.setItem(this.RP_CORNER_KEY, corner); } catch (_) {}
   },
@@ -825,11 +839,12 @@ const ResultsCtrl = {
         fab.classList.add('dragging');
       }
       if (!moved) return;
+      const screen = this._rpScreenRect();
       const w = fab.offsetWidth, h = fab.offsetHeight;
       let left = startRect.left + (x - startX);
       let top = startRect.top + (y - startY);
-      left = Math.max(4, Math.min(window.innerWidth - w - 4, left));
-      top = Math.max(4, Math.min(window.innerHeight - h - 4, top));
+      left = Math.max(screen.left + 4, Math.min(screen.right - w - 4, left));
+      top = Math.max(screen.top + 4, Math.min(screen.bottom - h - 4, top));
       fab.style.left = left + 'px';
       fab.style.top = top + 'px';
       fab.style.right = 'auto';
