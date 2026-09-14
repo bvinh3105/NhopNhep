@@ -342,7 +342,7 @@ const HomeCtrl = {
       showToast(I18N.t('toast.geminiQuotaHit'), 4000);
     } else if (items.length) {
       showToast(source === 'gemini'
-        ? I18N.t('toast.foundN', { n: items.length, src: '✨ Gemini' })
+        ? I18N.t('toast.foundN', { n: items.length })
         : I18N.t('toast.foundNPlain', { n: items.length }), 2200);
     } else if (State.activeSrcs.has('osm')) {
       // Nothing came back from either source. Only show "chưa có key" when
@@ -583,7 +583,7 @@ const ResultsCtrl = {
     document.getElementById('resultsTitle').textContent = I18N.t('results.nCount', { n });
     // Data-source name is dev-only info (see console.debug in scan()) — the
     // OSM case intentionally shows no source suffix here, just the radius.
-    const src = State.lastScanSource === 'gemini' ? '✨ Google Maps'
+    const src = State.lastScanSource === 'gemini' ? '✨ Nhóp Nhép'
       : State.lastScanSource === 'osm' ? ''
       : I18N.t('results.notScanned');
     document.getElementById('resultsSub').textContent = src ? `${fmtDist(State.radius)} · ${src}` : fmtDist(State.radius);
