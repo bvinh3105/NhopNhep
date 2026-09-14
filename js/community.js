@@ -253,16 +253,16 @@ const Community = {
       // 12MP — báo tiến độ để người dùng biết máy đang làm việc chứ không
       // phải treo. yield 1 nhịp trước mỗi ảnh để chữ kịp vẽ ra.
       if (onProgress) { onProgress('compress', i + 1, files.length); await new Promise(r => setTimeout(r, 0)); }
-      let blob;
+      let result;
       try {
-        blob = await this.compressImage(files[i]);
+        result = await this.compressImage(files[i]);
       } catch (e) {
         // Hỏng 1 ảnh thì dừng cả bài, nhưng nói rõ ảnh nào — bỏ lặng lẽ
         // rồi đăng thiếu ảnh còn tệ hơn (người dùng không hề biết).
         return { ok: false, status: 'image', error: e.message || I18N.t('err.imageUnreadable') };
       }
-      if (!blob || !blob.size) return { ok: false, status: 'image', error: `${I18N.t('err.imageUnreadable')}: ${files[i].name || ''}` };
-      fd.append('photos', blob, (files[i].name || 'photo').replace(/\.\w+$/, '') + '.webp');
+      if (!result || !result.blob || !result.blob.size) return { ok: false, status: 'image', error: `${I18N.t('err.imageUnreadable')}: ${files[i].name || ''}` };
+      fd.append('photos', result.blob, (files[i].name || 'photo').replace(/\.\w+$/, '') + '.' + result.ext);
     }
     if (onProgress) onProgress('upload', files.length, files.length);
     // Scale timeout with photo count — home upload bandwidth through the
@@ -301,13 +301,13 @@ const Community = {
     const fd = new FormData();
     for (let i = 0; i < list.length; i++) {
       if (onProgress) { onProgress('compress', i + 1, list.length); await new Promise(r => setTimeout(r, 0)); }
-      let blob;
+      let result;
       // Cùng cách xử lý như createRestaurant: ảnh hỏng phải báo rõ tên file
       // chứ không được để lỗi văng ra làm treo nút.
-      try { blob = await this.compressImage(list[i]); }
+      try { result = await this.compressImage(list[i]); }
       catch (e) { return { ok: false, status: 'image', error: e.message || I18N.t('err.imageUnreadable') }; }
-      if (!blob || !blob.size) return { ok: false, status: 'image', error: `${I18N.t('err.imageUnreadable')}: ${list[i].name || ''}` };
-      fd.append('photos+', blob, (list[i].name || 'photo').replace(/\.\w+$/, '') + '.webp');
+      if (!result || !result.blob || !result.blob.size) return { ok: false, status: 'image', error: `${I18N.t('err.imageUnreadable')}: ${list[i].name || ''}` };
+      fd.append('photos+', result.blob, (list[i].name || 'photo').replace(/\.\w+$/, '') + '.' + result.ext);
     }
     if (onProgress) onProgress('upload', list.length, list.length);
 
@@ -633,6 +633,17 @@ const Community = {
   // thường không chạy — nút kẹt ở "Đang đăng…" vĩnh viễn, không báo gì.
   // Đó chính là triệu chứng "lag xong ko up được". Giờ lỗi được gói lại
   // kèm TÊN FILE để người dùng biết đúng ảnh nào cần bỏ ra.
+  // Trả về { blob, ext } chứ không phải blob trần — Safari (dưới iOS 16.4)
+  // không hỗ trợ ENCODE webp qua canvas (dù nó HIỂN THỊ webp bình thường,
+  // 2 việc khác nhau): xin 'image/webp' thì toBlob() theo spec phải âm
+  // thầm trả về PNG thay vì null khi codec không có, không hề báo lỗi.
+  // Trước đây code coi mọi blob trả về là thành công ("có blob = có webp"),
+  // nên trên Safari cũ ảnh bị nén thành PNG nặng gấp nhiều lần WebP/JPEG
+  // (PNG không nén được ảnh chụp thật), lại còn gắn nhầm đuôi .webp — đúng
+  // là nguyên nhân "khó up ảnh" trên iPhone Safari: ảnh quá nặng, tunnel
+  // nhà chậm upload, dễ timeout. Giờ kiểm tra blob.type thật thay vì chỉ
+  // xem có blob hay không, sai type thì rơi thẳng xuống JPEG (Safari mã
+  // hoá JPEG qua canvas đúng chuẩn từ rất lâu rồi, không có vấn đề này).
   compressImage(file, maxWidth = 1600, quality = 0.82) {
     return new Promise((resolve, reject) => {
       const fail = () => reject(new Error(`${I18N.t('err.imageUnreadable')}: ${file.name || 'ảnh'}`));
@@ -649,14 +660,13 @@ const Community = {
           const ctx = canvas.getContext('2d');
           if (!ctx) return fail();
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          // toBlob trả null khi codec không có (WebP trên Safari cũ) HOẶC
-          // khi canvas vượt giới hạn bộ nhớ của máy — phải kiểm tra cả 2
-          // tầng, tầng cuối mới được bỏ cuộc.
           canvas.toBlob((webp) => {
-            if (webp) return this._shrinkIfHuge(canvas, webp, resolve);
+            if (webp && webp.type === 'image/webp') {
+              return this._shrinkIfHuge(canvas, webp, 'webp', resolve);
+            }
             canvas.toBlob((jpeg) => {
-              if (jpeg) return this._shrinkIfHuge(canvas, jpeg, resolve);
-              fail(); // cả WebP lẫn JPEG đều không mã hoá được
+              if (jpeg) return this._shrinkIfHuge(canvas, jpeg, 'jpg', resolve);
+              fail(); // JPEG luôn được hỗ trợ — chỉ hỏng khi hết bộ nhớ
             }, 'image/jpeg', quality);
           }, 'image/webp', quality);
         } catch (_) { fail(); }
@@ -666,8 +676,12 @@ const Community = {
     });
   },
 
-  _shrinkIfHuge(canvas, blob, resolve) {
-    if (blob.size <= this.MAX_PHOTO_BYTES) return resolve(blob);
-    canvas.toBlob((smaller) => resolve(smaller && smaller.size < blob.size ? smaller : blob), 'image/webp', 0.62);
+  _shrinkIfHuge(canvas, blob, ext, resolve) {
+    if (blob.size <= this.MAX_PHOTO_BYTES) return resolve({ blob, ext });
+    const mime = ext === 'webp' ? 'image/webp' : 'image/jpeg';
+    canvas.toBlob((smaller) => {
+      const ok = smaller && smaller.type === mime && smaller.size < blob.size;
+      resolve({ blob: ok ? smaller : blob, ext });
+    }, mime, 0.62);
   },
 };
