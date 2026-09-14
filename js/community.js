@@ -117,7 +117,7 @@ const Community = {
   // client->PocketBase registration had zero bot protection (no CAPTCHA,
   // no email verification), confirmed exploitable by scripting throwaway
   // accounts in seconds.
-  async register(email, password, name, turnstileToken) {
+  async register(email, password, name, turnstileToken, invitedBy) {
     let r;
     try {
       const ctrl = new AbortController();
@@ -125,7 +125,7 @@ const Community = {
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name: name || '', turnstileToken }),
+        body: JSON.stringify({ email, password, name: name || '', turnstileToken, invitedBy: invitedBy || undefined }),
         signal: ctrl.signal,
       });
       clearTimeout(timer);
@@ -557,6 +557,14 @@ const Community = {
   async followerList(userId, page = 1, perPage = 50) {
     const filter = `friends.id?="${userId}"`;
     return this._fetch(`/api/collections/users/records?perPage=${perPage}&page=${page}&filter=${encodeURIComponent(filter)}&sort=-updated`);
+  },
+
+  // How many people registered through MY invite link (invited_by = me).
+  // Same count-only trick as followerCount — perPage=1, read totalItems.
+  async myReferralCount(userId) {
+    const filter = `invited_by="${userId}"`;
+    const r = await this._fetch(`/api/collections/users/records?perPage=1&filter=${encodeURIComponent(filter)}`);
+    return r.ok ? r.data.totalItems : 0;
   },
 
   // Push the local emoji-avatar pick up to this user's record so OTHER

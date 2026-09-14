@@ -49,7 +49,7 @@ export async function onRequestPost(context) {
     return jsonError(400, 'Yêu cầu không hợp lệ');
   }
 
-  const { email, password, name, turnstileToken } = body || {};
+  const { email, password, name, turnstileToken, invitedBy } = body || {};
   if (!email || !password) { apiLog(400, 'missing_fields'); return jsonError(400, 'Thiếu email hoặc mật khẩu'); }
   if (typeof turnstileToken !== 'string' || !turnstileToken || turnstileToken.length > 2048) {
     apiLog(403, 'no_token');
@@ -96,21 +96,39 @@ export async function onRequestPost(context) {
     return jsonError(403, 'Xác thực chống bot thất bại, thử lại nhé');
   }
 
+  // Referral attribution (?ref=<user_id> → invited_by) — best-effort only.
+  // A relation field rejects the WHOLE create if the id doesn't resolve to
+  // a real record, so a stale/bad/made-up link must never be allowed to
+  // break signup. Confirm the id is a real user first; on any doubt, drop
+  // it silently and register normally rather than risk a hard failure.
+  let invitedById = null;
+  if (typeof invitedBy === 'string' && /^[a-z0-9]{15}$/.test(invitedBy)) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 5000);
+      const checkRes = await fetch(`${PB_URL}/api/collections/users/records/${invitedBy}`, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (checkRes.ok) invitedById = invitedBy;
+    } catch (_) { /* tunnel hiccup — skip attribution, never block signup for it */ }
+  }
+
   // Turnstile passed — forward the real registration to PocketBase.
   // Proxy its exact status/body so client error handling keeps working.
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 12000);
+    const userBody = { email, password, passwordConfirm: password, name: name || '' };
+    if (invitedById) userBody.invited_by = invitedById;
     const upstream = await fetch(`${PB_URL}/api/collections/users/records`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, passwordConfirm: password, name: name || '' }),
+      body: JSON.stringify(userBody),
       signal: ctrl.signal,
     });
     clearTimeout(timer);
     const text = await upstream.text();
     // Log outcome: 200 = new account created, 4xx = email taken / validation fail.
-    apiLog(upstream.status, upstream.ok ? 'registered' : 'pb_rejected');
+    apiLog(upstream.status, (upstream.ok ? 'registered' : 'pb_rejected') + (invitedBy ? (invitedById ? ':ref_ok' : ':ref_dropped') : ''));
     return new Response(text, {
       status: upstream.status,
       headers: { 'Content-Type': 'application/json' },

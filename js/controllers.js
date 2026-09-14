@@ -1691,6 +1691,27 @@ const ProfileCtrl = {
     });
     this._initAccountModal();
 
+    // Mời bạn bè — link cá nhân hoá ?ref=<my_id>, tracked bởi invited_by
+    // (xem functions/api/register.js). Nút chỉ hiện khi đã đăng nhập
+    // (_renderMyRestaurants toggle .hidden trên #inviteCard), nhưng vẫn
+    // guard ở đây phòng bấm trúng lúc DOM chưa kịp ẩn.
+    document.getElementById('inviteBtn')?.addEventListener('click', async () => {
+      if (!Community.isLoggedIn()) return;
+      const url = `${location.origin}/?ref=${encodeURIComponent(Community.currentUser.id)}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast(I18N.t('toast.linkCopied'));
+      } catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); showToast(I18N.t('toast.linkCopied')); }
+        catch (_) { showToast(I18N.t('toast.linkCopyFail')); }
+        document.body.removeChild(ta);
+      }
+      if (typeof Analytics !== 'undefined') Analytics.track('invite_link_copied', {});
+    });
+
     const nameInput = document.getElementById('profileNameInput');
     nameInput.addEventListener('input', () => {
       State.profile.name = nameInput.value;
@@ -1915,6 +1936,7 @@ const ProfileCtrl = {
       // any lingering reference (e.g. hidden diagnostic HTML).
       const s1 = document.getElementById('statMyR'); if (s1) s1.textContent = '0';
       const s2 = document.getElementById('statScore'); if (s2) s2.textContent = '0';
+      document.getElementById('inviteCard')?.classList.add('hidden');
       list.innerHTML = `<div class="empty-my-r">
         <div class="em-icon">📝</div>
         <div class="em-msg">${I18N.t('em.notLoggedIn')}</div>
@@ -1927,12 +1949,19 @@ const ProfileCtrl = {
     this._myRestaurants = r.ok ? r.data.items : [];
     // Old #statMyR was removed — count is shown in the community header
     // (rendered by _renderMyRestaurants below via the postCount slot).
-    const [followerCount, friendsRes] = await Promise.all([
+    const [followerCount, friendsRes, referralCount] = await Promise.all([
       Community.followerCount(Community.currentUser.id),
       Community.myFriends(),
+      Community.myReferralCount(Community.currentUser.id),
     ]);
     this._myFollowerCount = followerCount;
     this._myFollowingCount = (friendsRes.ok && friendsRes.data.friends) ? friendsRes.data.friends.length : 0;
+    const inviteCard = document.getElementById('inviteCard');
+    const inviteText = document.getElementById('inviteText');
+    if (inviteCard && inviteText) {
+      inviteCard.classList.remove('hidden');
+      inviteText.innerHTML = I18N.t('invite.joinedText', { n: referralCount });
+    }
     this._renderMyRestaurants();
     this._loadMyScore();
   },
@@ -2629,8 +2658,12 @@ const CommunityCtrl = {
     const btn = document.getElementById('communityAuthSubmit');
     const original = btn.textContent;
     btn.disabled = true; btn.textContent = I18N.t('auth.processing');
+    let invitedBy = null;
+    if (this._mode === 'register') {
+      try { invitedBy = sessionStorage.getItem('nhopnhep_ref') || null; } catch (_) {}
+    }
     const r = this._mode === 'register'
-      ? await Community.register(email, password, name, turnstileToken)
+      ? await Community.register(email, password, name, turnstileToken, invitedBy)
       : await Community.login(email, password);
     btn.disabled = false; btn.textContent = original;
 
@@ -2656,6 +2689,9 @@ const CommunityCtrl = {
     }
     showToast(this._mode === 'register' ? I18N.t('toast.registered') : I18N.t('toast.loginSuccess'));
     document.getElementById('cAuthPassword').value = '';
+    // Referral consumed — clear so a later logout+register in the same tab
+    // session doesn't wrongly re-attribute a second, unrelated account.
+    if (this._mode === 'register') { try { sessionStorage.removeItem('nhopnhep_ref'); } catch (_) {} }
     // One-time backfill: this account's avatar_emoji field didn't exist
     // until this session's redesign, so anyone who already picked an
     // emoji locally (or just registered, which never sets one) needs it

@@ -63,6 +63,17 @@ function boot() {
     setTimeout(() => SavedListModal.openFromLink(urlQ), 400);
   }
 
+  // Referral link: ?ref=<inviter_user_id> from "Mời bạn bè". Stashed in
+  // sessionStorage (not localStorage) — attribution should only apply to
+  // THIS visit deciding to register, not linger indefinitely and wrongly
+  // credit an unrelated signup weeks later from the same browser. Read by
+  // _submitAuth() in controllers.js when the register form is submitted;
+  // functions/api/register.js validates it's a real user before attaching.
+  const urlRef = new URLSearchParams(location.search).get('ref');
+  if (urlRef) {
+    try { sessionStorage.setItem('nhopnhep_ref', urlRef); } catch (_) {}
+  }
+
   // Fire-and-forget one app_open event per page load. Skipped on
   // localhost by Analytics itself so dev noise doesn't hit prod stats.
   if (typeof Analytics !== 'undefined') Analytics.boot();
