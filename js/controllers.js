@@ -578,7 +578,7 @@ const ResultsCtrl = {
     document.getElementById('resultsTitle').textContent = I18N.t('results.nCount', { n });
     // Data-source name is dev-only info (see console.debug in scan()) — the
     // OSM case intentionally shows no source suffix here, just the radius.
-    const src = State.lastScanSource === 'gemini' ? '✨ Google Maps (Gemini)'
+    const src = State.lastScanSource === 'gemini' ? '✨ Google Maps'
       : State.lastScanSource === 'osm' ? ''
       : I18N.t('results.notScanned');
     document.getElementById('resultsSub').textContent = src ? `${fmtDist(State.radius)} · ${src}` : fmtDist(State.radius);
