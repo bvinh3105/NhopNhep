@@ -1650,13 +1650,51 @@ body.map-full .tabbar{transform:translateY(105%)}
    đối xứng với nút ← bên trái. */
 .plan-save-btn{
   margin-left:auto;flex:0 0 auto;
-  width:2.3rem;height:2.3rem;border-radius:50%;
-  background:var(--white);border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
-  display:flex;align-items:center;justify-content:center;font-size:1.05rem;cursor:pointer;
+  display:flex;align-items:center;gap:.3rem;
+  padding:.38rem .85rem;border-radius:20px;
+  background:var(--primary);color:var(--cream);
+  border:2px solid var(--text);box-shadow:2.5px 2.5px 0 var(--text);
+  font-size:.8rem;font-weight:800;font-family:var(--font-display);
+  cursor:pointer;white-space:nowrap;
   transition:transform .12s,box-shadow .12s;
 }
-.plan-save-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
-.plan-save-btn.saved{background:var(--primary)}
+.plan-save-icon{font-size:.95rem;line-height:1}
+.plan-save-btn:active{transform:translate(1.5px,1.5px);box-shadow:1px 1px 0 var(--text)}
+.plan-save-btn.saved{background:var(--accent)}
+
+/* Trip name dialog — thay window.prompt() */
+.trip-name-overlay{
+  position:fixed;inset:0;z-index:500;background:rgba(42,24,16,.55);
+  display:flex;align-items:center;justify-content:center;padding:1.2rem;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.trip-name-overlay.show{opacity:1;pointer-events:auto}
+.trip-name-card{
+  background:var(--white);border:2.5px solid var(--text);border-radius:18px;
+  box-shadow:5px 5px 0 var(--text);padding:1.25rem 1.2rem 1rem;
+  width:100%;max-width:320px;
+  transform:scale(.93);transition:transform .2s cubic-bezier(.32,1,.56,1);
+}
+.trip-name-overlay.show .trip-name-card{transform:none}
+.trip-name-title{
+  font-family:var(--font-display);font-size:.95rem;font-weight:900;
+  color:var(--text);margin-bottom:.8rem;text-align:center;
+}
+.trip-name-actions{display:flex;gap:.6rem;margin-top:.85rem}
+.trip-name-cancel{
+  flex:1;padding:.55rem;border-radius:10px;
+  border:2px solid var(--text);background:var(--paper);
+  color:var(--text);font-weight:700;font-size:.85rem;font-family:var(--font-body);
+  cursor:pointer;transition:background .12s;
+}
+.trip-name-cancel:active{background:var(--line-2)}
+.trip-name-confirm{
+  flex:1;padding:.55rem;border-radius:10px;
+  border:2px solid var(--text);background:var(--primary);box-shadow:2px 2px 0 var(--text);
+  color:var(--cream);font-weight:800;font-size:.85rem;font-family:var(--font-display);
+  cursor:pointer;transition:transform .12s,box-shadow .12s;
+}
+.trip-name-confirm:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
 
 /* Thẻ 1 lộ trình đã lưu */
 .strip-item{

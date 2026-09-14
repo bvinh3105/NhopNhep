@@ -902,13 +902,45 @@ const PlanCtrl = {
   // Khác "Đi lại" ở trên: lộ trình lưu mang theo ĐIỂM XUẤT PHÁT của chính
   // nó, nên mở lại lúc còn ở nhà vẫn dựng đúng đường tại nơi sắp tới —
   // không đòi GPS, không tính đường từ chỗ đang đứng.
-  saveCurrentTrip() {
+  _promptTripName(defaultValue) {
+    return new Promise(resolve => {
+      const overlay = document.getElementById('tripNameOverlay');
+      const input   = document.getElementById('tripNameInput');
+      const confirm = document.getElementById('tripNameConfirm');
+      const cancel  = document.getElementById('tripNameCancel');
+      if (!overlay) { resolve(defaultValue); return; }
+
+      input.value = defaultValue;
+      overlay.classList.add('show');
+      input.focus(); input.select();
+
+      const done = (val) => {
+        overlay.classList.remove('show');
+        confirm.removeEventListener('click', onConfirm);
+        cancel.removeEventListener('click', onCancel);
+        input.removeEventListener('keydown', onKey);
+        overlay.removeEventListener('click', onBackdrop);
+        resolve(val);
+      };
+      const onConfirm  = () => done(input.value.trim());
+      const onCancel   = () => done('');
+      const onKey      = (e) => { if (e.key === 'Enter') done(input.value.trim()); if (e.key === 'Escape') done(''); };
+      const onBackdrop = (e) => { if (e.target === overlay) done(''); };
+
+      confirm.addEventListener('click', onConfirm);
+      cancel.addEventListener('click', onCancel);
+      input.addEventListener('keydown', onKey);
+      overlay.addEventListener('click', onBackdrop);
+    });
+  },
+
+  async saveCurrentTrip() {
     if (!State.itinerary.length) { showToast(I18N.t('savedTrip.nothingToSave')); return; }
     const suggested = I18N.t('savedTrip.defaultName', {
       place: (document.getElementById('locInput')?.value || '').trim().split(',')[0] || I18N.t('savedTrip.unnamedPlace'),
     });
-    const name = (prompt(I18N.t('savedTrip.namePrompt'), suggested) || '').trim();
-    if (!name) return; // bấm Huỷ hoặc để trống = không lưu
+    const name = (await this._promptTripName(suggested)).trim();
+    if (!name) return;
 
     State.savedTrips = State.savedTrips || [];
     State.savedTrips.unshift({

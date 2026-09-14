@@ -193,7 +193,9 @@
   <div class="plan-topbar">
     <button class="back-btn" id="planBack">←</button>
     <div class="plan-title" data-i18n="plan.title">Lịch trình hôm nay</div>
-    <button class="plan-save-btn" id="planSaveBtn" type="button" data-i18n="savedTrip.saveTitle" data-i18n-attr="title" title="Lưu lộ trình này để đi sau">💾</button>
+    <button class="plan-save-btn" id="planSaveBtn" type="button" title="Lưu lộ trình này để đi sau">
+      <span class="plan-save-icon">💾</span><span class="plan-save-label" data-i18n="plan.saveBtn">Lưu</span>
+    </button>
   </div>
   <div class="plan-summary" id="planSummary"></div>
   <div id="planMapWrap"><div id="planMap"></div></div>
@@ -664,6 +666,18 @@
 <script src="js/map.js?v=2574"></script>
 <script src="js/gps.js?v=2574"></script>
 <script src="js/locationPicker.js?v=2574"></script>
+<!-- Trip name dialog — thay thế window.prompt() native -->
+<div class="trip-name-overlay" id="tripNameOverlay" role="dialog" aria-modal="true">
+  <div class="trip-name-card">
+    <div class="trip-name-title" data-i18n="savedTrip.namePrompt">Đặt tên cho lộ trình này:</div>
+    <input class="form-input" id="tripNameInput" type="text" maxlength="60" autocomplete="off" spellcheck="false">
+    <div class="trip-name-actions">
+      <button class="trip-name-cancel" id="tripNameCancel" data-i18n="common.cancel">Huỷ</button>
+      <button class="trip-name-confirm" id="tripNameConfirm">💾 <span data-i18n="plan.saveBtn">Lưu</span></button>
+    </div>
+  </div>
+</div>
+
 <script src="js/controllers.js?v=2574"></script>
 <script src="js/app.js?v=2574"></script>
 
