@@ -91,11 +91,54 @@ const Gemini = {
   },
   _sharedOnCooldown() { return Date.now() < this._sharedCooldownUntil; },
 
+  // ── Daily quota (shared key only) ────────────────────────────────────
+  // Real enforcement is server-side (functions/api/gemini-quota.js →
+  // PocketBase, checked in _call() below) — this localStorage flag just
+  // lets isConfigured() stay synchronous and skip the network once today
+  // is already known to be exhausted. A user's own key is never limited
+  // by this (see _call()'s key order).
+  get _dailyQuotaFlagKey() { return `gemini_quota_${new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10)}`; },
+  _dailyQuotaExhausted() { return localStorage.getItem(this._dailyQuotaFlagKey) === '1'; },
+  _markDailyQuotaExhausted() {
+    // Drop any other day's stale flag so it doesn't linger in storage forever.
+    Object.keys(localStorage).forEach(k => { if (k.startsWith('gemini_quota_') && k !== this._dailyQuotaFlagKey) localStorage.removeItem(k); });
+    localStorage.setItem(this._dailyQuotaFlagKey, '1');
+  },
+  // One-shot: true only on the search that JUST discovered today's quota
+  // is exhausted, so controllers.js can toast it once — not on every
+  // later search this session, where _dailyQuotaExhausted() short-circuits
+  // isConfigured() before _call() ever runs again.
+  justHitQuota: false,
+  consumeQuotaHitFlag() { const v = this.justHitQuota; this.justHitQuota = false; return v; },
+
+  // Server-side check via the same-origin proxy. Fail-open on any error —
+  // see functions/api/gemini-quota.js header for why (tunnel hiccups are
+  // common here, and Google's own per-key quota is still the real backstop).
+  async _checkDailyQuota() {
+    if (this._dailyQuotaExhausted()) return false; // already known today — skip the round-trip
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 5000);
+      const res = await fetch('/api/gemini-quota', { method: 'POST', signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!res.ok) return true;
+      const data = await res.json().catch(() => null);
+      if (data && data.allowed === false) {
+        this._markDailyQuotaExhausted();
+        this.justHitQuota = true;
+        return false;
+      }
+      return true;
+    } catch (_) {
+      return true;
+    }
+  },
+
   // Configured if we have ANY key (user or built-in) that isn't on
-  // cooldown right now.
+  // cooldown / out of daily quota right now.
   isConfigured() {
     if (this.userKey) return this.userKey.length > 20;
-    return this.defaultKey.length > 20 && !this._sharedOnCooldown();
+    return this.defaultKey.length > 20 && !this._sharedOnCooldown() && !this._dailyQuotaExhausted();
   },
 
   // ── Low-level call to Google, with a specific key ──────────────────────
@@ -154,6 +197,8 @@ const Gemini = {
 
     // 2) Built-in shared key
     if (this.defaultKey) {
+      const quotaOk = await this._checkDailyQuota();
+      if (!quotaOk) throw new Error(I18N.t('err.geminiQuotaExhausted'));
       const r = await this._fetch(this.defaultKey, body, opts.timeout);
       if (r.ok) return r.text;
       if (r.status === 429) {

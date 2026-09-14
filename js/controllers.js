@@ -334,18 +334,23 @@ const HomeCtrl = {
     }
 
     // ── Toast kết quả ───────────────────────────────────────────────────
-    if (items.length) {
+    // Quota vừa hết ở lượt quét NÀY → báo ngay, bất kể OSM có tìm được gì
+    // hay không (chỉ 1 lần/ngày — consumeQuotaHitFlag() tự reset ở những
+    // lượt quét sau, xem gemini.js).
+    const justHitQuota = typeof Gemini !== 'undefined' && Gemini.consumeQuotaHitFlag && Gemini.consumeQuotaHitFlag();
+    if (justHitQuota) {
+      showToast(I18N.t('toast.geminiQuotaHit'), 4000);
+    } else if (items.length) {
       showToast(source === 'gemini'
         ? I18N.t('toast.foundN', { n: items.length, src: '✨ Gemini' })
         : I18N.t('toast.foundNPlain', { n: items.length }), 2200);
     } else if (State.activeSrcs.has('osm')) {
-      // Nothing came back from either source
-      const geminiOn = typeof Gemini !== 'undefined' && Gemini.isConfigured();
-      if (!geminiOn) {
-        showToast(I18N.t('toast.noGeminiKey'), 4000);
-      } else {
-        showToast(I18N.t('toast.noResults'), 3500);
-      }
+      // Nothing came back from either source. Only show "chưa có key" when
+      // there truly isn't one — a key that's just on cooldown or past its
+      // daily quota for today still HAS a key, so that message would be
+      // misleading (isConfigured() alone can't tell these apart).
+      const hasNoKey = typeof Gemini === 'undefined' || (!Gemini.userKey && !Gemini.defaultKey);
+      showToast(I18N.t(hasNoKey ? 'toast.noGeminiKey' : 'toast.noResults'), hasNoKey ? 4000 : 3500);
     }
 
     this._doScan();

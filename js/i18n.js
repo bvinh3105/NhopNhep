@@ -206,6 +206,8 @@ const I18N = {
       // ── Thông báo lỗi/toast dùng chung (community.js + controllers.js) ──
       'err.sessionExpired': 'Phiên đăng nhập đã hết hạn — đăng nhập lại nhé',
       'err.reloginHint': 'thử đăng xuất rồi đăng nhập lại',
+      'err.geminiQuotaExhausted': 'Hết lượt AI dùng chung hôm nay',
+      'toast.geminiQuotaHit': '✨ Hết lượt tìm AI hôm nay (bản thử nghiệm) — mai quay lại hoặc dùng key riêng nhé',
       'err.connectionGeneric': 'Lỗi kết nối server cộng đồng',
       'err.serverSlow': 'Server phản hồi chậm — thử lại sau nhé',
       'err.serverUnreachable': 'Không kết nối được server cộng đồng — server có đang chạy không?',
@@ -559,6 +561,8 @@ const I18N = {
       'account.language': 'Language',
       'err.sessionExpired': 'Session expired — please sign in again',
       'err.reloginHint': 'try signing out then back in',
+      'err.geminiQuotaExhausted': 'Out of shared AI searches for today',
+      'toast.geminiQuotaHit': '✨ Out of free AI searches for today (trial limit) — try again tomorrow or add your own key',
       'err.connectionGeneric': 'Community server connection error',
       'err.serverSlow': 'Server is responding slowly — try again shortly',
       'err.serverUnreachable': "Can't reach the community server — is it running?",
