@@ -3748,7 +3748,11 @@ const CommunityAddModal = {
       if (addBtn) addBtn.disabled = false;
     }
 
-    if (!r.ok) { showToast(`⚠️ ${r.error}`); this._renderPhotoGrid(); return; }
+    if (!r.ok) {
+      const hint = (r.status === 400 && Community.isLoggedIn()) ? ` — ${I18N.t('err.reloginHint')}` : '';
+      showToast(`⚠️ ${r.error}${hint}`, hint ? 5000 : 3000);
+      this._renderPhotoGrid(); return;
+    }
     this._editingRecord = r.data;
     this._existingPhotos = (r.data.photos || []).map(f => Community.photoUrl(r.data, f, '200x200'));
     this._renderPhotoGrid();
