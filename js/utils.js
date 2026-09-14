@@ -44,9 +44,22 @@ const DropdownPosition = {
   },
   reposition(input, suggest) {
     const r = input.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const spaceBelow = vh - r.bottom - 8;
+    const spaceAbove = r.top - 8;
+    const maxH = 280;
+
     suggest.style.setProperty('--go-left', `${r.left}px`);
-    suggest.style.setProperty('--go-top', `${r.bottom + 4}px`);
     suggest.style.setProperty('--go-width', `${r.width}px`);
+
+    if (spaceBelow >= 100 || spaceBelow >= spaceAbove) {
+      suggest.style.setProperty('--go-top', `${r.bottom + 4}px`);
+      suggest.style.setProperty('--go-max-h', `${Math.max(Math.min(maxH, spaceBelow), 80)}px`);
+    } else {
+      const h = Math.max(Math.min(maxH, spaceAbove), 80);
+      suggest.style.setProperty('--go-top', `${r.top - h - 4}px`);
+      suggest.style.setProperty('--go-max-h', `${h}px`);
+    }
   },
   _syncShown() {
     this._pairs.forEach(({ input, suggest }) => {

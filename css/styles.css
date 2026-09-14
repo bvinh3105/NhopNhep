@@ -322,7 +322,7 @@ input,textarea,select{font-family:var(--font-body)}
   position:fixed;top:var(--go-top,0);left:var(--go-left,0);width:var(--go-width,auto);z-index:9999;
   background:var(--white);border:2px solid var(--text);border-radius:14px;
   box-shadow:4px 4px 0 var(--primary-2);overflow:hidden;
-  max-height:280px;overflow-y:auto;display:none;
+  max-height:var(--go-max-h,280px);overflow-y:auto;display:none;
 }
 .geocode-suggest.show{display:block;animation:go-in .18s ease}
 @keyframes go-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
