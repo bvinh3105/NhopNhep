@@ -1712,6 +1712,20 @@ const ProfileCtrl = {
       if (typeof Analytics !== 'undefined') Analytics.track('invite_link_copied', {});
     });
 
+    // Bật/tắt thông báo follow — xem js/push.js. Nút bị disable ở
+    // _renderPushToggle() khi trình duyệt không hỗ trợ, nên tới đây chắc
+    // chắn Push.isSupported() === true.
+    document.getElementById('pushNotifToggle')?.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      const wasSubscribed = btn.dataset.subscribed === '1';
+      btn.disabled = true;
+      btn.textContent = I18N.t('auth.processing');
+      const r = wasSubscribed ? await Push.unsubscribe() : await Push.subscribe();
+      if (!r.ok) { showToast(`⚠️ ${r.error}`); }
+      else showToast(I18N.t(wasSubscribed ? 'push.disabledToast' : 'push.enabledToast'));
+      await this._renderPushToggle();
+    });
+
     const nameInput = document.getElementById('profileNameInput');
     nameInput.addEventListener('input', () => {
       State.profile.name = nameInput.value;
@@ -1878,6 +1892,21 @@ const ProfileCtrl = {
       b.classList.toggle('active', b.dataset.avatar === State.profile.avatar);
     });
     document.getElementById('accountModal').classList.add('show');
+    this._renderPushToggle();
+  },
+
+  async _renderPushToggle() {
+    const btn = document.getElementById('pushNotifToggle');
+    if (!btn) return;
+    if (typeof Push === 'undefined' || !Push.isSupported()) {
+      btn.textContent = I18N.t('push.unsupported');
+      btn.disabled = true;
+      return;
+    }
+    btn.disabled = false;
+    const subscribed = await Push.isSubscribed();
+    btn.dataset.subscribed = subscribed ? '1' : '0';
+    btn.textContent = subscribed ? I18N.t('push.onLabel') : I18N.t('push.offLabel');
   },
 
   render() {
@@ -2447,6 +2476,16 @@ function wireFollowButtons(container, onChange) {
         // Only the follow direction — unfollow is negative engagement,
         // separate metric later if we ever need to look at churn.
         Analytics.track('follow', {});
+      }
+      // Push notification to the person just followed — fire-and-forget,
+      // never blocks the follow UI or shows an error if it fails (best-
+      // effort, see functions/api/notify-follow.js header for why).
+      if (nowFollowing && Community.currentUser) {
+        fetch('/api/notify-follow', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ followerUserId: Community.currentUser.id, followedUserId: id }),
+        }).catch(() => {});
       }
       const nowMutual = nowFollowing && theyFollowMe;
       btn.classList.toggle('following', nowFollowing);
