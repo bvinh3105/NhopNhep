@@ -3477,14 +3477,18 @@ const FollowingListModal = {
 const FriendsListModal = {
   init() {
     document.getElementById('friendsModalClose')?.addEventListener('click', () => this.close());
+    document.getElementById('friendsModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'friendsModal') this.close();
+    });
   },
   open() {
     document.getElementById('friendsModal').classList.add('show');
     CommunityCtrl._renderFriends();
   },
   // Returns to accountModal (same "settings" sheet the user came from)
-  // rather than exiting the whole Cài đặt flow — matches the "← quay lại"
-  // feel of a pushed screen, not a dismissed sheet.
+  // rather than exiting the whole Cài đặt flow — both modals share the
+  // same z-index, so having two .show at once would just stack in DOM
+  // order instead of layering correctly; close/reopen avoids that.
   close() {
     document.getElementById('friendsModal').classList.remove('show');
     document.getElementById('accountModal').classList.add('show');
