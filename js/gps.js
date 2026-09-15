@@ -71,7 +71,9 @@ const GPS = {
     const shouldCenter = this._sessionFirstFix;
     this._sessionFirstFix = false;
     MapHome.setUserLocation(lat, lng, accuracy, { center: shouldCenter, tracking: true });
-    
+    State._locKind = 'gps';
+    LocationCache.save(lat, lng, 'gps');
+
     // Reverse geocode optionally or just show coordinates
     document.getElementById('locInput').value = I18N.t('gps.yourLocation');
 
@@ -108,6 +110,8 @@ const GPS = {
       pos => {
         const {latitude:lat, longitude:lng, accuracy} = pos.coords;
         MapHome.setUserLocation(lat, lng, accuracy, { center:true, tracking:false });
+        State._locKind = 'gps';
+        LocationCache.save(lat, lng, 'gps');
         document.getElementById('locInput').value = I18N.t('gps.yourLocation');
         document.getElementById('gpsBtn').classList.add('active');
       },

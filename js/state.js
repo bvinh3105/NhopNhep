@@ -143,3 +143,40 @@ const Storage = {
     }
   },
 };
+
+/* ═══════════════════════════════════════════════
+   LOCATION CACHE
+   Nhớ vị trí lần user dùng cuối (GPS thật hoặc pick địa chỉ tay) để lần
+   mở app sau map hiện đúng chỗ ngay, thay vì rơi về Hoàn Kiếm HN rồi
+   mới nhảy đi. Tách khỏi Storage.KEY chính để không lẫn vào export/
+   import backup — vị trí là dữ liệu phiên, không phải profile.
+═══════════════════════════════════════════════ */
+const LocationCache = {
+  KEY: 'nhopnhep_loc_v1',
+  MAX_AGE_MS: 7 * 24 * 60 * 60 * 1000, // 7 ngày
+
+  // source: 'gps' | 'user_pick'. KHÔNG cache 'cf_geo' (city-accurate,
+  // đủ cho phiên hiện tại nhưng user đổi mạng/VPN sẽ sai nếu dùng lại
+  // 7 ngày sau) và 'hn_default' (fallback vô nghĩa để lưu).
+  save(lat, lng, source, label) {
+    if (typeof lat !== 'number' || typeof lng !== 'number') return;
+    if (source !== 'gps' && source !== 'user_pick') return;
+    try {
+      localStorage.setItem(this.KEY, JSON.stringify({
+        lat, lng, source, label: label || null, ts: Date.now(),
+      }));
+    } catch (_) { /* quota / private mode — không critical, bỏ qua */ }
+  },
+
+  // Trả về { lat, lng, source, label, ts } hoặc null nếu chưa có / hết hạn.
+  load() {
+    try {
+      const raw = localStorage.getItem(this.KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || typeof data.lat !== 'number' || typeof data.lng !== 'number') return null;
+      if (!data.ts || Date.now() - data.ts > this.MAX_AGE_MS) return null;
+      return data;
+    } catch (_) { return null; }
+  },
+};

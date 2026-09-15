@@ -98,14 +98,54 @@ function boot() {
     ResultsCtrl._updatePlanBtn();
   });
 
-  // Fallback default location — Hoàn Kiếm, Hà Nội
-  State.userLat = 21.0285;
-  State.userLng = 105.8542;
-  document.getElementById('locInput').value = I18N.t('app.sampleLocation');
-  MapHome.setUserLocation(State.userLat, State.userLng, null, { center:true });
+  // Thứ tự đặt vị trí ban đầu, từ chính xác nhất xuống fallback:
+  //   1) localStorage cache (GPS/user_pick lần trước, TTL 7 ngày) → 0ms
+  //   2) Nếu không có cache → Hoàn Kiếm HN tạm để map không trống
+  //   3) Song song: GPS.silentFix() — thắng mọi thứ nếu user đã cấp quyền
+  //   4) Song song: /api/geo (Cloudflare IP geo, city-accurate) — chỉ
+  //      override khi lúc về vẫn là HN default (cache/GPS đã có thì tôn
+  //      trọng vì chính xác hơn IP geo).
+  // State._locKind theo dõi vị trí đến từ đâu để race không đảo ngược.
+  State._locKind = 'hn_default';
+  const _locInputEl = document.getElementById('locInput');
+  const _cached = LocationCache.load();
+  if (_cached) {
+    State.userLat = _cached.lat;
+    State.userLng = _cached.lng;
+    State._locKind = 'cache';
+    _locInputEl.value = _cached.label
+      ? `📍 ${_cached.label}` : I18N.t('gps.yourLocation');
+  } else {
+    State.userLat = 21.0285;
+    State.userLng = 105.8542;
+    _locInputEl.value = I18N.t('app.sampleLocation');
+  }
+  MapHome.setUserLocation(State.userLat, State.userLng, null, { center: true });
 
   // Silent GPS attempt if the context is secure
   GPS.silentFix();
+
+  // Cloudflare IP geo — city-accurate, không cần permission. Chỉ áp
+  // dụng khi tại thời điểm về vẫn là HN default (cache/GPS/user_pick
+  // đều chính xác hơn IP geo). 5s timeout để mạng chậm không kẹt.
+  (function fetchCfGeo() {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    fetch('/api/geo', { signal: ctrl.signal })
+      .then(r => r.ok ? r.json() : null)
+      .then(g => {
+        clearTimeout(timer);
+        if (!g || typeof g.lat !== 'number' || typeof g.lng !== 'number') return;
+        if (State._locKind !== 'hn_default') return;
+        State._locKind = 'cf_geo';
+        State.userLat = g.lat; State.userLng = g.lng;
+        MapHome.setUserLocation(g.lat, g.lng, null, { center: true });
+        if (_locInputEl && _locInputEl.value === I18N.t('app.sampleLocation')) {
+          _locInputEl.value = g.city ? `📍 ${g.city}` : I18N.t('gps.yourLocation');
+        }
+      })
+      .catch(() => { clearTimeout(timer); /* offline / abort — bỏ qua */ });
+  })();
 
   // Warn if not secure context
   if (!GPS.isSecure() && location.protocol === 'http:' && location.hostname !== 'localhost') {

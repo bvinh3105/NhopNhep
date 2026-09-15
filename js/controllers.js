@@ -122,6 +122,8 @@ const HomeCtrl = {
 
     const pick = (r) => {
       MapHome.setUserLocation(r.lat, r.lng, null, { center: true });
+      State._locKind = 'user_pick';
+      LocationCache.save(r.lat, r.lng, 'user_pick', r.sub || r.name);
       input.value = r.name;
       Geocoder.hide(suggest);
       showToast(`📍 ${r.sub}`);
@@ -205,6 +207,8 @@ const HomeCtrl = {
         const results = await Geocoder.search(typedQ.replace(/^📌\s*/, ''), { nearLat: State.userLat, nearLng: State.userLng });
         if (results.length) {
           MapHome.setUserLocation(results[0].lat, results[0].lng, null, { center: true });
+          State._locKind = 'user_pick';
+          LocationCache.save(results[0].lat, results[0].lng, 'user_pick', results[0].sub || results[0].name);
           if (locInput) locInput.value = results[0].name;
           Geocoder.hide(document.getElementById('locSuggest'));
         }
