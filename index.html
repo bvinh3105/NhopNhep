@@ -25,7 +25,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2578">
+<link rel="stylesheet" href="css/styles.css?v=2579">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -522,6 +522,29 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════
+     FRIENDS MODAL — search + manage who "Bạn bè"-visibility posts show
+     to. Opened by tapping the "Bạn bè" row in accountModal (moved out of
+     there 2026-09-15 — was a wall of inline chips making Cài đặt feel
+     cluttered; this follows the same list-sheet pattern as
+     followerListModal/followingListModal above).
+═══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="friendsModal">
+  <div class="modal-sheet list-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" data-i18n="account.friends">Bạn <em>bè</em></div>
+    <p class="ai-hint" style="margin-top:0" data-i18n="account.friendsHint">Quán bạn đăng ở chế độ "Bạn bè" sẽ chỉ hiện với những người bạn thêm ở đây.</p>
+    <div class="loc-row-wrap">
+      <input class="form-input" id="friendSearchInput" type="text" data-i18n="account.friendSearchPlaceholder" data-i18n-attr="placeholder" placeholder="🔎 Tìm theo tên hoặc email…" autocomplete="off">
+      <div class="geocode-suggest" id="friendSearchResults"></div>
+    </div>
+    <div class="chip-tag-list" id="friendList" style="margin-top:.7rem"></div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="friendsModalClose" data-i18n="common.close">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
      SAVED POSTS MODAL — bookmarks list, opened by the 🔖 icon
      in the profile screen top-right.
 ═══════════════════════════════════════════════ -->
@@ -563,6 +586,8 @@
     <div class="modal-handle"></div>
     <div class="modal-title" data-i18n="account.title">Tài khoản <em>của tôi</em></div>
 
+    <div class="psec-title" style="margin-bottom:.6rem" data-i18n="account.sectionProfile">Hồ sơ</div>
+
     <div class="form-group">
       <label class="form-label" data-i18n="account.avatar">Avatar</label>
       <div class="avatar-picker" id="avatarPicker"></div>
@@ -573,7 +598,6 @@
       <input class="form-input" id="profileNameInput" type="text" data-i18n="profile.namePlaceholder" data-i18n-attr="placeholder" placeholder="Tên của bạn…" maxlength="30">
     </div>
 
-    <!-- Ngôn ngữ -->
     <div class="form-group">
       <label class="form-label" data-i18n="account.language">Ngôn ngữ</label>
       <div class="cat-picker" id="langPicker">
@@ -582,8 +606,12 @@
       </div>
     </div>
 
-    <!-- Sở thích (moved from profile main — hiếm khi thay, hợp với settings) -->
-    <div class="form-group">
+    <!-- Sở thích — tạm ẩn theo yêu cầu (2026-09-15), gây rối vì gộp chung
+         loại quán + mức giá không phân biệt. Elements + JS wiring
+         (ProfileCtrl.render()/prefChips listener) giữ nguyên, remove
+         .hidden ở cả 2 chỗ dưới để hiện lại (nên tách 2 nhãn con "Loại
+         quán"/"Mức giá" rõ ràng khi bật lại, xem mockup đã duyệt). -->
+    <div class="form-group hidden">
       <label class="form-label" data-i18n="profile.prefs">Sở thích</label>
       <div class="pref-chips" id="prefChips">
         <button class="pref-chip" data-pref="restaurant">🍽️ <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
@@ -595,11 +623,14 @@
       </div>
     </div>
 
-    <!-- Bật/tắt nút 🎲 random món ở màn chính -->
-    <div class="form-group">
-      <label class="form-label" data-i18n="account.randomPick">Gợi ý <em>chọn món</em></label>
-      <p class="ai-hint" style="margin-top:0" data-i18n="account.randomPickHint">Nút 🎲 nổi ở màn chính, random 1 món rồi quét luôn — tắt nếu không muốn dùng.</p>
-      <button class="data-btn" id="randomPickToggle" type="button">🎲 …</button>
+    <div class="settings-divider"></div>
+    <div class="psec-title" style="margin-bottom:.6rem" data-i18n="account.sectionFeatures">Tính năng</div>
+    <div class="switch-row">
+      <div>
+        <div class="switch-label" data-i18n="account.randomPickRowLabel">🎲 Gợi ý chọn món</div>
+        <div class="switch-hint" data-i18n="account.randomPickHint">Nút 🎲 nổi ở màn chính, random 1 món rồi quét luôn.</div>
+      </div>
+      <div class="switch" id="randomPickToggle" role="button" tabindex="0" aria-label="Gợi ý chọn món"><div class="switch-knob"></div></div>
     </div>
 
     <!-- Dữ liệu — hidden per request. Elements kept for JS wiring in
@@ -631,40 +662,39 @@
       <a class="ai-getkey" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" data-i18n="profile.getKey">Lấy key miễn phí tại Google AI Studio →</a>
     </div>
 
-    <!-- Tài khoản cộng đồng + Bạn bè — chỉ hiện khi đã đăng nhập (ở tab Cộng đồng) -->
-    <div class="profile-section" id="profileLoggedOutHint" style="padding:0 0 .9rem">
-      <p class="ai-hint" data-i18n="account.loggedOutHint">Đăng nhập ở tab Cộng đồng để xem bạn bè và quán bạn đã đăng.</p>
+    <!-- Cộng đồng — chỉ hiện khi đã đăng nhập (ở tab Cộng đồng) -->
+    <div class="settings-divider"></div>
+    <div class="psec-title" style="margin-bottom:.6rem" data-i18n="account.sectionCommunity">Cộng đồng</div>
+
+    <div class="profile-section" id="profileLoggedOutHint" style="padding:0">
+      <p class="ai-hint" style="margin-top:0" data-i18n="account.loggedOutHint">Đăng nhập ở tab Cộng đồng để xem bạn bè và quán bạn đã đăng.</p>
     </div>
     <div id="profileLoggedIn" class="hidden">
-      <div class="profile-section" style="padding:0 0 .9rem">
-        <div class="psec-head">
-          <div>
-            <div class="psec-title" id="communityWelcome" data-i18n="account.hello">Chào <em>bạn</em></div>
-            <div class="community-welcome-sub" data-i18n="account.communitySub">Cộng đồng nhỏ — cùng nhau chọn quán</div>
-          </div>
-          <button class="data-btn" id="communityLogout" data-i18n="account.signOut">Đăng xuất</button>
+      <div class="settings-row" style="cursor:default;margin-bottom:.6rem">
+        <div>
+          <div class="switch-label" id="communityWelcome" data-i18n="account.hello">Chào <em>bạn</em></div>
+          <div class="switch-hint" data-i18n="account.communitySub">Cộng đồng nhỏ — cùng nhau chọn quán</div>
         </div>
       </div>
 
-      <div class="profile-section" style="padding:0 0 .9rem">
-        <div class="psec-head">
-          <div class="psec-title" data-i18n="account.notifications">Thông <em>báo</em></div>
+      <div class="switch-row" style="margin-bottom:.6rem">
+        <div>
+          <div class="switch-label" data-i18n="account.notifRowLabel">🔔 Thông báo follow</div>
+          <div class="switch-hint" id="pushNotifHint" data-i18n="account.notifHint">Nhận thông báo khi có người bắt đầu theo dõi bạn.</div>
         </div>
-        <p class="ai-hint" data-i18n="account.notifHint">Nhận thông báo khi có người bắt đầu theo dõi bạn.</p>
-        <button class="data-btn" id="pushNotifToggle" type="button">🔔 …</button>
+        <div class="switch" id="pushNotifToggle" role="button" tabindex="0" aria-label="Thông báo follow"><div class="switch-knob"></div></div>
       </div>
 
-      <div class="profile-section" style="padding:0">
-        <div class="psec-head">
-          <div class="psec-title" data-i18n="account.friends">Bạn <em>bè</em></div>
+      <div class="settings-row" id="friendsRowBtn">
+        <div class="switch-label" data-i18n="account.friendsRowLabel">👥 Bạn bè</div>
+        <div style="display:flex;align-items:center;gap:.4rem">
+          <span class="settings-row-count" id="friendsRowCount">0</span>
+          <span class="settings-row-arrow">›</span>
         </div>
-        <p class="ai-hint" data-i18n="account.friendsHint">Quán bạn đăng ở chế độ "Bạn bè" sẽ chỉ hiện với những người bạn thêm ở đây.</p>
-        <div class="loc-row-wrap">
-          <input class="form-input" id="friendSearchInput" type="text" data-i18n="account.friendSearchPlaceholder" data-i18n-attr="placeholder" placeholder="🔎 Tìm theo tên hoặc email…" autocomplete="off">
-          <div class="geocode-suggest" id="friendSearchResults"></div>
-        </div>
-        <div class="chip-tag-list" id="friendList" style="margin-top:.7rem"></div>
       </div>
+
+      <div class="settings-divider"></div>
+      <div class="logout-row" id="communityLogout" data-i18n="account.signOut">Đăng xuất</div>
     </div>
 
     <div class="form-actions">
@@ -679,19 +709,19 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2578"></script>
-<script src="js/i18n.js?v=2578"></script>
-<script src="js/utils.js?v=2578"></script>
-<script src="js/state.js?v=2578"></script>
-<script src="js/poi.js?v=2578"></script>
-<script src="js/geocoder.js?v=2578"></script>
-<script src="js/gemini.js?v=2578"></script>
-<script src="js/community.js?v=2578"></script>
-<script src="js/push.js?v=2578"></script>
-<script src="js/analytics.js?v=2578"></script>
-<script src="js/map.js?v=2578"></script>
-<script src="js/gps.js?v=2578"></script>
-<script src="js/locationPicker.js?v=2578"></script>
+<script src="js/security.js?v=2579"></script>
+<script src="js/i18n.js?v=2579"></script>
+<script src="js/utils.js?v=2579"></script>
+<script src="js/state.js?v=2579"></script>
+<script src="js/poi.js?v=2579"></script>
+<script src="js/geocoder.js?v=2579"></script>
+<script src="js/gemini.js?v=2579"></script>
+<script src="js/community.js?v=2579"></script>
+<script src="js/push.js?v=2579"></script>
+<script src="js/analytics.js?v=2579"></script>
+<script src="js/map.js?v=2579"></script>
+<script src="js/gps.js?v=2579"></script>
+<script src="js/locationPicker.js?v=2579"></script>
 <!-- Trip name dialog — thay thế window.prompt() native -->
 <div class="trip-name-overlay" id="tripNameOverlay" role="dialog" aria-modal="true">
   <div class="trip-name-card">
@@ -704,8 +734,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2578"></script>
-<script src="js/app.js?v=2578"></script>
+<script src="js/controllers.js?v=2579"></script>
+<script src="js/app.js?v=2579"></script>
 
 </body>
 </html>

@@ -712,7 +712,11 @@ const HomeCtrl = {
     this._applyRpCorner(fab, savedCorner);
 
     const onMove = (e) => {
-      if (pid !== null && e.pointerId !== pid) return;
+      // No active drag (pid only gets set in pointerdown below) — a bare
+      // hover/mousemove over the FAB still fires 'pointermove' per spec
+      // even with no button pressed, and used to crash here reading
+      // startRect.left while startRect was still null from init.
+      if (pid === null || e.pointerId !== pid) return;
       const x = e.clientX, y = e.clientY;
       if (!moved && Math.hypot(x - startX, y - startY) > 6) {
         moved = true;
@@ -731,7 +735,7 @@ const HomeCtrl = {
       fab.style.bottom = 'auto';
     };
     const onEnd = (e) => {
-      if (pid !== null && e.pointerId !== pid) return;
+      if (pid === null || e.pointerId !== pid) return;
       pid = null;
       fab.classList.remove('dragging');
       if (moved) {
@@ -1909,24 +1913,27 @@ const ProfileCtrl = {
     // _renderPushToggle() khi trình duyệt không hỗ trợ, nên tới đây chắc
     // chắn Push.isSupported() === true.
     document.getElementById('pushNotifToggle')?.addEventListener('click', async (e) => {
-      const btn = e.currentTarget;
-      const wasSubscribed = btn.dataset.subscribed === '1';
-      btn.disabled = true;
-      btn.textContent = I18N.t('auth.processing');
+      const sw = e.currentTarget;
+      if (sw.classList.contains('disabled')) return;
+      const wasSubscribed = sw.dataset.subscribed === '1';
+      sw.classList.add('disabled');
       const r = wasSubscribed ? await Push.unsubscribe() : await Push.subscribe();
       if (!r.ok) { showToast(`⚠️ ${r.error}`); }
       else showToast(I18N.t(wasSubscribed ? 'push.disabledToast' : 'push.enabledToast'));
       await this._renderPushToggle();
     });
 
-    document.getElementById('randomPickToggle')?.addEventListener('click', (e) => {
-      const btn = e.currentTarget;
-      const nowHidden = btn.dataset.hidden !== '1';
-      State.profile.hideRandomPick = nowHidden;
+    document.getElementById('randomPickToggle')?.addEventListener('click', () => {
+      State.profile.hideRandomPick = !State.profile.hideRandomPick;
       Storage.save();
       this._renderRandomPickToggle();
       HomeCtrl._updateRandomPickVisibility();
-      showToast(I18N.t(nowHidden ? 'randomPick.disabledToast' : 'randomPick.enabledToast'));
+      showToast(I18N.t(State.profile.hideRandomPick ? 'randomPick.disabledToast' : 'randomPick.enabledToast'));
+    });
+
+    document.getElementById('friendsRowBtn')?.addEventListener('click', () => {
+      document.getElementById('accountModal').classList.remove('show');
+      FriendsListModal.open();
     });
 
     const nameInput = document.getElementById('profileNameInput');
@@ -2100,25 +2107,26 @@ const ProfileCtrl = {
   },
 
   _renderRandomPickToggle() {
-    const btn = document.getElementById('randomPickToggle');
-    if (!btn) return;
-    const hidden = !!State.profile.hideRandomPick;
-    btn.dataset.hidden = hidden ? '1' : '0';
-    btn.textContent = hidden ? I18N.t('randomPick.offLabel') : I18N.t('randomPick.onLabel');
+    const sw = document.getElementById('randomPickToggle');
+    if (!sw) return;
+    sw.classList.toggle('on', !State.profile.hideRandomPick);
   },
 
   async _renderPushToggle() {
-    const btn = document.getElementById('pushNotifToggle');
-    if (!btn) return;
+    const sw = document.getElementById('pushNotifToggle');
+    const hint = document.getElementById('pushNotifHint');
+    if (!sw) return;
     if (typeof Push === 'undefined' || !Push.isSupported()) {
-      btn.textContent = I18N.t('push.unsupported');
-      btn.disabled = true;
+      sw.classList.add('disabled');
+      sw.classList.remove('on');
+      if (hint) hint.textContent = I18N.t('push.unsupported');
       return;
     }
-    btn.disabled = false;
+    sw.classList.remove('disabled');
     const subscribed = await Push.isSubscribed();
-    btn.dataset.subscribed = subscribed ? '1' : '0';
-    btn.textContent = subscribed ? I18N.t('push.onLabel') : I18N.t('push.offLabel');
+    sw.dataset.subscribed = subscribed ? '1' : '0';
+    sw.classList.toggle('on', subscribed);
+    if (hint) hint.textContent = I18N.t('account.notifHint');
   },
 
   render() {
@@ -2855,10 +2863,13 @@ const CommunityCtrl = {
   },
 
   async _renderFriends() {
-    const el = document.getElementById('friendList');
-    if (!el) return;
     const r = await Community.myFriends();
     const friends = (r.ok && r.data.expand && r.data.expand.friends) || [];
+    const countEl = document.getElementById('friendsRowCount');
+    if (countEl) countEl.textContent = I18N.t('account.friendsCountLabel', { n: friends.length });
+
+    const el = document.getElementById('friendList');
+    if (!el) return;
     if (!friends.length) {
       el.innerHTML = `<span style="font-size:.78rem;color:var(--text3)">${I18N.t('em.noFriendsYet')}</span>`;
       return;
@@ -3437,6 +3448,35 @@ const FollowingListModal = {
 
   _close() {
     document.getElementById('followingListModal').classList.remove('show');
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   FRIENDS MODAL — search + manage "Bạn bè"-visibility list. Opened from
+   the accountModal's "Bạn bè" row (see ProfileCtrl.init). The actual
+   search input/results/list (#friendSearchInput etc.) are wired once by
+   CommunityCtrl._initFriendSearch()/_renderFriends() at boot — this modal
+   is just the show/hide shell around them, same shape as
+   FollowerListModal/FollowingListModal above.
+═══════════════════════════════════════════════ */
+const FriendsListModal = {
+  init() {
+    document.getElementById('friendsModalClose')?.addEventListener('click', () => this.close());
+    document.getElementById('friendsModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'friendsModal') this.close();
+    });
+  },
+  open() {
+    document.getElementById('friendsModal').classList.add('show');
+    CommunityCtrl._renderFriends();
+  },
+  // Returns to accountModal (same "settings" sheet the user came from)
+  // rather than exiting the whole Cài đặt flow — both modals share the
+  // same z-index, so having two .show at once would just stack in DOM
+  // order instead of layering correctly; close/reopen avoids that.
+  close() {
+    document.getElementById('friendsModal').classList.remove('show');
+    document.getElementById('accountModal').classList.add('show');
   },
 };
 

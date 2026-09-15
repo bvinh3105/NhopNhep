@@ -52,6 +52,7 @@ function boot() {
   SavedListModal.init();
   FollowerListModal.init();
   FollowingListModal.init();
+  FriendsListModal.init();
   wireScrollMasks();
 
   // Deep-link handler: ?q=<pb_id> auto-opens the community detail

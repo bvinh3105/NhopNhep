@@ -139,7 +139,7 @@ input,textarea,select{font-family:var(--font-body)}
   position:relative;margin:0 1.1rem;border-radius:var(--radius-lg);overflow:hidden;
   border:2px solid var(--text);background:var(--cream-2);flex:0 0 auto;
   height:min(38vh,260px);
-  box-shadow:6px 6px 0 var(--primary-2);
+  box-shadow:6px 6px 0 var(--text);
 }
 #mainMap{position:absolute;inset:0}
 /* Neutral light-gray ground so panning never reveals the app's warm
@@ -921,6 +921,39 @@ body.map-full .tabbar{transform:translateY(105%)}
 .pref-chip:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
 .pref-chip.active{background:var(--primary);color:var(--cream);box-shadow:2px 2px 0 var(--primary-2);border-color:var(--primary-2)}
 
+/* Settings modal — section divider + toggle switch + tappable summary row */
+.settings-divider{border-top:2px dashed var(--line-2);margin:1.1rem 0}
+
+.switch-row{display:flex;align-items:center;justify-content:space-between;gap:.6rem}
+.switch-label{font-size:.8rem;font-weight:700;color:var(--text)}
+.switch-hint{font-size:.68rem;color:var(--text3);font-weight:600;margin-top:1px}
+.switch{
+  width:44px;height:26px;border-radius:14px;background:var(--cream-3);
+  border:2px solid var(--text);position:relative;flex-shrink:0;cursor:pointer;
+  transition:background .15s;padding:0;
+}
+.switch-knob{
+  width:18px;height:18px;border-radius:50%;background:var(--paper);
+  position:absolute;top:1px;left:1px;transition:left .15s;
+}
+.switch.on{background:var(--primary)}
+.switch.on .switch-knob{left:19px}
+.switch.disabled{opacity:.55;pointer-events:none}
+
+.settings-row{
+  display:flex;align-items:center;justify-content:space-between;gap:.6rem;
+  background:var(--white);border:2px solid var(--text);border-radius:14px;
+  padding:.65rem .8rem;box-shadow:2px 2px 0 var(--text);cursor:pointer;transition:all .12s;
+}
+.settings-row:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.settings-row-count{font-size:.72rem;font-weight:700;color:var(--text3)}
+.settings-row-arrow{color:var(--primary);font-weight:900}
+
+.logout-row{
+  text-align:center;padding:.6rem;font-family:var(--font-display);
+  font-size:.8rem;font-weight:800;font-style:italic;color:var(--primary);cursor:pointer;
+}
+
 .my-r-del{
   width:2rem;height:2rem;border-radius:50%;background:var(--paper);
   border:1.5px solid var(--text2);color:var(--text2);font-size:.9rem;
@@ -1415,8 +1448,6 @@ body.map-full .tabbar{transform:translateY(105%)}
 /* (Guest CTA banner styles removed 2026-09-11 — banners felt too
    intrusive; kept a small "Đăng nhập" .add-btn in the tab header for
    guest sign-up entry instead.) */
-
-.community-welcome-sub{font-size:.75rem;color:var(--text3);margin-top:.1rem;font-weight:600}
 
 /* Restaurant card — like my-r-card but with a taller cover photo + chip rows */
 /* Xem ảnh cỡ lớn (chế độ sửa bài). z-index trên cả modal-overlay vì nó
