@@ -26,6 +26,7 @@ const State = {
     prefs: new Set(),
     trips: 0,
     tripHistory: [], // [{ id, at, stops: [{ id, name, cat, price, address, lat, lng }] }]
+    hideRandomPick: false, // ẩn nút 🎲 random món ở màn chính (xem HomeCtrl._openRandomPick)
   },
   // Lộ trình người dùng CHỦ ĐỘNG lưu, khác hẳn tripHistory:
   //  - tripHistory tự ghi mọi lần lên lịch và bị cắt còn 50 chuyến gần nhất,
@@ -55,6 +56,7 @@ const Storage = {
         prefs: [...State.profile.prefs],
         trips: State.profile.trips,
         tripHistory: State.profile.tripHistory || [],
+        hideRandomPick: !!State.profile.hideRandomPick,
       },
       userRestaurants: State.userRestaurants,
       savedPosts: [...State.savedPosts],
@@ -73,6 +75,7 @@ const Storage = {
         State.profile.prefs = new Set(data.profile.prefs || []);
         State.profile.trips = data.profile.trips || 0;
         State.profile.tripHistory = Array.isArray(data.profile.tripHistory) ? data.profile.tripHistory : [];
+        State.profile.hideRandomPick = !!data.profile.hideRandomPick;
       }
       State.userRestaurants = data.userRestaurants || [];
       State.savedPosts = new Set(Array.isArray(data.savedPosts) ? data.savedPosts : []);

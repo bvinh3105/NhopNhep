@@ -44,6 +44,10 @@
 ═══════════════════════════════════════════════ -->
 <div id="homeScreen" class="screen">
 
+  <button class="rp-fab hidden" id="randomPickBubble" type="button">
+    <span id="rpbIcon">🎲</span>
+  </button>
+
   <!-- Hero -->
   <div class="home-hero">
     <div class="hero-row">
@@ -168,10 +172,6 @@
     <button class="cat-tab" data-filter="snack">🧆 <span data-i18n="catLabel.snack">Ăn vặt</span></button>
     <button class="cat-tab" data-filter="cafe">☕ <span data-i18n="catLabel.cafe">Cà phê</span></button>
   </div>
-
-  <button class="rp-fab hidden" id="randomPickBubble" type="button">
-    <span id="rpbIcon">🎲</span>
-  </button>
 
   <div class="restaurant-grid" id="restaurantGrid"></div>
 
@@ -593,6 +593,13 @@
         <button class="pref-chip" data-pref="cheap">💸 <span data-i18n="priceLabel.cheap">Bình dân</span></button>
         <button class="pref-chip" data-pref="premium">✨ <span data-i18n="priceLabel.premium">Sang chảnh</span></button>
       </div>
+    </div>
+
+    <!-- Bật/tắt nút 🎲 random món ở màn chính -->
+    <div class="form-group">
+      <label class="form-label" data-i18n="account.randomPick">Gợi ý <em>chọn món</em></label>
+      <p class="ai-hint" style="margin-top:0" data-i18n="account.randomPickHint">Nút 🎲 nổi ở màn chính, random 1 món rồi quét luôn — tắt nếu không muốn dùng.</p>
+      <button class="data-btn" id="randomPickToggle" type="button">🎲 …</button>
     </div>
 
     <!-- Dữ liệu — hidden per request. Elements kept for JS wiring in

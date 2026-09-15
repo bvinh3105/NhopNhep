@@ -73,6 +73,17 @@ const HomeCtrl = {
 
     this._initEasterEgg();
 
+    this._initRandomPickDrag();
+    this._updateRandomPickVisibility();
+    document.getElementById('rpRetryBtn').addEventListener('click', () => {
+      this._closeRandomPickModal();
+      setTimeout(() => this._openRandomPick(), 320);
+    });
+    document.getElementById('rpGoBtn').addEventListener('click', () => this._closeRandomPickModal());
+    document.getElementById('randomPickModal').addEventListener('click', e => {
+      if (e.target.id === 'randomPickModal') this._closeRandomPickModal();
+    });
+
     this._updateBadge();
   },
 
@@ -170,11 +181,6 @@ const HomeCtrl = {
 
   async scan() {
     if (this._scanning) return;
-    // A fresh real scan invalidates whatever "restore previous list" state
-    // the random-dish-pick FAB was holding for the results-screen back
-    // button — otherwise pressing back after this scan could restore
-    // stale data from before it.
-    ResultsCtrl._rpFilterActive = false;
     // Analytics — fire before network so we count intent, not success
     if (typeof Analytics !== 'undefined') Analytics.track('scan', {
       radius: State.radius,
@@ -571,6 +577,187 @@ const HomeCtrl = {
     ResultsCtrl.show();
     this._updateBadge();
   },
+
+  // ── Random dish pick ────────────────────────────────────────────────
+  // Round FAB on the home screen — pick a dish at random and scan for it
+  // right away (reuses the exact dish-chip list + scan flow the manual
+  // "Tìm món" search already uses). Free-draggable, snaps to whichever
+  // screen corner is nearest, position remembered across visits. Can be
+  // turned off entirely from Cài đặt (see ProfileCtrl._renderRandomPickToggle).
+  RP_CORNER_KEY: 'nhopnhep_rp_corner',
+  RP_SIDE: 16, RP_TOP: 90, RP_BOTTOM: 24,
+
+  _updateRandomPickVisibility() {
+    const fab = document.getElementById('randomPickBubble');
+    if (!fab) return;
+    fab.classList.toggle('hidden', !!State.profile.hideRandomPick);
+  },
+  _resetRandomPickBubble() {
+    const fab = document.getElementById('randomPickBubble');
+    document.getElementById('rpbIcon').textContent = '🎲';
+    fab.classList.remove('picking');
+    fab.setAttribute('aria-label', I18N.t('randomPick.cta'));
+    fab.title = I18N.t('randomPick.sub');
+  },
+  _dishChipList() {
+    return Array.from(document.querySelectorAll('#dishSuggest .dish-chip')).map(chip => {
+      const label = chip.textContent.trim();
+      const emoji = label.split(' ')[0];
+      return { dish: chip.dataset.dish || '', emoji, name: label.slice(emoji.length).trim() };
+    }).filter(d => d.dish);
+  },
+  async _openRandomPick() {
+    if (this._rpPicking) return;
+    const list = this._dishChipList();
+    if (!list.length) return;
+    this._rpPicking = true;
+    const fab = document.getElementById('randomPickBubble');
+    const icon = document.getElementById('rpbIcon');
+    fab.classList.add('picking');
+    let i = 0;
+    const iv = setInterval(() => {
+      icon.textContent = list[i % list.length].emoji;
+      i++;
+    }, 90);
+    await new Promise(r => setTimeout(r, 1200));
+    clearInterval(iv);
+    fab.classList.remove('picking');
+    this._resetRandomPickBubble();
+
+    const picked = list[Math.floor(Math.random() * list.length)];
+    const dishInput = document.getElementById('dishInput');
+    if (dishInput) dishInput.value = picked.dish;
+    State.activeDish = picked.dish;
+
+    // Keep the "picking" guard held through the scan itself (not just the
+    // shuffle) — otherwise a second tap while the network scan is still in
+    // flight starts a whole new shuffle for nothing, since scan() would
+    // just no-op on its own _scanning guard anyway.
+    try {
+      // scan() itself handles "no location yet" with its own toast and
+      // bails without navigating — only show the result sheet if it
+      // actually landed on the results screen.
+      await this.scan();
+      if (document.getElementById('resultsScreen').classList.contains('hidden')) return;
+
+      const n = State.filteredResults.length;
+      const noExactMatch = State.queryUnmatched;
+      document.getElementById('rpModalTitle').textContent =
+        I18N.t('randomPick.resultTitle', { emoji: picked.emoji, name: picked.name });
+      document.getElementById('rpModalSub').textContent = n === 0
+        ? I18N.t('randomPick.resultSubEmpty', { name: picked.name })
+        : noExactMatch
+          ? I18N.t('randomPick.resultSubFallback', { n, name: picked.name })
+          : I18N.t('randomPick.resultSub', { n, name: picked.name });
+      document.getElementById('randomPickModal').classList.add('show');
+    } finally {
+      this._rpPicking = false;
+    }
+  },
+  _closeRandomPickModal() {
+    document.getElementById('randomPickModal').classList.remove('show');
+  },
+
+  // ── FAB free-drag + corner snap ─────────────────────────────────────
+  // Bounds are computed against #homeScreen, not window.innerWidth/
+  // innerHeight — .screen (and this FAB) are position:fixed, and on the
+  // desktop phone-frame preview (body{transform:translateZ(0)} in the
+  // >=560px media query) that makes BODY their containing block, which is
+  // narrower than the real browser window. Clamping against window size
+  // let the FAB drag past the visible frame into the letterboxed margin,
+  // where it's still technically on-screen but reads as "disappeared".
+  // #homeScreen shares the same containing-block quirk, so its rect is
+  // always the actual visible app area in both desktop and mobile.
+  _rpScreenRect() {
+    const el = document.getElementById('homeScreen');
+    return el.getBoundingClientRect();
+  },
+  // Always sets left/top (never right/bottom) computed straight from
+  // _rpScreenRect() — CSS `bottom`/`right` on a position:fixed element
+  // resolve against its containing block (viewport, or body on the
+  // desktop phone-frame preview), NOT against #homeScreen's own shorter
+  // box (.screen{bottom:var(--tab-h)} already excludes the tab bar from
+  // ITS box, but that doesn't change what `bottom:Npx` on a sibling means)
+  // — using raw `bottom` here let the FAB sit UNDER the tab bar. Deriving
+  // left/top from the same rect the drag clamp already uses keeps both
+  // code paths in the same coordinate space and avoids the mismatch.
+  _applyRpCorner(fab, corner) {
+    const screen = this._rpScreenRect();
+    const w = fab.offsetWidth || 54, h = fab.offsetHeight || 54;
+    const left = corner[0] === 'l' ? screen.left + this.RP_SIDE : screen.right - this.RP_SIDE - w;
+    const top = corner[1] === 't' ? screen.top + this.RP_TOP : screen.bottom - this.RP_BOTTOM - h;
+    fab.style.left = left + 'px';
+    fab.style.top = top + 'px';
+    fab.style.right = 'auto';
+    fab.style.bottom = 'auto';
+  },
+  _snapRpToCorner(fab) {
+    const screen = this._rpScreenRect();
+    const rect = fab.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const corner = (cx < screen.left + screen.width / 2 ? 'l' : 'r') + (cy < screen.top + screen.height / 2 ? 't' : 'b');
+    this._applyRpCorner(fab, corner);
+    try { localStorage.setItem(this.RP_CORNER_KEY, corner); } catch (_) {}
+  },
+  _initRandomPickDrag() {
+    const fab = document.getElementById('randomPickBubble');
+    let startX = 0, startY = 0, startRect = null, moved = false, pid = null;
+
+    let savedCorner = 'rb';
+    try {
+      const s = localStorage.getItem(this.RP_CORNER_KEY);
+      if (s && /^[lr][tb]$/.test(s)) savedCorner = s;
+    } catch (_) {}
+    this._applyRpCorner(fab, savedCorner);
+
+    const onMove = (e) => {
+      if (pid !== null && e.pointerId !== pid) return;
+      const x = e.clientX, y = e.clientY;
+      if (!moved && Math.hypot(x - startX, y - startY) > 6) {
+        moved = true;
+        fab.classList.add('dragging');
+      }
+      if (!moved) return;
+      const screen = this._rpScreenRect();
+      const w = fab.offsetWidth, h = fab.offsetHeight;
+      let left = startRect.left + (x - startX);
+      let top = startRect.top + (y - startY);
+      left = Math.max(screen.left + 4, Math.min(screen.right - w - 4, left));
+      top = Math.max(screen.top + 4, Math.min(screen.bottom - h - 4, top));
+      fab.style.left = left + 'px';
+      fab.style.top = top + 'px';
+      fab.style.right = 'auto';
+      fab.style.bottom = 'auto';
+    };
+    const onEnd = (e) => {
+      if (pid !== null && e.pointerId !== pid) return;
+      pid = null;
+      fab.classList.remove('dragging');
+      if (moved) {
+        this._snapRpToCorner(fab);
+        this._rpJustDragged = true;
+      }
+    };
+    // Pointer capture on the fab itself guarantees pointermove/up/cancel
+    // keep firing on it even if the finger/cursor leaves its bounds or a
+    // browser quirk would otherwise drop the up event mid-drag, so the FAB
+    // never gets stuck in "dragging" state.
+    fab.addEventListener('pointerdown', (e) => {
+      moved = false;
+      pid = e.pointerId;
+      startX = e.clientX; startY = e.clientY;
+      startRect = fab.getBoundingClientRect();
+      fab.setPointerCapture(pid);
+    });
+    fab.addEventListener('pointermove', onMove);
+    fab.addEventListener('pointerup', onEnd);
+    fab.addEventListener('pointercancel', onEnd);
+    fab.addEventListener('click', () => {
+      if (this._rpJustDragged) { this._rpJustDragged = false; return; }
+      this._openRandomPick();
+    });
+  },
 };
 
 /* ═══════════════════════════════════════════════
@@ -592,7 +779,6 @@ const ResultsCtrl = {
       : State.lastScanSource === 'osm' ? ''
       : I18N.t('results.notScanned');
     document.getElementById('resultsSub').textContent = src ? `${fmtDist(State.radius)} · ${src}` : fmtDist(State.radius);
-    this._checkRandomPick();
   },
   _setTabFilter(filter) {
     State.tabFilter = filter;
@@ -714,186 +900,8 @@ const ResultsCtrl = {
     btn.textContent = n === 0 ? I18N.t('results.schedule') : I18N.t('results.scheduleN', { n });
   },
 
-  // ── Random dish pick ────────────────────────────────────────────────
-  // Too many results to browse → offer to pick a dish at random and
-  // re-filter down to it, reusing the exact same dish-chip list and
-  // filter logic as the manual "Tìm món" search (HomeCtrl._doScan).
-  RP_THRESHOLD: 15,
-
-  RP_CORNER_KEY: 'nhopnhep_rp_corner',
-  RP_SIDE: 16, RP_TOP: 134, RP_BOTTOM: 100,
-
-  _checkRandomPick() {
-    const fab = document.getElementById('randomPickBubble');
-    if (!fab) return;
-    const show = !this._rpPicking && State.filteredResults.length > this.RP_THRESHOLD;
-    fab.classList.toggle('hidden', !show);
-    if (show) this._resetRandomPickBubble();
-  },
-  _resetRandomPickBubble() {
-    document.getElementById('rpbIcon').textContent = '🎲';
-    const fab = document.getElementById('randomPickBubble');
-    fab.classList.remove('picking');
-    fab.setAttribute('aria-label', I18N.t('randomPick.cta'));
-    fab.title = I18N.t('randomPick.sub');
-  },
-  _dishChipList() {
-    return Array.from(document.querySelectorAll('#dishSuggest .dish-chip')).map(chip => {
-      const label = chip.textContent.trim();
-      const emoji = label.split(' ')[0];
-      return { dish: chip.dataset.dish || '', emoji, name: label.slice(emoji.length).trim() };
-    }).filter(d => d.dish);
-  },
-  _openRandomPick() {
-    if (this._rpPicking) return;
-    const list = this._dishChipList();
-    if (!list.length) return;
-    this._rpPicking = true;
-    // Remember the list as it was BEFORE this pick (only on the first pick,
-    // not on a "Chọn lại" retry) so the results-screen back button can
-    // restore it instead of just exiting to the home screen.
-    if (!this._rpFilterActive) {
-      this._rpPrevDish = State.activeDish;
-      this._rpPrevResults = State.filteredResults.slice();
-    }
-    const fab = document.getElementById('randomPickBubble');
-    const icon = document.getElementById('rpbIcon');
-    fab.classList.add('picking');
-    let i = 0;
-    const iv = setInterval(() => {
-      icon.textContent = list[i % list.length].emoji;
-      i++;
-    }, 90);
-    setTimeout(() => {
-      clearInterval(iv);
-      fab.classList.remove('picking');
-      const picked = list[Math.floor(Math.random() * list.length)];
-      const dishInput = document.getElementById('dishInput');
-      if (dishInput) dishInput.value = picked.dish;
-      State.activeDish = picked.dish;
-      HomeCtrl._doScan();
-      const n = State.filteredResults.length;
-      const noExactMatch = State.queryUnmatched;
-      document.getElementById('rpModalTitle').textContent =
-        I18N.t('randomPick.resultTitle', { emoji: picked.emoji, name: picked.name });
-      document.getElementById('rpModalSub').textContent = n === 0
-        ? I18N.t('randomPick.resultSubEmpty', { name: picked.name })
-        : noExactMatch
-          ? I18N.t('randomPick.resultSubFallback', { n, name: picked.name })
-          : I18N.t('randomPick.resultSub', { n, name: picked.name });
-      document.getElementById('randomPickModal').classList.add('show');
-      this._rpPicking = false;
-      this._rpFilterActive = true;
-      this._checkRandomPick();
-    }, 1200);
-  },
-  _closeRandomPickModal() {
-    document.getElementById('randomPickModal').classList.remove('show');
-    this._checkRandomPick();
-  },
-
-  // ── FAB free-drag + corner snap ─────────────────────────────────────
-  // Bounds are computed against #resultsScreen, not window.innerWidth/
-  // innerHeight — .screen (and this FAB) are position:fixed, and on the
-  // desktop phone-frame preview (body{transform:translateZ(0)} in the
-  // >=560px media query) that makes BODY their containing block, which is
-  // narrower than the real browser window. Clamping against window size
-  // let the FAB drag past the visible frame into the letterboxed margin,
-  // where it's still technically on-screen but reads as "disappeared".
-  // #resultsScreen shares the same containing-block quirk, so its rect is
-  // always the actual visible app area in both desktop and mobile.
-  _rpScreenRect() {
-    const el = document.getElementById('resultsScreen');
-    return el.getBoundingClientRect();
-  },
-  _applyRpCorner(fab, corner) {
-    fab.style.left = fab.style.top = fab.style.right = fab.style.bottom = '';
-    if (corner[0] === 'l') fab.style.left = this.RP_SIDE + 'px'; else fab.style.right = this.RP_SIDE + 'px';
-    if (corner[1] === 't') fab.style.top = this.RP_TOP + 'px'; else fab.style.bottom = this.RP_BOTTOM + 'px';
-  },
-  _snapRpToCorner(fab) {
-    const screen = this._rpScreenRect();
-    const rect = fab.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const corner = (cx < screen.left + screen.width / 2 ? 'l' : 'r') + (cy < screen.top + screen.height / 2 ? 't' : 'b');
-    this._applyRpCorner(fab, corner);
-    try { localStorage.setItem(this.RP_CORNER_KEY, corner); } catch (_) {}
-  },
-  _initRandomPickDrag() {
-    const fab = document.getElementById('randomPickBubble');
-    let startX = 0, startY = 0, startRect = null, moved = false, pid = null;
-
-    let savedCorner = 'rb';
-    try {
-      const s = localStorage.getItem(this.RP_CORNER_KEY);
-      if (s && /^[lr][tb]$/.test(s)) savedCorner = s;
-    } catch (_) {}
-    this._applyRpCorner(fab, savedCorner);
-
-    const onMove = (e) => {
-      if (pid !== null && e.pointerId !== pid) return;
-      const x = e.clientX, y = e.clientY;
-      if (!moved && Math.hypot(x - startX, y - startY) > 6) {
-        moved = true;
-        fab.classList.add('dragging');
-      }
-      if (!moved) return;
-      const screen = this._rpScreenRect();
-      const w = fab.offsetWidth, h = fab.offsetHeight;
-      let left = startRect.left + (x - startX);
-      let top = startRect.top + (y - startY);
-      left = Math.max(screen.left + 4, Math.min(screen.right - w - 4, left));
-      top = Math.max(screen.top + 4, Math.min(screen.bottom - h - 4, top));
-      fab.style.left = left + 'px';
-      fab.style.top = top + 'px';
-      fab.style.right = 'auto';
-      fab.style.bottom = 'auto';
-    };
-    const onEnd = (e) => {
-      if (pid !== null && e.pointerId !== pid) return;
-      pid = null;
-      fab.classList.remove('dragging');
-      if (moved) {
-        this._snapRpToCorner(fab);
-        this._rpJustDragged = true;
-      }
-    };
-    // Pointer capture on the fab itself guarantees pointermove/up/cancel
-    // keep firing on it even if the finger/cursor leaves its bounds or a
-    // browser quirk would otherwise drop the up event mid-drag, so the FAB
-    // never gets stuck in "dragging" state.
-    fab.addEventListener('pointerdown', (e) => {
-      moved = false;
-      pid = e.pointerId;
-      startX = e.clientX; startY = e.clientY;
-      startRect = fab.getBoundingClientRect();
-      fab.setPointerCapture(pid);
-    });
-    fab.addEventListener('pointermove', onMove);
-    fab.addEventListener('pointerup', onEnd);
-    fab.addEventListener('pointercancel', onEnd);
-    fab.addEventListener('click', () => {
-      if (this._rpJustDragged) { this._rpJustDragged = false; return; }
-      this._openRandomPick();
-    });
-  },
-
   init() {
     document.getElementById('resultsBack').addEventListener('click', () => {
-      // A random dish pick is active → first back tap undoes it and
-      // restores the originally-scanned list instead of leaving the
-      // results screen. A second tap (now that it's cleared) exits normally.
-      if (this._rpFilterActive) {
-        State.activeDish = this._rpPrevDish;
-        State.filteredResults = this._rpPrevResults;
-        this._rpFilterActive = false;
-        const dishInput = document.getElementById('dishInput');
-        if (dishInput) dishInput.value = State.activeDish || '';
-        MapHome.showRestaurants(State.filteredResults);
-        this.show();
-        return;
-      }
       document.getElementById('homeScreen').classList.remove('hidden');
       document.getElementById('resultsScreen').classList.add('hidden');
       setTimeout(() => State.mainMap?.invalidateSize(), 60);
@@ -967,16 +975,6 @@ const ResultsCtrl = {
       PlanCtrl._returnTo = 'results';
       PlanCtrl.buildItinerary();
       PlanCtrl.show();
-    });
-
-    this._initRandomPickDrag();
-    document.getElementById('rpRetryBtn').addEventListener('click', () => {
-      this._closeRandomPickModal();
-      setTimeout(() => this._openRandomPick(), 320);
-    });
-    document.getElementById('rpGoBtn').addEventListener('click', () => this._closeRandomPickModal());
-    document.getElementById('randomPickModal').addEventListener('click', e => {
-      if (e.target.id === 'randomPickModal') this._closeRandomPickModal();
     });
   },
 };
@@ -1921,6 +1919,16 @@ const ProfileCtrl = {
       await this._renderPushToggle();
     });
 
+    document.getElementById('randomPickToggle')?.addEventListener('click', (e) => {
+      const btn = e.currentTarget;
+      const nowHidden = btn.dataset.hidden !== '1';
+      State.profile.hideRandomPick = nowHidden;
+      Storage.save();
+      this._renderRandomPickToggle();
+      HomeCtrl._updateRandomPickVisibility();
+      showToast(I18N.t(nowHidden ? 'randomPick.disabledToast' : 'randomPick.enabledToast'));
+    });
+
     const nameInput = document.getElementById('profileNameInput');
     nameInput.addEventListener('input', () => {
       State.profile.name = nameInput.value;
@@ -2088,6 +2096,15 @@ const ProfileCtrl = {
     });
     document.getElementById('accountModal').classList.add('show');
     this._renderPushToggle();
+    this._renderRandomPickToggle();
+  },
+
+  _renderRandomPickToggle() {
+    const btn = document.getElementById('randomPickToggle');
+    if (!btn) return;
+    const hidden = !!State.profile.hideRandomPick;
+    btn.dataset.hidden = hidden ? '1' : '0';
+    btn.textContent = hidden ? I18N.t('randomPick.offLabel') : I18N.t('randomPick.onLabel');
   },
 
   async _renderPushToggle() {
