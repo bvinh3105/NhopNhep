@@ -25,7 +25,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2579">
+<link rel="stylesheet" href="css/styles.css?v=2580">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -522,25 +522,25 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════
-     FRIENDS MODAL — search + manage who "Bạn bè"-visibility posts show
+     FRIENDS SCREEN — search + manage who "Bạn bè"-visibility posts show
      to. Opened by tapping the "Bạn bè" row in accountModal (moved out of
      there 2026-09-15 — was a wall of inline chips making Cài đặt feel
-     cluttered; this follows the same list-sheet pattern as
-     followerListModal/followingListModal above).
+     cluttered). Slides in from the right like a pushed screen (not a
+     bottom sheet) — closing it returns to accountModal, see
+     FriendsListModal in controllers.js.
 ═══════════════════════════════════════════════ -->
-<div class="modal-overlay" id="friendsModal">
-  <div class="modal-sheet list-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title" data-i18n="account.friends">Bạn <em>bè</em></div>
+<div class="slide-screen" id="friendsModal">
+  <div class="slide-screen-head">
+    <button class="back-btn" id="friendsModalClose" type="button" aria-label="Quay lại">←</button>
+    <div class="modal-title" style="margin:0" data-i18n="account.friends">Bạn <em>bè</em></div>
+  </div>
+  <div class="slide-screen-body">
     <p class="ai-hint" style="margin-top:0" data-i18n="account.friendsHint">Quán bạn đăng ở chế độ "Bạn bè" sẽ chỉ hiện với những người bạn thêm ở đây.</p>
     <div class="loc-row-wrap">
       <input class="form-input" id="friendSearchInput" type="text" data-i18n="account.friendSearchPlaceholder" data-i18n-attr="placeholder" placeholder="🔎 Tìm theo tên hoặc email…" autocomplete="off">
       <div class="geocode-suggest" id="friendSearchResults"></div>
     </div>
     <div class="chip-tag-list" id="friendList" style="margin-top:.7rem"></div>
-    <div class="form-actions">
-      <button class="btn-cancel" id="friendsModalClose" data-i18n="common.close">Đóng</button>
-    </div>
   </div>
 </div>
 
@@ -709,19 +709,19 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2579"></script>
-<script src="js/i18n.js?v=2579"></script>
-<script src="js/utils.js?v=2579"></script>
-<script src="js/state.js?v=2579"></script>
-<script src="js/poi.js?v=2579"></script>
-<script src="js/geocoder.js?v=2579"></script>
-<script src="js/gemini.js?v=2579"></script>
-<script src="js/community.js?v=2579"></script>
-<script src="js/push.js?v=2579"></script>
-<script src="js/analytics.js?v=2579"></script>
-<script src="js/map.js?v=2579"></script>
-<script src="js/gps.js?v=2579"></script>
-<script src="js/locationPicker.js?v=2579"></script>
+<script src="js/security.js?v=2580"></script>
+<script src="js/i18n.js?v=2580"></script>
+<script src="js/utils.js?v=2580"></script>
+<script src="js/state.js?v=2580"></script>
+<script src="js/poi.js?v=2580"></script>
+<script src="js/geocoder.js?v=2580"></script>
+<script src="js/gemini.js?v=2580"></script>
+<script src="js/community.js?v=2580"></script>
+<script src="js/push.js?v=2580"></script>
+<script src="js/analytics.js?v=2580"></script>
+<script src="js/map.js?v=2580"></script>
+<script src="js/gps.js?v=2580"></script>
+<script src="js/locationPicker.js?v=2580"></script>
 <!-- Trip name dialog — thay thế window.prompt() native -->
 <div class="trip-name-overlay" id="tripNameOverlay" role="dialog" aria-modal="true">
   <div class="trip-name-card">
@@ -734,8 +734,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2579"></script>
-<script src="js/app.js?v=2579"></script>
+<script src="js/controllers.js?v=2580"></script>
+<script src="js/app.js?v=2580"></script>
 
 </body>
 </html>

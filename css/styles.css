@@ -1032,6 +1032,24 @@ body.map-full .tabbar{transform:translateY(105%)}
   opacity:0;pointer-events:none;transition:opacity .25s;
 }
 .modal-overlay.show{opacity:1;pointer-events:auto}
+
+/* Slide-in screen — full-viewport panel pushed from the right, for
+   sub-views opened from a modal (e.g. "Bạn bè" from Cài đặt) that should
+   feel like navigating to another screen rather than a bottom sheet
+   stacking on top of it. Higher z-index than .modal-overlay so it can
+   still be reached from inside one (see FriendsListModal). */
+.slide-screen{
+  position:fixed;inset:0;z-index:210;background:var(--cream);
+  display:flex;flex-direction:column;
+  transform:translateX(100%);transition:transform .28s cubic-bezier(.32,1,.56,1);
+}
+.slide-screen.show{transform:translateX(0)}
+.slide-screen-head{
+  flex-shrink:0;display:flex;align-items:center;gap:.7rem;
+  padding:calc(var(--safe-top) + .9rem) 1.1rem .8rem;
+}
+.slide-screen-body{flex:1;overflow-y:auto;padding:0 1.1rem calc(var(--safe-bottom) + 1rem);scrollbar-width:none}
+.slide-screen-body::-webkit-scrollbar{display:none}
 .modal-sheet{
   background:var(--paper);width:100%;max-width:520px;
   border-radius:var(--radius-lg) var(--radius-lg) 0 0;

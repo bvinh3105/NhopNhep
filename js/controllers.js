@@ -672,6 +672,17 @@ const HomeCtrl = {
     const el = document.getElementById('homeScreen');
     return el.getBoundingClientRect();
   },
+  // getBoundingClientRect() is always viewport-absolute, but CSS
+  // left/top on a position:fixed element resolve against its containing
+  // block's own padding edge — body's own rect on the desktop preview
+  // (offset from the viewport since it's centered in a wider window), the
+  // viewport itself (offset 0) on a real phone. Subtract this before
+  // assigning to style.left/top, or the FAB lands `body.left`/`body.top`
+  // px further than intended — invisible on mobile (offset is 0 there)
+  // but puts it outside the visible frame on any wider window.
+  _rpContainingOffset() {
+    return document.body.getBoundingClientRect();
+  },
   // Always sets left/top (never right/bottom) computed straight from
   // _rpScreenRect() — CSS `bottom`/`right` on a position:fixed element
   // resolve against its containing block (viewport, or body on the
@@ -683,11 +694,12 @@ const HomeCtrl = {
   // code paths in the same coordinate space and avoids the mismatch.
   _applyRpCorner(fab, corner) {
     const screen = this._rpScreenRect();
+    const offset = this._rpContainingOffset();
     const w = fab.offsetWidth || 54, h = fab.offsetHeight || 54;
     const left = corner[0] === 'l' ? screen.left + this.RP_SIDE : screen.right - this.RP_SIDE - w;
     const top = corner[1] === 't' ? screen.top + this.RP_TOP : screen.bottom - this.RP_BOTTOM - h;
-    fab.style.left = left + 'px';
-    fab.style.top = top + 'px';
+    fab.style.left = (left - offset.left) + 'px';
+    fab.style.top = (top - offset.top) + 'px';
     fab.style.right = 'auto';
     fab.style.bottom = 'auto';
   },
@@ -724,11 +736,14 @@ const HomeCtrl = {
       }
       if (!moved) return;
       const screen = this._rpScreenRect();
+      const offset = this._rpContainingOffset();
       const w = fab.offsetWidth, h = fab.offsetHeight;
       let left = startRect.left + (x - startX);
       let top = startRect.top + (y - startY);
       left = Math.max(screen.left + 4, Math.min(screen.right - w - 4, left));
       top = Math.max(screen.top + 4, Math.min(screen.bottom - h - 4, top));
+      left -= offset.left;
+      top -= offset.top;
       fab.style.left = left + 'px';
       fab.style.top = top + 'px';
       fab.style.right = 'auto';
@@ -3462,18 +3477,14 @@ const FollowingListModal = {
 const FriendsListModal = {
   init() {
     document.getElementById('friendsModalClose')?.addEventListener('click', () => this.close());
-    document.getElementById('friendsModal')?.addEventListener('click', (e) => {
-      if (e.target.id === 'friendsModal') this.close();
-    });
   },
   open() {
     document.getElementById('friendsModal').classList.add('show');
     CommunityCtrl._renderFriends();
   },
   // Returns to accountModal (same "settings" sheet the user came from)
-  // rather than exiting the whole Cài đặt flow — both modals share the
-  // same z-index, so having two .show at once would just stack in DOM
-  // order instead of layering correctly; close/reopen avoids that.
+  // rather than exiting the whole Cài đặt flow — matches the "← quay lại"
+  // feel of a pushed screen, not a dismissed sheet.
   close() {
     document.getElementById('friendsModal').classList.remove('show');
     document.getElementById('accountModal').classList.add('show');
