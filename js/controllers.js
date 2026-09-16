@@ -953,6 +953,9 @@ const ResultsCtrl = {
     const btn = document.getElementById('planBtn');
     btn.disabled = n === 0;
     btn.textContent = n === 0 ? I18N.t('results.schedule') : I18N.t('results.scheduleN', { n });
+    // Group Session cần ít nhất 2 quán để có gì đó cho bạn bè vote.
+    const sessionBtn = document.getElementById('sessionCreateBtn');
+    if (sessionBtn) sessionBtn.disabled = n < 2;
   },
 
   init() {
@@ -1031,6 +1034,311 @@ const ResultsCtrl = {
       PlanCtrl.buildItinerary();
       PlanCtrl.show();
     });
+    document.getElementById('sessionCreateBtn').addEventListener('click', () => {
+      SessionCreateModal.open();
+    });
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   GROUP SESSION — "Phiên chọn quán theo nhóm"
+   Host chọn 1 nhóm quán ứng viên (từ State.selected trên màn Kết quả —
+   dùng lại đúng cơ chế multi-select sẵn có, không thêm UI chọn mới),
+   chia sẻ link, bạn bè vote KHÔNG CẦN tài khoản, host chốt random trong
+   nhóm được vote nhiều nhất. Thuần cộng thêm — không đụng gì tới scan/
+   random/lên lịch/đăng quán cộng đồng hiện có.
+═══════════════════════════════════════════════ */
+const SessionCreateModal = {
+  init() {
+    document.getElementById('sessionCreateClose').addEventListener('click', () => this.close());
+    document.getElementById('sessionCreateOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'sessionCreateOverlay') this.close();
+    });
+    document.getElementById('sessionCreateSave').addEventListener('click', () => this._create());
+  },
+
+  // Snapshot State.selected thành candidates JSON — KHÔNG phải relation,
+  // vì quán từ OSM/Gemini không có id PocketBase ổn định (xem community.js
+  // createSession comment). cid chỉ cần duy nhất TRONG session này, nên
+  // dùng luôn chỉ số vị trí cho đơn giản.
+  open() {
+    if (!Community.isLoggedIn()) { showToast(I18N.t('toast.sessionNeedLogin')); return; }
+    const ids = [...State.selected];
+    if (ids.length < 2) { showToast(I18N.t('toast.sessionNeedTwo')); return; }
+
+    this._candidates = ids.map((id, i) => {
+      const r = State.filteredResults.find(x => x.id === id)
+        || (Array.isArray(State.results) ? State.results.find(x => x.id === id) : null);
+      if (!r) return null;
+      const photo = (r._community && r._pb)
+        ? (Community.thumbnailUrl(r._pb, '400x400') || null)
+        : (r.image || null);
+      return {
+        cid: 'c' + i,
+        name: r.name,
+        address: r.address || r.desc || '',
+        lat: r.lat, lng: r.lng,
+        category: r.cat,
+        photo_url: photo,
+        source: r._gemini ? 'gemini' : (r._community ? 'community' : (r.id >= 1e13 ? 'osm' : 'mine')),
+      };
+    }).filter(Boolean);
+
+    if (this._candidates.length < 2) { showToast(I18N.t('toast.sessionNeedTwo')); return; }
+
+    document.getElementById('sessionCreateTitle').value = '';
+    document.getElementById('sessionCreateList').innerHTML = this._candidates.map(c => `
+      <div class="session-cand-row">
+        <span class="session-cand-icon">${(CATEGORIES[c.category] && CATEGORIES[c.category].icon) || '🍽️'}</span>
+        <span class="session-cand-name">${escapeHtml(c.name)}</span>
+      </div>
+    `).join('');
+    document.getElementById('sessionCreateOverlay').classList.add('show');
+  },
+
+  close() {
+    document.getElementById('sessionCreateOverlay').classList.remove('show');
+  },
+
+  async _create() {
+    const btn = document.getElementById('sessionCreateSave');
+    const original = btn.textContent;
+    btn.disabled = true; btn.textContent = I18N.t('session.creating');
+    const title = document.getElementById('sessionCreateTitle').value.trim();
+    const r = await Community.createSession({ title, candidates: this._candidates });
+    btn.disabled = false; btn.textContent = original;
+    if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+    if (typeof Analytics !== 'undefined') Analytics.track('session_created', { n: this._candidates.length });
+    this.close();
+    SessionVoteModal.openAsHost(r.data);
+  },
+};
+
+const SessionVoteModal = {
+  _session: null,
+  _counts: {},
+  _myVotes: new Set(),
+  _isHost: false,
+  _pollTimer: null,
+  _pollBusy: false,
+  _failCount: 0,
+  _lastVotesSig: null,
+  _lastUpdated: null,
+
+  init() {
+    document.getElementById('sessionVoteClose').addEventListener('click', () => this.close());
+    document.getElementById('sessionVoteOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'sessionVoteOverlay') this.close();
+    });
+    document.getElementById('sessionInviteCopy').addEventListener('click', () => this._copyInviteLink());
+    document.getElementById('sessionVoteCloseSession').addEventListener('click', () => this._closeAndRandom());
+    document.getElementById('sessionVoteList').addEventListener('click', (e) => {
+      const row = e.target.closest('.session-vote-row');
+      if (!row || this._session?.status !== 'open') return;
+      this._onVoteTap(row.dataset.cid);
+    });
+  },
+
+  // Host vừa tạo xong — record đầy đủ đã có sẵn, không cần fetch lại.
+  openAsHost(sessionRecord) {
+    this._open(sessionRecord, true);
+  },
+
+  // Từ link mời (?join=<id>) — participant hoặc host mở lại từ máy khác.
+  async openFromInvite(id) {
+    if (!id) return;
+    const r = await Community.getSession(id);
+    if (!r.ok || !r.data) { showToast(I18N.t('toast.sessionNotFound')); return; }
+    const isHost = Community.isLoggedIn() && r.data.host === Community.currentUser.id;
+    this._open(r.data, isHost);
+  },
+
+  _open(sessionRecord, isHost) {
+    this._session = sessionRecord;
+    this._isHost = isHost;
+    this._counts = {};
+    this._myVotes = new Set();
+    this._lastVotesSig = null;
+    this._lastUpdated = null;
+    this._failCount = 0;
+
+    document.getElementById('sessionVoteTitle').textContent = sessionRecord.title
+      ? `👥 ${sessionRecord.title}` : I18N.t('session.defaultTitle');
+    document.getElementById('sessionInviteLink').value = `${location.origin}/?join=${sessionRecord.id}`;
+    document.getElementById('sessionReconnectBanner').classList.add('hidden');
+    document.getElementById('sessionVoteOverlay').classList.add('show');
+
+    // Tên quán đã có sẵn trong session.candidates (snapshot) — render NGAY,
+    // không đợi network. Vote count thật (ban đầu luôn là 0 nếu vừa tạo,
+    // hoặc cần fetch nếu mở từ link) tới trong lượt poll đầu tiên ngay sau
+    // đây — tránh gọi _refresh() 2 lần liền (1 lần ở đây + 1 lần trong tick
+    // đầu của _startPolling()).
+    this._render();
+    this._startPolling();
+  },
+
+  close() {
+    this._stopPolling();
+    document.getElementById('sessionVoteOverlay').classList.remove('show');
+  },
+
+  async _copyInviteLink() {
+    const url = document.getElementById('sessionInviteLink').value;
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast(I18N.t('toast.linkCopied'));
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); showToast(I18N.t('toast.linkCopied')); }
+      catch (_) { showToast(I18N.t('toast.linkCopyFail')); }
+      document.body.removeChild(ta);
+    }
+  },
+
+  async _onVoteTap(cid) {
+    // Optimistic UI — cập nhật ngay tại chỗ, không đợi round-trip 3s poll.
+    // Poll kế tiếp sẽ tự sửa nếu có lệch (race với người khác vote cùng lúc).
+    const wasVoted = this._myVotes.has(cid);
+    if (wasVoted) { this._myVotes.delete(cid); this._counts[cid] = Math.max(0, (this._counts[cid] || 1) - 1); }
+    else { this._myVotes.add(cid); this._counts[cid] = (this._counts[cid] || 0) + 1; }
+    this._render();
+    const r = await Community.castVote(this._session.id, cid);
+    if (!r.ok) {
+      // Rollback nếu server từ chối (session đã đóng giữa chừng, v.v.)
+      if (wasVoted) { this._myVotes.add(cid); this._counts[cid] = (this._counts[cid] || 0) + 1; }
+      else { this._myVotes.delete(cid); this._counts[cid] = Math.max(0, (this._counts[cid] || 1) - 1); }
+      this._render();
+      showToast(`⚠️ ${r.error}`);
+    }
+  },
+
+  async _closeAndRandom() {
+    const candidates = this._session.candidates || [];
+    if (!candidates.length) return;
+    let maxCount = 0;
+    for (const c of candidates) maxCount = Math.max(maxCount, this._counts[c.cid] || 0);
+    // Chưa ai vote gì cả → random đều trong TẤT CẢ candidate, không phải
+    // random trong "top 0 phiếu" (sẽ luôn khớp mọi candidate, vô nghĩa).
+    const pool = maxCount > 0
+      ? candidates.filter(c => (this._counts[c.cid] || 0) === maxCount)
+      : candidates;
+    const winner = pool[Math.floor(Math.random() * pool.length)];
+
+    const btn = document.getElementById('sessionVoteCloseSession');
+    btn.disabled = true;
+    const r = await Community.closeSession(this._session.id, winner.cid);
+    btn.disabled = false;
+    if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+    if (typeof Analytics !== 'undefined') Analytics.track('session_closed', { n: candidates.length });
+    await this._refresh();
+  },
+
+  // ── Poll: gọi mỗi ~3s trong lúc modal mở. Fetch session (cheap, để bắt
+  // được lúc host chốt — KHÔNG sinh vote record mới nên signature phiếu
+  // bầu không đổi) + signature phiếu bầu (cheap). Chỉ khi 1 trong 2 đổi
+  // mới làm tally đầy đủ (nặng hơn). Backoff về 9s sau 3 lần lỗi liên tiếp,
+  // trở lại 3s ngay khi 1 lần poll thành công.
+  async _pollTick() {
+    if (this._pollBusy || document.hidden || !this._session) return;
+    this._pollBusy = true;
+    const [sessionR, sig] = await Promise.all([
+      Community.getSession(this._session.id),
+      Community.sessionSignature(this._session.id),
+    ]);
+    this._pollBusy = false;
+
+    if (!sessionR.ok || sig === null) {
+      this._failCount++;
+      if (this._failCount >= 3) {
+        document.getElementById('sessionReconnectBanner').classList.remove('hidden');
+        this._scheduleNext(9000);
+      }
+      return;
+    }
+    this._failCount = 0;
+    document.getElementById('sessionReconnectBanner').classList.add('hidden');
+    this._scheduleNext(3000);
+
+    const changed = sessionR.data.updated !== this._lastUpdated || sig.sig !== this._lastVotesSig;
+    this._session = sessionR.data;
+    this._lastUpdated = sessionR.data.updated;
+    this._lastVotesSig = sig.sig;
+    if (changed) await this._refresh(true);
+  },
+
+  _scheduleNext(ms) {
+    clearInterval(this._pollTimer);
+    this._pollTimer = setInterval(() => this._pollTick(), ms);
+  },
+
+  _startPolling() {
+    this._stopPolling();
+    this._pollTick();
+    this._pollTimer = setInterval(() => this._pollTick(), 3000);
+    this._visHandler = () => { if (!document.hidden) this._pollTick(); };
+    document.addEventListener('visibilitychange', this._visHandler);
+  },
+
+  _stopPolling() {
+    clearInterval(this._pollTimer);
+    if (this._visHandler) document.removeEventListener('visibilitychange', this._visHandler);
+  },
+
+  // Tally đầy đủ + vote của chính mình — chỉ gọi khi cần (lần đầu mở, hoặc
+  // signature/updated vừa đổi), không phải mỗi tick.
+  async _refresh(skipSessionFetch) {
+    if (!skipSessionFetch) {
+      const r = await Community.getSession(this._session.id);
+      if (r.ok) this._session = r.data;
+    }
+    const [countsR, myVotes] = await Promise.all([
+      Community.getSessionResults(this._session.id),
+      Community.myVotesInSession(this._session.id),
+    ]);
+    if (countsR.ok) this._counts = countsR.data;
+    this._myVotes = myVotes;
+    this._render();
+  },
+
+  _render() {
+    const s = this._session;
+    if (!s) return;
+    const isClosed = s.status === 'closed';
+    const isExpired = !isClosed && s.expires_at && new Date(s.expires_at).getTime() < Date.now();
+
+    document.getElementById('sessionExpiredBanner').classList.toggle('hidden', !isExpired);
+    document.getElementById('sessionVoteSub').textContent = isClosed
+      ? I18N.t('session.subClosed')
+      : I18N.t('session.subOpen', { n: (s.candidates || []).length });
+
+    const list = document.getElementById('sessionVoteList');
+    list.innerHTML = (s.candidates || []).map(c => {
+      const voted = this._myVotes.has(c.cid);
+      const isWinner = isClosed && s.winner_cid === c.cid;
+      const count = this._counts[c.cid] || 0;
+      const icon = (CATEGORIES[c.category] && CATEGORIES[c.category].icon) || '🍽️';
+      return `<div class="session-vote-row${voted ? ' voted' : ''}${isWinner ? ' winner' : ''}" data-cid="${c.cid}">
+        <span class="session-vote-icon">${isWinner ? '🏆' : icon}</span>
+        <span class="session-vote-name">${escapeHtml(c.name)}</span>
+        <span class="session-vote-count">${count}</span>
+        <span class="session-vote-check">✅</span>
+      </div>`;
+    }).join('');
+
+    const winnerBanner = document.getElementById('sessionWinnerBanner');
+    if (isClosed) {
+      const winner = (s.candidates || []).find(c => c.cid === s.winner_cid);
+      document.getElementById('sessionWinnerName').textContent = winner ? winner.name : '';
+      winnerBanner.classList.remove('hidden');
+    } else {
+      winnerBanner.classList.add('hidden');
+    }
+
+    const closeBtn = document.getElementById('sessionVoteCloseSession');
+    closeBtn.classList.toggle('hidden', !this._isHost || isClosed);
+    closeBtn.disabled = isExpired;
   },
 };
 

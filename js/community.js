@@ -739,11 +739,20 @@ const Community = {
   // Toàn bộ vote của CHÍNH MÌNH trong 1 session (không lọc candidate) — để
   // render "đã vote quán nào" trong danh sách mà không cần N query riêng
   // lẻ cho N candidate mỗi lần poll.
+  //
+  // `session=<id>` GẮN THÊM làm query param riêng (ngoài `filter`) — sau
+  // adversarial review 2026-09-16 phát hiện listRule cũ ("" = public vô
+  // điều kiện) cho phép BẤT KỲ ai không có link mời cũng list được TOÀN
+  // BỘ vote của MỌI session (lộ cả guest_token — "mật khẩu" duy nhất của
+  // khách). Đã vá bằng migration mới, listRule giờ bắt buộc
+  // @request.query.session khớp field session — filter= không đủ vì
+  // PocketBase rule không đọc được bên trong chuỗi filter, phải là query
+  // param riêng tên đúng "session".
   async myVotesInSession(sessionId) {
     const isGuest = !this.isLoggedIn();
     const who = isGuest ? `guest_token="${this.getGuestToken()}"` : `voter="${this.currentUser.id}"`;
     const filter = `session="${sessionId}" && ${who}`;
-    const r = await this._fetch(`/api/collections/session_votes/records?perPage=200&filter=${encodeURIComponent(filter)}`);
+    const r = await this._fetch(`/api/collections/session_votes/records?perPage=200&session=${encodeURIComponent(sessionId)}&filter=${encodeURIComponent(filter)}`);
     if (!r.ok) return new Set();
     return new Set(r.data.items.map(v => v.candidate_ref));
   },
@@ -754,18 +763,31 @@ const Community = {
       ? `guest_token="${this.getGuestToken()}"`
       : `voter="${this.currentUser.id}"`;
     const filter = `session="${sessionId}" && candidate_ref="${candidateRef}" && ${who}`;
-    const r = await this._fetch(`/api/collections/session_votes/records?filter=${encodeURIComponent(filter)}`);
+    const r = await this._fetch(`/api/collections/session_votes/records?session=${encodeURIComponent(sessionId)}&filter=${encodeURIComponent(filter)}`);
     return (r.ok && r.data.items[0]) || null;
   },
 
   // Toggle — tap để vote, tap lại để bỏ vote (giống toggleVote() ở trên,
   // nhưng KHÔNG cần login: khách dùng guest_token thay voter).
+  //
+  // voter/guest_token LUÔN gửi CẢ HAI field (rỗng cho cái không dùng) thay
+  // vì bỏ hẳn field không dùng — createRule check `guest_token = ''` /
+  // `voter = ''` cần field đó THỰC SỰ có mặt với giá trị rỗng, không phụ
+  // thuộc vào PocketBase tự suy ra "thiếu field = rỗng" (adversarial
+  // review 2026-09-16 flag đây là giả định chưa verify được — gửi tường
+  // minh thì loại bỏ hẳn rủi ro, tốn 0 chi phí).
+  //
+  // Un-vote (DELETE) kèm `?guest_token=<token>` khi là khách — deleteRule
+  // mới yêu cầu khớp đúng token của chính người xoá, chặn vote griefing
+  // (bug khác từ cùng đợt review: rule cũ cho phép xoá vote của BẤT KỲ
+  // khách nào, không chỉ vote của chính mình).
   async castVote(sessionId, candidateRef) {
     const existing = await this.myVoteInSession(sessionId, candidateRef);
     if (existing) {
-      return this._fetch(`/api/collections/session_votes/records/${existing.id}`, { method: 'DELETE' });
+      const qs = this.isLoggedIn() ? '' : `?guest_token=${encodeURIComponent(this.getGuestToken())}`;
+      return this._fetch(`/api/collections/session_votes/records/${existing.id}${qs}`, { method: 'DELETE' });
     }
-    const body = { session: sessionId, candidate_ref: candidateRef };
+    const body = { session: sessionId, candidate_ref: candidateRef, voter: '', guest_token: '' };
     if (this.isLoggedIn()) body.voter = this.currentUser.id;
     else body.guest_token = this.getGuestToken();
     return this._fetch('/api/collections/session_votes/records', {
@@ -779,7 +801,7 @@ const Community = {
   // signature đổi mới cần gọi getSessionResults() (nặng hơn, tally đầy đủ).
   async sessionSignature(sessionId) {
     const q = new URLSearchParams({
-      page: 1, perPage: 1, sort: '-updated',
+      page: 1, perPage: 1, sort: '-updated', session: sessionId,
       filter: `session="${sessionId}"`, fields: 'id,updated',
     });
     const r = await this._fetch(`/api/collections/session_votes/records?${q}`, { timeoutMs: 8000 });
@@ -790,7 +812,7 @@ const Community = {
 
   // Tally đầy đủ — fetch toàn bộ vote của session, gộp theo candidate_ref.
   async getSessionResults(sessionId) {
-    const q = new URLSearchParams({ perPage: 200, filter: `session="${sessionId}"` });
+    const q = new URLSearchParams({ perPage: 200, session: sessionId, filter: `session="${sessionId}"` });
     const r = await this._fetch(`/api/collections/session_votes/records?${q}`);
     if (!r.ok) return r;
     const counts = {};

@@ -1,8 +1,10 @@
 # Nhóp Nhép — Tài liệu bàn giao dự án
 
-> Viết ngày 2026-09-10, cập nhật lớn 2026-09-11, cập nhật lớn 2026-09-14 (sau ~1 tháng phát triển).
+> Viết ngày 2026-09-10, cập nhật lớn 2026-09-11, cập nhật lớn 2026-09-14, **cập nhật lớn 2026-09-16** (sau ~1 tháng phát triển).
 > Mục đích: để một phiên Claude khác (hoặc chính bạn sau này) đọc 1 file này là nắm được toàn bộ bối cảnh, không cần hỏi lại từ đầu.
-> **Nếu bạn đọc file này sau 2026-09-14 quá vài ngày**: chạy `git log --oneline <commit cuối bạn biết>..HEAD` trước — giữa 2026-09-11 và 2026-09-14 đã có ~26 commit feature/fix thật (Turnstile, nav rewrite, crash reporter, mutual-follow, draft auto-save...) hoàn toàn không được ghi vào bản 2026-09-11 của file này. Đừng tin ngày "cập nhật lớn" ở trên là luôn đủ mới.
+> **Nếu bạn đọc file này sau 2026-09-16 quá vài ngày**: chạy `git log --oneline <commit cuối bạn biết>..HEAD` trước. Đừng tin ngày "cập nhật lớn" ở trên là luôn đủ mới.
+>
+> **🚧 ĐỌC MỤC 3.5 TRƯỚC KHI LÀM BẤT KỲ GÌ KHÁC** nếu bạn định tiếp tục việc — tính năng "Phiên chọn quán theo nhóm" (Group Session) đang **LÀM DỞ, CHƯA COMMIT frontend** (backend migration đã LIVE production rồi). Có 1 review workflow (5 lens + adversarial verify) có thể vẫn đang chạy hoặc đã xong tuỳ lúc bạn đọc — xem mục 3.5 để biết chính xác cần làm gì tiếp.
 
 ---
 

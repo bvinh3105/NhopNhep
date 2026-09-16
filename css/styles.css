@@ -571,6 +571,62 @@ input,textarea,select{font-family:var(--font-body)}
 .action-btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--text)}
 .action-btn:disabled{opacity:.65;pointer-events:none;box-shadow:2px 2px 0 var(--text)}
 
+/* Group Session — "Tạo phiên chọn quán" secondary button above Lên lịch */
+.session-create-btn{
+  width:100%;padding:.7rem;border-radius:14px;margin-bottom:.5rem;
+  background:var(--white);color:var(--text);font-weight:800;font-size:.85rem;
+  border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);transition:all .12s;
+}
+.session-create-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.session-create-btn:disabled{opacity:.65;pointer-events:none;box-shadow:1px 1px 0 var(--text)}
+
+.session-cand-list{display:flex;flex-direction:column;gap:.4rem;max-height:220px;overflow-y:auto}
+.session-cand-row{
+  display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;
+  border:1.5px solid var(--line-2);border-radius:12px;background:var(--paper);
+}
+.session-cand-icon{font-size:1rem}
+.session-cand-name{font-size:.85rem;font-weight:700;color:var(--text);flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.session-invite-row{display:flex;gap:.5rem;margin-bottom:.7rem}
+.session-invite-row .form-input{flex:1;font-size:.78rem;color:var(--text2)}
+.session-copy-btn{
+  flex-shrink:0;width:44px;border-radius:12px;background:var(--primary);
+  border:2px solid var(--text);font-size:1.1rem;box-shadow:2px 2px 0 var(--text);
+  transition:all .12s;
+}
+.session-copy-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+
+.session-reconnect-banner,.session-expired-banner{
+  padding:.5rem .7rem;border-radius:10px;font-size:.78rem;font-weight:700;
+  margin-bottom:.6rem;background:#FFEBEE;color:#C62828;border:1px solid #EF9A9A;
+}
+.session-expired-banner{background:var(--paper);color:var(--text3);border-color:var(--line-2)}
+
+.session-vote-list{display:flex;flex-direction:column;gap:.5rem;max-height:min(45vh,360px);overflow-y:auto;margin-bottom:.7rem}
+.session-vote-row{
+  display:flex;align-items:center;gap:.6rem;padding:.65rem .8rem;cursor:pointer;
+  border:2px solid var(--text);border-radius:14px;background:var(--white);
+  box-shadow:2px 2px 0 var(--text);transition:all .12s;
+}
+.session-vote-row:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.session-vote-row.voted{background:var(--primary-tint);border-color:var(--primary)}
+.session-vote-row.winner{background:#FFF8E1;border-color:#F9A825;box-shadow:3px 3px 0 #F9A825}
+.session-vote-icon{font-size:1.1rem;flex-shrink:0}
+.session-vote-name{font-size:.88rem;font-weight:800;color:var(--text);flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-vote-count{font-size:.8rem;font-weight:900;color:var(--accent-2);flex-shrink:0}
+.session-vote-check{font-size:.9rem;flex-shrink:0;opacity:0;transition:opacity .12s}
+.session-vote-row.voted .session-vote-check{opacity:1}
+
+.session-winner-banner{
+  text-align:center;padding:1rem;border-radius:16px;margin-bottom:.7rem;
+  background:#FFF8E1;border:2px solid #F9A825;
+}
+.session-winner-title{font-family:var(--font-display);font-weight:900;font-size:1rem;color:var(--text);margin-bottom:.3rem}
+.session-winner-name{font-family:var(--font-display);font-weight:900;font-size:1.2rem;color:var(--primary)}
+
 /* Random pick FAB — round, free-draggable, snaps to a screen corner.
    position:fixed is contained by body's transform:translateZ(0) in the
    desktop phone-frame media query above, so it stays inside the frame

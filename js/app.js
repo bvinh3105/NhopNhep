@@ -53,6 +53,8 @@ function boot() {
   FollowerListModal.init();
   FollowingListModal.init();
   FriendsListModal.init();
+  SessionCreateModal.init();
+  SessionVoteModal.init();
   wireScrollMasks();
 
   // Deep-link handler: ?q=<pb_id> auto-opens the community detail
@@ -62,6 +64,15 @@ function boot() {
   if (urlQ) {
     // Delay slightly so all controllers/modals are ready to render.
     setTimeout(() => SavedListModal.openFromLink(urlQ), 400);
+  }
+
+  // Group Session invite: ?join=<session_id> from "Sao chép link mời".
+  // Mirrors the ?q= handler exactly — dining_sessions.viewRule is fully
+  // public, so this works for guest/logged-out/logged-in alike, with no
+  // signup wall (see js/community.js Group Session section).
+  const urlJoin = new URLSearchParams(location.search).get('join');
+  if (urlJoin) {
+    setTimeout(() => SessionVoteModal.openFromInvite(urlJoin), 400);
   }
 
   // Referral link: ?ref=<inviter_user_id> from "Mời bạn bè". Stashed in
