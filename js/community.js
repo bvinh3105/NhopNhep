@@ -831,4 +831,36 @@ const Community = {
       body: JSON.stringify({ status: 'closed', winner_cid: winnerCid }),
     });
   },
+
+  // ── Bình luận trên bài đăng cộng đồng ────────────────────────────────────
+  // Rule server-side kế thừa ĐÚNG visibility của bài viết (private/friends/
+  // public) — xem migration create_comments, mirror y hệt logic đã audit
+  // cho `votes`. Tải LƯỜI (chỉ khi mở chi tiết 1 bài, KHÔNG poll real-time,
+  // KHÔNG tải trước cho cả feed) — quyết định có chủ đích để không thêm 1
+  // vòng lặp poll nữa đè lên Cloudflare Quick Tunnel vốn đã hay rớt (xem
+  // PROJECT_HANDOFF mục 4).
+  async listComments(restaurantId) {
+    const q = new URLSearchParams({
+      perPage: 100, sort: 'created', expand: 'user',
+      filter: `restaurant="${restaurantId}"`,
+    });
+    return this._fetch(`/api/collections/comments/records?${q}`);
+  },
+
+  async createComment(restaurantId, text) {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    const body = { restaurant: restaurantId, user: this.currentUser.id, text: (text || '').trim() };
+    return this._fetch('/api/collections/comments/records', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+
+  // Xoá được nếu là người bình luận HOẶC chủ bài viết — deleteRule
+  // server-side đã enforce, đây chỉ là lệnh gọi, không cần biết trước ai
+  // được phép (thất bại thì _fetch trả {ok:false} bình thường).
+  async deleteComment(id) {
+    return this._fetch(`/api/collections/comments/records/${id}`, { method: 'DELETE' });
+  },
 };

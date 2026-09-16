@@ -3561,6 +3561,20 @@ const CommunityDetailModal = {
         document.body.removeChild(ta);
       }
     });
+
+    // Bình luận — nút Gửi + Enter đều submit. Delegated trên body vì
+    // #cdmCommentInput/#cdmCommentSend được vẽ lại mỗi lần open() (bên
+    // trong innerHTML của #communityDetailBody).
+    const bodyEl = document.getElementById('communityDetailBody');
+    bodyEl.addEventListener('click', (e) => {
+      if (e.target.id === 'cdmCommentSend') this._submitComment();
+    });
+    bodyEl.addEventListener('keydown', (e) => {
+      if (e.target.id === 'cdmCommentInput' && e.key === 'Enter') {
+        e.preventDefault();
+        this._submitComment();
+      }
+    });
   },
 
   _syncSaveBtn() {
@@ -3626,10 +3640,20 @@ const CommunityDetailModal = {
       <div class="comm-r-footer" style="border-top:1.5px dashed var(--line-2);margin-top:.9rem;padding-top:.7rem">
         ${footerHtml}
       </div>
+      <div class="comment-section">
+        <div class="comment-section-title">${I18N.t('comment.title')}</div>
+        <div class="comment-list" id="cdmCommentList"></div>
+        <div class="comment-input-row">
+          <input class="comment-input" id="cdmCommentInput" type="text" maxlength="500"
+            placeholder="${I18N.t('comment.placeholder')}" autocomplete="off">
+          <button class="comment-send-btn" id="cdmCommentSend" type="button">${I18N.t('comment.send')}</button>
+        </div>
+      </div>
     `;
     const body = document.getElementById('communityDetailBody');
     wireCarousels(body);
     this._loadLinkedGroup(r);
+    this._loadComments(r);
     if (isOwner) {
       document.getElementById('cdmEdit').addEventListener('click', () => { this.close(); CommunityAddModal.open(r); });
       document.getElementById('cdmDelete').addEventListener('click', async () => {
@@ -3690,6 +3714,68 @@ const CommunityDetailModal = {
         if (target) this.open(target);
       });
     });
+  },
+
+  // Tải bình luận — CHỈ khi user thực sự mở chi tiết 1 bài, KHÔNG poll
+  // real-time (quyết định có chủ đích, xem comment ở js/community.js —
+  // tránh thêm 1 vòng poll nữa lên Cloudflare Quick Tunnel vốn đã hay rớt).
+  // Muốn thấy bình luận mới của người khác thì đóng mở lại modal.
+  async _loadComments(r) {
+    const list = document.getElementById('cdmCommentList');
+    if (!list) return;
+    list.innerHTML = `<div class="comment-loading">${I18N.t('em.loading')}</div>`;
+    const res = await Community.listComments(r.id);
+    if (this._current !== r) return; // đã đóng/chuyển bài khác trong lúc chờ
+    if (!res.ok) { list.innerHTML = `<div class="comment-loading">${I18N.t('comment.loadFail')}</div>`; return; }
+    this._renderComments(res.data.items || []);
+  },
+
+  _renderComments(items) {
+    const list = document.getElementById('cdmCommentList');
+    if (!list) return;
+    if (!items.length) {
+      list.innerHTML = `<div class="comment-empty">${I18N.t('comment.empty')}</div>`;
+      return;
+    }
+    const myId = Community.currentUser && Community.currentUser.id;
+    const postOwnerId = this._current && this._current.created_by;
+    list.innerHTML = items.map(c => {
+      const author = c.expand && c.expand.user;
+      const authorName = (author && author.name) || I18N.t('common.anonymous');
+      const canDelete = myId && (c.user === myId || postOwnerId === myId);
+      return `<div class="comment-row" data-id="${c.id}">
+        <div class="comment-avatar">${authorAvatar(author)}</div>
+        <div class="comment-body">
+          <div class="comment-meta"><span class="comment-author">${escapeHtml(authorName)}</span><span class="comment-time">${timeAgo(c.created)}</span></div>
+          <div class="comment-text">${escapeHtml(c.text)}</div>
+        </div>
+        ${canDelete ? `<button class="comment-del-btn" data-id="${c.id}" title="${I18N.t('common.close')}">✕</button>` : ''}
+      </div>`;
+    }).join('');
+    list.querySelectorAll('.comment-del-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(I18N.t('comment.confirmDelete'))) return;
+        const res = await Community.deleteComment(btn.dataset.id);
+        if (!res.ok) { showToast(`⚠️ ${res.error}`); return; }
+        showToast(I18N.t('toast.commentDeleted'));
+        this._loadComments(this._current);
+      });
+    });
+  },
+
+  async _submitComment() {
+    const input = document.getElementById('cdmCommentInput');
+    const text = input.value.trim();
+    if (!Community.isLoggedIn()) { showToast(I18N.t('toast.commentNeedLogin')); return; }
+    if (!text) { showToast(I18N.t('toast.commentEmpty')); return; }
+    const btn = document.getElementById('cdmCommentSend');
+    btn.disabled = true;
+    const res = await Community.createComment(this._current.id, text);
+    btn.disabled = false;
+    if (!res.ok) { showToast(`⚠️ ${res.error}`); return; }
+    input.value = '';
+    if (typeof Analytics !== 'undefined') Analytics.track('comment_post', {});
+    this._loadComments(this._current);
   },
 
   close() {
