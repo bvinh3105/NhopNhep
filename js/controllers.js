@@ -320,6 +320,13 @@ const HomeCtrl = {
         raceResult = { items: merged, source: merged.length ? (g.length ? 'gemini' : 'osm') : 'none' };
       } else {
         // ── GENERAL SEARCH: race both, first non-empty wins (fastest UX)
+        // BUG-FIX 2026-09-16: when Gemini isn't configured, geminiP is
+        // `Promise.resolve([])` above — a microtask, so its `.then(finish)`
+        // fires BEFORE osmP has a chance to resolve. With total=1 (osm-only
+        // mode), finished (1) >= total (1) tripped instantly and the race
+        // resolved empty, silently killing every scan for users without a
+        // Gemini key (banner "Không tìm thấy quán" even in Cầu Giấy).
+        // Only attach `.then` to providers actually in play.
         raceResult = await new Promise(resolve => {
           let done = false;
           let finished = 0;
@@ -330,7 +337,7 @@ const HomeCtrl = {
             if (it.length) { done = true; resolve({ items: it, source: src }); }
             else if (finished >= total) { done = true; resolve({ items: [], source: 'none' }); }
           };
-          geminiP.then(r => finish(r, 'gemini'));
+          if (useGemini) geminiP.then(r => finish(r, 'gemini'));
           osmP.then(r => finish(r, 'osm'));
           setTimeout(() => { if (!done) { done = true; resolve({ items: [], source: 'none' }); } }, 20000);
         });
