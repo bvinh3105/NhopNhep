@@ -141,7 +141,21 @@ function boot() {
         State.userLat = g.lat; State.userLng = g.lng;
         MapHome.setUserLocation(g.lat, g.lng, null, { center: true });
         if (_locInputEl && _locInputEl.value === I18N.t('app.sampleLocation')) {
-          _locInputEl.value = g.city ? `📍 ${g.city}` : I18N.t('gps.yourLocation');
+          // Suffix "(ước tính)" so user knows this is IP-level (city
+          // centroid), not their real spot — feedback 2026-09-16: user
+          // in Tây Hồ saw label "📍 Hà Nội" and thought app was locked
+          // to Hoàn Kiếm. Making it explicit + nudging to GPS below.
+          _locInputEl.value = g.city
+            ? `📍 ${g.city} ${I18N.t('gps.approxSuffix')}`
+            : I18N.t('gps.yourLocation');
+        }
+        // CF IP geo lands at city centroid — for a HN IP that's ≈ Hoàn
+        // Kiếm, so a user in Tây Hồ/Cầu Giấy/etc sees the map "wrong".
+        // Nudge them to enable GPS. GPS.hint auto-clears when GPS starts
+        // (startTracking overwrites it), so this only shows while CF geo
+        // remains the source of truth.
+        if (typeof GPS !== 'undefined' && GPS.hint) {
+          GPS.hint(I18N.t('gps.cfGeoHint'), 'warn');
         }
       })
       .catch(() => { clearTimeout(timer); /* offline / abort — bỏ qua */ });
