@@ -249,10 +249,16 @@ const Geocoder = {
         p.city || p.county,
         p.state,
       ].filter(Boolean);
+      // For house/street entities Photon doesn't populate `p.name`, so
+      // the old `p.name || parts[0]` fallback set name = housenumber
+      // alone (e.g. "10" for a house at 10 Phan Chu Trinh). Prefer the
+      // "housenumber + street" pair — that's what the dropdown row and
+      // any downstream code reading `r.name` actually wants.
+      const fullStreet = [p.housenumber, p.street].filter(Boolean).join(' ');
       return {
         lat: coords[1],
         lng: coords[0],
-        name: p.name || parts[0] || I18N.t('geo.unnamed'),
+        name: p.name || fullStreet || parts[0] || I18N.t('geo.unnamed'),
         sub: parts.join(' · ') || (p.country || ''),
         _type: p.type || '',
         _osmKey: p.osm_key || '',
@@ -324,10 +330,13 @@ const Geocoder = {
         // for POI/street/house alike, so a naïve `hit.name || addr.road`
         // fallback would show "Phố Nguyễn Chí Thanh" instead of "Highlands
         // Coffee" for a POI whose road happens to be Nguyễn Chí Thanh.
-        // `display_name` always leads with the entity's own name (POI,
-        // street or admin unit), so try it BEFORE we fall through to the
-        // address components.
+        // For house entities, prefer "housenumber + road" so the dropdown
+        // row reads "10 Phố Phan Chu Trinh" not the naked "10" that
+        // display_name.split(',')[0] alone would give. `display_name`
+        // always leads with the entity's own name (POI, street or admin
+        // unit), so use it as the final text fallback.
         name: hit.name
+              || [addr.house_number, addr.road].filter(Boolean).join(' ')
               || (hit.display_name || '').split(',')[0].trim()
               || addr.road || addr.suburb || addr.city
               || I18N.t('geo.unnamed'),

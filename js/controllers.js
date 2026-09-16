@@ -3921,8 +3921,15 @@ const CommunityAddModal = {
       } else {
         this._pickedLat = r.lat;
         this._pickedLng = r.lng;
+        // Feedback trực quan: map + marker đã move; toast xác nhận pick
+        // đã ghi nhận. KHÔNG cần đè input để user thấy pick thành công.
+        showToast(`📍 ${r.name}${r.sub ? ' · ' + r.sub : ''}`, 2000);
       }
-      document.getElementById('cfLocSearch').value = r.name;
+      // KHÔNG overwrite cfLocSearch value — user gõ địa chỉ đầy đủ
+      // ("10 Phan Chu Trinh, Hoàn Kiếm, Hà Nội" kèm tầng/ngách nếu có)
+      // để lưu vào record; ghi đè bằng r.name (thường chỉ housenumber
+      // hoặc tên POI) sẽ mất thông tin. Coords + marker là feedback đủ
+      // cho pick — text address là "sở hữu" của người dùng.
       Geocoder.hide(document.getElementById('cfLocSuggest'));
       this._scheduleDupCheck();
       this._scheduleDraftSave();
