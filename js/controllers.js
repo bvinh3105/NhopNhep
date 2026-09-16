@@ -2893,6 +2893,7 @@ function communityCardHtml(r, groupCount = 0) {
   const _isMine = _cu && (r.created_by === _cu.id);
   const authorName = (author && author.name) || (_isMine && _cu.name) || I18N.t('common.anonymous');
   const authorId = (author && author.id) || r.created_by || '';
+  const isSaved = State.savedPosts.has(r.id);
 
   return `<div class="post-card comm-r-card" data-id="${r.id}">
     <div class="post-head">
@@ -2907,6 +2908,9 @@ function communityCardHtml(r, groupCount = 0) {
       <div class="post-actions">
         <button class="heart-btn" data-id="${r.id}"><span class="heart-ico">♡</span></button>
         <span class="heart-count">···</span>
+        <button class="post-action-btn comment-icon-btn" type="button" data-id="${r.id}" title="${I18N.t('comment.title')}">💬</button>
+        <button class="post-action-btn share-icon-btn" type="button" data-id="${r.id}" title="${I18N.t('detail.copyLink')}">📤</button>
+        <button class="post-action-btn save-icon-btn${isSaved ? ' on' : ''}" type="button" data-id="${r.id}" title="${I18N.t('detail.save')}">🔖</button>
         <span class="post-cat-pill" style="color:${cat.color};background:${cat.color}18">${cat.icon} ${cat.label}${priceLabel ? ' · ' + priceLabel : ''}</span>
       </div>
       <div class="post-caption"><b>${escapeHtml(r.name)}</b>${r.description ? ' ' + escapeHtml(r.description) : ''}</div>
@@ -2966,6 +2970,63 @@ function wireCarousels(container) {
   });
 }
 
+
+// Copy link tới 1 bài viết cộng đồng — dùng chung cho nút 📤 trên card feed
+// VÀ nút "📋 Sao chép link" trong CommunityDetailModal (trước đây code lặp
+// lại y hệt ở 2 nơi, giờ chỉ 1 chỗ).
+async function copyPostLink(id) {
+  const url = `${location.origin}/?q=${encodeURIComponent(id)}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast(I18N.t('toast.linkCopied'));
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); showToast(I18N.t('toast.linkCopied')); }
+    catch (_) { showToast(I18N.t('toast.linkCopyFail')); }
+    document.body.removeChild(ta);
+  }
+}
+
+// Toggle bookmark 1 bài (localStorage-only, không cần login) — dùng chung
+// cho nút 🔖 trên card feed VÀ nút "Lưu" trong CommunityDetailModal. Trả về
+// trạng thái MỚI (true = vừa lưu) để caller tự cập nhật UI của mình.
+function toggleSavedPost(id) {
+  const wasSaved = State.savedPosts.has(id);
+  if (wasSaved) State.savedPosts.delete(id);
+  else State.savedPosts.add(id);
+  Storage.save();
+  showToast(I18N.t(wasSaved ? 'toast.postUnsaved' : 'toast.postSaved'));
+  return !wasSaved;
+}
+
+// Bình luận/Chia sẻ/Lưu ngay trên card feed — share+save thực hiện thẳng
+// hành động (không cần mở modal); comment mở CommunityDetailModal và tự
+// cuộn tới ô nhập, vì bình luận cần cả ô nhập + danh sách, không "1 chạm
+// xong" được như 2 cái kia.
+function wireCardActions(container, items) {
+  container.querySelectorAll('.comment-icon-btn[data-id]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const r = items.find(x => x.id === btn.dataset.id);
+      if (r) CommunityDetailModal.open(r, { focusComment: true });
+    });
+  });
+  container.querySelectorAll('.share-icon-btn[data-id]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyPostLink(btn.dataset.id);
+    });
+  });
+  container.querySelectorAll('.save-icon-btn[data-id]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const nowSaved = toggleSavedPost(btn.dataset.id);
+      btn.classList.toggle('on', nowSaved);
+    });
+  });
+}
 
 // Heart button (feed posts) — same underlying vote mechanism as ☆, just a
 // separate wiring since the feed's icon/classes are ♡/♥ not ☆/★.
@@ -3506,6 +3567,7 @@ const CommunityCtrl = {
     wireAuthorButtons(list);
     wireCarousels(list);
     wireCardDetail(list, items);
+    wireCardActions(list, items);
   },
 };
 
@@ -3534,32 +3596,15 @@ const CommunityDetailModal = {
     document.getElementById('communityDetailSave').addEventListener('click', () => {
       const r = this._current;
       if (!r || !r.id) return;
-      const wasSaved = State.savedPosts.has(r.id);
-      if (wasSaved) State.savedPosts.delete(r.id);
-      else State.savedPosts.add(r.id);
-      Storage.save();
+      toggleSavedPost(r.id);
       this._syncSaveBtn();
-      showToast(I18N.t(wasSaved ? 'toast.postUnsaved' : 'toast.postSaved'));
     });
 
     // Copy shareable link — the boot handler in app.js reads ?q=<id>
     // and auto-opens this modal on load.
-    document.getElementById('communityDetailCopy').addEventListener('click', async () => {
+    document.getElementById('communityDetailCopy').addEventListener('click', () => {
       const r = this._current;
-      if (!r || !r.id) return;
-      const url = `${location.origin}/?q=${encodeURIComponent(r.id)}`;
-      try {
-        await navigator.clipboard.writeText(url);
-        showToast(I18N.t('toast.linkCopied'));
-      } catch (e) {
-        // Older browsers / permission denied: fallback via a hidden input
-        const ta = document.createElement('textarea');
-        ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
-        document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); showToast(I18N.t('toast.linkCopied')); }
-        catch (_) { showToast(I18N.t('toast.linkCopyFail')); }
-        document.body.removeChild(ta);
-      }
+      if (r && r.id) copyPostLink(r.id);
     });
 
     // Bình luận — nút Gửi + Enter đều submit. Delegated trên body vì
@@ -3586,7 +3631,9 @@ const CommunityDetailModal = {
     if (short) short.textContent = I18N.t(on ? 'detail.savedShort' : 'detail.saveShort');
   },
 
-  open(r) {
+  // opts.focusComment: true khi mở từ nút 💬 trên card feed — cuộn thẳng
+  // xuống ô nhập bình luận sau khi modal hiện, đỡ user phải tự cuộn tay.
+  open(r, opts = {}) {
     this._current = r;
     if (typeof Analytics !== 'undefined') Analytics.track('detail_open', {
       source: 'community',
@@ -3676,6 +3723,19 @@ const CommunityDetailModal = {
 
     this._syncSaveBtn();
     document.getElementById('communityDetailModal').classList.add('show');
+
+    // Ô nhập bình luận đã nằm sẵn trong template tĩnh ở trên (không đợi
+    // _loadComments() — danh sách comment có tải chậm thì ô nhập vẫn dùng
+    // được ngay). Delay nhỏ để đợi modal slide-up xong mới cuộn, không bị
+    // giật giữa lúc animation đang chạy.
+    if (opts.focusComment) {
+      setTimeout(() => {
+        const input = document.getElementById('cdmCommentInput');
+        if (!input) return;
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        input.focus();
+      }, 350);
+    }
   },
 
   // Truy vấn CHÍNH XÁC toàn bộ nhóm "cùng 1 quán" (kể cả bài không nằm
