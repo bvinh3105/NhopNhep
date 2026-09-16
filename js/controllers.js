@@ -144,7 +144,19 @@ const HomeCtrl = {
     };
 
     input.addEventListener('input', (e) => {
+      // Skip Vietnamese IME mid-composition — see locationPicker.js comment.
+      if (e.isComposing) return;
       const q = e.target.value.trim();
+      if (q.length < 3) { Geocoder.hide(suggest); return; }
+      reposition();
+      Geocoder.showLoading(suggest);
+      Geocoder.onInput('locInput', q, 450, (results) => {
+        reposition();
+        Geocoder.renderSuggestions(suggest, filterForRender(q, results), pick);
+      }, bias());
+    });
+    input.addEventListener('compositionend', () => {
+      const q = input.value.trim();
       if (q.length < 3) { Geocoder.hide(suggest); return; }
       reposition();
       Geocoder.showLoading(suggest);
@@ -3887,11 +3899,28 @@ const CommunityAddModal = {
     document.getElementById('cfSave').addEventListener('click', () => this._save());
 
     LocationPicker.initSearch('cfLocSearch', 'cfLocSuggest', (r) => {
-      this._pickedLat = r.lat;
-      this._pickedLng = r.lng;
+      // Big admin units (district / city / suburb / county / state) return
+      // their centroid as coords — dropping a pin there means the quán's
+      // "vị trí" ends up in the middle of Hoàn Kiếm, not at the actual
+      // address. In that case, DON'T set the marker or _pickedLat/_pickedLng
+      // (require tap-on-map for precision), just recenter with a wider
+      // zoom so the user sees the district and can tap the exact spot.
+      // For actual street/house/road hits, keep the previous behavior.
+      const bigAdmin = ['city','county','state','district','suburb','locality','village','hamlet']
+        .includes((r._type || '').toLowerCase());
       if (State.communityPickerMap) {
-        State.communityPickerMap.setView([r.lat, r.lng], 17);
-        LocationPicker.setMarker('communityPickerMap', 'communityPickerMarker', r.lat, r.lng, this._selectedCat);
+        State.communityPickerMap.setView([r.lat, r.lng], bigAdmin ? 14 : 17);
+        if (!bigAdmin) {
+          LocationPicker.setMarker('communityPickerMap', 'communityPickerMarker', r.lat, r.lng, this._selectedCat);
+        }
+      }
+      if (bigAdmin) {
+        this._pickedLat = null;
+        this._pickedLng = null;
+        showToast(I18N.t('toast.tapMapForPrecise'), 3000);
+      } else {
+        this._pickedLat = r.lat;
+        this._pickedLng = r.lng;
       }
       document.getElementById('cfLocSearch').value = r.name;
       Geocoder.hide(document.getElementById('cfLocSuggest'));

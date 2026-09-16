@@ -38,7 +38,26 @@ const LocationPicker = {
     };
 
     input.addEventListener('input', (e) => {
+      // Vietnamese IME (Telex/VNI) emits input events mid-composition, so
+      // "Hà" is seen as h, ha, ha`, hà across ~4 fires. Firing the geocoder
+      // on those intermediates wastes requests and shows garbled "no
+      // results" to the user before they finish typing. Skip until IME
+      // commits — a final 'input' event fires with isComposing=false.
+      if (e.isComposing) return;
       const q = e.target.value.trim();
+      if (q.length < 3) { Geocoder.hide(suggest); return; }
+      reposition();
+      Geocoder.showLoading(suggest);
+      Geocoder.onInput(inputId, q, 450, (results) => {
+        reposition();
+        Geocoder.renderSuggestions(suggest, filterForRender(q, results), onPick);
+      }, bias());
+    });
+    // Some IMEs fire the final commit as 'compositionend' without a
+    // trailing 'input'. Re-run the search from there so committed VN text
+    // never gets stuck waiting for a keystroke that never comes.
+    input.addEventListener('compositionend', () => {
+      const q = input.value.trim();
       if (q.length < 3) { Geocoder.hide(suggest); return; }
       reposition();
       Geocoder.showLoading(suggest);
