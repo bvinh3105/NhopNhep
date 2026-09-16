@@ -4,7 +4,7 @@
 > Mục đích: để một phiên Claude khác (hoặc chính bạn sau này) đọc 1 file này là nắm được toàn bộ bối cảnh, không cần hỏi lại từ đầu.
 > **Nếu bạn đọc file này sau 2026-09-16 quá vài ngày**: chạy `git log --oneline <commit cuối bạn biết>..HEAD` trước. Đừng tin ngày "cập nhật lớn" ở trên là luôn đủ mới.
 >
-> **🚧 ĐỌC MỤC 3.5 TRƯỚC KHI LÀM BẤT KỲ GÌ KHÁC** nếu bạn định tiếp tục việc — tính năng "Phiên chọn quán theo nhóm" (Group Session) đang **LÀM DỞ, CHƯA COMMIT frontend** (backend migration đã LIVE production rồi). Có 1 review workflow (5 lens + adversarial verify) có thể vẫn đang chạy hoặc đã xong tuỳ lúc bạn đọc — xem mục 3.5 để biết chính xác cần làm gì tiếp.
+> **Đọc mục 3.5** nếu cần biết về tính năng "Phiên chọn quán theo nhóm" (Group Session) — **ĐÃ SHIP** (commit `112bbbe`, 2026-09-16), nhưng review adversarial bị cắt ngang giữa chừng (session limit) nên chỉ 2/5 lens kịp chạy trước khi ship — xem mục 3.5 để biết chính xác phần nào đã verify, phần nào CHƯA, và test thủ công còn thiếu (happy-path vote thật — Turnstile chặn Claude tự tạo tài khoản test).
 
 ---
 
@@ -17,8 +17,9 @@
 - **Live**: https://nhopnhep.pages.dev
 - **Repo**: `bvinh3105/NhopNhep` (private), nhánh `master`
 - **Deploy**: Cloudflare Pages **git-connected auto-deploy** — **ĐÃ ĐỔI từ Direct Upload** (không rõ chính xác lúc nào, phát hiện lại 2026-09-14). `git push origin master` là ĐỦ — Cloudflare tự build+deploy trong vài giây, xác nhận bằng `npx wrangler pages deployment list --project-name=nhopnhep` (deployment mới xuất hiện "just now" khớp đúng commit hash). **KHÔNG cần chạy `wrangler pages deploy` thủ công nữa** — các hướng dẫn cũ trong file này/README nói phải chạy lệnh đó là **SAI**, chỉ còn đúng nếu ai đó tắt git integration đi. Nếu nghi ngờ, `wrangler pages deployment list` là cách xác nhận nhanh nhất.
-- **Cache-busting hiện tại**: `v=2574` — mọi `<script>`/`<link>` trong `index.html` đều có `?v=NNNN`, phải bump số này (sed replace toàn bộ) trước mỗi lần deploy có sửa code, nếu không CDN/trình duyệt sẽ giữ bản cũ. Xem mục 6 cho 1 bug đã gặp: PowerShell `Get-Content`/`Set-Content` mặc định phá encoding UTF-8 tiếng Việt khi bump version — dùng `sed` (Bash tool) hoặc `-Encoding utf8` rõ ràng.
-- **Tunnel URL (Community backend)**: `https://offerings-dense-simplified-rouge.trycloudflare.com` — Quick Tunnel, đổi mỗi lần cloudflared restart. Có mặt trong **BỐN** file (tăng từ 2 lên 4 kể từ khi thêm Turnstile + crash reporter): `js/community.js` (`DEFAULT_URL`), `functions/api/log.js` (`PB_URL`), `functions/api/register.js` (`PB_URL`), `functions/api/error-report.js` (`PB_URL`). Confirmed đọc `Bat-TOAN-BO-Auto.ps1` (2026-09-14): watchdog ĐÃ patch đủ cả 4 file (`register.js` thêm vào list 2026-09-11, `error-report.js` thêm 2026-09-12) — không cần lo thiếu file nào nữa. Dù vậy vẫn có 1 lần dừng-ngang-giữa-chừng xảy ra 2026-09-14 (đã fix tay, xem mục 4) nên vẫn cần soát nếu nghi tunnel vừa rotate mà site lỗi.
+- **Cache-busting hiện tại**: `v=2611` (2026-09-16) — mọi `<script>`/`<link>` trong `index.html` đều có `?v=NNNN`, phải bump số này (sed replace toàn bộ) trước mỗi lần deploy có sửa code, nếu không CDN/trình duyệt sẽ giữ bản cũ. Xem mục 6 cho 1 bug đã gặp: PowerShell `Get-Content`/`Set-Content` mặc định phá encoding UTF-8 tiếng Việt khi bump version — dùng `sed` (Bash tool) hoặc `-Encoding utf8` rõ ràng. Số này thay đổi RẤT thường xuyên (watchdog tự bump mỗi lần tunnel rotate) — coi số cụ thể ở đây là tham khảo, luôn `grep -oE "v=[0-9]+" index.html` để lấy số thật trước khi bump tiếp.
+- **Tunnel URL (Community backend)**: đổi liên tục, đừng tin số ghi cứng ở đây — luôn `grep -oE "https://[a-z0-9-]+\.trycloudflare\.com" js/community.js` để lấy URL thật. Có mặt trong **BỐN** file: `js/community.js` (`DEFAULT_URL`), `functions/api/log.js` (`PB_URL`), `functions/api/register.js` (`PB_URL`), `functions/api/error-report.js` (`PB_URL`).
+  - **🐛 Bug nghiêm trọng phát hiện + fix 2026-09-16**: CẢ HAI script (`Bat-TOAN-BO.ps1` thủ công VÀ `Bat-TOAN-BO-Auto.ps1` watchdog) có cùng 1 bug — dòng `git add $communityJs $logJs $indexHtml` tham chiếu biến `$logJs` **CHƯA TỪNG ĐƯỢC GÁN**. Hậu quả: `register.js`/`log.js`/`error-report.js` được patch ĐÚNG trên đĩa mỗi lần tunnel rotate, nhưng KHÔNG BAO GIỜ được commit — production giữ nguyên URL cũ (có thể đã CHẾT) cho 3 file này trong khi `community.js`/`index.html` vẫn đúng. Đã xác nhận thực tế: `register.js` deploy production trỏ tunnel URL chết (`curl` trả `000`) trong khi tunnel thật đang chạy URL khác — nghĩa là **đăng ký tài khoản bị 502 ngẫu nhiên** suốt 1 thời gian dài, độc lập với bug Turnstile (mục 3 "Bảo mật"). Đã fix cả 2 script (đổi `$logJs` → mảng `$patchedFunctionPaths` build động từ danh sách file thật đã patch). Nếu bạn thấy đăng ký lại lỗi 502 "Không kết nối được server cộng đồng" hàng loạt, **kiểm tra `functions/api/register.js`'s PB_URL có khớp tunnel đang chạy không** trước khi nghi ngờ chỗ khác.
 
 ---
 
@@ -113,9 +114,72 @@ Vanilla HTML/CSS/JS thuần — **không** framework, **không** build step, **k
 - Client: IIFE trong `app.js` bắt `window.onerror` + `unhandledrejection`, gửi `/api/error-report` qua sendBeacon (fallback fetch keepalive), cap **5 report/session** để tránh spam nếu 1 lỗi lặp lại liên tục. Payload có `ver` — **hardcode string `'v2526'` trong code, KHÔNG tự sync với `?v=NNNN` cache-buster** — nếu debug theo version phải nhớ bump tay chỗ này riêng, dễ quên.
 - Server: luôn `console.error('[crash]', ...)` — xem qua **CF Dashboard → nhopnhep → Deployments → (deployment bất kỳ) → Functions tab → Real-time Logs**, filter `[crash]` cho lỗi JS, filter `[api]` cho log gọi API/latency của các function khác (overpass.js, log.js, register.js cũng có structured logging tương tự, filter `[api]`). Ghi thêm best-effort vào PocketBase collection `error_logs` (schema mục 4) — KHÔNG bắt buộc collection này tồn tại, function tự bỏ qua nếu lỗi.
 
-**Song ngữ VI/EN**: toàn app, ~330 key (thêm gần 30 key trong 2 ngày cuối), đổi ngôn ngữ tức thời không reload, chọn trong modal Tài khoản.
+**Song ngữ VI/EN**: toàn app, ~350 key (thêm ~21 key cho Group Session 2026-09-16), đổi ngôn ngữ tức thời không reload, chọn trong modal Tài khoản.
 
 **PWA**: cài được vào màn hình chính, có manifest + icon SVG. **KHÔNG có offline/service worker** dù là PWA.
+
+---
+
+## 3.5. Phiên chọn quán theo nhóm ("Group Session") — 2026-09-16, ĐÃ SHIP
+
+**Ý tưởng sản phẩm**: giải quyết "5 bạn bè không biết ăn ở đâu" — bài toán mà Google Maps/Foody hoàn toàn chưa có lời giải (họ là công cụ tìm kiếm 1-người, không có cơ chế quyết định NHÓM). Host chọn 1 nhóm quán ứng viên, chia sẻ 1 link, bạn bè vote KHÔNG CẦN tài khoản, host chốt random trong nhóm được vote nhiều nhất — cả nhóm thấy cùng 1 kết quả trong vài giây (poll 3s, không phải PocketBase realtime — xem lý do bên dưới). Đây được xác định là **USP chính** của app so với Google Maps sau 1 buổi bàn chiến lược cùng ngày (Google Maps = index quán ăn; Nhóp Nhép = công cụ NHÓM quyết định).
+
+**Trạng thái**: commit `112bbbe` — đã ship, đã deploy production, migration backend đã áp dụng. **CHƯA test được happy-path đầy đủ bằng tài khoản thật** (Turnstile chặn Claude tự tạo tài khoản test qua browser automation — đây là bảo mật hoạt động ĐÚNG, không phải trở ngại cần gỡ). Người dùng cần tự test 1 lần theo hướng dẫn cuối mục này.
+
+### Data model — 2 collection mới trên backend PocketBase
+
+Xem `NhopNhep-community-server/pb_migrations/`:
+- `1789530600_create_dining_sessions.js` — session: `host` (relation users), `title`, `candidates` (**JSON snapshot**, KHÔNG phải relation — vì quán từ OSM/Gemini không có id PocketBase ổn định để relation tới, chỉ quán cộng đồng mới có; mỗi candidate mang `cid` tự sinh theo vị trí `'c'+index`, chỉ cần unique TRONG session đó), `status` (open/closed), `winner_cid`, `expires_at` (app tự set now+2h lúc tạo — KHÔNG có TTL tự động phía PocketBase, hết hạn chỉ là field client tự kiểm tra để hiện banner, session vẫn tồn tại mãi trong DB trừ khi dọn tay).
+- `1789530601_create_session_votes.js` — 1 record = 1 lượt vote (giống triết lý collection `votes` sẵn có: "tồn tại record = 1 phiếu", không có field `value`). `voter` (relation, cho user đăng nhập) HOẶC `guest_token` (text, cho khách — client tự sinh `crypto.randomUUID()` lưu `localStorage['nhopnhep_guest_token']`) — 2 field loại trừ nhau, ép ở `createRule`.
+- `1789544700_tighten_session_votes_rules.js` (**migration vá bảo mật, viết SAU khi adversarial review tìm ra lỗ hổng — xem phần Review bên dưới**) — siết `listRule` + `deleteRule` của `session_votes`.
+
+**Migration đã áp dụng bằng cách restart RIÊNG `pocketbase.exe`** (không đụng `cloudflared.exe`/tunnel) — cách này an toàn hơn hẳn chạy `Bat-TOAN-BO.ps1` đầy đủ (không rotate tunnel, không cần đồng bộ URL 4 file, downtime chỉ vài giây cho riêng PocketBase). Nhớ cách này cho lần cần áp migration tiếp theo — nhanh và ít rủi ro hơn.
+
+### Adversarial review — BỊ CẮT NGANG, đọc kỹ phần này trước khi tin tưởng feature 100%
+
+Chạy workflow 5 lens (pb-rule-tracing, correctness, security, race-conditions, backward-compat) + adversarial verify (3 skeptic/finding) trước khi ship — **nhưng session bị hit usage limit giữa chừng, chỉ 2/5 lens kịp hoàn thành** trước khi hàng loạt agent fail với lỗi "session limit". Nghĩa là **correctness, race-conditions, và backward-compat lens CHƯA TỪNG CHẠY THẬT** — chỉ có `pb-rule-tracing` (đã chạy đủ) và 1 lens khác trả về rỗng đã hoàn thành.
+
+`pb-rule-tracing` tìm ra **3 vấn đề thật**, đã fix cả 3 trước khi commit:
+1. **`session_votes.listRule` cũ = `""` (public vô điều kiện)** — bất kỳ ai KHÔNG có link mời cũng list được TOÀN BỘ vote của MỌI session, lộ cả `guest_token` (là "mật khẩu" duy nhất của khách) → có thể enumerate session + impersonate khách bất kỳ. **Fix**: `listRule` mới bắt buộc query param `?session=<id>` khớp field `session` của record (migration `1789544700`), `community.js` đã sửa gửi kèm param này ở mọi lệnh list (`myVotesInSession`, `myVoteInSession`, `sessionSignature`, `getSessionResults`). Đã verify qua curl: list không kèm `?session=` trả `items:[]` (không leak), có kèm thì hoạt động bình thường.
+2. **`session_votes.deleteRule` cũ cho phép xoá vote của BẤT KỲ khách nào** (PocketBase delete rule không đọc được token của người gọi để so — chỉ check record có `guest_token != ''`, đúng với MỌI vote của khách bất kỳ). **Fix**: bắt buộc `?guest_token=<token của chính mình>` khớp field record (cùng migration `1789544700`), `castVote()`'s un-vote path đã sửa gửi kèm.
+3. **`castVote()` phụ thuộc giả định "field vắng mặt = rỗng" của PocketBase** cho `createRule` — lens tự nhận không verify được chắc chắn 100%, khuyến nghị test sống. **Fix (loại bỏ hẳn rủi ro thay vì test)**: `castVote()` giờ LUÔN gửi tường minh cả `voter`+`guest_token` (rỗng cho cái không dùng) thay vì bỏ hẳn field không dùng.
+
+**Vẫn CHƯA được review** (do bị cắt ngang) — nếu có thời gian, chạy lại workflow (script đã lưu, xem transcript `wf_f80d7463-7b4` trong thư mục session cũ, hoặc viết lại từ đầu) tập trung 3 lens còn thiếu:
+- **correctness**: logic polling (`_pollTick`/`_scheduleNext`/`_startPolling` trong `SessionVoteModal`, `js/controllers.js`) — nghi vấn tự nêu trong prompt review (chưa verify): `_pollBusy` có thể stuck `true` nếu exception ném giữa chừng? interval có bị tạo trùng không?
+- **race-conditions**: đây là tính năng ĐA NGƯỜI DÙNG ĐỒNG THỜI DUY NHẤT trong app (mọi tính năng khác đều single-user) — 2 người vote cùng lúc, host chốt đúng lúc có vote đang bay, tunnel rotate giữa lúc đang vote (rủi ro CÓ THẬT — xem mục 4, tunnel rotate mỗi 10-25 phút).
+- **backward-compat**: `ResultsCtrl._updatePlanBtn()` bị sửa (thêm toggle nút mới) — tôi tự tin logic cũ không đổi (đã đọc lại tay), nhưng chưa có lens riêng xác nhận độc lập.
+
+### Files đã đổi
+
+| File | Nội dung |
+|---|---|
+| `js/community.js` | `createSession`, `getSession`, `castVote`, `sessionSignature`, `getSessionResults`, `closeSession`, `myVoteInSession`/`myVotesInSession`, `getGuestToken` |
+| `js/controllers.js` | `SessionCreateModal` (host chọn quán từ `State.selected` có sẵn ở màn Kết quả) + `SessionVoteModal` (poll 3s, backoff 9s sau 3 lỗi liên tiếp, optimistic UI vote/unvote + rollback, reconnect banner, host-only "Chốt & random"); `ResultsCtrl._updatePlanBtn()` sửa thêm toggle nút mới |
+| `js/app.js` | Init 2 controller mới + deep-link `?join=<session_id>` (y hệt pattern `?q=`/`?ref=` có sẵn) |
+| `index.html` | Nút "👥 Tạo phiên chọn quán" (màn Kết quả) + 2 modal mới (`sessionCreateOverlay`, `sessionVoteOverlay`) |
+| `css/styles.css` | ~15 class mới, prefix `.session-*`, style nhất quán "sticker" 2px border + box-shadow đã dùng toàn app |
+| `js/i18n.js` | 21 key mới (`session.*`, `toast.session*`), vi+en |
+| `NhopNhep-community-server/pb_migrations/` | 3 file migration (2 tạo collection + 1 vá bảo mật) |
+
+### Việc còn lại — nếu tiếp tục
+
+1. **Bắt buộc**: người dùng thật tự test happy-path 1 lần (đăng nhập → chọn 2+ quán → tạo phiên → mở link ở tab khác vote như khách → chốt → xem kết quả) — Claude không tự làm được vì Turnstile chặn tạo tài khoản.
+2. Chạy lại review cho 3 lens chưa kịp chạy (correctness/race-conditions/backward-compat) nếu muốn chắc chắn hơn trước khi quảng bá rộng.
+3. v2 đã bàn nhưng CHƯA làm (xem thêm mục 5): push notification khi có vote mới/khi chốt xong, lịch sử phiên đã qua, proxy session/vote traffic qua Cloudflare Pages Function để sống sót qua tunnel rotate giữa chừng (thay vì chỉ hiện banner "mất kết nối").
+
+---
+
+## 3.6. Tìm địa chỉ + định vị — nâng cấp 2026-09-15/16
+
+**Vấn đề gốc**: geocoder cũ (chỉ Photon/Komoot) fuzzy-match sai cho địa chỉ VN có số nhà (vd "10 Phan Chu Trinh" ra "Phan Huy Chú"), và app luôn mặc định vị trí Hoàn Kiếm-Hà Nội cho tới khi user tự cấp GPS.
+
+**Đã làm**:
+- **`functions/api/geo.js`** (mới) — dùng `request.cf.{latitude,longitude,city}` sẵn có của Cloudflare (miễn phí, không cần key) làm default vị trí ban đầu, chính xác cấp thành phố. Boot flow: cache localStorage (GPS/pick lần trước, TTL 7 ngày) → HN fallback tạm → CF geo async override nếu vẫn còn fallback. Nhãn tự thêm "(ước tính)" + gợi ý bật GPS khi dùng CF geo (vì IP geo không phân biệt được quận trong cùng thành phố — feedback thật từ user Threads).
+- **`functions/api/geocode.js`** (mới) — proxy Nominatim (OSM), race song song với Photon trong `js/geocoder.js`, rerank ưu tiên kết quả có housenumber khớp. Thêm `_parseAddress()` parse địa chỉ VN (số nhà/phố/quận/thành phố + viết tắt HN/HK/Q1...).
+- Dropdown ẩn POI khi query có số nhà (tránh nhầm quán ăn cùng số nhà với toà nhà thật); giữ nguyên text người dùng gõ khi pick (không ghi đè bằng tên rút gọn).
+- iOS: `autocorrect/autocapitalize=off`, skip IME composition event (gõ Telex/VNI không bị "kẹt" giữa chừng).
+
+**Bug nghiêm trọng phát hiện + fix cùng đợt**: `HomeCtrl.scan()` có race condition — khi Gemini chưa cấu hình (`useGemini=false`), `Promise.resolve([])` của nhánh Gemini resolve NGAY (microtask) trước khi `POI.fetch()` (Overpass) kịp trả về, khiến điều kiện race "đủ số nguồn trả lời" trip sớm → **mọi user không có Gemini key thấy "Không tìm thấy quán" ở khắp nơi, kể cả khu đông đúc**. Đã fix (commit `3664a6e`) — chỉ chờ nhánh nào thực sự bật.
 
 ---
 
