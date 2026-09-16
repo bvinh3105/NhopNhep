@@ -19,7 +19,7 @@ const Community = {
   // override for whenever this goes stale before a redeploy catches up.
   DEFAULT_URL: (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
     ? 'http://127.0.0.1:8090'
-    : 'https://backing-texture-entrepreneurs-peace.trycloudflare.com',
+    : 'https://operation-tiny-cotton-seem.trycloudflare.com',
   get BASE_URL() {
     return (localStorage.getItem('community_api_url') || this.DEFAULT_URL).replace(/\/$/, '');
   },
@@ -683,5 +683,130 @@ const Community = {
       const ok = smaller && smaller.type === mime && smaller.size < blob.size;
       resolve({ blob: ok ? smaller : blob, ext });
     }, mime, 0.62);
+  },
+
+  // ── Group Session ("Phiên chọn quán theo nhóm") ─────────────────────────
+  // Host chọn 1 nhóm quán ứng viên (từ kết quả quét OSM/Gemini HOẶC quán
+  // cộng đồng), chia sẻ 1 link, bạn bè vote, host chốt random trong nhóm
+  // được vote nhiều nhất. Candidates lưu SNAPSHOT dạng JSON trên chính
+  // session record — không phải relation tới `restaurants` — vì quán từ
+  // OSM/Gemini không có id PocketBase ổn định để relation tới.
+  //
+  // Vote không bắt buộc đăng nhập: user có tài khoản dùng `voter`, khách
+  // dùng `guest_token` tự sinh lưu localStorage (2 field loại trừ nhau,
+  // ép ở server-side rule) — đổi lấy friction thấp nhất cho người được mời,
+  // chấp nhận khách có thể tự xoá localStorage để vote lại (nhóm bạn bè
+  // tin tưởng nhau, không phải bình chọn công khai).
+
+  GUEST_TOKEN_KEY: 'nhopnhep_guest_token',
+  getGuestToken() {
+    try {
+      let t = localStorage.getItem(this.GUEST_TOKEN_KEY);
+      if (!t) {
+        t = (crypto.randomUUID && crypto.randomUUID())
+          || `g_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        localStorage.setItem(this.GUEST_TOKEN_KEY, t);
+      }
+      return t;
+    } catch (_) { return `g_${Date.now()}`; }
+  },
+
+  // Host only. candidates: [{cid, name, address, lat, lng, category,
+  // photo_url, source}] — source ∈ 'community' | 'osm' | 'gemini'.
+  async createSession({ title = '', candidates = [], expiresInHours = 2 } = {}) {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    const body = {
+      host: this.currentUser.id,
+      title,
+      candidates,
+      status: 'open',
+      expires_at: new Date(Date.now() + expiresInHours * 3600 * 1000).toISOString(),
+    };
+    return this._fetch('/api/collections/dining_sessions/records', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+
+  // Public — works for host, guest, or any logged-in participant. Session
+  // viewRule is fully public (see backend migration) so ?join=<id> works
+  // with zero auth, same as SavedListModal's ?q=<id> deep link.
+  async getSession(id) {
+    return this._fetch(`/api/collections/dining_sessions/records/${id}`);
+  },
+
+  // Toàn bộ vote của CHÍNH MÌNH trong 1 session (không lọc candidate) — để
+  // render "đã vote quán nào" trong danh sách mà không cần N query riêng
+  // lẻ cho N candidate mỗi lần poll.
+  async myVotesInSession(sessionId) {
+    const isGuest = !this.isLoggedIn();
+    const who = isGuest ? `guest_token="${this.getGuestToken()}"` : `voter="${this.currentUser.id}"`;
+    const filter = `session="${sessionId}" && ${who}`;
+    const r = await this._fetch(`/api/collections/session_votes/records?perPage=200&filter=${encodeURIComponent(filter)}`);
+    if (!r.ok) return new Set();
+    return new Set(r.data.items.map(v => v.candidate_ref));
+  },
+
+  async myVoteInSession(sessionId, candidateRef) {
+    const isGuest = !this.isLoggedIn();
+    const who = isGuest
+      ? `guest_token="${this.getGuestToken()}"`
+      : `voter="${this.currentUser.id}"`;
+    const filter = `session="${sessionId}" && candidate_ref="${candidateRef}" && ${who}`;
+    const r = await this._fetch(`/api/collections/session_votes/records?filter=${encodeURIComponent(filter)}`);
+    return (r.ok && r.data.items[0]) || null;
+  },
+
+  // Toggle — tap để vote, tap lại để bỏ vote (giống toggleVote() ở trên,
+  // nhưng KHÔNG cần login: khách dùng guest_token thay voter).
+  async castVote(sessionId, candidateRef) {
+    const existing = await this.myVoteInSession(sessionId, candidateRef);
+    if (existing) {
+      return this._fetch(`/api/collections/session_votes/records/${existing.id}`, { method: 'DELETE' });
+    }
+    const body = { session: sessionId, candidate_ref: candidateRef };
+    if (this.isLoggedIn()) body.voter = this.currentUser.id;
+    else body.guest_token = this.getGuestToken();
+    return this._fetch('/api/collections/session_votes/records', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+
+  // Cheap poll probe — gọi mỗi ~3s trong lúc màn vote đang mở; chỉ khi
+  // signature đổi mới cần gọi getSessionResults() (nặng hơn, tally đầy đủ).
+  async sessionSignature(sessionId) {
+    const q = new URLSearchParams({
+      page: 1, perPage: 1, sort: '-updated',
+      filter: `session="${sessionId}"`, fields: 'id,updated',
+    });
+    const r = await this._fetch(`/api/collections/session_votes/records?${q}`, { timeoutMs: 8000 });
+    if (!r.ok || !r.data) return null;
+    const top = (r.data.items && r.data.items[0]) || null;
+    return { sig: `${r.data.totalItems}|${top ? top.updated : ''}`, total: r.data.totalItems || 0 };
+  },
+
+  // Tally đầy đủ — fetch toàn bộ vote của session, gộp theo candidate_ref.
+  async getSessionResults(sessionId) {
+    const q = new URLSearchParams({ perPage: 200, filter: `session="${sessionId}"` });
+    const r = await this._fetch(`/api/collections/session_votes/records?${q}`);
+    if (!r.ok) return r;
+    const counts = {};
+    for (const v of r.data.items) counts[v.candidate_ref] = (counts[v.candidate_ref] || 0) + 1;
+    return { ok: true, data: counts };
+  },
+
+  // Host only — chốt phiên + lưu quán thắng cuộc. Random pick tự thân chạy
+  // client-side TRƯỚC khi gọi hàm này (xem SessionVoteModal._pickWinner) —
+  // đây chỉ persist kết quả để mọi người cùng thấy ở lần poll kế tiếp.
+  async closeSession(sessionId, winnerCid) {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    return this._fetch(`/api/collections/dining_sessions/records/${sessionId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'closed', winner_cid: winnerCid }),
+    });
   },
 };

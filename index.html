@@ -25,7 +25,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2606">
+<link rel="stylesheet" href="css/styles.css?v=2607">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -176,6 +176,7 @@
   <div class="restaurant-grid" id="restaurantGrid"></div>
 
   <div class="results-action">
+    <button class="session-create-btn" id="sessionCreateBtn" disabled data-i18n="session.createBtn">👥 Tạo phiên chọn quán</button>
     <button class="action-btn" id="planBtn" disabled data-i18n="results.schedule">Lên lịch</button>
   </div>
 </div>
@@ -188,6 +189,60 @@
     <div class="rp-modal-actions">
       <button class="rp-btn rp-btn-retry" id="rpRetryBtn" data-i18n="randomPick.retry">🎲 Chọn lại</button>
       <button class="rp-btn rp-btn-go" id="rpGoBtn" data-i18n="randomPick.go">Đi thôi →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     GROUP SESSION — "Phiên chọn quán theo nhóm"
+     Host chọn quán ứng viên từ kết quả quét/đăng cộng đồng, chia sẻ
+     link, bạn bè vote (không cần tài khoản), host chốt random trong
+     nhóm được vote nhiều nhất.
+═══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="sessionCreateOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" data-i18n="session.createTitle">👥 Tạo phiên chọn quán</div>
+    <div class="modal-sub" data-i18n="session.createSub">Bạn bè vote, random chọn trong nhóm được thích nhiều nhất</div>
+    <div class="form-group">
+      <label class="form-label" data-i18n="session.titleLabel">Tên phiên (tuỳ chọn)</label>
+      <input class="form-input" id="sessionCreateTitle" type="text" data-i18n="session.titlePlaceholder" data-i18n-attr="placeholder" placeholder="VD: Tối nay ăn gì đây" maxlength="100" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label class="form-label" data-i18n="session.candidatesLabel">Quán ứng viên</label>
+      <div id="sessionCreateList" class="session-cand-list"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn-cancel" id="sessionCreateClose" data-i18n="common.cancel">Huỷ</button>
+      <button class="btn-save" id="sessionCreateSave" data-i18n="session.createSave">Tạo phiên</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="sessionVoteOverlay">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="sessionVoteTitle">👥 Phiên chọn quán</div>
+    <div class="modal-sub" id="sessionVoteSub"></div>
+
+    <div class="session-invite-row" id="sessionInviteRow">
+      <input class="form-input" id="sessionInviteLink" type="text" readonly autocomplete="off">
+      <button class="session-copy-btn" id="sessionInviteCopy" data-i18n="session.copyLink" data-i18n-attr="title" title="Sao chép link">🔗</button>
+    </div>
+
+    <div class="session-reconnect-banner hidden" id="sessionReconnectBanner" data-i18n="session.reconnecting">⚠️ Mất kết nối server, thử tải lại trang</div>
+    <div class="session-expired-banner hidden" id="sessionExpiredBanner" data-i18n="session.expiredBanner">⏰ Phiên đã hết hạn</div>
+
+    <div id="sessionVoteList" class="session-vote-list"></div>
+
+    <div class="session-winner-banner hidden" id="sessionWinnerBanner">
+      <div class="session-winner-title" data-i18n="session.winnerTitle">🎉 Đã chọn xong!</div>
+      <div class="session-winner-name" id="sessionWinnerName"></div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-cancel" id="sessionVoteClose" data-i18n="common.close">Đóng</button>
+      <button class="btn-save hidden" id="sessionVoteCloseSession" data-i18n="session.closeAndRandom">🎲 Chốt &amp; random</button>
     </div>
   </div>
 </div>
@@ -710,19 +765,19 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2606"></script>
-<script src="js/i18n.js?v=2606"></script>
-<script src="js/utils.js?v=2606"></script>
-<script src="js/state.js?v=2606"></script>
-<script src="js/poi.js?v=2606"></script>
-<script src="js/geocoder.js?v=2606"></script>
-<script src="js/gemini.js?v=2606"></script>
-<script src="js/community.js?v=2606"></script>
-<script src="js/push.js?v=2606"></script>
-<script src="js/analytics.js?v=2606"></script>
-<script src="js/map.js?v=2606"></script>
-<script src="js/gps.js?v=2606"></script>
-<script src="js/locationPicker.js?v=2606"></script>
+<script src="js/security.js?v=2607"></script>
+<script src="js/i18n.js?v=2607"></script>
+<script src="js/utils.js?v=2607"></script>
+<script src="js/state.js?v=2607"></script>
+<script src="js/poi.js?v=2607"></script>
+<script src="js/geocoder.js?v=2607"></script>
+<script src="js/gemini.js?v=2607"></script>
+<script src="js/community.js?v=2607"></script>
+<script src="js/push.js?v=2607"></script>
+<script src="js/analytics.js?v=2607"></script>
+<script src="js/map.js?v=2607"></script>
+<script src="js/gps.js?v=2607"></script>
+<script src="js/locationPicker.js?v=2607"></script>
 <!-- Trip name dialog — thay thế window.prompt() native -->
 <div class="trip-name-overlay" id="tripNameOverlay" role="dialog" aria-modal="true">
   <div class="trip-name-card">
@@ -735,8 +790,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2606"></script>
-<script src="js/app.js?v=2606"></script>
+<script src="js/controllers.js?v=2607"></script>
+<script src="js/app.js?v=2607"></script>
 
 </body>
 </html>
