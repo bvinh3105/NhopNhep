@@ -131,6 +131,18 @@ const HomeCtrl = {
 
     const bias = () => ({ nearLat: State.userLat, nearLng: State.userLng });
 
+    // Same POI-hide policy as LocationPicker.initSearch({ hidePoiOnAddress: true }):
+    // when the query has a housenumber, drop POI-typed hits so the dropdown
+    // and Enter land on the address, not a nearby café that shares the number.
+    // Never returns empty when input was non-empty — falls back to raw
+    // results if the address filter would zero out the list.
+    const filterForRender = (q, results) => {
+      const parsed = Geocoder.parseAddress(q);
+      if (!parsed.housenumber) return results;
+      const addressOnly = results.filter(r => Geocoder.isAddressType(r));
+      return addressOnly.length ? addressOnly : results;
+    };
+
     input.addEventListener('input', (e) => {
       const q = e.target.value.trim();
       if (q.length < 3) { Geocoder.hide(suggest); return; }
@@ -138,7 +150,7 @@ const HomeCtrl = {
       Geocoder.showLoading(suggest);
       Geocoder.onInput('locInput', q, 450, (results) => {
         reposition();
-        Geocoder.renderSuggestions(suggest, results, pick);
+        Geocoder.renderSuggestions(suggest, filterForRender(q, results), pick);
       }, bias());
     });
 
@@ -152,7 +164,8 @@ const HomeCtrl = {
       Geocoder.showLoading(suggest);
       const results = await Geocoder.search(q, bias());
       reposition();
-      if (results.length) { pick(results[0]); }
+      const filtered = filterForRender(q, results);
+      if (filtered.length) { pick(filtered[0]); }
       else { Geocoder.renderSuggestions(suggest, [], pick); }
     });
 

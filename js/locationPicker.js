@@ -10,7 +10,16 @@
 const LocationPicker = {
   // Wires <input id=inputId> + <div id=suggestId> (Geocoder-style dropdown).
   // onPick(result) is called both on suggestion click and on Enter.
-  initSearch(inputId, suggestId, onPick) {
+  //
+  // opts.hidePoiOnAddress (default false):
+  //   When true, if the user's query parses to an address that includes a
+  //   housenumber (e.g. "10 Phan Chu Trinh"), hide POI-typed results in
+  //   the dropdown so tapping doesn't land on "Highlands Coffee, 10 Phan
+  //   Chu Trinh" when they wanted the actual building. Never hides if the
+  //   filter would leave the list empty (better to show POIs than nothing).
+  //   Off by default so CommunityAddModal can still add POIs by name.
+  initSearch(inputId, suggestId, onPick, opts = {}) {
+    const hidePoiOnAddress = !!opts.hidePoiOnAddress;
     const input = document.getElementById(inputId);
     const suggest = document.getElementById(suggestId);
     if (!input || !suggest) return;
@@ -19,6 +28,15 @@ const LocationPicker = {
 
     const bias = () => ({ nearLat: State.userLat, nearLng: State.userLng });
 
+    // Apply POI hide only when the query has a housenumber (per product spec).
+    const filterForRender = (q, results) => {
+      if (!hidePoiOnAddress) return results;
+      const parsed = Geocoder.parseAddress(q);
+      if (!parsed.housenumber) return results;
+      const addressOnly = results.filter(r => Geocoder.isAddressType(r));
+      return addressOnly.length ? addressOnly : results;
+    };
+
     input.addEventListener('input', (e) => {
       const q = e.target.value.trim();
       if (q.length < 3) { Geocoder.hide(suggest); return; }
@@ -26,7 +44,7 @@ const LocationPicker = {
       Geocoder.showLoading(suggest);
       Geocoder.onInput(inputId, q, 450, (results) => {
         reposition();
-        Geocoder.renderSuggestions(suggest, results, onPick);
+        Geocoder.renderSuggestions(suggest, filterForRender(q, results), onPick);
       }, bias());
     });
 
@@ -39,10 +57,12 @@ const LocationPicker = {
       Geocoder.showLoading(suggest);
       const results = await Geocoder.search(q, bias());
       reposition();
+      // Keyboard-pick uses the same filter so Enter matches what the user sees.
       // Address-shaped hits first so Enter doesn't land on a nearby
       // landmark POI when the user typed an actual address.
-      const addressFirst = results.filter(r => Geocoder.isAddressType(r));
-      const pool = addressFirst.length ? addressFirst : results;
+      const filtered = filterForRender(q, results);
+      const addressFirst = filtered.filter(r => Geocoder.isAddressType(r));
+      const pool = addressFirst.length ? addressFirst : filtered;
       if (pool.length) onPick(pool[0]);
       else Geocoder.renderSuggestions(suggest, [], onPick);
     });
