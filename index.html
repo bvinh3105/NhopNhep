@@ -25,7 +25,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2613">
+<link rel="stylesheet" href="css/styles.css?v=2614">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -530,7 +530,11 @@
   <div class="modal-sheet detail-sheet">
     <div class="modal-handle"></div>
     <div id="communityDetailBody"></div>
-    <div class="detail-quick-actions">
+    <!-- Ẩn — trùng chức năng với 📤🔖 đã có ngay trên card feed (bấm 1 chạm,
+         không cần mở modal), giữ 2 nút này trong DOM (không xoá) vì
+         _syncSaveBtn()/copyPostLink() vẫn tham chiếu id này; JS wiring giữ
+         nguyên, chỉ ẩn UI qua class hidden. -->
+    <div class="detail-quick-actions hidden">
       <button type="button" class="quick-action-btn" id="communityDetailSave" data-i18n="detail.save" data-i18n-attr="title" title="Lưu vào 'Đã lưu'">🔖 <span data-i18n="detail.saveShort">Lưu</span></button>
       <button type="button" class="quick-action-btn" id="communityDetailCopy" data-i18n="detail.copyLink" data-i18n-attr="title" title="Sao chép link đến quán này">📋 <span data-i18n="detail.copyLinkShort">Sao chép link</span></button>
     </div>
@@ -765,19 +769,19 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2613"></script>
-<script src="js/i18n.js?v=2613"></script>
-<script src="js/utils.js?v=2613"></script>
-<script src="js/state.js?v=2613"></script>
-<script src="js/poi.js?v=2613"></script>
-<script src="js/geocoder.js?v=2613"></script>
-<script src="js/gemini.js?v=2613"></script>
-<script src="js/community.js?v=2613"></script>
-<script src="js/push.js?v=2613"></script>
-<script src="js/analytics.js?v=2613"></script>
-<script src="js/map.js?v=2613"></script>
-<script src="js/gps.js?v=2613"></script>
-<script src="js/locationPicker.js?v=2613"></script>
+<script src="js/security.js?v=2614"></script>
+<script src="js/i18n.js?v=2614"></script>
+<script src="js/utils.js?v=2614"></script>
+<script src="js/state.js?v=2614"></script>
+<script src="js/poi.js?v=2614"></script>
+<script src="js/geocoder.js?v=2614"></script>
+<script src="js/gemini.js?v=2614"></script>
+<script src="js/community.js?v=2614"></script>
+<script src="js/push.js?v=2614"></script>
+<script src="js/analytics.js?v=2614"></script>
+<script src="js/map.js?v=2614"></script>
+<script src="js/gps.js?v=2614"></script>
+<script src="js/locationPicker.js?v=2614"></script>
 <!-- Trip name dialog — thay thế window.prompt() native -->
 <div class="trip-name-overlay" id="tripNameOverlay" role="dialog" aria-modal="true">
   <div class="trip-name-card">
@@ -790,8 +794,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2613"></script>
-<script src="js/app.js?v=2613"></script>
+<script src="js/controllers.js?v=2614"></script>
+<script src="js/app.js?v=2614"></script>
 
 </body>
 </html>
