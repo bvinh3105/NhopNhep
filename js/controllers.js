@@ -2932,6 +2932,36 @@ const CommunityCtrl = {
     document.getElementById('communityAuthSubmit').textContent = isRegister ? I18N.t('community.register') : I18N.t('community.signIn');
     document.getElementById('communityAuthToggle').textContent = isRegister
       ? I18N.t('community.toLogin') : I18N.t('community.toRegister');
+    if (isRegister) this._ensureTurnstile();
+  },
+
+  // Explicit-render Turnstile widget. Previously we let api.js auto-scan the
+  // DOM at load time, but the .cf-turnstile div starts inside a .hidden
+  // container (Đăng ký tab isn't the default mode) — Turnstile's implicit
+  // render silently no-ops on hidden containers and never retries when
+  // visibility flips later. Result: users toggled to Đăng ký, saw an empty
+  // widget slot, submitted, got "Đợi xác thực chống bot xong đã nhé" toast.
+  // Explicit render (index.html script has ?render=explicit&onload=...)
+  // lets us call turnstile.render() the first time user opens register mode.
+  _ensureTurnstile() {
+    const el = document.getElementById('communityTurnstile');
+    if (!el || this._turnstileWidgetId) return;
+    const doRender = () => {
+      try {
+        this._turnstileWidgetId = window.turnstile.render(el, {
+          sitekey: el.getAttribute('data-sitekey'),
+          action: el.getAttribute('data-action') || 'register',
+        });
+      } catch (e) { console.warn('[Turnstile] render failed:', e?.message || e); }
+    };
+    if (window.turnstile && window.turnstile.render) {
+      doRender();
+    } else {
+      // api.js not loaded yet — chain into its onload callback. Multiple
+      // callers layer safely by preserving any previous handler.
+      const prev = window.onloadTurnstileCallback;
+      window.onloadTurnstileCallback = () => { if (prev) { try { prev(); } catch(_){} } doRender(); };
+    }
   },
 
   async _submitAuth() {
@@ -2942,17 +2972,21 @@ const CommunityCtrl = {
     if (this._mode === 'register' && password.length < 8) { showToast(I18N.t('toast.passwordMin8')); return; }
 
     // Bot check only gates NEW account creation — login stays untouched.
-    // IMPORTANT: turnstile.getResponse()/.reset() need the actual container
-    // ELEMENT, not its id as a string — passing a string throws "Could not
-    // find widget for provided container" (caught live-testing 2026-09-11
-    // before shipping; would have silently broken every registration
-    // attempt). Wrapped in try/catch too as a defensive backstop — an
-    // uncaught throw here would otherwise abort _submitAuth() with zero
-    // visible feedback to the user.
-    const turnstileEl = document.getElementById('communityTurnstile');
+    // With explicit render (see _ensureTurnstile above), getResponse/reset
+    // take the widget ID string returned by turnstile.render(). If the
+    // widget hasn't rendered yet (api.js still loading, or register mode
+    // opened for the first time this frame), tell the user to wait rather
+    // than the generic "cần xác thực" which reads like the user did
+    // something wrong.
     let turnstileToken = null;
     if (this._mode === 'register') {
-      try { turnstileToken = window.turnstile?.getResponse(turnstileEl) || null; } catch (_) { turnstileToken = null; }
+      if (!window.turnstile || !this._turnstileWidgetId) {
+        // Widget not ready — try to kick off render for next attempt.
+        this._ensureTurnstile();
+        showToast(I18N.t('toast.turnstileLoading'));
+        return;
+      }
+      try { turnstileToken = window.turnstile.getResponse(this._turnstileWidgetId) || null; } catch (_) { turnstileToken = null; }
       if (!turnstileToken) { showToast(I18N.t('toast.turnstileRequired')); return; }
     }
 
@@ -2971,7 +3005,9 @@ const CommunityCtrl = {
     // Turnstile tokens are single-use — always reset after an attempt so
     // a retry (this one failing, or the next registration this same page
     // load) gets a fresh token instead of silently reusing a spent one.
-    if (this._mode === 'register') { try { window.turnstile?.reset(turnstileEl); } catch (_) {} }
+    if (this._mode === 'register' && this._turnstileWidgetId) {
+      try { window.turnstile?.reset(this._turnstileWidgetId); } catch (_) {}
+    }
 
     if (!r.ok) {
       // Special case: account was created but auto-login failed (tunnel blip).
