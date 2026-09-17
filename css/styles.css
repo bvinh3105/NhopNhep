@@ -1608,7 +1608,10 @@ body.map-full .tabbar{transform:translateY(105%)}
 }
 .post-meta-line{font-size:.72rem;color:var(--text3);margin-top:.1rem}
 
-.post-carousel{position:relative;width:100%;aspect-ratio:1/1;background:var(--cream-2)}
+/* 3:4 — khớp tỉ lệ ảnh phổ biến nhất trong feed thật (xem ghi chú ở
+   communityCardHtml() trong controllers.js). Thumbnail đã crop-fill đúng
+   3:4 từ server nên background-size:cover ở dưới chỉ là fallback an toàn. */
+.post-carousel{position:relative;width:100%;aspect-ratio:3/4;background:var(--cream-2)}
 .post-carousel-track{
   display:flex;width:100%;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;
   scrollbar-width:none;
@@ -1616,10 +1619,7 @@ body.map-full .tabbar{transform:translateY(105%)}
 .post-carousel-track::-webkit-scrollbar{display:none}
 .post-photo{
   flex:0 0 100%;width:100%;height:100%;scroll-snap-align:start;
-  /* contain, not cover — ảnh gốc thường không phải 1:1 (dọc hoặc ngang),
-     "cover" trước đây crop mất phần trên/dưới hoặc 2 bên. Viền cream-2
-     của .post-carousel lộ ra thành khung nền, không còn mất ảnh. */
-  background-size:contain;background-position:center;background-repeat:no-repeat;
+  background-size:cover;background-position:center;
 }
 .post-photo-empty{display:flex;align-items:center;justify-content:center;font-size:3rem}
 .post-dots{position:absolute;bottom:10px;left:0;right:0;display:flex;justify-content:center;gap:5px}
