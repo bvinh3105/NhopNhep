@@ -20,7 +20,7 @@
    2026-09-17 (chip buttons rendered as giant colored blocks).
 ═══════════════════════════════════════════════ */
 function svgIcon(name, cls = '') {
-  return `<svg class="icon${cls ? ' ' + cls : ''}" width="20" height="20"><use href="icons/sprite.svg#ic-${name}"></use></svg>`;
+  return `<svg class="icon${cls ? ' ' + cls : ''}" width="20" height="20"><use href="#ic-${name}"></use></svg>`;
 }
 
 /* ═══════════════════════════════════════════════

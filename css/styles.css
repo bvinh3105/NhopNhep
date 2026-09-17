@@ -290,6 +290,11 @@ input,textarea,select{font-family:var(--font-body)}
    fade out in the first place. */
 #myRFilterChips{gap:.4rem}
 #myRFilterChips .cat-chip{padding:.46rem .7rem}
+/* Home's #catChips (4 chips, no "Tất cả") — sized to fit all 4 on one
+   row with no horizontal scroll on a narrow phone, not just "less
+   overflow" like #myRFilterChips above (which still scrolls/fades). */
+#catChips{gap:.35rem;flex-wrap:wrap}
+#catChips .cat-chip{padding:.5rem .5rem;font-size:.74rem;gap:.25rem}
 .cat-chip[data-cat="cafe"].active{background:var(--cat-cafe);border-color:#5A3B24;box-shadow:2px 2px 0 #5A3B24}
 /* Community source chip — was flagged "sắp có" until the PocketBase
    backend went live. Now a normal, selectable source. */
@@ -654,6 +659,10 @@ input,textarea,select{font-family:var(--font-body)}
   font-size:1.5rem;line-height:1;cursor:grab;touch-action:none;user-select:none;
   transition:box-shadow .12s,transform .12s,left .25s ease,top .25s ease,right .25s ease,bottom .25s ease;
 }
+/* Dice icon bigger than the 1em default — this button IS the icon (no
+   label text next to it), so it can afford to fill more of the circle
+   for a clearer silhouette at a glance. */
+.rp-fab .icon{width:1.7em;height:1.7em}
 .rp-fab:active{transform:scale(.96)}
 .rp-fab.dragging{transition:none;cursor:grabbing;box-shadow:5px 5px 0 var(--text)}
 .rp-fab.picking{animation:rp-wiggle .28s ease-in-out infinite}

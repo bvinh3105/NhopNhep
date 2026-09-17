@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2625">
+<link rel="stylesheet" href="css/styles.css?v=2626">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -36,6 +36,300 @@
 
 </head>
 <body>
+<!-- Icon sprite, inlined (not fetched via <link>/<use href="file#id">) — cross-file
+     <use> references to an external SVG have inconsistent support on real
+     mobile browsers (symbols silently fail to resolve, icon renders empty).
+     Inlining + same-document #id refs works everywhere. Source of truth for
+     each individual icon is icons/sprite.svg (also kept, for reference/
+     regenerating this block) -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+<symbol id="ic-action-bookmark" viewBox="0 0 24 24"><path d="M6,3 H18 V21 L12,17 L6,21 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-close" viewBox="0 0 24 24"><path d="M5,5 L19,19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M19,5 L5,19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-copy-link" viewBox="0 0 24 24"><path d="M6,4 h8 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-8 a2,2 0 0 1 -2,-2 v-8 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M11,9 h8 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-8 a2,2 0 0 1 -2,-2 v-8 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-delete" viewBox="0 0 24 24"><path d="M7,8 h10 a1,1 0 0 1 1,1 v10 a1,1 0 0 1 -1,1 h-10 a1,1 0 0 1 -1,-1 v-10 a1,1 0 0 1 1,-1 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M4,8 L20,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,8 L9,5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15,8 L15,5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,5 L15,5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10,11 L10,17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M14,11 L14,17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-dice" viewBox="0 0 24 24"><path d="M8,4 h8 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-8 a4,4 0 0 1 -4,-4 v-8 a4,4 0 0 1 4,-4 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M7.9,9 a1.1,1.1 0 1,0 2.2,0 a1.1,1.1 0 1,0 -2.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M13.9,9 a1.1,1.1 0 1,0 2.2,0 a1.1,1.1 0 1,0 -2.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10.9,12 a1.1,1.1 0 1,0 2.2,0 a1.1,1.1 0 1,0 -2.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M7.9,15 a1.1,1.1 0 1,0 2.2,0 a1.1,1.1 0 1,0 -2.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M13.9,15 a1.1,1.1 0 1,0 2.2,0 a1.1,1.1 0 1,0 -2.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-edit" viewBox="0 0 24 24"><path d="M4,20 L4,16 L16,4 L20,8 L8,20 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M13,7 L17,11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-export" viewBox="0 0 24 24"><path d="M4,13 v6 a1,1 0 0 0 1,1 h14 a1,1 0 0 0 1,-1 v-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,3 L12,13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,7 L12,3 L16,7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-eye" viewBox="0 0 24 24"><path d="M2,12 C2,12 6,5 12,5 C18,5 22,12 22,12 C22,12 18,19 12,19 C6,19 2,12 2,12 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,12 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-fullscreen" viewBox="0 0 24 24"><path d="M4,9 V4 H9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15,4 H20 V9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M20,15 V20 H15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,20 H4 V15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-gps" viewBox="0 0 24 24"><path d="M12,3 C7.6,3 4,6.6 4,11 C4,17 12,22 12,22 C12,22 20,17 20,11 C20,6.6 16.4,3 12,3 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9.8,11 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-import" viewBox="0 0 24 24"><path d="M4,13 v6 a1,1 0 0 0 1,1 h14 a1,1 0 0 0 1,-1 v-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,3 L12,13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,9 L12,13 L16,9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-invite-link" viewBox="0 0 24 24"><path d="M5,16 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M13,8 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10.1,13.9 L13.9,10.1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-pin-static" viewBox="0 0 24 24"><path d="M9,3 H15 L14,8 L17,12 H7 L10,8 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,12 L12,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-post-upload" viewBox="0 0 24 24"><path d="M12,16 L12,4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M7,9 L12,4 L17,9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M4,20 L20,20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-save-disk" viewBox="0 0 24 24"><path d="M6,4 h12 a2,2 0 0 1 2,2 v12 a2,2 0 0 1 -2,2 h-12 a2,2 0 0 1 -2,-2 v-12 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15,4 v5 h-6 v-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,14 h8 a1,1 0 0 1 1,1 v5 a1,1 0 0 1 -1,1 h-8 a1,1 0 0 1 -1,-1 v-5 a1,1 0 0 1 1,-1 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-scan" viewBox="0 0 24 24"><path d="M4,9 V5 H8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M16,5 H20 V9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M20,15 V19 H16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,19 H4 V15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M6,12 L18,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-search" viewBox="0 0 24 24"><path d="M4,11 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M20,20 L16.6,16.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-share" viewBox="0 0 24 24"><path d="M4,12 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M16,6 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M16,18 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M7.8,11 L16.2,6.9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M7.8,13 L16.2,17.1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-shuffle" viewBox="0 0 24 24"><path d="M3,7 H8 L18,17 H21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M18,17 L15,14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M18,17 L15,20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,17 H8 L18,7 H21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M18,7 L15,4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M18,7 L15,10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-undo-reset" viewBox="0 0 24 24"><path d="M14.74,4.48 A8,8 0 1 1 5.07,8.00" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M5,7 L4,12 L9,11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-ai-badge" viewBox="0 0 24 24"><path d="M3,12 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12.00,8.40 L13.01,10.99 L15.60,12.00 L13.01,13.01 L12.00,15.60 L10.99,13.01 L8.40,12.00 L10.99,10.99 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-avatar-bento" viewBox="0 0 24 24"><path d="M5,5 h14 a2,2 0 0 1 2,2 v10 a2,2 0 0 1 -2,2 h-14 a2,2 0 0 1 -2,-2 v-10 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,5 L12,19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,12 L12,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-avatar-burger" viewBox="0 0 24 24"><path d="M4,10 a8,6 0 0 1 16,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M4,10 L20,10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M4,13 q2,-2.5 4,0 q2,2.5 4,0 q2,-2.5 4,0 q2,2.5 4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M4,16 H20 V18 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-avatar-cake" viewBox="0 0 24 24"><path d="M4,20 L12,6 L20,20 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M6,15 L18,15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M11,8 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-avatar-cocktail" viewBox="0 0 24 24"><path d="M4,4 H20 L12,13 V20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M7,20 L17,20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M14,6 a1,1 0 1,0 2,0 a1,1 0 1,0 -2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-avatar-donut" viewBox="0 0 24 24"><path d="M4,12 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,12 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,7 L9,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15,7 L16,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,17 L10,18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-avatar-dumpling" viewBox="0 0 24 24"><path d="M12,4 Q4,8 4,14 A8,8 0 0 0 20,14 Q20,8 12,4 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,6 L9,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,4 L12,7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15,6 L15,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-avatar-salad" viewBox="0 0 24 24"><path d="M4,12 a8,6 0 0 0 16,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,12 L21,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M6,11 q2,-4 4,-1 q2,-4 4,-1 q2,-4 4,-1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-avatar-shrimp" viewBox="0 0 24 24"><path d="M6,6 Q18,4 18,12 Q18,18 10,18 Q6,18 6,14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M6,14 L2,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M6,14 L2,16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-avatar-taco" viewBox="0 0 24 24"><path d="M4,14 A8,8 0 0 1 20,14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M6,14 L18,14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,12 L10,15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,11 L14,15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M16,12 L17,15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-cat-anvat" viewBox="0 0 24 24"><path d="M3,12 L21,12" fill="none" stroke="#D64B7A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M7,9 h1 a1,1 0 0 1 1,1 v4 a1,1 0 0 1 -1,1 h-1 a1,1 0 0 1 -1,-1 v-4 a1,1 0 0 1 1,-1 z" fill="none" stroke="#D64B7A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,9 h1 a1,1 0 0 1 1,1 v4 a1,1 0 0 1 -1,1 h-1 a1,1 0 0 1 -1,-1 v-4 a1,1 0 0 1 1,-1 z" fill="none" stroke="#D64B7A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M17,9 h1 a1,1 0 0 1 1,1 v4 a1,1 0 0 1 -1,1 h-1 a1,1 0 0 1 -1,-1 v-4 a1,1 0 0 1 1,-1 z" fill="none" stroke="#D64B7A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-cat-caphe" viewBox="0 0 24 24"><path d="M5,9 H17 V17 A6,6 0 0 1 5,17 Z" fill="none" stroke="#7A4E2F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M17,10 a3,3 0 0 1 0,6" fill="none" stroke="#7A4E2F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,5 L9,7" fill="none" stroke="#7A4E2F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M13,5 L13,7" fill="none" stroke="#7A4E2F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-cat-nhahang" viewBox="0 0 24 24"><path d="M7,3 L7,11" fill="none" stroke="#B92626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M5,3 L5,7" fill="none" stroke="#B92626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,3 L9,7" fill="none" stroke="#B92626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M5,7 a2,4 0 0 0 4,0" fill="none" stroke="#B92626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M7,11 L7,21" fill="none" stroke="#B92626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M17,3 v7 a2,2 0 0 1 -2,2 v9" fill="none" stroke="#B92626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15,3 L15,10" fill="none" stroke="#B92626" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-cat-viahe" viewBox="0 0 24 24"><path d="M4,12 a8,6 0 0 0 16,0" fill="none" stroke="#E8843C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,12 L21,12" fill="none" stroke="#E8843C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,5 L9,9" fill="none" stroke="#E8843C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,4 L12,8" fill="none" stroke="#E8843C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15,5 L15,9" fill="none" stroke="#E8843C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-food-banhmi" viewBox="0 0 24 24"><path d="M4,14 Q4,9 9,9 H15 Q20,9 20,14 Q20,19 15,19 H9 Q4,19 4,14 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,10 L10,18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,9 L14,19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M16,10 L18,18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-food-bun" viewBox="0 0 24 24"><path d="M4,12 a8,6 0 0 0 16,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,12 L21,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8.4,7 a0.6,0.6 0 1,0 1.2,0 a0.6,0.6 0 1,0 -1.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M11.4,6 a0.6,0.6 0 1,0 1.2,0 a0.6,0.6 0 1,0 -1.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M14.4,7 a0.6,0.6 0 1,0 1.2,0 a0.6,0.6 0 1,0 -1.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-food-caphe" viewBox="0 0 24 24"><path d="M5,9 H17 V17 A6,6 0 0 1 5,17 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M17,10 a3,3 0 0 1 0,6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,5 L9,7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M13,5 L13,7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-food-che" viewBox="0 0 24 24"><path d="M7,6 H17 L15,19 A3,3 0 0 1 9,19 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,10 L16,10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8.5,14 L15.5,14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M16,3 L13,9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-food-com" viewBox="0 0 24 24"><path d="M5,13 a7,5 0 0 0 14,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M4,13 L20,13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10.63,13.76 A4,4 0 0 1 10.63,6.24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-food-kem" viewBox="0 0 24 24"><path d="M7,9 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,11 L12,21 L16,11 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-food-lau" viewBox="0 0 24 24"><path d="M7,11 h10 a2,2 0 0 1 2,2 v4 a2,2 0 0 1 -2,2 h-10 a2,2 0 0 1 -2,-2 v-4 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,15 L5,15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M19,15 L21,15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M5,11 Q12,6 19,11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M11.2,6 a0.8,0.8 0 1,0 1.6,0 a0.8,0.8 0 1,0 -1.6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-food-nuong" viewBox="0 0 24 24"><path d="M3,12 L21,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M7,9 h1 a1,1 0 0 1 1,1 v4 a1,1 0 0 1 -1,1 h-1 a1,1 0 0 1 -1,-1 v-4 a1,1 0 0 1 1,-1 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,9 h1 a1,1 0 0 1 1,1 v4 a1,1 0 0 1 -1,1 h-1 a1,1 0 0 1 -1,-1 v-4 a1,1 0 0 1 1,-1 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M17,9 h1 a1,1 0 0 1 1,1 v4 a1,1 0 0 1 -1,1 h-1 a1,1 0 0 1 -1,-1 v-4 a1,1 0 0 1 1,-1 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-food-pho" viewBox="0 0 24 24"><path d="M4,12 a8,6 0 0 0 16,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,12 L21,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,6 L9,9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,5 L12,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15,6 L15,9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15,4 L20,15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M17,4 L22,15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-food-pizza" viewBox="0 0 24 24"><path d="M12,4 L20,20 H4 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10.1,10 a0.9,0.9 0 1,0 1.8,0 a0.9,0.9 0 1,0 -1.8,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M14.1,13 a0.9,0.9 0 1,0 1.8,0 a0.9,0.9 0 1,0 -1.8,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8.1,15 a0.9,0.9 0 1,0 1.8,0 a0.9,0.9 0 1,0 -1.8,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M4,20 Q12,17 20,20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-food-sushi" viewBox="0 0 24 24"><path d="M8,9 h8 a4,4 0 0 1 4,4 v0 a4,4 0 0 1 -4,4 h-8 a4,4 0 0 1 -4,-4 v0 a4,4 0 0 1 4,-4 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10,13 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M4,9 L4,17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M20,9 L20,17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-food-trasua" viewBox="0 0 24 24"><path d="M6,8 H18 L16,20 H8 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M11,3 L11,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9.2,15 a0.8,0.8 0 1,0 1.6,0 a0.8,0.8 0 1,0 -1.6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M13.2,16 a0.8,0.8 0 1,0 1.6,0 a0.8,0.8 0 1,0 -1.6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-heart-filled" viewBox="0 0 24 24"><path d="M12,20 C7,16.6 3,13.3 3,9.3 C3,6.4 5.3,4.2 8.1,4.2 C9.8,4.2 11.2,5 12,6.2 C12.8,5 14.2,4.2 15.9,4.2 C18.7,4.2 21,6.4 21,9.3 C21,13.3 17,16.6 12,20 Z" fill="#B92626" stroke="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-heart-outline" viewBox="0 0 24 24"><path d="M12,20 C7,16.6 3,13.3 3,9.3 C3,6.4 5.3,4.2 8.1,4.2 C9.8,4.2 11.2,5 12,6.2 C12.8,5 14.2,4.2 15.9,4.2 C18.7,4.2 21,6.4 21,9.3 C21,13.3 17,16.6 12,20 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-map-external" viewBox="0 0 24 24"><path d="M12,3 C7.6,3 4,6.6 4,11 C4,17 12,22 12,22 C12,22 20,17 20,11 C20,7.5 18.2,4.9 15.5,3.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15,3 H20 V8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M20,3 L13.5,9.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-map-saved-route" viewBox="0 0 24 24"><path d="M3,6 L9,3 L15,6 L21,3 V18 L15,21 L9,18 L3,21 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,3 L9,18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15,6 L15,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-nav-community" viewBox="0 0 24 24"><path d="M6,9 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,20 a6,6 0 0 1 12,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M14.7,10 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M13,20 a5,5 0 0 1 8.5,-0.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-nav-home" viewBox="0 0 24 24"><path d="M4,12 a8,6 0 0 0 16,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,12 L21,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,5 L9,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,4 L12,7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15,5 L15,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-nav-profile" viewBox="0 0 24 24"><path d="M8.8,8 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M5,20 A7,7 0 0 1 19,20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-price-budget" viewBox="0 0 24 24"><path d="M5,12 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8.5,12 L15.5,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-price-mid" viewBox="0 0 24 24"><path d="M4,12 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,7 L12,17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,9.5 c0,-1.2 1.4,-1.8 3,-1.8 c1.8,0 3,0.8 3,1.8 c0,1.3 -1.6,1.7 -3,2.2 c-1.4,0.5 -3,0.9 -3,2.2 c0,1 1.2,1.8 3,1.8 c1.6,0 3,-0.6 3,-1.8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-price-premium" viewBox="0 0 24 24"><path d="M12.00,3.00 L14.52,9.48 L21.00,12.00 L14.52,14.52 L12.00,21.00 L9.48,14.52 L3.00,12.00 L9.48,9.48 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-privacy-friends" viewBox="0 0 24 24"><path d="M4.5,9 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M2.5,19 a4.5,4.5 0 0 1 9,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M14.5,9 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12.5,19 a4.5,4.5 0 0 1 9,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-privacy-globe" viewBox="0 0 24 24"><path d="M3,12 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,12 L21,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,3 A14,9 0 0 1 12,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,3 A14,9 0 0 0 12,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-privacy-lock" viewBox="0 0 24 24"><path d="M7,11 h10 a2,2 0 0 1 2,2 v6 a2,2 0 0 1 -2,2 h-10 a2,2 0 0 1 -2,-2 v-6 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,11 V7 a4,4 0 0 1 8,0 v4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-rating-star-cover" viewBox="0 0 24 24"><path d="M12.00,5.50 L13.59,9.82 L18.18,9.99 L14.57,12.83 L15.82,17.26 L12.00,14.70 L8.18,17.26 L9.43,12.83 L5.82,9.99 L10.41,9.82 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M4,4 V7 M4,4 H7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M20,4 V7 M20,4 H17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-rating-star-filled" viewBox="0 0 24 24"><path d="M12.00,4.00 L13.94,9.33 L19.61,9.53 L15.14,13.02 L16.70,18.47 L12.00,15.30 L7.30,18.47 L8.86,13.02 L4.39,9.53 L10.06,9.33 Z" fill="currentColor" stroke="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-rating-star-outline" viewBox="0 0 24 24"><path d="M12.00,4.00 L13.94,9.33 L19.61,9.53 L15.14,13.02 L16.70,18.47 L12.00,15.30 L7.30,18.47 L8.86,13.02 L4.39,9.53 L10.06,9.33 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-route-calendar" viewBox="0 0 24 24"><path d="M6,5 h12 a2,2 0 0 1 2,2 v11 a2,2 0 0 1 -2,2 h-12 a2,2 0 0 1 -2,-2 v-11 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M4,10 L20,10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,3 L8,7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M16,3 L16,7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-route-duration" viewBox="0 0 24 24"><path d="M4,13 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,13 L12,9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,13 L15,15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10,3 L14,3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,3 L12,5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-route-flag-finish" viewBox="0 0 24 24"><path d="M6,3 L6,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M6,4 H16 L13,7 L16,10 H6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-route-reroute" viewBox="0 0 24 24"><path d="M18.93,16.00 A8,8 0 1 1 18.93,8.00" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M18,5 L20,9 L15.5,9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-route-scooter" viewBox="0 0 24 24"><path d="M3.8,19 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15.8,19 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M6,19 L10,10 H16 L18,19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10,10 L10,6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10,6 L14,6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-route-stop-count" viewBox="0 0 24 24"><path d="M4,10 L6,4 H18 L20,10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M4,10 L20,10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M5,10 h14 a1,1 0 0 1 1,1 v8 a1,1 0 0 1 -1,1 h-14 a1,1 0 0 1 -1,-1 v-8 a1,1 0 0 1 1,-1 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,14 L12,20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-route-time-window" viewBox="0 0 24 24"><path d="M3,12 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,7 L12,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,12 L15.5,14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-session-create" viewBox="0 0 24 24"><path d="M6.5,9 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M4,19 a5,5 0 0 1 10,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M17,8 L17,14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M14,11 L20,11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-social-author" viewBox="0 0 24 24"><path d="M8.8,8 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M5,20 A7,7 0 0 1 19,20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-social-bell" viewBox="0 0 24 24"><path d="M6,10 a6,6 0 0 1 12,0 v5 l2,3 H4 l2,-3 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10,20 a2,2 0 0 0 4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-social-comment" viewBox="0 0 24 24"><path d="M4,5 H20 V16 H9 L5,20 V16 H4 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-social-fork-poi" viewBox="0 0 24 24"><path d="M8,3 L8,10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M6,3 L6,7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10,3 L10,7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M6,7 a2,4 0 0 0 4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,10 L8,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-social-handshake" viewBox="0 0 24 24"><path d="M2,10 H8 L11,13 L9,15 L6,15 L2,13 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M22,10 H16 L13,13 L15,15 L18,15 L22,13 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M11,13 L13,13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-social-home-address" viewBox="0 0 24 24"><path d="M4,11 L12,4 L20,11 V20 H4 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,14 h0 a2,2 0 0 1 2,2 v2 a2,2 0 0 1 -2,2 h0 a2,2 0 0 1 -2,-2 v-2 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-social-trophy" viewBox="0 0 24 24"><path d="M7,4 H17 V10 A5,5 0 0 1 7,10 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M7,5 H4 V8 A3,3 0 0 0 7,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M17,5 H20 V8 A3,3 0 0 1 17,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,15 L12,18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,20 L16,20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-status-closed-dot" viewBox="0 0 24 24"><path d="M6,12 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" fill="#B92626" stroke="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-status-confirmed" viewBox="0 0 24 24"><path d="M3,12 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,12 L11,15 L16,9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-status-draft" viewBox="0 0 24 24"><path d="M7,3 h10 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 h-10 a2,2 0 0 1 -2,-2 v-14 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,8 L16,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,12 L16,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,16 L13,16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-status-empty-mailbox" viewBox="0 0 24 24"><path d="M5,6 h14 a2,2 0 0 1 2,2 v9 a2,2 0 0 1 -2,2 h-14 a2,2 0 0 1 -2,-2 v-9 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,7 L12,15 L21,7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-status-empty-wave" viewBox="0 0 24 24"><path d="M8,21 V11 a1.5,1.5 0 0 1 3,0 v5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M11,20 V8 a1.5,1.5 0 0 1 3,0 v8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M14,19 V10 a1.5,1.5 0 0 1 3,0 v6 a5,5 0 0 1 -5,5 h-2 a5,5 0 0 1 -4.2,-2.3 l-2.3,-3.6 a1.4,1.4 0 0 1 2.3,-1.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-status-error-face" viewBox="0 0 24 24"><path d="M3,12 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8.2,10 a0.8,0.8 0 1,0 1.6,0 a0.8,0.8 0 1,0 -1.6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M14.2,10 a0.8,0.8 0 1,0 1.6,0 a0.8,0.8 0 1,0 -1.6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,16 Q12,13 16,16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-status-hours-unclear" viewBox="0 0 24 24"><path d="M3,12 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,7 L12,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,12 L15.5,14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-status-loading" viewBox="0 0 24 24"><path d="M12.00,3.00 A9,9 0 1 1 3.00,12.00" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-status-open-dot" viewBox="0 0 24 24"><path d="M6,12 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" fill="#2F8F5B" stroke="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-status-selected" viewBox="0 0 24 24"><path d="M5,13 L9,17 L19,7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-status-warning" viewBox="0 0 24 24"><path d="M12,3 L22,20 H2 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,9 L12,14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M11.4,17 a0.6,0.6 0 1,0 1.2,0 a0.6,0.6 0 1,0 -1.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+</svg>
+
 
 <!-- ═══════════════════════════════════════════════
      HOME SCREEN (Nhóp Nhép tab main)
@@ -43,7 +337,7 @@
 <div id="homeScreen" class="screen">
 
   <button class="rp-fab hidden" id="randomPickBubble" type="button">
-    <span id="rpbIcon"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-dice"></use></svg></span>
+    <span id="rpbIcon"><svg class="icon" width="20" height="20"><use href="#ic-action-dice"></use></svg></span>
   </button>
 
   <!-- Hero -->
@@ -74,10 +368,10 @@
     <!-- Categories -->
     <div class="row-label" data-i18n="home.wantToEat">Tôi muốn ăn</div>
     <div class="cat-chips" id="catChips">
-      <button class="cat-chip active" data-cat="restaurant"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-nhahang"></use></svg> <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
-      <button class="cat-chip active" data-cat="street"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-viahe"></use></svg> <span data-i18n="catLabel.street">Vỉa hè</span></button>
-      <button class="cat-chip active" data-cat="snack"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-anvat"></use></svg> <span data-i18n="catLabel.snack">Ăn vặt</span></button>
-      <button class="cat-chip active" data-cat="cafe"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-caphe"></use></svg> <span data-i18n="catLabel.cafe">Cà phê</span></button>
+      <button class="cat-chip active" data-cat="restaurant"><svg class="icon" width="20" height="20"><use href="#ic-cat-nhahang"></use></svg> <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
+      <button class="cat-chip active" data-cat="street"><svg class="icon" width="20" height="20"><use href="#ic-cat-viahe"></use></svg> <span data-i18n="catLabel.street">Vỉa hè</span></button>
+      <button class="cat-chip active" data-cat="snack"><svg class="icon" width="20" height="20"><use href="#ic-cat-anvat"></use></svg> <span data-i18n="catLabel.snack">Ăn vặt</span></button>
+      <button class="cat-chip active" data-cat="cafe"><svg class="icon" width="20" height="20"><use href="#ic-cat-caphe"></use></svg> <span data-i18n="catLabel.cafe">Cà phê</span></button>
     </div>
 
     <!-- Dish search — compact input; chip gợi ý hiện khi focus -->
@@ -85,21 +379,21 @@
     <div class="loc-row-wrap">
       <div class="loc-row">
         <input id="dishInput" class="loc-input" type="text" data-i18n="home.dishPlaceholder" data-i18n-attr="placeholder" placeholder="VD: phở, bánh mì, tên quán… (bỏ trống = mọi món)" autocomplete="off" spellcheck="false" maxlength="60">
-        <button class="loc-gps-btn" id="dishClearBtn" data-i18n="home.clearDish" data-i18n-attr="title" title="Xoá bộ lọc món" style="display:none"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-close"></use></svg></button>
+        <button class="loc-gps-btn" id="dishClearBtn" data-i18n="home.clearDish" data-i18n-attr="title" title="Xoá bộ lọc món" style="display:none"><svg class="icon" width="20" height="20"><use href="#ic-action-close"></use></svg></button>
       </div>
       <div class="dish-suggest" id="dishSuggest">
-        <button class="dish-chip" data-dish="phở"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-food-pho"></use></svg> Phở</button>
-        <button class="dish-chip" data-dish="bún"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-food-bun"></use></svg> Bún</button>
-        <button class="dish-chip" data-dish="bánh mì"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-food-banhmi"></use></svg> Bánh mì</button>
-        <button class="dish-chip" data-dish="cơm"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-food-com"></use></svg> Cơm</button>
-        <button class="dish-chip" data-dish="nướng"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-food-nuong"></use></svg> Nướng</button>
-        <button class="dish-chip" data-dish="lẩu"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-food-lau"></use></svg> Lẩu</button>
-        <button class="dish-chip" data-dish="trà sữa"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-food-trasua"></use></svg> Trà sữa</button>
-        <button class="dish-chip" data-dish="cà phê"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-food-caphe"></use></svg> Cà phê</button>
-        <button class="dish-chip" data-dish="pizza"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-food-pizza"></use></svg> Pizza</button>
-        <button class="dish-chip" data-dish="sushi"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-food-sushi"></use></svg> Sushi</button>
-        <button class="dish-chip" data-dish="chè"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-food-che"></use></svg> Chè</button>
-        <button class="dish-chip" data-dish="kem"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-food-kem"></use></svg> Kem</button>
+        <button class="dish-chip" data-dish="phở"><svg class="icon" width="20" height="20"><use href="#ic-food-pho"></use></svg> Phở</button>
+        <button class="dish-chip" data-dish="bún"><svg class="icon" width="20" height="20"><use href="#ic-food-bun"></use></svg> Bún</button>
+        <button class="dish-chip" data-dish="bánh mì"><svg class="icon" width="20" height="20"><use href="#ic-food-banhmi"></use></svg> Bánh mì</button>
+        <button class="dish-chip" data-dish="cơm"><svg class="icon" width="20" height="20"><use href="#ic-food-com"></use></svg> Cơm</button>
+        <button class="dish-chip" data-dish="nướng"><svg class="icon" width="20" height="20"><use href="#ic-food-nuong"></use></svg> Nướng</button>
+        <button class="dish-chip" data-dish="lẩu"><svg class="icon" width="20" height="20"><use href="#ic-food-lau"></use></svg> Lẩu</button>
+        <button class="dish-chip" data-dish="trà sữa"><svg class="icon" width="20" height="20"><use href="#ic-food-trasua"></use></svg> Trà sữa</button>
+        <button class="dish-chip" data-dish="cà phê"><svg class="icon" width="20" height="20"><use href="#ic-food-caphe"></use></svg> Cà phê</button>
+        <button class="dish-chip" data-dish="pizza"><svg class="icon" width="20" height="20"><use href="#ic-food-pizza"></use></svg> Pizza</button>
+        <button class="dish-chip" data-dish="sushi"><svg class="icon" width="20" height="20"><use href="#ic-food-sushi"></use></svg> Sushi</button>
+        <button class="dish-chip" data-dish="chè"><svg class="icon" width="20" height="20"><use href="#ic-food-che"></use></svg> Chè</button>
+        <button class="dish-chip" data-dish="kem"><svg class="icon" width="20" height="20"><use href="#ic-food-kem"></use></svg> Kem</button>
       </div>
     </div>
 
@@ -120,16 +414,16 @@
     <div class="advanced-body" id="advBody">
       <div class="row-label mini" data-i18n="home.dataSource">Nguồn dữ liệu</div>
       <div class="cat-chips" id="srcChips">
-        <button class="cat-chip active" data-src="osm"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-privacy-globe"></use></svg> <span data-i18n="src.osm">Địa điểm công khai</span></button>
-        <button class="cat-chip active" data-src="mine"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-rating-star-filled"></use></svg> <span data-i18n="src.mine">Của tôi</span></button>
-        <button class="cat-chip" data-src="community"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-nav-community"></use></svg> <span data-i18n="src.community">Cộng đồng</span></button>
+        <button class="cat-chip active" data-src="osm"><svg class="icon" width="20" height="20"><use href="#ic-privacy-globe"></use></svg> <span data-i18n="src.osm">Địa điểm công khai</span></button>
+        <button class="cat-chip active" data-src="mine"><svg class="icon" width="20" height="20"><use href="#ic-rating-star-filled"></use></svg> <span data-i18n="src.mine">Của tôi</span></button>
+        <button class="cat-chip" data-src="community"><svg class="icon" width="20" height="20"><use href="#ic-nav-community"></use></svg> <span data-i18n="src.community">Cộng đồng</span></button>
       </div>
       <div class="row-label mini" data-i18n="home.rating">Đánh giá</div>
       <div class="radius-chips" id="minRatingChips">
         <button class="radius-chip active" data-rating="0"><span data-i18n="filter.all">Tất cả</span></button>
-        <button class="radius-chip" data-rating="3.5">3.5<svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-rating-star-filled"></use></svg></button>
-        <button class="radius-chip" data-rating="4">4<svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-rating-star-filled"></use></svg></button>
-        <button class="radius-chip" data-rating="4.5">4.5<svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-rating-star-filled"></use></svg></button>
+        <button class="radius-chip" data-rating="3.5">3.5<svg class="icon" width="20" height="20"><use href="#ic-rating-star-filled"></use></svg></button>
+        <button class="radius-chip" data-rating="4">4<svg class="icon" width="20" height="20"><use href="#ic-rating-star-filled"></use></svg></button>
+        <button class="radius-chip" data-rating="4.5">4.5<svg class="icon" width="20" height="20"><use href="#ic-rating-star-filled"></use></svg></button>
       </div>
     </div>
 
@@ -138,14 +432,14 @@
     <div class="loc-row-wrap">
       <div class="loc-row">
         <input id="locInput" class="loc-input" type="text" data-i18n="home.locPlaceholder" data-i18n-attr="placeholder" placeholder="Gõ địa chỉ, tên đường, quán… hoặc dùng GPS" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="search">
-        <button class="loc-gps-btn" id="gpsBtn" data-i18n="home.gpsTitle" data-i18n-attr="title" title="Bật GPS · nhấn giữ để tracking liên tục"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-gps"></use></svg></button>
+        <button class="loc-gps-btn" id="gpsBtn" data-i18n="home.gpsTitle" data-i18n-attr="title" title="Bật GPS · nhấn giữ để tracking liên tục"><svg class="icon" width="20" height="20"><use href="#ic-action-gps"></use></svg></button>
       </div>
       <div class="geocode-suggest" id="locSuggest"></div>
     </div>
     <div class="gps-hint" id="gpsHint"></div>
 
     <!-- Scan CTA -->
-    <button class="scan-btn" id="scanBtn" data-i18n="home.scanNow"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-scan"></use></svg> Quét <em>ngay</em>!</button>
+    <button class="scan-btn" id="scanBtn" data-i18n="home.scanNow"><svg class="icon" width="20" height="20"><use href="#ic-action-scan"></use></svg> Quét <em>ngay</em>!</button>
 
   </div>
 </div>
@@ -160,21 +454,21 @@
       <div class="results-title" id="resultsTitle" data-i18n="results.nearby">Quán gần đây</div>
       <div class="results-sub" id="resultsSub"></div>
     </div>
-    <button class="reshuffle-btn" id="reshuffleBtn" data-i18n="results.reshuffle"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-shuffle"></use></svg> Xáo lại</button>
+    <button class="reshuffle-btn" id="reshuffleBtn" data-i18n="results.reshuffle"><svg class="icon" width="20" height="20"><use href="#ic-action-shuffle"></use></svg> Xáo lại</button>
   </div>
 
   <div class="cat-tabs" id="catTabs">
     <button class="cat-tab active" data-filter="all"><span data-i18n="filter.all">Tất cả</span></button>
-    <button class="cat-tab" data-filter="restaurant"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-nhahang"></use></svg> <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
-    <button class="cat-tab" data-filter="street"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-viahe"></use></svg> <span data-i18n="catLabel.street">Vỉa hè</span></button>
-    <button class="cat-tab" data-filter="snack"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-anvat"></use></svg> <span data-i18n="catLabel.snack">Ăn vặt</span></button>
-    <button class="cat-tab" data-filter="cafe"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-caphe"></use></svg> <span data-i18n="catLabel.cafe">Cà phê</span></button>
+    <button class="cat-tab" data-filter="restaurant"><svg class="icon" width="20" height="20"><use href="#ic-cat-nhahang"></use></svg> <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
+    <button class="cat-tab" data-filter="street"><svg class="icon" width="20" height="20"><use href="#ic-cat-viahe"></use></svg> <span data-i18n="catLabel.street">Vỉa hè</span></button>
+    <button class="cat-tab" data-filter="snack"><svg class="icon" width="20" height="20"><use href="#ic-cat-anvat"></use></svg> <span data-i18n="catLabel.snack">Ăn vặt</span></button>
+    <button class="cat-tab" data-filter="cafe"><svg class="icon" width="20" height="20"><use href="#ic-cat-caphe"></use></svg> <span data-i18n="catLabel.cafe">Cà phê</span></button>
   </div>
 
   <div class="restaurant-grid" id="restaurantGrid"></div>
 
   <div class="results-action">
-    <button class="session-create-btn" id="sessionCreateBtn" disabled data-i18n="session.createBtn"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-session-create"></use></svg> Tạo phiên chọn quán</button>
+    <button class="session-create-btn" id="sessionCreateBtn" disabled data-i18n="session.createBtn"><svg class="icon" width="20" height="20"><use href="#ic-session-create"></use></svg> Tạo phiên chọn quán</button>
     <button class="action-btn" id="planBtn" disabled data-i18n="results.schedule">Lên lịch</button>
   </div>
 </div>
@@ -182,10 +476,10 @@
 <div class="modal-overlay" id="randomPickModal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="rpModalTitle"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-food-pho"></use></svg> Phở nghe!</div>
+    <div class="modal-title" id="rpModalTitle"><svg class="icon" width="20" height="20"><use href="#ic-food-pho"></use></svg> Phở nghe!</div>
     <div class="modal-sub" id="rpModalSub">Đã lọc 8 quán có Phở gần bạn</div>
     <div class="rp-modal-actions">
-      <button class="rp-btn rp-btn-retry" id="rpRetryBtn" data-i18n="randomPick.retry"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-dice"></use></svg> Chọn lại</button>
+      <button class="rp-btn rp-btn-retry" id="rpRetryBtn" data-i18n="randomPick.retry"><svg class="icon" width="20" height="20"><use href="#ic-action-dice"></use></svg> Chọn lại</button>
       <button class="rp-btn rp-btn-go" id="rpGoBtn" data-i18n="randomPick.go">Đi thôi →</button>
     </div>
   </div>
@@ -200,7 +494,7 @@
 <div class="modal-overlay" id="sessionCreateOverlay">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" data-i18n="session.createTitle"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-session-create"></use></svg> Tạo phiên chọn quán</div>
+    <div class="modal-title" data-i18n="session.createTitle"><svg class="icon" width="20" height="20"><use href="#ic-session-create"></use></svg> Tạo phiên chọn quán</div>
     <div class="modal-sub" data-i18n="session.createSub">Bạn bè vote, random chọn trong nhóm được thích nhiều nhất</div>
     <div class="form-group">
       <label class="form-label" data-i18n="session.titleLabel">Tên phiên (tuỳ chọn)</label>
@@ -220,16 +514,16 @@
 <div class="modal-overlay" id="sessionVoteOverlay">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="sessionVoteTitle"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-session-create"></use></svg> Phiên chọn quán</div>
+    <div class="modal-title" id="sessionVoteTitle"><svg class="icon" width="20" height="20"><use href="#ic-session-create"></use></svg> Phiên chọn quán</div>
     <div class="modal-sub" id="sessionVoteSub"></div>
 
     <div class="session-invite-row" id="sessionInviteRow">
       <input class="form-input" id="sessionInviteLink" type="text" readonly autocomplete="off">
-      <button class="session-copy-btn" id="sessionInviteCopy" data-i18n="session.copyLink" data-i18n-attr="title" title="Sao chép link"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-invite-link"></use></svg></button>
+      <button class="session-copy-btn" id="sessionInviteCopy" data-i18n="session.copyLink" data-i18n-attr="title" title="Sao chép link"><svg class="icon" width="20" height="20"><use href="#ic-action-invite-link"></use></svg></button>
     </div>
 
-    <div class="session-reconnect-banner hidden" id="sessionReconnectBanner" data-i18n="session.reconnecting"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-status-warning"></use></svg> Mất kết nối server, thử tải lại trang</div>
-    <div class="session-expired-banner hidden" id="sessionExpiredBanner" data-i18n="session.expiredBanner"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-status-hours-unclear"></use></svg> Phiên đã hết hạn</div>
+    <div class="session-reconnect-banner hidden" id="sessionReconnectBanner" data-i18n="session.reconnecting"><svg class="icon" width="20" height="20"><use href="#ic-status-warning"></use></svg> Mất kết nối server, thử tải lại trang</div>
+    <div class="session-expired-banner hidden" id="sessionExpiredBanner" data-i18n="session.expiredBanner"><svg class="icon" width="20" height="20"><use href="#ic-status-hours-unclear"></use></svg> Phiên đã hết hạn</div>
 
     <div id="sessionVoteList" class="session-vote-list"></div>
 
@@ -240,7 +534,7 @@
 
     <div class="form-actions">
       <button class="btn-cancel" id="sessionVoteClose" data-i18n="common.close">Đóng</button>
-      <button class="btn-save hidden" id="sessionVoteCloseSession" data-i18n="session.closeAndRandom"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-dice"></use></svg> Chốt &amp; random</button>
+      <button class="btn-save hidden" id="sessionVoteCloseSession" data-i18n="session.closeAndRandom"><svg class="icon" width="20" height="20"><use href="#ic-action-dice"></use></svg> Chốt &amp; random</button>
     </div>
   </div>
 </div>
@@ -253,7 +547,7 @@
     <button class="back-btn" id="planBack">←</button>
     <div class="plan-title" data-i18n="plan.title">Lịch trình hôm nay</div>
     <button class="plan-save-btn" id="planSaveBtn" type="button" title="Lưu lộ trình này để đi sau">
-      <span class="plan-save-icon"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-save-disk"></use></svg></span><span class="plan-save-label" data-i18n="plan.saveBtn">Lưu</span>
+      <span class="plan-save-icon"><svg class="icon" width="20" height="20"><use href="#ic-action-save-disk"></use></svg></span><span class="plan-save-label" data-i18n="plan.saveBtn">Lưu</span>
     </button>
   </div>
   <div class="plan-summary" id="planSummary"></div>
@@ -268,8 +562,8 @@
   <!-- Settings gear — replaces the old avatar-tap gesture. Opens accountModal
        which now holds Avatar/Tên/Ngôn ngữ/Bạn bè/Sở thích/Dữ liệu/Gemini AI. -->
   <button class="settings-gear" id="settingsGearBtn" type="button" data-i18n="profile.settings" data-i18n-attr="title" title="Cài đặt">⚙️</button>
-  <button class="settings-gear settings-gear-2" id="savedListBtn" type="button" data-i18n="saved.openTitle" data-i18n-attr="title" title="Quán đã lưu"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-bookmark"></use></svg></button>
-  <button class="settings-gear settings-gear-3" id="savedTripsBtn" type="button" data-i18n="savedTrip.openTitle" data-i18n-attr="title" title="Lộ trình đã lưu"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-map-saved-route"></use></svg></button>
+  <button class="settings-gear settings-gear-2" id="savedListBtn" type="button" data-i18n="saved.openTitle" data-i18n-attr="title" title="Quán đã lưu"><svg class="icon" width="20" height="20"><use href="#ic-action-bookmark"></use></svg></button>
+  <button class="settings-gear settings-gear-3" id="savedTripsBtn" type="button" data-i18n="savedTrip.openTitle" data-i18n-attr="title" title="Lộ trình đã lưu"><svg class="icon" width="20" height="20"><use href="#ic-map-saved-route"></use></svg></button>
   <div class="profile-scroll">
     <!-- Quán community section — the community profile header (avatar,
          name, 3 social stats) is rendered inline into #myRestaurantList
@@ -281,14 +575,14 @@
       <div id="myRProfileHeader"></div>
       <div class="invite-card hidden" id="inviteCard">
         <div class="invite-text" id="inviteText"></div>
-        <button class="invite-btn" id="inviteBtn" type="button" data-i18n="invite.btn"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-invite-link"></use></svg> Mời bạn bè</button>
+        <button class="invite-btn" id="inviteBtn" type="button" data-i18n="invite.btn"><svg class="icon" width="20" height="20"><use href="#ic-action-invite-link"></use></svg> Mời bạn bè</button>
       </div>
       <div class="cat-chips" id="myRFilterChips" style="margin-top:.6rem">
         <button class="cat-chip active" data-filter="all"><span data-i18n="filter.all">Tất cả</span></button>
-        <button class="cat-chip" data-filter="restaurant"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-nhahang"></use></svg> <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
-        <button class="cat-chip" data-filter="street"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-viahe"></use></svg> <span data-i18n="catLabel.street">Vỉa hè</span></button>
-        <button class="cat-chip" data-filter="snack"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-anvat"></use></svg> <span data-i18n="catLabel.snack">Ăn vặt</span></button>
-        <button class="cat-chip" data-filter="cafe"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-caphe"></use></svg> <span data-i18n="catLabel.cafe">Cà phê</span></button>
+        <button class="cat-chip" data-filter="restaurant"><svg class="icon" width="20" height="20"><use href="#ic-cat-nhahang"></use></svg> <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
+        <button class="cat-chip" data-filter="street"><svg class="icon" width="20" height="20"><use href="#ic-cat-viahe"></use></svg> <span data-i18n="catLabel.street">Vỉa hè</span></button>
+        <button class="cat-chip" data-filter="snack"><svg class="icon" width="20" height="20"><use href="#ic-cat-anvat"></use></svg> <span data-i18n="catLabel.snack">Ăn vặt</span></button>
+        <button class="cat-chip" data-filter="cafe"><svg class="icon" width="20" height="20"><use href="#ic-cat-caphe"></use></svg> <span data-i18n="catLabel.cafe">Cà phê</span></button>
       </div>
       <div class="comm-r-list" id="myRestaurantList" style="margin-top:.7rem"></div>
     </div>
@@ -322,7 +616,7 @@
         <label class="form-label" data-i18n="community.password">Mật khẩu</label>
         <div class="ai-key-row">
           <input class="form-input" id="cAuthPassword" type="password" data-i18n="community.passwordPlaceholder" data-i18n-attr="placeholder" placeholder="Ít nhất 8 ký tự" autocomplete="current-password">
-          <button class="ai-key-toggle" id="cAuthPasswordToggle" data-i18n="community.togglePassword" data-i18n-attr="title" title="Hiện/ẩn mật khẩu" type="button"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-eye"></use></svg></button>
+          <button class="ai-key-toggle" id="cAuthPasswordToggle" data-i18n="community.togglePassword" data-i18n-attr="title" title="Hiện/ẩn mật khẩu" type="button"><svg class="icon" width="20" height="20"><use href="#ic-action-eye"></use></svg></button>
         </div>
       </div>
 
@@ -367,15 +661,15 @@
 ═══════════════════════════════════════════════ -->
 <div class="tabbar">
   <button class="tab-btn" data-tab="profile">
-    <div class="tab-ico"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-nav-profile"></use></svg></div>
+    <div class="tab-ico"><svg class="icon" width="20" height="20"><use href="#ic-nav-profile"></use></svg></div>
     <div data-i18n="tab.profile">Cá nhân</div>
   </button>
   <button class="tab-btn active" data-tab="home">
-    <div class="tab-ico"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-nav-home"></use></svg></div>
+    <div class="tab-ico"><svg class="icon" width="20" height="20"><use href="#ic-nav-home"></use></svg></div>
     <div>Nhóp Nhép</div>
   </button>
   <button class="tab-btn" data-tab="community">
-    <div class="tab-ico"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-nav-community"></use></svg></div>
+    <div class="tab-ico"><svg class="icon" width="20" height="20"><use href="#ic-nav-community"></use></svg></div>
     <div data-i18n="tab.community">Cộng đồng</div>
   </button>
 </div>
@@ -388,7 +682,7 @@
 <div class="modal-overlay" id="savedTripsModal">
   <div class="modal-sheet list-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" data-i18n="savedTrip.title">Lộ trình <em>đã lưu</em> <svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-map-saved-route"></use></svg></div>
+    <div class="modal-title" data-i18n="savedTrip.title">Lộ trình <em>đã lưu</em> <svg class="icon" width="20" height="20"><use href="#ic-map-saved-route"></use></svg></div>
     <div class="modal-sub" id="savedTripsCount">0 lộ trình</div>
     <div class="list-modal-body" id="savedTripsBody"></div>
     <div class="form-actions">
@@ -418,7 +712,7 @@
     <div id="detailBody"></div>
     <div class="form-actions">
       <button class="btn-cancel" id="detailClose" data-i18n="common.close">Đóng</button>
-      <button class="btn-save" id="detailMaps" data-i18n="common.openMaps"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-map-external"></use></svg> Mở Google Maps</button>
+      <button class="btn-save" id="detailMaps" data-i18n="common.openMaps"><svg class="icon" width="20" height="20"><use href="#ic-map-external"></use></svg> Mở Google Maps</button>
     </div>
   </div>
 </div>
@@ -429,11 +723,11 @@
 <div class="modal-overlay" id="communityAddModal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" data-i18n="addQuan.title">Đăng quán <em>cộng đồng</em> <svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-nav-community"></use></svg></div>
+    <div class="modal-title" data-i18n="addQuan.title">Đăng quán <em>cộng đồng</em> <svg class="icon" width="20" height="20"><use href="#ic-nav-community"></use></svg></div>
     <div class="modal-sub" data-i18n="addQuan.sub">Chia sẻ quán ngon cho cả nhóm</div>
 
     <div class="draft-banner hidden" id="cfDraftBanner">
-      <span class="draft-banner-text" data-i18n="addQuan.draftRestored"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-status-draft"></use></svg> Đã khôi phục bản nháp chưa đăng</span>
+      <span class="draft-banner-text" data-i18n="addQuan.draftRestored"><svg class="icon" width="20" height="20"><use href="#ic-status-draft"></use></svg> Đã khôi phục bản nháp chưa đăng</span>
       <button type="button" class="draft-banner-discard" id="cfDraftDiscard" data-i18n="addQuan.draftDiscard">Xoá nháp</button>
     </div>
 
@@ -445,28 +739,28 @@
     <div class="form-group">
       <label class="form-label" data-i18n="addQuan.category">Loại quán</label>
       <div class="cat-picker" id="cfCatPicker">
-        <button class="cat-pick-btn active" data-cat="restaurant"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-nhahang"></use></svg> <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
-        <button class="cat-pick-btn" data-cat="street"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-viahe"></use></svg> <span data-i18n="catLabel.street">Vỉa hè</span></button>
-        <button class="cat-pick-btn" data-cat="snack"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-anvat"></use></svg> <span data-i18n="catLabel.snack">Ăn vặt</span></button>
-        <button class="cat-pick-btn" data-cat="cafe"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-caphe"></use></svg> <span data-i18n="catLabel.cafe">Cà phê</span></button>
+        <button class="cat-pick-btn active" data-cat="restaurant"><svg class="icon" width="20" height="20"><use href="#ic-cat-nhahang"></use></svg> <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
+        <button class="cat-pick-btn" data-cat="street"><svg class="icon" width="20" height="20"><use href="#ic-cat-viahe"></use></svg> <span data-i18n="catLabel.street">Vỉa hè</span></button>
+        <button class="cat-pick-btn" data-cat="snack"><svg class="icon" width="20" height="20"><use href="#ic-cat-anvat"></use></svg> <span data-i18n="catLabel.snack">Ăn vặt</span></button>
+        <button class="cat-pick-btn" data-cat="cafe"><svg class="icon" width="20" height="20"><use href="#ic-cat-caphe"></use></svg> <span data-i18n="catLabel.cafe">Cà phê</span></button>
       </div>
     </div>
 
     <div class="form-group">
       <label class="form-label" data-i18n="addQuan.priceRange">Mức giá</label>
       <div class="cat-picker" id="cfPricePicker">
-        <button class="cat-pick-btn active" data-price="binh_dan"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-price-budget"></use></svg> <span data-i18n="priceLabel.cheap">Bình dân</span></button>
-        <button class="cat-pick-btn" data-price="tam_trung"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-price-mid"></use></svg> <span data-i18n="priceLabel.mid">Tầm trung</span></button>
-        <button class="cat-pick-btn" data-price="sang_chanh" style="grid-column:span 2"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-price-premium"></use></svg> <span data-i18n="priceLabel.premium">Sang chảnh</span></button>
+        <button class="cat-pick-btn active" data-price="binh_dan"><svg class="icon" width="20" height="20"><use href="#ic-price-budget"></use></svg> <span data-i18n="priceLabel.cheap">Bình dân</span></button>
+        <button class="cat-pick-btn" data-price="tam_trung"><svg class="icon" width="20" height="20"><use href="#ic-price-mid"></use></svg> <span data-i18n="priceLabel.mid">Tầm trung</span></button>
+        <button class="cat-pick-btn" data-price="sang_chanh" style="grid-column:span 2"><svg class="icon" width="20" height="20"><use href="#ic-price-premium"></use></svg> <span data-i18n="priceLabel.premium">Sang chảnh</span></button>
       </div>
     </div>
 
     <div class="form-group">
       <label class="form-label" data-i18n="addQuan.visibility">Độ mở</label>
       <div class="cat-picker" id="cfVisibilityPicker">
-        <button class="cat-pick-btn" data-vis="private"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-privacy-lock"></use></svg> <span data-i18n="visLabel.private">Riêng tư</span></button>
-        <button class="cat-pick-btn" data-vis="friends"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-privacy-friends"></use></svg> <span data-i18n="visLabel.friends">Bạn bè</span></button>
-        <button class="cat-pick-btn active" data-vis="public" style="grid-column:span 2"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-privacy-globe"></use></svg> <span data-i18n="visLabel.public">Công khai</span></button>
+        <button class="cat-pick-btn" data-vis="private"><svg class="icon" width="20" height="20"><use href="#ic-privacy-lock"></use></svg> <span data-i18n="visLabel.private">Riêng tư</span></button>
+        <button class="cat-pick-btn" data-vis="friends"><svg class="icon" width="20" height="20"><use href="#ic-privacy-friends"></use></svg> <span data-i18n="visLabel.friends">Bạn bè</span></button>
+        <button class="cat-pick-btn active" data-vis="public" style="grid-column:span 2"><svg class="icon" width="20" height="20"><use href="#ic-privacy-globe"></use></svg> <span data-i18n="visLabel.public">Công khai</span></button>
       </div>
     </div>
 
@@ -500,7 +794,7 @@
     </div>
 
     <div class="form-group">
-      <label class="form-label"><span data-i18n="addQuan.photos">Ảnh quán</span> <span style="opacity:.6;font-weight:600;text-transform:none;font-style:normal" data-i18n="addQuan.photosHint">(tối đa 4 · nhấn <svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-rating-star-cover"></use></svg> để chọn ảnh đại diện)</span></label>
+      <label class="form-label"><span data-i18n="addQuan.photos">Ảnh quán</span> <span style="opacity:.6;font-weight:600;text-transform:none;font-style:normal" data-i18n="addQuan.photosHint">(tối đa 4 · nhấn <svg class="icon" width="20" height="20"><use href="#ic-rating-star-cover"></use></svg> để chọn ảnh đại diện)</span></label>
       <input type="file" id="cfPhotoInput" accept="image/png,image/jpeg,image/webp" multiple style="display:none">
       <div class="photo-picker-grid" id="cfPhotoGrid">
         <button class="photo-slot photo-slot-empty" id="cfPhotoAddBtn" type="button">＋<br><span style="font-size:.65rem" data-i18n="addQuan.addPhoto">Thêm ảnh</span></button>
@@ -509,7 +803,7 @@
 
     <div class="form-actions">
       <button class="btn-cancel" id="cfCancel" data-i18n="common.cancel">Huỷ</button>
-      <button class="btn-save" id="cfSave" data-i18n="addQuan.submit"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-post-upload"></use></svg> Đăng quán</button>
+      <button class="btn-save" id="cfSave" data-i18n="addQuan.submit"><svg class="icon" width="20" height="20"><use href="#ic-action-post-upload"></use></svg> Đăng quán</button>
     </div>
   </div>
 </div>
@@ -518,7 +812,7 @@
      (ô ảnh trong lưới là 200x200 đã cắt, nhiều khi không phân biệt nổi) -->
 <div class="photo-view" id="photoView" hidden>
   <img id="photoViewImg" alt="">
-  <button type="button" class="photo-view-close" id="photoViewClose" aria-label="Đóng"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-close"></use></svg></button>
+  <button type="button" class="photo-view-close" id="photoViewClose" aria-label="Đóng"><svg class="icon" width="20" height="20"><use href="#ic-action-close"></use></svg></button>
 </div>
 
 <!-- ═══════════════════════════════════════════════
@@ -533,12 +827,12 @@
          _syncSaveBtn()/copyPostLink() vẫn tham chiếu id này; JS wiring giữ
          nguyên, chỉ ẩn UI qua class hidden. -->
     <div class="detail-quick-actions hidden">
-      <button type="button" class="quick-action-btn" id="communityDetailSave" data-i18n="detail.save" data-i18n-attr="title" title="Lưu vào 'Đã lưu'"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-bookmark"></use></svg> <span data-i18n="detail.saveShort">Lưu</span></button>
-      <button type="button" class="quick-action-btn" id="communityDetailCopy" data-i18n="detail.copyLink" data-i18n-attr="title" title="Sao chép link đến quán này"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-copy-link"></use></svg> <span data-i18n="detail.copyLinkShort">Sao chép link</span></button>
+      <button type="button" class="quick-action-btn" id="communityDetailSave" data-i18n="detail.save" data-i18n-attr="title" title="Lưu vào 'Đã lưu'"><svg class="icon" width="20" height="20"><use href="#ic-action-bookmark"></use></svg> <span data-i18n="detail.saveShort">Lưu</span></button>
+      <button type="button" class="quick-action-btn" id="communityDetailCopy" data-i18n="detail.copyLink" data-i18n-attr="title" title="Sao chép link đến quán này"><svg class="icon" width="20" height="20"><use href="#ic-action-copy-link"></use></svg> <span data-i18n="detail.copyLinkShort">Sao chép link</span></button>
     </div>
     <div class="form-actions">
       <button class="btn-cancel" id="communityDetailClose" data-i18n="common.close">Đóng</button>
-      <button class="btn-save" id="communityDetailMaps" data-i18n="common.openMaps"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-map-external"></use></svg> Mở Google Maps</button>
+      <button class="btn-save" id="communityDetailMaps" data-i18n="common.openMaps"><svg class="icon" width="20" height="20"><use href="#ic-map-external"></use></svg> Mở Google Maps</button>
     </div>
   </div>
 </div>
@@ -672,12 +966,12 @@
     <div class="form-group hidden">
       <label class="form-label" data-i18n="profile.prefs">Sở thích</label>
       <div class="pref-chips" id="prefChips">
-        <button class="pref-chip" data-pref="restaurant"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-nhahang"></use></svg> <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
-        <button class="pref-chip" data-pref="street"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-viahe"></use></svg> <span data-i18n="catLabel.street">Vỉa hè</span></button>
-        <button class="pref-chip" data-pref="snack"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-anvat"></use></svg> <span data-i18n="catLabel.snack">Ăn vặt</span></button>
-        <button class="pref-chip" data-pref="cafe"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-cat-caphe"></use></svg> <span data-i18n="catLabel.cafe">Cà phê</span></button>
-        <button class="pref-chip" data-pref="cheap"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-price-budget"></use></svg> <span data-i18n="priceLabel.cheap">Bình dân</span></button>
-        <button class="pref-chip" data-pref="premium"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-price-premium"></use></svg> <span data-i18n="priceLabel.premium">Sang chảnh</span></button>
+        <button class="pref-chip" data-pref="restaurant"><svg class="icon" width="20" height="20"><use href="#ic-cat-nhahang"></use></svg> <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
+        <button class="pref-chip" data-pref="street"><svg class="icon" width="20" height="20"><use href="#ic-cat-viahe"></use></svg> <span data-i18n="catLabel.street">Vỉa hè</span></button>
+        <button class="pref-chip" data-pref="snack"><svg class="icon" width="20" height="20"><use href="#ic-cat-anvat"></use></svg> <span data-i18n="catLabel.snack">Ăn vặt</span></button>
+        <button class="pref-chip" data-pref="cafe"><svg class="icon" width="20" height="20"><use href="#ic-cat-caphe"></use></svg> <span data-i18n="catLabel.cafe">Cà phê</span></button>
+        <button class="pref-chip" data-pref="cheap"><svg class="icon" width="20" height="20"><use href="#ic-price-budget"></use></svg> <span data-i18n="priceLabel.cheap">Bình dân</span></button>
+        <button class="pref-chip" data-pref="premium"><svg class="icon" width="20" height="20"><use href="#ic-price-premium"></use></svg> <span data-i18n="priceLabel.premium">Sang chảnh</span></button>
       </div>
     </div>
 
@@ -685,8 +979,8 @@
     <div class="psec-title" style="margin-bottom:.6rem" data-i18n="account.sectionFeatures">Tính năng</div>
     <div class="switch-row">
       <div>
-        <div class="switch-label" data-i18n="account.randomPickRowLabel"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-dice"></use></svg> Gợi ý chọn món</div>
-        <div class="switch-hint" data-i18n="account.randomPickHint">Nút <svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-dice"></use></svg> nổi ở màn chính, random 1 món rồi quét luôn.</div>
+        <div class="switch-label" data-i18n="account.randomPickRowLabel"><svg class="icon" width="20" height="20"><use href="#ic-action-dice"></use></svg> Gợi ý chọn món</div>
+        <div class="switch-hint" data-i18n="account.randomPickHint">Nút <svg class="icon" width="20" height="20"><use href="#ic-action-dice"></use></svg> nổi ở màn chính, random 1 món rồi quét luôn.</div>
       </div>
       <div class="switch" id="randomPickToggle" role="button" tabindex="0" aria-label="Gợi ý chọn món"><div class="switch-knob"></div></div>
     </div>
@@ -697,8 +991,8 @@
     <div class="form-group hidden">
       <label class="form-label" data-i18n="profile.dataSection">Dữ liệu</label>
       <div class="data-actions">
-        <button class="data-btn" id="exportDataBtn" data-i18n="profile.exportData"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-export"></use></svg> Xuất dữ liệu</button>
-        <button class="data-btn import" id="importDataBtn" data-i18n="profile.importData"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-import"></use></svg> Nhập dữ liệu</button>
+        <button class="data-btn" id="exportDataBtn" data-i18n="profile.exportData"><svg class="icon" width="20" height="20"><use href="#ic-action-export"></use></svg> Xuất dữ liệu</button>
+        <button class="data-btn import" id="importDataBtn" data-i18n="profile.importData"><svg class="icon" width="20" height="20"><use href="#ic-action-import"></use></svg> Nhập dữ liệu</button>
       </div>
       <input type="file" id="importFileInput" accept=".json">
     </div>
@@ -711,11 +1005,11 @@
       <p class="ai-hint" style="margin-top:0" data-i18n="profile.geminiHint">Tìm quán thông minh bằng AI. Mặc định đã có key dùng chung — bạn có thể dùng key riêng để không giới hạn lượt.</p>
       <div class="ai-key-row">
         <input class="form-input" id="geminiKeyInput" type="password" data-i18n="profile.keyPlaceholder" data-i18n-attr="placeholder" placeholder="Dán API key của bạn (tùy chọn)…" autocomplete="off" spellcheck="false">
-        <button class="ai-key-toggle" id="geminiKeyToggle" data-i18n="profile.toggleKey" data-i18n-attr="title" title="Hiện/ẩn key" type="button"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-eye"></use></svg></button>
+        <button class="ai-key-toggle" id="geminiKeyToggle" data-i18n="profile.toggleKey" data-i18n-attr="title" title="Hiện/ẩn key" type="button"><svg class="icon" width="20" height="20"><use href="#ic-action-eye"></use></svg></button>
       </div>
       <div class="ai-key-actions">
-        <button class="data-btn" id="geminiKeySave" data-i18n="profile.saveKey"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-save-disk"></use></svg> Lưu key</button>
-        <button class="data-btn import" id="geminiKeyClear" data-i18n="profile.clearKey"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-undo-reset"></use></svg> Dùng key mặc định</button>
+        <button class="data-btn" id="geminiKeySave" data-i18n="profile.saveKey"><svg class="icon" width="20" height="20"><use href="#ic-action-save-disk"></use></svg> Lưu key</button>
+        <button class="data-btn import" id="geminiKeyClear" data-i18n="profile.clearKey"><svg class="icon" width="20" height="20"><use href="#ic-action-undo-reset"></use></svg> Dùng key mặc định</button>
       </div>
       <a class="ai-getkey" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" data-i18n="profile.getKey">Lấy key miễn phí tại Google AI Studio →</a>
     </div>
@@ -737,14 +1031,14 @@
 
       <div class="switch-row" style="margin-bottom:.6rem">
         <div>
-          <div class="switch-label" data-i18n="account.notifRowLabel"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-social-bell"></use></svg> Thông báo follow</div>
+          <div class="switch-label" data-i18n="account.notifRowLabel"><svg class="icon" width="20" height="20"><use href="#ic-social-bell"></use></svg> Thông báo follow</div>
           <div class="switch-hint" id="pushNotifHint" data-i18n="account.notifHint">Nhận thông báo khi có người bắt đầu theo dõi bạn.</div>
         </div>
         <div class="switch" id="pushNotifToggle" role="button" tabindex="0" aria-label="Thông báo follow"><div class="switch-knob"></div></div>
       </div>
 
       <div class="settings-row" id="friendsRowBtn">
-        <div class="switch-label" data-i18n="account.friendsRowLabel"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-social-handshake"></use></svg> Bạn bè</div>
+        <div class="switch-label" data-i18n="account.friendsRowLabel"><svg class="icon" width="20" height="20"><use href="#ic-social-handshake"></use></svg> Bạn bè</div>
         <div style="display:flex;align-items:center;gap:.4rem">
           <span class="settings-row-count" id="friendsRowCount">0</span>
           <span class="settings-row-arrow">›</span>
@@ -767,19 +1061,19 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2625"></script>
-<script src="js/i18n.js?v=2625"></script>
-<script src="js/utils.js?v=2625"></script>
-<script src="js/state.js?v=2625"></script>
-<script src="js/poi.js?v=2625"></script>
-<script src="js/geocoder.js?v=2625"></script>
-<script src="js/gemini.js?v=2625"></script>
-<script src="js/community.js?v=2625"></script>
-<script src="js/push.js?v=2625"></script>
-<script src="js/analytics.js?v=2625"></script>
-<script src="js/map.js?v=2625"></script>
-<script src="js/gps.js?v=2625"></script>
-<script src="js/locationPicker.js?v=2625"></script>
+<script src="js/security.js?v=2626"></script>
+<script src="js/i18n.js?v=2626"></script>
+<script src="js/utils.js?v=2626"></script>
+<script src="js/state.js?v=2626"></script>
+<script src="js/poi.js?v=2626"></script>
+<script src="js/geocoder.js?v=2626"></script>
+<script src="js/gemini.js?v=2626"></script>
+<script src="js/community.js?v=2626"></script>
+<script src="js/push.js?v=2626"></script>
+<script src="js/analytics.js?v=2626"></script>
+<script src="js/map.js?v=2626"></script>
+<script src="js/gps.js?v=2626"></script>
+<script src="js/locationPicker.js?v=2626"></script>
 <!-- Trip name dialog — thay thế window.prompt() native -->
 <div class="trip-name-overlay" id="tripNameOverlay" role="dialog" aria-modal="true">
   <div class="trip-name-card">
@@ -787,13 +1081,13 @@
     <input class="form-input" id="tripNameInput" type="text" maxlength="60" autocomplete="off" spellcheck="false">
     <div class="trip-name-actions">
       <button class="trip-name-cancel" id="tripNameCancel" data-i18n="common.cancel">Huỷ</button>
-      <button class="trip-name-confirm" id="tripNameConfirm"><svg class="icon" width="20" height="20"><use href="icons/sprite.svg#ic-action-save-disk"></use></svg> <span data-i18n="plan.saveBtn">Lưu</span></button>
+      <button class="trip-name-confirm" id="tripNameConfirm"><svg class="icon" width="20" height="20"><use href="#ic-action-save-disk"></use></svg> <span data-i18n="plan.saveBtn">Lưu</span></button>
     </div>
   </div>
 </div>
 
-<script src="js/controllers.js?v=2625"></script>
-<script src="js/app.js?v=2625"></script>
+<script src="js/controllers.js?v=2626"></script>
+<script src="js/app.js?v=2626"></script>
 
 </body>
 </html>
