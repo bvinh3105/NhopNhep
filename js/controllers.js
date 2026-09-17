@@ -3583,6 +3583,7 @@ const CommunityCtrl = {
 ═══════════════════════════════════════════════ */
 const CommunityDetailModal = {
   _current: null,
+  _returnModalId: null,
 
   init() {
     document.getElementById('communityDetailClose').addEventListener('click', () => this.close());
@@ -3637,7 +3638,16 @@ const CommunityDetailModal = {
 
   // opts.focusComment: true khi mở từ nút 💬 trên card feed — cuộn thẳng
   // xuống ô nhập bình luận sau khi modal hiện, đỡ user phải tự cuộn tay.
+  //
+  // Mở được từ NHIỀU chỗ (feed, UserQuanModal, SavedListModal, deep-link
+  // chia sẻ…) — đóng modal đang mở (nếu có) trước khi hiện, cùng lý do
+  // và cùng cách xử lý như UserQuanModal.open() ở trên (2 modal cùng
+  // z-index sẽ chồng lớp thay vì thay thế đúng nghĩa nếu cùng .show).
   open(r, opts = {}) {
+    const prevModal = document.querySelector('.modal-overlay.show:not(#communityDetailModal)');
+    this._returnModalId = prevModal ? prevModal.id : null;
+    if (prevModal) prevModal.classList.remove('show');
+
     this._current = r;
     if (typeof Analytics !== 'undefined') Analytics.track('detail_open', {
       source: 'community',
@@ -3844,6 +3854,10 @@ const CommunityDetailModal = {
 
   close() {
     document.getElementById('communityDetailModal').classList.remove('show');
+    if (this._returnModalId) {
+      document.getElementById(this._returnModalId)?.classList.add('show');
+      this._returnModalId = null;
+    }
   },
 };
 
@@ -4104,6 +4118,8 @@ const SavedListModal = {
    visibility phía server tự lọc: public/friends-nếu-tôi-là-bạn/chính tôi)
 ═══════════════════════════════════════════════ */
 const UserQuanModal = {
+  _returnModalId: null,
+
   init() {
     document.getElementById('userQuanClose').addEventListener('click', () => this.close());
     document.getElementById('userQuanModal').addEventListener('click', (e) => {
@@ -4112,6 +4128,16 @@ const UserQuanModal = {
   },
 
   async open(userId, userName) {
+    // Mở được từ NHIỀU chỗ (card feed, CommunityDetailModal, danh sách
+    // follower/following…) — nếu modal đó đang mở thì đóng nó trước, vì
+    // mọi .modal-overlay dùng chung z-index nên 2 modal cùng .show sẽ
+    // chồng lớp lên nhau (bug đã gặp y hệt ở AccountModal/FriendsListModal,
+    // xem comment ở FriendsListModal.close()) thay vì thay thế đúng nghĩa.
+    // Nhớ modal đó lại để close() quay về đúng chỗ, không làm gián đoạn flow.
+    const prevModal = document.querySelector('.modal-overlay.show:not(#userQuanModal)');
+    this._returnModalId = prevModal ? prevModal.id : null;
+    if (prevModal) prevModal.classList.remove('show');
+
     document.getElementById('userQuanTitle').innerHTML = I18N.t('userQuan.title', { name: escapeHtml(userName || I18N.t('common.thisPerson')) });
     const body = document.getElementById('userQuanBody');
     body.innerHTML = `<div class="empty-comm"><div class="em-icon">⏳</div><div class="em-msg">${I18N.t('em.loading')}</div></div>`;
@@ -4164,6 +4190,10 @@ const UserQuanModal = {
 
   close() {
     document.getElementById('userQuanModal').classList.remove('show');
+    if (this._returnModalId) {
+      document.getElementById(this._returnModalId)?.classList.add('show');
+      this._returnModalId = null;
+    }
   },
 };
 
