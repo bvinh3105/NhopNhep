@@ -2539,7 +2539,7 @@ const ProfileCtrl = {
       // No community identity yet — render a placeholder header from
       // local profile so the page isn't headless.
       if (headerEl) headerEl.innerHTML = communityProfileHeaderHtml({
-        avatar: State.profile.avatar,
+        avatar: avatarIcon(State.profile.avatar),
         name: State.profile.name || I18N.t('profile.namePlaceholder'),
         tagline: I18N.t('profile.tagline'),
         postCount: 0, starCount: 0, followerCount: 0, followingCount: 0,
@@ -2599,7 +2599,7 @@ const ProfileCtrl = {
       : this._myRestaurants.filter(r => COMMUNITY_PB_TO_CAT[r.category] === this._myRFilter);
 
     const header = communityProfileHeaderHtml({
-      avatar: State.profile.avatar,
+      avatar: avatarIcon(State.profile.avatar),
       name: Community.currentUser?.name || State.profile.name || I18N.t('profile.namePlaceholder'),
       tagline: I18N.t('profile.tagline'),
       postCount: this._myRestaurants.length,

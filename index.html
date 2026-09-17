@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2627">
+<link rel="stylesheet" href="css/styles.css?v=2628">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -68,6 +68,7 @@
   <path d="M8,7 L12,3 L16,7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
 <symbol id="ic-action-eye" viewBox="0 0 24 24"><path d="M2,12 C2,12 6,5 12,5 C18,5 22,12 22,12 C22,12 18,19 12,19 C6,19 2,12 2,12 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M9,12 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-filter" viewBox="0 0 24 24"><path d="M4,5 L20,5 L13,14 L13,20 L11,20 L11,14 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
 <symbol id="ic-action-fullscreen" viewBox="0 0 24 24"><path d="M4,9 V4 H9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M15,4 H20 V9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M20,15 V20 H15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -95,6 +96,12 @@
   <path d="M6,12 L18,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
 <symbol id="ic-action-search" viewBox="0 0 24 24"><path d="M4,11 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M20,20 L16.6,16.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-settings" viewBox="0 0 24 24"><path d="M6,12 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10,12 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,6 L12,3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M18,12 L21,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,18 L12,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M6,12 L3,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
 <symbol id="ic-action-share" viewBox="0 0 24 24"><path d="M4,12 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M16,6 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M16,18 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -561,7 +568,7 @@
 <div id="profileScreen" class="screen hidden">
   <!-- Settings gear — replaces the old avatar-tap gesture. Opens accountModal
        which now holds Avatar/Tên/Ngôn ngữ/Bạn bè/Sở thích/Dữ liệu/Gemini AI. -->
-  <button class="settings-gear" id="settingsGearBtn" type="button" data-i18n="profile.settings" data-i18n-attr="title" title="Cài đặt">⚙️</button>
+  <button class="settings-gear" id="settingsGearBtn" type="button" data-i18n="profile.settings" data-i18n-attr="title" title="Cài đặt"><svg class="icon" width="20" height="20"><use href="#ic-action-settings"></use></svg></button>
   <button class="settings-gear settings-gear-2" id="savedListBtn" type="button" data-i18n="saved.openTitle" data-i18n-attr="title" title="Quán đã lưu"><svg class="icon" width="20" height="20"><use href="#ic-action-bookmark"></use></svg></button>
   <button class="settings-gear settings-gear-3" id="savedTripsBtn" type="button" data-i18n="savedTrip.openTitle" data-i18n-attr="title" title="Lộ trình đã lưu"><svg class="icon" width="20" height="20"><use href="#ic-map-saved-route"></use></svg></button>
   <div class="profile-scroll">
@@ -1061,19 +1068,19 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2627"></script>
-<script src="js/i18n.js?v=2627"></script>
-<script src="js/utils.js?v=2627"></script>
-<script src="js/state.js?v=2627"></script>
-<script src="js/poi.js?v=2627"></script>
-<script src="js/geocoder.js?v=2627"></script>
-<script src="js/gemini.js?v=2627"></script>
-<script src="js/community.js?v=2627"></script>
-<script src="js/push.js?v=2627"></script>
-<script src="js/analytics.js?v=2627"></script>
-<script src="js/map.js?v=2627"></script>
-<script src="js/gps.js?v=2627"></script>
-<script src="js/locationPicker.js?v=2627"></script>
+<script src="js/security.js?v=2628"></script>
+<script src="js/i18n.js?v=2628"></script>
+<script src="js/utils.js?v=2628"></script>
+<script src="js/state.js?v=2628"></script>
+<script src="js/poi.js?v=2628"></script>
+<script src="js/geocoder.js?v=2628"></script>
+<script src="js/gemini.js?v=2628"></script>
+<script src="js/community.js?v=2628"></script>
+<script src="js/push.js?v=2628"></script>
+<script src="js/analytics.js?v=2628"></script>
+<script src="js/map.js?v=2628"></script>
+<script src="js/gps.js?v=2628"></script>
+<script src="js/locationPicker.js?v=2628"></script>
 <!-- Trip name dialog — thay thế window.prompt() native -->
 <div class="trip-name-overlay" id="tripNameOverlay" role="dialog" aria-modal="true">
   <div class="trip-name-card">
@@ -1086,8 +1093,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2627"></script>
-<script src="js/app.js?v=2627"></script>
+<script src="js/controllers.js?v=2628"></script>
+<script src="js/app.js?v=2628"></script>
 
 </body>
 </html>
