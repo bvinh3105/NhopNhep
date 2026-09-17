@@ -1616,7 +1616,10 @@ body.map-full .tabbar{transform:translateY(105%)}
 .post-carousel-track::-webkit-scrollbar{display:none}
 .post-photo{
   flex:0 0 100%;width:100%;height:100%;scroll-snap-align:start;
-  background-size:cover;background-position:center;
+  /* contain, not cover — ảnh gốc thường không phải 1:1 (dọc hoặc ngang),
+     "cover" trước đây crop mất phần trên/dưới hoặc 2 bên. Viền cream-2
+     của .post-carousel lộ ra thành khung nền, không còn mất ảnh. */
+  background-size:contain;background-position:center;background-repeat:no-repeat;
 }
 .post-photo-empty{display:flex;align-items:center;justify-content:center;font-size:3rem}
 .post-dots{position:absolute;bottom:10px;left:0;right:0;display:flex;justify-content:center;gap:5px}
