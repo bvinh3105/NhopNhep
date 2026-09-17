@@ -64,7 +64,7 @@ Vanilla HTML/CSS/JS — **không framework, không build step**. 14 module `js/*
 - **Photon (Komoot)** — autocomplete địa chỉ
 - **OSRM** (public demo server) — dẫn đường thật
 - **PocketBase** (tự host) — backend cộng đồng: tài khoản, quán đăng, vote, follow
-- **Google Fonts** — Fraunces (display) + Plus Jakarta Sans (body)
+- **Nunito** (variable font, tự host tại `fonts/`) — display + body
 - **localStorage** — persist profile, sở thích, ngôn ngữ, key AI riêng
 
 ---
@@ -133,7 +133,7 @@ Backend cộng đồng (PocketBase) nằm ở thư mục riêng ngoài repo này
 
 ## 🎨 Design language
 
-Warm cream palette (`#FBF3D9`) + deep tomato red (`#B92626`) + orange accent (`#E8843C`). Card viền dày kiểu sticker, hard shadow. Fraunces italic cho headers, Plus Jakarta Sans cho body.
+Warm cream palette (`#FBF3D9`) + deep tomato red (`#B92626`) + orange accent (`#E8843C`). Card viền dày kiểu sticker, hard shadow. Nunito (variable, tự host) cho cả headers (italic, weight 800-900) lẫn body.
 
 ---
 
