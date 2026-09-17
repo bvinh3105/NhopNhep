@@ -1,18 +1,73 @@
 /* ═══════════════════════════════════════════════
+   ICON SYSTEM — SVG sprite (icons/sprite.svg), one <symbol> per icon,
+   referenced via <use>. Replaces the emoji this app used to render
+   directly (Windows/Android/iOS/each browser draws emoji differently —
+   see the icon inventory this was generated from). svgIcon(name) returns
+   ready-to-insert markup; .icon in styles.css handles sizing (1em, scales
+   with font-size like the emoji did) and color (currentColor, so a button
+   with a colored background tints its icon exactly like its text).
+   Named svgIcon() and not icon() — several functions in controllers.js/
+   map.js already use `icon` as a local variable name (a DOM element or an
+   L.divIcon), which would shadow a global icon() inside those scopes.
+
+   width/height="20" are a hard fallback, not the real size: .icon in
+   styles.css overrides them with 1em (scales with font-size, like the
+   emoji did) whenever the stylesheet is actually loaded. Without them, a
+   stale-cached styles.css served alongside a fresh HTML/JS pair (e.g. a
+   deploy landing mid-cache-window) leaves the <svg> with no size at all,
+   and browsers fall back to the intrinsic replaced-element default of
+   300×150px — every icon balloons to fill its button. Caught live
+   2026-09-17 (chip buttons rendered as giant colored blocks).
+═══════════════════════════════════════════════ */
+function svgIcon(name, cls = '') {
+  return `<svg class="icon${cls ? ' ' + cls : ''}" width="20" height="20"><use href="icons/sprite.svg#ic-${name}"></use></svg>`;
+}
+
+/* ═══════════════════════════════════════════════
    CONSTANTS
 ═══════════════════════════════════════════════ */
 // .label là getter đọc I18N.t(...) tại thời điểm truy cập (không phải giá
 // trị cố định) — nên mọi nơi trong app đang gọi CATEGORIES[x].label tự
 // động ra đúng ngôn ngữ hiện tại, kể cả sau khi người dùng đổi ngôn ngữ
-// giữa chừng, không cần sửa lại từng chỗ gọi.
+// giữa chừng, không cần sửa lại từng chỗ gọi. .icon cũng là getter (trả
+// markup <svg> sẵn dùng) theo đúng lý do tương tự — mọi ${cat.icon} hiện
+// có tự động ra icon mới, không cần sửa từng chỗ gọi.
 const CATEGORIES = {
-  restaurant: { get label(){ return I18N.t('catLabel.restaurant'); }, icon:'🍽️', color:'#B92626', dwell:60 },
-  street:     { get label(){ return I18N.t('catLabel.street'); },     icon:'🍜', color:'#E8843C', dwell:30 },
-  snack:      { get label(){ return I18N.t('catLabel.snack'); },      icon:'🧆', color:'#D64B7A', dwell:20 },
-  cafe:       { get label(){ return I18N.t('catLabel.cafe'); },       icon:'☕', color:'#7A4E2F', dwell:45 },
+  restaurant: { get label(){ return I18N.t('catLabel.restaurant'); }, get icon(){ return svgIcon('cat-nhahang'); }, color:'#B92626', dwell:60 },
+  street:     { get label(){ return I18N.t('catLabel.street'); },     get icon(){ return svgIcon('cat-viahe'); },   color:'#E8843C', dwell:30 },
+  snack:      { get label(){ return I18N.t('catLabel.snack'); },      get icon(){ return svgIcon('cat-anvat'); },   color:'#D64B7A', dwell:20 },
+  cafe:       { get label(){ return I18N.t('catLabel.cafe'); },       get icon(){ return svgIcon('cat-caphe'); },   color:'#7A4E2F', dwell:45 },
 };
 
-const AVATARS = ['🍜','🍕','🍔','🍣','🍰','🍩','🍦','🥗','🌮','🍤','🍱','🥘','🍲','🥟','🍢','☕','🧋','🍹'];
+// Tên icon avatar khớp file icons-svg gốc — dùng food-* cho món đã có icon
+// riêng (phở, pizza, sushi…) thay vì vẽ lại. AVATAR_LEGACY_EMOJI map ngược
+// lại để đọc đúng avatar_emoji cũ đã lưu trong PocketBase từ trước khi có
+// icon (user cũ không phải chọn lại avatar).
+const AVATARS = ['food-pho','food-pizza','avatar-burger','food-sushi','avatar-cake','avatar-donut','food-kem','avatar-salad','avatar-taco','avatar-shrimp','avatar-bento','food-lau','food-bun','avatar-dumpling','food-nuong','food-caphe','food-trasua','avatar-cocktail'];
+const AVATAR_DEFAULT = 'food-pho';
+const AVATAR_LEGACY_EMOJI = {
+  '🍜':'food-pho','🍕':'food-pizza','🍔':'avatar-burger','🍣':'food-sushi','🍰':'avatar-cake',
+  '🍩':'avatar-donut','🍦':'food-kem','🥗':'avatar-salad','🌮':'avatar-taco','🍤':'avatar-shrimp',
+  '🍱':'avatar-bento','🥘':'food-lau','🍲':'food-bun','🥟':'avatar-dumpling','🍢':'food-nuong',
+  '☕':'food-caphe','🧋':'food-trasua','🍹':'avatar-cocktail',
+};
+// avatar_emoji lưu trong PocketBase có thể là icon-name mới HOẶC emoji cũ
+// (user đã có tài khoản từ trước bản icon này) — hàm này luôn trả về đúng
+// markup hiển thị bất kể định dạng nào đang lưu.
+function avatarIcon(stored) {
+  if (!stored) return svgIcon(AVATAR_DEFAULT);
+  if (AVATARS.includes(stored)) return svgIcon(stored);
+  if (AVATAR_LEGACY_EMOJI[stored]) return svgIcon(AVATAR_LEGACY_EMOJI[stored]);
+  return escapeHtml(stored); // giá trị lạ không nhận diện được — hiện nguyên văn thay vì vỡ layout
+}
+// Chuẩn hoá về đúng tên icon (không phải markup) — dùng khi GÁN vào
+// State.profile.avatar (từ localStorage/PocketBase cũ) để phần so sánh
+// "avatar nào đang được chọn" trong avatarPicker luôn khớp đúng, kể cả
+// với tài khoản có avatar_emoji lưu từ trước khi có bộ icon này.
+function normalizeAvatarName(stored) {
+  if (AVATARS.includes(stored)) return stored;
+  return AVATAR_LEGACY_EMOJI[stored] || AVATAR_DEFAULT;
+}
 
 /* ═══════════════════════════════════════════════
    DROPDOWN POSITIONING
@@ -318,9 +373,10 @@ function timeAgo(dateStr) {
   return I18N.t('time.yearsAgo', { n: Math.floor(diffMonth / 12) });
 }
 
-// Emoji avatar for a community author record — falls back to a default
-// for accounts created before the avatar_emoji field existed, or anyone
-// who hasn't opened the avatar picker yet.
+// Avatar icon markup for a community author record — falls back to a
+// default for accounts created before the avatar_emoji field existed, or
+// anyone who hasn't opened the avatar picker yet. avatarIcon() also
+// handles records that still have a legacy emoji stored (pre-icon-system).
 function authorAvatar(author) {
-  return (author && author.avatar_emoji) || '🍜';
+  return avatarIcon(author && author.avatar_emoji);
 }

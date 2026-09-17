@@ -37,7 +37,7 @@ const GPS = {
   startTracking() {
     if (this._tracking) return;
     const btn = document.getElementById('gpsBtn');
-    btn.textContent = '⏳';
+    btn.innerHTML = svgIcon('status-loading');
     btn.classList.remove('active');
     this.hint(I18N.t('gps.turningOn'));
     this._sessionFirstFix = true;
@@ -58,7 +58,7 @@ const GPS = {
     const btn = document.getElementById('gpsBtn');
     btn.classList.remove('tracking');
     btn.classList.add('active');
-    btn.textContent = '📍';
+    btn.innerHTML = svgIcon('action-gps');
     MapHome.clearAccuracyCircle();
     this.hint(I18N.t('gps.stopped'), '');
     setTimeout(() => this.hint(''), 2500);
@@ -78,7 +78,7 @@ const GPS = {
     document.getElementById('locInput').value = I18N.t('gps.yourLocation');
 
     const btn = document.getElementById('gpsBtn');
-    btn.textContent = '📍';
+    btn.innerHTML = svgIcon('action-gps');
     btn.classList.remove('active');
     btn.classList.add('tracking');
 

@@ -454,7 +454,7 @@ const Geocoder = {
 
     suggestEl.innerHTML = unique.map((r, i) => `
       <div class="go-item" data-idx="${i}">
-        <div class="go-primary">📍 ${escapeHtml(r.name)}</div>
+        <div class="go-primary">${svgIcon('action-gps')} ${escapeHtml(r.name)}</div>
         <div class="go-sub">${escapeHtml(r.sub)}</div>
       </div>
     `).join('');

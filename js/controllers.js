@@ -630,16 +630,20 @@ const HomeCtrl = {
   },
   _resetRandomPickBubble() {
     const fab = document.getElementById('randomPickBubble');
-    document.getElementById('rpbIcon').textContent = '🎲';
+    document.getElementById('rpbIcon').innerHTML = svgIcon('action-dice');
     fab.classList.remove('picking');
     fab.setAttribute('aria-label', I18N.t('randomPick.cta'));
     fab.title = I18N.t('randomPick.sub');
   },
   _dishChipList() {
+    // Chip giờ là icon SVG + tên (không còn emoji đứng đầu textContent như
+    // trước) — đọc thẳng tên icon từ <use href="...#ic-NAME"> thay vì tách
+    // chuỗi. chip.textContent giờ chỉ còn đúng phần tên món (svg không có
+    // text node), khỏi cần .slice(emoji.length) nữa.
     return Array.from(document.querySelectorAll('#dishSuggest .dish-chip')).map(chip => {
-      const label = chip.textContent.trim();
-      const emoji = label.split(' ')[0];
-      return { dish: chip.dataset.dish || '', emoji, name: label.slice(emoji.length).trim() };
+      const use = chip.querySelector('use');
+      const icon = use ? use.getAttribute('href').split('#ic-')[1] : '';
+      return { dish: chip.dataset.dish || '', icon, name: chip.textContent.trim() };
     }).filter(d => d.dish);
   },
   async _openRandomPick() {
@@ -648,11 +652,11 @@ const HomeCtrl = {
     if (!list.length) return;
     this._rpPicking = true;
     const fab = document.getElementById('randomPickBubble');
-    const icon = document.getElementById('rpbIcon');
+    const rpbIcon = document.getElementById('rpbIcon');
     fab.classList.add('picking');
     let i = 0;
     const iv = setInterval(() => {
-      icon.textContent = list[i % list.length].emoji;
+      rpbIcon.innerHTML = svgIcon(list[i % list.length].icon);
       i++;
     }, 90);
     await new Promise(r => setTimeout(r, 1200));
@@ -678,8 +682,8 @@ const HomeCtrl = {
 
       const n = State.filteredResults.length;
       const noExactMatch = State.queryUnmatched;
-      document.getElementById('rpModalTitle').textContent =
-        I18N.t('randomPick.resultTitle', { emoji: picked.emoji, name: picked.name });
+      document.getElementById('rpModalTitle').innerHTML =
+        I18N.t('randomPick.resultTitle', { emoji: svgIcon(picked.icon), name: picked.name });
       document.getElementById('rpModalSub').textContent = n === 0
         ? I18N.t('randomPick.resultSubEmpty', { name: picked.name })
         : noExactMatch
@@ -858,17 +862,17 @@ const ResultsCtrl = {
 
     if (parsed.isOpen === true) {
       return `<div class="r-hours">
-        <span class="hours-badge open">🟢 ${parsed.label}</span>
+        <span class="hours-badge open">${svgIcon('status-open-dot')} ${parsed.label}</span>
         <span class="hours-detail">${parsed.detail}</span>
       </div>`;
     } else if (parsed.isOpen === false) {
       return `<div class="r-hours">
-        <span class="hours-badge closed">🔴 ${parsed.label}</span>
+        <span class="hours-badge closed">${svgIcon('status-closed-dot')} ${parsed.label}</span>
         <span class="hours-detail">${parsed.detail}</span>
       </div>`;
     } else {
       return `<div class="r-hours">
-        <span class="hours-badge unknown">⏰ ${parsed.raw}</span>
+        <span class="hours-badge unknown">${svgIcon('status-hours-unclear')} ${parsed.raw}</span>
       </div>`;
     }
   },
@@ -883,14 +887,14 @@ const ResultsCtrl = {
         // whose autocomplete finds nearby places our data misses ("coo").
         const esc = escapeHtml(q);
         grid.innerHTML = `<div class="empty-state">
-          <div class="es-icon">🔍</div>
+          <div class="es-icon">${svgIcon('action-search')}</div>
           <div class="es-msg">${I18N.t('empty.notFound', { q: `<b>${esc}</b>` })}<br>
             <span style="font-size:.82rem;opacity:.75">${I18N.t('empty.tapBelow')}</span>
           </div>
           <a class="es-gmaps-btn" href="${gmapsSearchUrl(q)}" target="_blank" rel="noopener">${I18N.t('empty.findOnMaps', { q: esc })}</a>
         </div>`;
       } else {
-        grid.innerHTML = `<div class="empty-state"><div class="es-icon">🍽️</div><div class="es-msg">${I18N.t('empty.noneInCategory')}</div></div>`;
+        grid.innerHTML = `<div class="empty-state"><div class="es-icon">${svgIcon('cat-nhahang')}</div><div class="es-msg">${I18N.t('empty.noneInCategory')}</div></div>`;
       }
       return;
     }
@@ -922,19 +926,19 @@ const ResultsCtrl = {
       const isGemini = !!r._gemini;
       const isOsm = r.id >= 1e13 && !isGemini;
       const flagCls = userAdded ? ' user-added' : (isGemini ? ' gemini-added' : (isOsm ? ' osm-added' : ''));
-      const priceLabel = r.price && r.price !== '—' ? `💰 ${r.price}` : '💰 —';
+      const priceLabel = r.price && r.price !== '—' ? `${svgIcon('price-mid')} ${r.price}` : `${svgIcon('price-mid')} —`;
       // No real rating for OSM-sourced places — show a neutral "no data"
       // dash (matches the existing '💰 —' convention below) instead of
       // naming the data source; that stays dev-only (osm-added CSS class
       // + console.debug in scan()), never surfaced as text to users.
-      const ratingLabel = isGemini ? `${r.rating.toFixed(1)} ★` : (isOsm ? '★ —' : `${r.rating} ★`);
+      const ratingLabel = isGemini ? `${r.rating.toFixed(1)} ${svgIcon('rating-star-filled')}` : (isOsm ? `${svgIcon('rating-star-filled')} —` : `${r.rating} ${svgIcon('rating-star-filled')}`);
       // Gemini invents price/rating (see prompt) — never verified against a
       // real source, so both get a visible "reference only" note right on
       // the card, not just an internal CSS hook nobody outside devtools sees.
       const refNote = isGemini ? ` <i class="r-ref-note">(${I18N.t('card.refNote')})</i>` : '';
       const hoursBadge = this._renderHoursBadge(r);
       return `<div class="r-card${sel?' selected':''}${flagCls}" data-id="${r.id}" style="animation-delay:${Math.min(i,10)*30}ms" role="button" tabindex="0" title="${I18N.t('card.tapDetail')}">
-        <button class="r-check" data-id="${r.id}" title="${I18N.t('card.selectAdd')}" aria-label="${I18N.t('card.select')}" aria-pressed="${sel?'true':'false'}">✓</button>
+        <button class="r-check" data-id="${r.id}" title="${I18N.t('card.selectAdd')}" aria-label="${I18N.t('card.select')}" aria-pressed="${sel?'true':'false'}">${svgIcon('status-selected')}</button>
         <div class="r-cat-badge" style="background:${cat.color}22;color:${cat.color}">${cat.icon} ${cat.label}</div>
         <div class="r-name">${escapeHtml(r.name)}</div>
         ${hoursBadge}
@@ -1089,7 +1093,7 @@ const SessionCreateModal = {
     document.getElementById('sessionCreateTitle').value = '';
     document.getElementById('sessionCreateList').innerHTML = this._candidates.map(c => `
       <div class="session-cand-row">
-        <span class="session-cand-icon">${(CATEGORIES[c.category] && CATEGORIES[c.category].icon) || '🍽️'}</span>
+        <span class="session-cand-icon">${(CATEGORIES[c.category] && CATEGORIES[c.category].icon) || svgIcon('cat-nhahang')}</span>
         <span class="session-cand-name">${escapeHtml(c.name)}</span>
       </div>
     `).join('');
@@ -1162,8 +1166,8 @@ const SessionVoteModal = {
     this._lastUpdated = null;
     this._failCount = 0;
 
-    document.getElementById('sessionVoteTitle').textContent = sessionRecord.title
-      ? `👥 ${sessionRecord.title}` : I18N.t('session.defaultTitle');
+    document.getElementById('sessionVoteTitle').innerHTML = sessionRecord.title
+      ? `${svgIcon('session-create')} ${escapeHtml(sessionRecord.title)}` : I18N.t('session.defaultTitle');
     document.getElementById('sessionInviteLink').value = `${location.origin}/?join=${sessionRecord.id}`;
     document.getElementById('sessionReconnectBanner').classList.add('hidden');
     document.getElementById('sessionVoteOverlay').classList.add('show');
@@ -1318,12 +1322,12 @@ const SessionVoteModal = {
       const voted = this._myVotes.has(c.cid);
       const isWinner = isClosed && s.winner_cid === c.cid;
       const count = this._counts[c.cid] || 0;
-      const icon = (CATEGORIES[c.category] && CATEGORIES[c.category].icon) || '🍽️';
+      const catIcon = (CATEGORIES[c.category] && CATEGORIES[c.category].icon) || svgIcon('cat-nhahang');
       return `<div class="session-vote-row${voted ? ' voted' : ''}${isWinner ? ' winner' : ''}" data-cid="${c.cid}">
-        <span class="session-vote-icon">${isWinner ? '🏆' : icon}</span>
+        <span class="session-vote-icon">${isWinner ? svgIcon('social-trophy') : catIcon}</span>
         <span class="session-vote-name">${escapeHtml(c.name)}</span>
         <span class="session-vote-count">${count}</span>
-        <span class="session-vote-check">✅</span>
+        <span class="session-vote-check">${svgIcon('status-confirmed')}</span>
       </div>`;
     }).join('');
 
@@ -1557,11 +1561,11 @@ const PlanCtrl = {
     const startTime   = State.itinerary.length ? addMinutes(State.itinerary[0].arrivalClock, -State.itinerary[0].travelMin) : new Date();
 
     document.getElementById('planSummary').innerHTML = `
-      <div class="sum-chip"><span class="sci">🏪</span>${I18N.t('plan.stops', { n: State.itinerary.length })}</div>
-      <div class="sum-chip"><span class="sci">🕐</span>${fmtClock(startTime)} → ${fmtClock(endTime)}</div>
-      <div class="sum-chip"><span class="sci">⏱</span>${fmtTime(totalTravel+totalDwell)}</div>
-      <div class="sum-chip"><span class="sci">📍</span>${fmtDist(totalDist)}</div>
-      <div class="sum-chip"><span class="sci">🛵</span>${I18N.t('plan.motorbike')}</div>
+      <div class="sum-chip"><span class="sci">${svgIcon('route-stop-count')}</span>${I18N.t('plan.stops', { n: State.itinerary.length })}</div>
+      <div class="sum-chip"><span class="sci">${svgIcon('route-time-window')}</span>${fmtClock(startTime)} → ${fmtClock(endTime)}</div>
+      <div class="sum-chip"><span class="sci">${svgIcon('route-duration')}</span>${fmtTime(totalTravel+totalDwell)}</div>
+      <div class="sum-chip"><span class="sci">${svgIcon('action-gps')}</span>${fmtDist(totalDist)}</div>
+      <div class="sum-chip"><span class="sci">${svgIcon('route-scooter')}</span>${I18N.t('plan.motorbike')}</div>
     `;
   },
 
@@ -1577,7 +1581,7 @@ const PlanCtrl = {
     let html = '';
 
     html += `<div class="tl-item">
-      <div class="tl-spine"><div class="tl-dot" style="background:#F8DFD3;border-color:#B92626;font-size:.85rem">📍</div><div class="tl-line"></div></div>
+      <div class="tl-spine"><div class="tl-dot" style="background:#F8DFD3;border-color:#B92626;font-size:.85rem">${svgIcon('action-gps')}</div><div class="tl-line"></div></div>
       <div class="tl-content"><div class="tl-start">${I18N.t('plan.depart', { time: fmtClock(addMinutes(State.itinerary[0].arrivalClock, -State.itinerary[0].travelMin)) })}</div></div>
     </div>`;
 
@@ -1587,10 +1591,10 @@ const PlanCtrl = {
       const hoursWarn = this._renderHoursWarning(stop);
 
       html += `<div class="tl-item">
-        <div class="tl-spine"><div class="tl-dot" style="font-size:.85rem">🛵</div><div class="tl-line"></div></div>
+        <div class="tl-spine"><div class="tl-dot" style="font-size:.85rem">${svgIcon('route-scooter')}</div><div class="tl-line"></div></div>
         <div class="tl-content">
           <div class="tl-travel">
-            <span class="tl-travel-icon">🛵</span>
+            <span class="tl-travel-icon">${svgIcon('route-scooter')}</span>
             <div class="tl-travel-info">
               <div class="tl-travel-time">${I18N.t('plan.travelMin', { min: stop.travelMin })}</div>
               <div class="tl-travel-dist">${I18N.t('plan.distMoto', { dist: fmtDist(stop._legDist) })}</div>
@@ -1635,7 +1639,7 @@ const PlanCtrl = {
     if (State.itinerary.length) {
       const last = State.itinerary[State.itinerary.length-1];
       html += `<div class="tl-item">
-        <div class="tl-spine"><div class="tl-dot" style="background:#FFF3B0;border-color:#B98A00;font-size:.85rem">🏁</div></div>
+        <div class="tl-spine"><div class="tl-dot" style="background:#FFF3B0;border-color:#B98A00;font-size:.85rem">${svgIcon('route-flag-finish')}</div></div>
         <div class="tl-content"><div class="tl-start" style="color:#B98A00" id="endTimeNode">${I18N.t('plan.endTrip', { time: fmtClock(last.departureClock) })}</div></div>
       </div>`;
     }
@@ -1766,8 +1770,8 @@ const PlanCtrl = {
       <button class="pmap-btn" id="pmapZoomIn" title="${I18N.t('pmap.zoomIn')}">＋</button>
       <button class="pmap-btn" id="pmapZoomOut" title="${I18N.t('pmap.zoomOut')}">－</button>
       <button class="pmap-btn pmap-fit" id="pmapFit" title="${I18N.t('pmap.fitRoute')}">⤢</button>
-      <button class="pmap-btn pmap-locate" id="pmapLocate" title="${I18N.t('pmap.myLocation')}">📍</button>
-      <button class="pmap-btn pmap-fs" id="pmapFs" title="${I18N.t('pmap.fullscreen')}">⛶</button>
+      <button class="pmap-btn pmap-locate" id="pmapLocate" title="${I18N.t('pmap.myLocation')}">${svgIcon('action-gps')}</button>
+      <button class="pmap-btn pmap-fs" id="pmapFs" title="${I18N.t('pmap.fullscreen')}">${svgIcon('action-fullscreen')}</button>
     `;
     wrap.appendChild(ctrl);
     document.getElementById('pmapZoomIn').addEventListener('click', () => State.planMap.zoomIn());
@@ -1839,7 +1843,7 @@ const PlanCtrl = {
     // the CSS transform rules key off of.
     document.body.classList.toggle('map-full', isFs);
     if (btn) {
-      btn.textContent = isFs ? '✕' : '⛶';
+      btn.innerHTML = isFs ? svgIcon('action-close') : svgIcon('action-fullscreen');
       btn.title = isFs ? I18N.t('nav.exitFullscreen') : I18N.t('nav.fullscreen');
     }
     // Leaflet needs to recompute size after the container resizes;
@@ -2039,7 +2043,7 @@ const PlanCtrl = {
         el = document.createElement('div');
         el.id = 'pmapOffRoute';
         el.className = 'pmap-offroute-banner';
-        el.innerHTML = `<span class="pmap-offroute-icon">↻</span><span>${I18N.t('nav.offRoute')}</span>`;
+        el.innerHTML = `<span class="pmap-offroute-icon">${svgIcon('route-reroute')}</span><span>${I18N.t('nav.offRoute')}</span>`;
         wrap.appendChild(el);
       }
     } else if (el) {
@@ -2421,7 +2425,7 @@ const ProfileCtrl = {
     });
 
     const picker = document.getElementById('avatarPicker');
-    picker.innerHTML = AVATARS.map(a => `<button type="button" class="avatar-pick-btn" data-avatar="${a}">${a}</button>`).join('');
+    picker.innerHTML = AVATARS.map(a => `<button type="button" class="avatar-pick-btn" data-avatar="${a}">${svgIcon(a)}</button>`).join('');
     picker.addEventListener('click', e => {
       const btn = e.target.closest('.avatar-pick-btn');
       if (!btn) return;
@@ -2429,7 +2433,7 @@ const ProfileCtrl = {
       State.profile.avatar = a;
       // avatarBtn was removed from main profile — community header
       // shows the current avatar and re-renders on next _renderMyRestaurants().
-      const avBtn = document.getElementById('avatarBtn'); if (avBtn) avBtn.textContent = a;
+      const avBtn = document.getElementById('avatarBtn'); if (avBtn) avBtn.innerHTML = svgIcon(a);
       picker.querySelectorAll('.avatar-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.avatar === a));
       Storage.save();
       // Refresh community header immediately so user sees the change
@@ -2518,7 +2522,7 @@ const ProfileCtrl = {
     const favEl = document.getElementById('statFav');
     if (favEl) {
       const catPrefs = [...State.profile.prefs].filter(p => CATEGORIES[p]);
-      favEl.textContent = catPrefs[0] ? CATEGORIES[catPrefs[0]].icon : '🍽️';
+      favEl.innerHTML = catPrefs[0] ? CATEGORIES[catPrefs[0]].icon : svgIcon('cat-nhahang');
     }
   },
 
@@ -2546,13 +2550,13 @@ const ProfileCtrl = {
       const s2 = document.getElementById('statScore'); if (s2) s2.textContent = '0';
       document.getElementById('inviteCard')?.classList.add('hidden');
       list.innerHTML = `<div class="empty-my-r">
-        <div class="em-icon">📝</div>
+        <div class="em-icon">${svgIcon('status-draft')}</div>
         <div class="em-msg">${I18N.t('em.notLoggedIn')}</div>
         <div class="em-sub">${I18N.t('em.signInToSeeYours')}</div>
       </div>`;
       return;
     }
-    list.innerHTML = `<div class="empty-my-r"><div class="em-icon">⏳</div><div class="em-msg">${I18N.t('em.loading')}</div></div>`;
+    list.innerHTML = `<div class="empty-my-r"><div class="em-icon">${svgIcon('status-loading')}</div><div class="em-msg">${I18N.t('em.loading')}</div></div>`;
     const r = await Community.myRestaurants();
     this._myRestaurants = r.ok ? r.data.items : [];
     // Old #statMyR was removed — count is shown in the community header
@@ -2612,7 +2616,7 @@ const ProfileCtrl = {
       // add-quán modal. Guests just see the message (no post permission).
       const loggedIn = Community.isLoggedIn();
       list.innerHTML = `<div class="empty-my-r">
-        <div class="em-icon">📝</div>
+        <div class="em-icon">${svgIcon('status-draft')}</div>
         <div class="em-msg">${I18N.t('em.noRestaurantsYet')}</div>
         <div class="em-sub">${I18N.t('em.postToSeeHere')}</div>
         ${loggedIn ? `<button class="em-cta" id="emCtaPostFirst" type="button">＋ ${I18N.t('em.postFirst')}</button>` : ''}
@@ -2656,7 +2660,7 @@ const DetailModal = {
       has_image: !!r.image,
       has_coords: r.lat != null && r.lng != null,
     });
-    const cat = CATEGORIES[r.cat] || { label: '—', color: '#888', icon: '🍽️' };
+    const cat = CATEGORIES[r.cat] || { label: '—', color: '#888', icon: svgIcon('cat-nhahang') };
     const body = document.getElementById('detailBody');
     const escape = (s) => String(s || '').replace(/[&<>"']/g, c => (
       { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -2675,24 +2679,24 @@ const DetailModal = {
     // would show a confidently-wrong street) — the "Google Maps" button
     // searches by name for the authoritative location instead.
     // Demo disclaimer — shown for AI results whose address may be off.
-    const demoNote = `<div class="detail-demo-note"><em>Ứng dụng đang trong giai đoạn demo nên có thể ghi sai địa chỉ — bấm 🗺️ Google Maps để xem địa chỉ &amp; chỉ đường chính xác.</em></div>`;
+    const demoNote = `<div class="detail-demo-note"><em>Ứng dụng đang trong giai đoạn demo nên có thể ghi sai địa chỉ — bấm ${svgIcon('map-external')} Google Maps để xem địa chỉ &amp; chỉ đường chính xác.</em></div>`;
     let addressHtml = '';
     if (isGemini) {
       // Show Gemini's (approximate) address like before, plus a clear
       // demo disclaimer steering the user to Google Maps for the exact one.
-      if (r.address) addressHtml = `<div class="detail-address">🏠 ${escape(r.address)}</div>`;
+      if (r.address) addressHtml = `<div class="detail-address">${svgIcon('social-home-address')} ${escape(r.address)}</div>`;
       addressHtml += demoNote;
     } else if (r.address || r._resolvedAddress) {
-      addressHtml = `<div class="detail-address">🏠 ${escape(r.address || r._resolvedAddress)}</div>`;
+      addressHtml = `<div class="detail-address">${svgIcon('social-home-address')} ${escape(r.address || r._resolvedAddress)}</div>`;
     } else if (hasCoords) {
-      addressHtml = `<div class="detail-address" id="_detailAddrPending">🏠 <em style="opacity:.6">Đang tra địa chỉ…</em></div>`;
+      addressHtml = `<div class="detail-address" id="_detailAddrPending">${svgIcon('social-home-address')} <em style="opacity:.6">Đang tra địa chỉ…</em></div>`;
     }
     const knownAddress = (!isGemini && (r.address || r._resolvedAddress)) || null;
     // Coords line — small hint only for accurate (non-Gemini) sources
     // when we don't yet have a human address.
     const coordsHtml = !hasCoords
-      ? `<div class="detail-coords warn">⚠️ Chưa có vị trí trên map · chỉnh sửa hoặc thêm mới để gắn vị trí</div>`
-      : (knownAddress || isGemini ? '' : `<div class="detail-coords">📍 ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}</div>`);
+      ? `<div class="detail-coords warn">${svgIcon('status-warning')} Chưa có vị trí trên map · chỉnh sửa hoặc thêm mới để gắn vị trí</div>`
+      : (knownAddress || isGemini ? '' : `<div class="detail-coords">${svgIcon('action-gps')} ${r.lat.toFixed(5)}, ${r.lng.toFixed(5)}</div>`);
 
     body.innerHTML = `
       ${imgHtml}
@@ -2701,9 +2705,9 @@ const DetailModal = {
       </div>
       <div class="detail-name">${escape(r.name)}</div>
       <div class="detail-meta">
-        <span>💰 ${escape(r.price || '—')}</span>
-        <span>⭐ ${(r.rating ?? 5).toFixed(1)}</span>
-        ${r.hours ? `<span>🕒 ${escape(r.hours)}</span>` : ''}
+        <span>${svgIcon('price-mid')} ${escape(r.price || '—')}</span>
+        <span>${svgIcon('rating-star-filled')} ${(r.rating ?? 5).toFixed(1)}</span>
+        ${r.hours ? `<span>${svgIcon('route-time-window')} ${escape(r.hours)}</span>` : ''}
       </div>
       ${isGemini ? `<div class="detail-demo-note">${I18N.t('detail.geminiRefNote')}</div>` : ''}
       <div class="detail-desc">${escape(r.desc || I18N.t('detail.noDesc'))}</div>
@@ -2730,7 +2734,7 @@ const DetailModal = {
         if (!pending) return;
         if (addr) {
           r._resolvedAddress = addr;
-          pending.innerHTML = `🏠 ${escape(addr)}`;
+          pending.innerHTML = `${svgIcon('social-home-address')} ${escape(addr)}`;
           pending.removeAttribute('id');
         } else {
           // No address found — remove the placeholder; coords line stays.
@@ -2779,7 +2783,7 @@ const HistoryModal = {
     if (trips.length === 0) {
       body.innerHTML = `
         <div class="list-empty">
-          <div class="list-empty-icon">🍜</div>
+          <div class="list-empty-icon">${svgIcon('food-pho')}</div>
           <div class="list-empty-msg">${I18N.t('trips.empty')}</div>
           <div class="list-empty-sub">${I18N.t('trips.emptySub')}</div>
         </div>`;
@@ -2793,13 +2797,13 @@ const HistoryModal = {
             <div class="trip-stop-idx">${i + 1}</div>
             <div class="trip-stop-info">
               <div class="trip-stop-name">${esc(s.name)}</div>
-              <div class="trip-stop-addr">${esc(s.address || (s.lat != null ? `📍 ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}` : I18N.t('trips.noAddress')))}</div>
+              <div class="trip-stop-addr">${esc(s.address || (s.lat != null ? `${svgIcon('action-gps')} ${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}` : I18N.t('trips.noAddress')))}</div>
             </div>
           </div>`).join('');
         return `
           <div class="trip-item">
             <div class="trip-date-row">
-              <div class="trip-date">📅 ${dateLabel} · ${trip.stops.length} điểm</div>
+              <div class="trip-date">${svgIcon('route-calendar')} ${dateLabel} · ${trip.stops.length} điểm</div>
               <button type="button" class="trip-replay-btn" data-trip-id="${trip.id}" title="${I18N.t('trips.replayTitle')}">${I18N.t('trips.replay')}</button>
             </div>
             ${stopsHtml}
@@ -2855,11 +2859,11 @@ const COMMUNITY_PB_TO_CAT = { nha_hang: 'restaurant', via_he: 'street', an_vat: 
 // Getter per key (như CATEGORIES.label) — tự đổi theo I18N.lang, không cần
 // sửa lại 4 chỗ đang đọc COMMUNITY_PRICE_LABEL[...] khi đổi ngôn ngữ.
 const COMMUNITY_PRICE_LABEL = {
-  get binh_dan() { return `💸 ${I18N.t('priceLabel.cheap')}`; },
-  get tam_trung() { return `💰 ${I18N.t('priceLabel.mid')}`; },
-  get sang_chanh() { return `✨ ${I18N.t('priceLabel.premium')}`; },
+  get binh_dan() { return `${svgIcon('price-budget')} ${I18N.t('priceLabel.cheap')}`; },
+  get tam_trung() { return `${svgIcon('price-mid')} ${I18N.t('priceLabel.mid')}`; },
+  get sang_chanh() { return `${svgIcon('price-premium')} ${I18N.t('priceLabel.premium')}`; },
 };
-const COMMUNITY_VIS_BADGE = { private: '🔒', friends: '👥', public: '🌍' };
+const COMMUNITY_VIS_BADGE = { private: svgIcon('privacy-lock'), friends: svgIcon('privacy-friends'), public: svgIcon('privacy-globe') };
 
 // Instagram-style feed post — used ONLY by the Cộng đồng browse tab
 // (CommunityCtrl._renderList). Profile-type views ("Quán của tôi",
@@ -2910,16 +2914,16 @@ function communityCardHtml(r, groupCount = 0) {
     ${carousel}
     <div class="post-body">
       <div class="post-actions">
-        <button class="heart-btn" data-id="${r.id}"><span class="heart-ico">♡</span></button>
+        <button class="heart-btn" data-id="${r.id}"><span class="heart-ico">${svgIcon('heart-outline')}</span></button>
         <span class="heart-count">···</span>
-        <button class="post-action-btn comment-icon-btn" type="button" data-id="${r.id}" title="${I18N.t('comment.title')}">💬</button>
-        <button class="post-action-btn share-icon-btn" type="button" data-id="${r.id}" title="${I18N.t('detail.copyLink')}">📤</button>
-        <button class="post-action-btn save-icon-btn${isSaved ? ' on' : ''}" type="button" data-id="${r.id}" title="${I18N.t('detail.save')}">🔖</button>
+        <button class="post-action-btn comment-icon-btn" type="button" data-id="${r.id}" title="${I18N.t('comment.title')}">${svgIcon('social-comment')}</button>
+        <button class="post-action-btn share-icon-btn" type="button" data-id="${r.id}" title="${I18N.t('detail.copyLink')}">${svgIcon('action-copy-link')}</button>
+        <button class="post-action-btn save-icon-btn${isSaved ? ' on' : ''}" type="button" data-id="${r.id}" title="${I18N.t('detail.save')}">${svgIcon('action-bookmark')}</button>
         <span class="post-cat-pill" style="color:${cat.color};background:${cat.color}18">${cat.icon} ${cat.label}${priceLabel ? ' · ' + priceLabel : ''}</span>
       </div>
       <div class="post-caption"><b>${escapeHtml(r.name)}</b>${r.description ? ' ' + escapeHtml(r.description) : ''}</div>
       ${(tagsHtml || hashHtml) ? `<div class="comm-r-chips">${tagsHtml}${hashHtml}</div>` : ''}
-      ${groupCount > 0 ? `<div class="dup-group-hint">🔗 ${I18N.t('post.alsoPostedBy', { n: groupCount })}</div>` : ''}
+      ${groupCount > 0 ? `<div class="dup-group-hint">${svgIcon('action-invite-link')} ${I18N.t('post.alsoPostedBy', { n: groupCount })}</div>` : ''}
     </div>
   </div>`;
 }
@@ -3056,7 +3060,7 @@ async function _loadHeartState(restaurantId, container) {
   const btn = container.querySelector(`.heart-btn[data-id="${restaurantId}"]`);
   if (!btn) return;
   btn.classList.toggle('voted', !!mine);
-  btn.querySelector('.heart-ico').textContent = mine ? '♥' : '♡';
+  btn.querySelector('.heart-ico').innerHTML = mine ? svgIcon('heart-filled') : svgIcon('heart-outline');
   const countEl = btn.parentElement.querySelector('.heart-count');
   if (countEl) countEl.textContent = count;
 }
@@ -3268,7 +3272,7 @@ const CommunityCtrl = {
           // trong 1 lần tìm cho tự nhiên, giống mạng xã hội thật.
           results.innerHTML = items.map(u => `
             <div class="go-item follow-row">
-              <span class="follow-name" data-user-id="${u.id}" data-user-name="${escapeHtml(u.name || I18N.t('common.anonymous'))}">👤 ${escapeHtml(u.name || I18N.t('common.anonymous'))}</span>
+              <span class="follow-name" data-user-id="${u.id}" data-user-name="${escapeHtml(u.name || I18N.t('common.anonymous'))}">${svgIcon('social-author')} ${escapeHtml(u.name || I18N.t('common.anonymous'))}</span>
               ${followBtnHtml(u.id, u.name || I18N.t('common.anonymous'), followingIds.has(u.id), (u.friends || []).includes(Community.currentUser?.id))}
             </div>`).join('');
           wireProfileLinks(results);
@@ -3298,7 +3302,7 @@ const CommunityCtrl = {
       el.innerHTML = `<span style="font-size:.78rem;color:var(--text3)">${I18N.t('em.noFriendsYet')}</span>`;
       return;
     }
-    el.innerHTML = friends.map(u => `<span class="chip-tag"><span data-user-id="${u.id}" data-user-name="${escapeHtml(u.name || I18N.t('common.anonymous'))}" style="cursor:pointer">👤 ${escapeHtml(u.name || I18N.t('common.anonymous'))}</span><button type="button" class="chip-tag-remove" data-id="${u.id}">✕</button></span>`).join('');
+    el.innerHTML = friends.map(u => `<span class="chip-tag"><span data-user-id="${u.id}" data-user-name="${escapeHtml(u.name || I18N.t('common.anonymous'))}" style="cursor:pointer">${svgIcon('social-author')} ${escapeHtml(u.name || I18N.t('common.anonymous'))}</span><button type="button" class="chip-tag-remove" data-id="${u.id}">${svgIcon('action-close')}</button></span>`).join('');
     wireProfileLinks(el);
     el.querySelectorAll('.chip-tag-remove').forEach(b => {
       b.addEventListener('click', async (e) => {
@@ -3514,7 +3518,7 @@ const CommunityCtrl = {
 
   async _loadList(query) {
     const list = document.getElementById('communityList');
-    list.innerHTML = `<div class="empty-comm"><div class="em-icon">⏳</div><div class="em-msg">${I18N.t('em.loading')}</div></div>`;
+    list.innerHTML = `<div class="empty-comm"><div class="em-icon">${svgIcon('status-loading')}</div><div class="em-msg">${I18N.t('em.loading')}</div></div>`;
     const loggedIn = Community.isLoggedIn();
     // Guests: browse-first preview capped to GUEST_CAP (10) newest quán,
     // no search box. Logged-in users: full list + search.
@@ -3523,7 +3527,7 @@ const CommunityCtrl = {
       : await Community.listRestaurants({ perPage: loggedIn ? 50 : this.GUEST_CAP });
     if (!r.ok) {
       list.innerHTML = `<div class="empty-comm">
-        <div class="em-icon">😕</div><div class="em-msg">${I18N.t('em.loadFail')}</div>
+        <div class="em-icon">${svgIcon('status-error-face')}</div><div class="em-msg">${I18N.t('em.loadFail')}</div>
         <div class="em-sub">${escapeHtml(r.error)}</div>
       </div>`;
       return;
@@ -3547,12 +3551,12 @@ const CommunityCtrl = {
     if (!items.length) {
       list.innerHTML = query
         ? `<div class="empty-comm">
-            <div class="em-icon">🔍</div>
+            <div class="em-icon">${svgIcon('action-search')}</div>
             <div class="em-msg">${I18N.t('em.noMatchFor', { q: escapeHtml(query) })}</div>
             <div class="em-sub">${I18N.t('em.tryShorterQuery')}</div>
           </div>`
         : `<div class="empty-comm">
-            <div class="em-icon">🍽️</div>
+            <div class="em-icon">${svgIcon('cat-nhahang')}</div>
             <div class="em-msg">${I18N.t('em.communityEmpty')}</div>
             <div class="em-sub">${I18N.t('em.postFirst')}</div>
           </div>`;
@@ -3673,16 +3677,16 @@ const CommunityDetailModal = {
     const _isMine2 = _cu2 && (r.created_by === _cu2.id);
     const authorName = (author && author.name) || (_isMine2 && _cu2.name) || I18N.t('common.anonymous');
     const authorId = (author && author.id) || r.created_by || '';
-    const addressHtml = r.address ? `<div class="detail-address">🏠 ${escapeHtml(r.address)}</div>` : '';
+    const addressHtml = r.address ? `<div class="detail-address">${svgIcon('social-home-address')} ${escapeHtml(r.address)}</div>` : '';
     const isOwner = !!(Community.currentUser && (r.created_by === Community.currentUser.id || authorId === Community.currentUser.id));
 
     const footerHtml = isOwner
-      ? `<button class="data-btn" id="cdmEdit">✏️ Sửa</button>
-         <button class="my-r-del" id="cdmDelete" title="${I18N.t('myR.delete')}">🗑</button>`
+      ? `<button class="data-btn" id="cdmEdit">${svgIcon('action-edit')} Sửa</button>
+         <button class="my-r-del" id="cdmDelete" title="${I18N.t('myR.delete')}">${svgIcon('action-delete')}</button>`
       : `<button class="post-avatar" type="button" data-user-id="${authorId}" data-user-name="${escapeHtml(authorName)}" style="width:30px;height:30px;font-size:1rem">${authorAvatar(author)}</button>
          <button class="comm-r-author" type="button" data-user-id="${authorId}" data-user-name="${escapeHtml(authorName)}">${escapeHtml(authorName)}</button>
          <div style="margin-left:auto;display:flex;align-items:center;gap:.35rem">
-           <button class="heart-btn" data-id="${r.id}"><span class="heart-ico">♡</span></button>
+           <button class="heart-btn" data-id="${r.id}"><span class="heart-ico">${svgIcon('heart-outline')}</span></button>
            <span class="heart-count">···</span>
          </div>`;
 
@@ -3769,7 +3773,7 @@ const CommunityDetailModal = {
     const total = mine + counts.reduce((a, b) => a + b, 0);
     slot.innerHTML = `
       <div class="linked-group-box">
-        <div class="linked-group-title">🔗 ${I18N.t('post.groupTitle', { n: others.length })} · ★ ${total}</div>
+        <div class="linked-group-title">${svgIcon('action-invite-link')} ${I18N.t('post.groupTitle', { n: others.length })} · svgIcon('rating-star-filled') ${total}</div>
         <div class="linked-group-list">
           ${others.map(x => {
             const a = x.expand && x.expand.created_by;
@@ -3823,7 +3827,7 @@ const CommunityDetailModal = {
           <div class="comment-meta"><span class="comment-author">${escapeHtml(authorName)}</span><span class="comment-time">${timeAgo(c.created)}</span></div>
           <div class="comment-text">${escapeHtml(c.text)}</div>
         </div>
-        ${canDelete ? `<button class="comment-del-btn" data-id="${c.id}" title="${I18N.t('common.close')}">✕</button>` : ''}
+        ${canDelete ? `<button class="comment-del-btn" data-id="${c.id}" title="${I18N.t('common.close')}">${svgIcon('action-close')}</button>` : ''}
       </div>`;
     }).join('');
     list.querySelectorAll('.comment-del-btn').forEach(btn => {
@@ -3891,13 +3895,13 @@ const FollowerListModal = {
     const body = document.getElementById('followerListBody');
     const countEl = document.getElementById('followerListCount');
     modal.classList.add('show');
-    body.innerHTML = `<div class="list-empty"><div class="list-empty-icon">⏳</div><div class="list-empty-msg">${I18N.t('em.loading')}</div></div>`;
+    body.innerHTML = `<div class="list-empty"><div class="list-empty-icon">${svgIcon('status-loading')}</div><div class="list-empty-msg">${I18N.t('em.loading')}</div></div>`;
     countEl.textContent = '···';
 
     const r = await Community.followerList(Community.currentUser.id);
     if (!r.ok) {
       body.innerHTML = `<div class="list-empty">
-        <div class="list-empty-icon">😕</div>
+        <div class="list-empty-icon">${svgIcon('status-error-face')}</div>
         <div class="list-empty-msg">${I18N.t('em.loadFail')}</div>
         <div class="list-empty-sub">${escapeHtml(r.error || '')}</div>
       </div>`;
@@ -3907,7 +3911,7 @@ const FollowerListModal = {
     countEl.textContent = I18N.t('follower.count', { n: items.length });
     if (!items.length) {
       body.innerHTML = `<div class="list-empty">
-        <div class="list-empty-icon">👋</div>
+        <div class="list-empty-icon">${svgIcon('status-empty-wave')}</div>
         <div class="list-empty-msg">${I18N.t('follower.emptyMsg')}</div>
         <div class="list-empty-sub">${I18N.t('follower.emptySub')}</div>
       </div>`;
@@ -3967,13 +3971,13 @@ const FollowingListModal = {
     const body = document.getElementById('followingListBody');
     const countEl = document.getElementById('followingListCount');
     modal.classList.add('show');
-    body.innerHTML = `<div class="list-empty"><div class="list-empty-icon">⏳</div><div class="list-empty-msg">${I18N.t('em.loading')}</div></div>`;
+    body.innerHTML = `<div class="list-empty"><div class="list-empty-icon">${svgIcon('status-loading')}</div><div class="list-empty-msg">${I18N.t('em.loading')}</div></div>`;
     countEl.textContent = '···';
 
     const r = await Community.myFriends();
     if (!r.ok) {
       body.innerHTML = `<div class="list-empty">
-        <div class="list-empty-icon">😕</div>
+        <div class="list-empty-icon">${svgIcon('status-error-face')}</div>
         <div class="list-empty-msg">${I18N.t('em.loadFail')}</div>
         <div class="list-empty-sub">${escapeHtml(r.error || '')}</div>
       </div>`;
@@ -3983,7 +3987,7 @@ const FollowingListModal = {
     countEl.textContent = I18N.t('following.count', { n: items.length });
     if (!items.length) {
       body.innerHTML = `<div class="list-empty">
-        <div class="list-empty-icon">👋</div>
+        <div class="list-empty-icon">${svgIcon('status-empty-wave')}</div>
         <div class="list-empty-msg">${I18N.t('following.emptyMsg')}</div>
         <div class="list-empty-sub">${I18N.t('following.emptySub')}</div>
       </div>`;
@@ -4062,13 +4066,13 @@ const SavedListModal = {
 
     if (ids.length === 0) {
       body.innerHTML = `<div class="list-empty">
-        <div class="list-empty-icon">🔖</div>
+        <div class="list-empty-icon">${svgIcon('action-bookmark')}</div>
         <div class="list-empty-msg">${I18N.t('saved.emptyMsg')}</div>
         <div class="list-empty-sub">${I18N.t('saved.emptySub')}</div>
       </div>`;
       return;
     }
-    body.innerHTML = `<div class="list-empty"><div class="list-empty-icon">⏳</div><div class="list-empty-msg">${I18N.t('em.loading')}</div></div>`;
+    body.innerHTML = `<div class="list-empty"><div class="list-empty-icon">${svgIcon('status-loading')}</div><div class="list-empty-msg">${I18N.t('em.loading')}</div></div>`;
 
     // Fetch each saved record from PocketBase in parallel. Silently
     // drops IDs that 404 (post was deleted by owner after being saved).
@@ -4077,7 +4081,7 @@ const SavedListModal = {
 
     if (items.length === 0) {
       body.innerHTML = `<div class="list-empty">
-        <div class="list-empty-icon">📭</div>
+        <div class="list-empty-icon">${svgIcon('status-empty-mailbox')}</div>
         <div class="list-empty-msg">${I18N.t('saved.allGoneMsg')}</div>
         <div class="list-empty-sub">${I18N.t('saved.allGoneSub')}</div>
       </div>`;
@@ -4140,7 +4144,7 @@ const UserQuanModal = {
 
     document.getElementById('userQuanTitle').innerHTML = I18N.t('userQuan.title', { name: escapeHtml(userName || I18N.t('common.thisPerson')) });
     const body = document.getElementById('userQuanBody');
-    body.innerHTML = `<div class="empty-comm"><div class="em-icon">⏳</div><div class="em-msg">${I18N.t('em.loading')}</div></div>`;
+    body.innerHTML = `<div class="empty-comm"><div class="em-icon">${svgIcon('status-loading')}</div><div class="em-msg">${I18N.t('em.loading')}</div></div>`;
     document.getElementById('userQuanCount').textContent = '';
     document.getElementById('userQuanModal').classList.add('show');
 
@@ -4164,7 +4168,7 @@ const UserQuanModal = {
       wireFollowButtons(followSlot, () => CommunityCtrl._renderFriends());
     }
     if (!listRes.ok) {
-      body.innerHTML = `<div class="empty-comm"><div class="em-icon">😕</div><div class="em-msg">${I18N.t('em.loadFail')}</div></div>`;
+      body.innerHTML = `<div class="empty-comm"><div class="em-icon">${svgIcon('status-error-face')}</div><div class="em-msg">${I18N.t('em.loadFail')}</div></div>`;
       return;
     }
     const items = listRes.data.items;
@@ -4181,7 +4185,7 @@ const UserQuanModal = {
     });
 
     if (!items.length) {
-      body.innerHTML = header + `<div class="empty-comm"><div class="em-icon">🍽️</div><div class="em-msg">${I18N.t('em.noneVisible')}</div></div>`;
+      body.innerHTML = header + `<div class="empty-comm"><div class="em-icon">${svgIcon('cat-nhahang')}</div><div class="em-msg">${I18N.t('em.noneVisible')}</div></div>`;
       return;
     }
     body.innerHTML = header + `<div class="social-grid">${items.map(x => communityGridCellHtml(x)).join('')}</div>`;
@@ -4227,7 +4231,7 @@ const SavedTripsModal = {
     if (!trips.length) {
       body.innerHTML = `
         <div class="list-empty">
-          <div class="list-empty-icon">🗺️</div>
+          <div class="list-empty-icon">${svgIcon('map-saved-route')}</div>
           <div class="list-empty-msg">${I18N.t('savedTrip.empty')}</div>
           <div class="list-empty-sub">${I18N.t('savedTrip.emptySub')}</div>
         </div>`;
@@ -4239,7 +4243,7 @@ const SavedTripsModal = {
       const stops = (t.stops || []).map((s, i) =>
         `<div class="strip-stop"><b>${i + 1}</b><span>${escapeHtml(s.name)}</span></div>`).join('');
       const origin = t.origin && t.origin.label
-        ? `<div class="strip-origin">📍 ${escapeHtml(t.origin.label)}</div>` : '';
+        ? `<div class="strip-origin">${svgIcon('action-gps')} ${escapeHtml(t.origin.label)}</div>` : '';
       return `
         <div class="strip-item" data-trip="${t.id}">
           <div class="strip-head"><div class="strip-name">${escapeHtml(t.name)}</div></div>
@@ -4647,7 +4651,7 @@ const CommunityAddModal = {
 
   _renderChipList(listId, arr, hashtag) {
     const el = document.getElementById(listId);
-    el.innerHTML = arr.map((v, i) => `<span class="chip-tag${hashtag ? ' hashtag' : ''}">${hashtag ? '#' : ''}${escapeHtml(v)}<button type="button" class="chip-tag-remove" data-i="${i}">✕</button></span>`).join('');
+    el.innerHTML = arr.map((v, i) => `<span class="chip-tag${hashtag ? ' hashtag' : ''}">${hashtag ? '#' : ''}${escapeHtml(v)}<button type="button" class="chip-tag-remove" data-i="${i}">${svgIcon('action-close')}</button></span>`).join('');
     el.querySelectorAll('.chip-tag-remove').forEach(b => {
       b.addEventListener('click', () => {
         arr.splice(parseInt(b.dataset.i), 1);
@@ -4720,8 +4724,8 @@ const CommunityAddModal = {
         const filename = filenames[i];
         const starActive = filename && filename === this._editingRecord.thumbnail ? ' active' : '';
         return `<div class="photo-slot" style="background-image:url('${url}')" data-view="${escapeHtml(filename)}" title="${I18N.t('photo.tapToView')}">
-          <button type="button" class="photo-slot-remove" data-del="${escapeHtml(filename)}" title="${I18N.t('photo.delete')}">✕</button>
-          <button type="button" class="photo-thumb-star${starActive}" data-filename="${escapeHtml(filename)}" title="${I18N.t('photo.setCover')}">⭐</button>
+          <button type="button" class="photo-slot-remove" data-del="${escapeHtml(filename)}" title="${I18N.t('photo.delete')}">${svgIcon('action-close')}</button>
+          <button type="button" class="photo-thumb-star${starActive}" data-filename="${escapeHtml(filename)}" title="${I18N.t('photo.setCover')}">${svgIcon('rating-star-cover')}</button>
         </div>`;
       }).join('') + addSlotEdit;
 
@@ -4772,8 +4776,8 @@ const CommunityAddModal = {
       const url = this._photoPreviewUrls[i];
       const starActive = i === this._thumbIndex ? ' active' : '';
       return `<div class="photo-slot" style="background-image:url('${url}')">
-        <button type="button" class="photo-slot-remove" data-idx="${i}">✕</button>
-        <button type="button" class="photo-thumb-star${starActive}" data-idx="${i}" title="${I18N.t('photo.setCover')}">⭐</button>
+        <button type="button" class="photo-slot-remove" data-idx="${i}">${svgIcon('action-close')}</button>
+        <button type="button" class="photo-thumb-star${starActive}" data-idx="${i}" title="${I18N.t('photo.setCover')}">${svgIcon('rating-star-cover')}</button>
       </div>`;
     }).join('');
     const addSlot = this._photoFiles.length < 4

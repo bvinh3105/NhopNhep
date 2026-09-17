@@ -62,6 +62,13 @@
 }
 html,body{height:100%;overflow:hidden;background:var(--cream);color:var(--text);font-family:var(--font-body);font-size:15px;line-height:1.5;font-weight:500;-webkit-font-smoothing:antialiased}
 
+/* Icon system — SVG sprite (icons/sprite.svg), referenced via <use>. Sized
+   in em so it scales with whatever font-size/line-height context it sits
+   in, same as the emoji it replaces; color defaults to currentColor so it
+   auto-matches surrounding text (buttons on a solid color background get
+   this for free — see js/utils.js icon() for the helper that emits this). */
+.icon{display:inline-block;width:1em;height:1em;flex-shrink:0;vertical-align:-.15em;color:currentColor}
+
 /* Desktop / wide screen: center app in a phone-shaped column */
 @media (min-width:560px){
   html{background:#2A1810}

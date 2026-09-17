@@ -22,7 +22,7 @@ const State = {
   // Profile persistence
   profile: {
     name: '',
-    avatar: '🍜',
+    avatar: AVATAR_DEFAULT,
     prefs: new Set(),
     trips: 0,
     tripHistory: [], // [{ id, at, stops: [{ id, name, cat, price, address, lat, lng }] }]
@@ -71,7 +71,7 @@ const Storage = {
       const data = JSON.parse(raw);
       if (data.profile) {
         State.profile.name = data.profile.name || '';
-        State.profile.avatar = data.profile.avatar || '🍜';
+        State.profile.avatar = normalizeAvatarName(data.profile.avatar);
         State.profile.prefs = new Set(data.profile.prefs || []);
         State.profile.trips = data.profile.trips || 0;
         State.profile.tripHistory = Array.isArray(data.profile.tripHistory) ? data.profile.tripHistory : [];
@@ -120,7 +120,7 @@ const Storage = {
       }
       if (data.profile) {
         State.profile.name = data.profile.name || '';
-        State.profile.avatar = data.profile.avatar || '🍜';
+        State.profile.avatar = normalizeAvatarName(data.profile.avatar);
         State.profile.prefs = new Set(data.profile.prefs || []);
         State.profile.trips = data.profile.trips || 0;
       }
