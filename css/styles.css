@@ -1612,6 +1612,11 @@ body.map-full .tabbar{transform:translateY(105%)}
    controllers.js. Thumbnail đã crop-fill đúng 4:5 từ server nên
    background-size:cover ở dưới chỉ là fallback an toàn. */
 .post-carousel{position:relative;width:100%;aspect-ratio:4/5;background:var(--cream-2)}
+/* Chỉ cap chiều cao ở feed (.comm-r-card) — ảnh dọc-dài (9:16) vẫn giữ
+   nguyên 4:5 nhưng không được kéo dài quá 60% màn hình khi cuộn feed,
+   che hết caption/nút bên dưới. Modal chi tiết (mở riêng để xem) KHÔNG
+   bị cap — cố ý, người dùng đã chủ động bấm vào để xem ảnh đầy đủ hơn. */
+.comm-r-card .post-carousel{max-height:60vh}
 .post-carousel-track{
   display:flex;width:100%;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;
   scrollbar-width:none;
