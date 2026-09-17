@@ -1608,10 +1608,10 @@ body.map-full .tabbar{transform:translateY(105%)}
 }
 .post-meta-line{font-size:.72rem;color:var(--text3);margin-top:.1rem}
 
-/* 3:4 — khớp tỉ lệ ảnh phổ biến nhất trong feed thật (xem ghi chú ở
-   communityCardHtml() trong controllers.js). Thumbnail đã crop-fill đúng
-   3:4 từ server nên background-size:cover ở dưới chỉ là fallback an toàn. */
-.post-carousel{position:relative;width:100%;aspect-ratio:3/4;background:var(--cream-2)}
+/* 4:5 (chuẩn Instagram) — xem ghi chú ở communityCardHtml() trong
+   controllers.js. Thumbnail đã crop-fill đúng 4:5 từ server nên
+   background-size:cover ở dưới chỉ là fallback an toàn. */
+.post-carousel{position:relative;width:100%;aspect-ratio:4/5;background:var(--cream-2)}
 .post-carousel-track{
   display:flex;width:100%;height:100%;overflow-x:auto;scroll-snap-type:x mandatory;
   scrollbar-width:none;

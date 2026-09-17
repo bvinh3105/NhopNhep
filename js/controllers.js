@@ -2875,10 +2875,11 @@ function communityCardHtml(r, groupCount = 0) {
   const catKey = COMMUNITY_PB_TO_CAT[r.category] || 'restaurant';
   const cat = CATEGORIES[catKey];
   const priceLabel = COMMUNITY_PRICE_LABEL[r.price_range] || '';
-  // Khung 3:4 — khớp tỉ lệ phổ biến nhất trong ảnh thật của app (đo 19 ảnh
-  // mẫu: 47% là 3:4, 26% là 9:16, chỉ 16% vuông sẵn). Crop-fill server-side
-  // (không có hậu tố 'f') để PocketBase cache đúng size cần, đỡ tải lại.
-  const photos = Community.photoUrls(r, '640x854');
+  // Khung 4:5 (chuẩn Instagram) — 3:4 đo được cắt ít hơn 1 chút trên ảnh
+  // thật của app (~15% vs ~18% trung bình), nhưng chọn 4:5 cho quen mắt
+  // người dùng đã dùng Instagram. Crop-fill server-side (không có hậu tố
+  // 'f') để PocketBase cache đúng size cần, đỡ tải lại.
+  const photos = Community.photoUrls(r, '640x800');
   const carousel = photos.length
     ? `<div class="post-carousel" data-id="${r.id}">
          <div class="post-carousel-track">
@@ -3648,7 +3649,7 @@ const CommunityDetailModal = {
     const cat = CATEGORIES[catKey];
     const priceLabel = COMMUNITY_PRICE_LABEL[r.price_range] || '';
     const visBadge = COMMUNITY_VIS_BADGE[r.visibility] || '';
-    const photos = Community.photoUrls(r, '800x1067'); // khung 3:4, xem ghi chú ở communityCardHtml()
+    const photos = Community.photoUrls(r, '800x1000'); // khung 4:5, xem ghi chú ở communityCardHtml()
     const carousel = photos.length
       ? `<div class="post-carousel" style="border-radius:var(--radius);overflow:hidden;margin-bottom:.7rem">
            <div class="post-carousel-track">${photos.map(url => `<div class="post-photo" style="background-image:url('${escapeHtml(url)}')"></div>`).join('')}</div>
