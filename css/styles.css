@@ -292,9 +292,11 @@ input,textarea,select{font-family:var(--font-body)}
 #myRFilterChips .cat-chip{padding:.46rem .7rem}
 /* Home's #catChips (4 chips, no "Tất cả") — sized to fit all 4 on one
    row with no horizontal scroll on a narrow phone, not just "less
-   overflow" like #myRFilterChips above (which still scrolls/fades). */
-#catChips{gap:.35rem;flex-wrap:wrap}
-#catChips .cat-chip{padding:.5rem .5rem;font-size:.74rem;gap:.25rem}
+   overflow" like #myRFilterChips above (which still scrolls/fades).
+   gap kept generous (not shrunk as far as it could go) — chips packed
+   too tight made adjacent ones easy to mis-tap (feedback 2026-09-17). */
+#catChips{gap:.55rem;flex-wrap:wrap}
+#catChips .cat-chip{padding:.5rem .5rem;font-size:.74rem;gap:.3rem}
 .cat-chip[data-cat="cafe"].active{background:var(--cat-cafe);border-color:#5A3B24;box-shadow:2px 2px 0 #5A3B24}
 /* Community source chip — was flagged "sắp có" until the PocketBase
    backend went live. Now a normal, selectable source. */
