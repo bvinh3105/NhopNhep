@@ -5005,7 +5005,7 @@ const CommunityAddModal = {
     this._editingRecord = record;
     document.querySelector('#communityAddModal .modal-title').innerHTML = record
       ? I18N.t('addQuan.editTitle') : I18N.t('addQuan.title');
-    document.getElementById('cfSave').textContent = record ? I18N.t('addQuan.update') : I18N.t('addQuan.submit');
+    document.getElementById('cfSave').innerHTML = record ? I18N.t('addQuan.update') : I18N.t('addQuan.submit');
 
     document.getElementById('cfName').value = record ? record.name : '';
     document.getElementById('cfDesc').value = record ? (record.description || '') : '';
@@ -5096,7 +5096,7 @@ const CommunityAddModal = {
     let lat = this._pickedLat, lng = this._pickedLng;
 
     const btn = document.getElementById('cfSave');
-    const original = btn.textContent;
+    const original = btn.innerHTML;
 
     if (lat == null && addressText.length >= 3) {
       btn.disabled = true; btn.textContent = I18N.t('addQuan.lookingUpLoc');
@@ -5118,7 +5118,7 @@ const CommunityAddModal = {
         tags: this._tags,
         hashtags: this._hashtags,
       });
-      btn.disabled = false; btn.textContent = original;
+      btn.disabled = false; btn.innerHTML = original;
       if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
       showToast(I18N.t('toast.updatedName', { name }));
       this.close();
@@ -5163,7 +5163,7 @@ const CommunityAddModal = {
     } catch (e) {
       r = { ok: false, error: (e && e.message) || I18N.t('err.connectionGeneric') };
     } finally {
-      btn.disabled = false; btn.textContent = original;
+      btn.disabled = false; btn.innerHTML = original;
     }
 
     if (!r.ok) {
