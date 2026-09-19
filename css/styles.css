@@ -1114,47 +1114,46 @@ body.map-full .tabbar{transform:translateY(105%)}
 /* .tabbar.scroll-hidden rule sống ở khối tabbar chính phía trên — nơi có cả
    opacity fade + pointer-events + preserve translateX(-50%) của pill nổi. */
 
-/* Cộng đồng — header sticky kiểu IG Reels/Friends: nút thêm bài viết bên
-   trái, 2 tab Quán ăn/Lộ trình ở giữa, spacer bên phải để nhóm tab thực
-   sự nằm giữa. Đối chiếu pixel thật trên ảnh chụp thanh Reels/Friends
-   của IG (2026-09-19): active/inactive gần như CÙNG cỡ chữ (~22px cap-
-   height cả hai, lệch không đáng kể) và KHÔNG có gạch chân dưới tab
-   active — phân biệt active/inactive gần như thuần bằng độ sáng màu chữ
-   (trắng ~255 vs xám nhạt ~210), không phải bằng size hay underline. Giữ
-   lại 1 chênh lệch size nhỏ (không xoá hẳn về bằng nhau) vì NhopNhep
-   không có avatar bạn bè để mắt "quét" nhanh tab đang chọn như IG, nên
-   cần thêm 1 chút size để dễ nhận ra khi lướt nhanh trên màn nhỏ.
-   Nền LUÔN là màu cream đặc (không đổi, không mờ) — chỉ MÀU CHỮ của tab
-   đổi khi lướt tới bài có nền trắng (post-head/post-body) so với bài có
-   ảnh (post-photo), xem CommunityCtrl._initSubtabContrastObserver(). Sticky
-   nên luôn hiện khi lướt feed, độc lập với tabbar dưới (có thể tự ẩn riêng). */
+/* Cộng đồng — header kiểu IG Reels/Friends THẬT: KHÔNG có lớp nền/thanh
+   bar nào cả, chữ nổi trực tiếp lên trên feed (ảnh mẫu Vinh gửi
+   2026-09-20: header IG luôn trong suốt, video/ảnh tràn ngay dưới chữ).
+   Trước đó vẫn còn nền cream đặc — đã xoá hẳn, đồng thời tăng cỡ chữ để
+   tạo cảm giác bài viết tràn ra kín màn hình thay vì bị 1 thanh chắn lên.
+   Vì không còn nền, độ tương phản giờ CHỈ dựa vào bản thân màu chữ: mặc
+   định giả định đang đè lên ảnh (post-photo, có thể sáng/tối/nhiều màu)
+   nên dùng chữ SÁNG (cream) + text-shadow nhẹ để luôn nổi bật bất kể ảnh
+   nền ra sao; khi lướt tới đoạn nền trắng/kem thật (post-head/post-body,
+   không có ảnh) thì đổi hẳn sang chữ TỐI (dark) vì lúc này không có ảnh
+   che, nền sáng thì chữ sáng sẽ chìm mất — xem
+   CommunityCtrl._initSubtabContrastObserver(). Sticky nên luôn hiện khi
+   lướt feed, độc lập với tabbar dưới (có thể tự ẩn riêng). */
 .comm-subtabs{
   position:sticky;top:0;z-index:5;
   display:flex;align-items:center;gap:.4rem;
-  padding:.6rem .5rem;margin-bottom:.4rem;
-  background:var(--cream);
-  border-bottom:1px solid var(--line);
+  padding:.7rem .5rem;margin-bottom:.4rem;
+  background:transparent;
 }
 .comm-hdr-iconbtn{
   width:34px;height:34px;border-radius:50%;flex-shrink:0;
   background:none;border:none;display:flex;align-items:center;justify-content:center;
-  color:var(--text2);
+  color:var(--cream);filter:drop-shadow(0 1px 3px rgba(20,10,5,.45));
+  transition:color .18s,filter .18s;
 }
 .comm-hdr-iconbtn.hidden{display:none}
 .comm-hdr-spacer{visibility:hidden;pointer-events:none}
-.comm-subtabs-center{flex:1;display:flex;align-items:center;justify-content:center;gap:1.2rem}
+.comm-subtabs-center{flex:1;display:flex;align-items:center;justify-content:center;gap:1.3rem}
 .comm-subtab{
   background:none;border:none;font-family:var(--font-display);font-weight:800;
-  font-size:.86rem;color:var(--text3);padding:.2rem 0 .3rem;position:relative;
-  transition:color .18s,font-size .15s;
+  font-size:1rem;color:rgba(251,243,217,.78);padding:.2rem 0 .3rem;position:relative;
+  text-shadow:0 1px 3px rgba(20,10,5,.45);
+  transition:color .18s,font-size .15s,text-shadow .18s;
 }
-.comm-subtab.active{font-size:.92rem;color:var(--primary)}
-/* Đổi màu chữ khi bài viết ngay dưới header có nền trắng/kem (post-head,
-   post-body) thay vì ảnh — chỉ đổi màu chữ, KHÔNG đổi nền .comm-subtabs
-   hay thêm khung/box nào (yêu cầu Vinh 2026-09-19). */
-.comm-subtabs.on-light .comm-subtab{color:var(--text2)}
-.comm-subtabs.on-light .comm-subtab.active{color:var(--primary-2)}
-.comm-subtabs.on-light .comm-hdr-iconbtn{color:var(--text)}
+.comm-subtab.active{font-size:1.18rem;color:var(--cream)}
+/* Nền trắng/kem thật phía dưới (post-head/post-body, không ảnh che) —
+   chữ sáng sẽ chìm nên đổi hẳn sang tối, bỏ shadow vì không cần nữa. */
+.comm-subtabs.on-light .comm-subtab{color:var(--text3);text-shadow:none}
+.comm-subtabs.on-light .comm-subtab.active{color:var(--primary)}
+.comm-subtabs.on-light .comm-hdr-iconbtn{color:var(--text2);filter:none}
 
 /* Placeholder "tính năng đang cập nhật" — dùng chung cho Check-in & Lộ trình */
 .coming-soon-wrap{
