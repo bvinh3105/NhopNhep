@@ -1114,25 +1114,35 @@ body.map-full .tabbar{transform:translateY(105%)}
 /* .tabbar.scroll-hidden rule sống ở khối tabbar chính phía trên — nơi có cả
    opacity fade + pointer-events + preserve translateX(-50%) của pill nổi. */
 
-/* Cộng đồng — header kiểu IG Reels/Friends THẬT: KHÔNG có lớp nền/thanh
-   bar nào cả, chữ nổi trực tiếp lên trên feed (ảnh mẫu Vinh gửi
-   2026-09-20: header IG luôn trong suốt, video/ảnh tràn ngay dưới chữ).
-   Trước đó vẫn còn nền cream đặc — đã xoá hẳn, đồng thời tăng cỡ chữ để
-   tạo cảm giác bài viết tràn ra kín màn hình thay vì bị 1 thanh chắn lên.
-   Vì không còn nền, độ tương phản giờ CHỈ dựa vào bản thân màu chữ: mặc
-   định giả định đang đè lên ảnh (post-photo, có thể sáng/tối/nhiều màu)
-   nên dùng chữ SÁNG (cream) + text-shadow nhẹ để luôn nổi bật bất kể ảnh
-   nền ra sao; khi lướt tới đoạn nền trắng/kem thật (post-head/post-body,
-   không có ảnh) thì đổi hẳn sang chữ TỐI (dark) vì lúc này không có ảnh
-   che, nền sáng thì chữ sáng sẽ chìm mất — xem
-   CommunityCtrl._initSubtabContrastObserver(). Sticky nên luôn hiện khi
-   lướt feed, độc lập với tabbar dưới (có thể tự ẩn riêng). */
+/* Cộng đồng — header kiểu IG Reels/Friends THẬT: không có thanh/bar nền
+   đặc, chữ nổi trực tiếp lên trên feed (ảnh mẫu Vinh gửi 2026-09-20:
+   header IG luôn trong suốt, video/ảnh tràn ngay dưới chữ). Tăng cỡ chữ
+   để tạo cảm giác bài viết tràn ra kín màn hình thay vì bị 1 thanh chắn.
+   Vì không có nền đặc, độ tương phản dựa vào 2 lớp: (1) gradient mờ
+   đậm-trên-nhạt-dưới qua ::before — chỉ để tách vùng chữ/icon khỏi feed
+   cho dễ nhìn hơn (Vinh phản hồi 2026-09-20 "cơ chế đúng nhưng hơi khó
+   nhìn"), KHÔNG phải nền đặc như bản cũ; (2) tự đổi màu CHỮ theo nội
+   dung ngay dưới: mặc định giả định đang đè lên ảnh (post-photo, có thể
+   sáng/tối/nhiều màu) nên dùng chữ SÁNG (cream) + text-shadow; khi lướt
+   tới đoạn nền trắng/kem thật (post-head/post-body, không ảnh che) thì
+   đổi hẳn sang chữ TỐI, ẩn luôn gradient (nền đã sáng sẵn, gradient tối
+   sẽ làm xấu, không cần) — xem CommunityCtrl._initSubtabContrastObserver().
+   Sticky nên luôn hiện khi lướt feed, độc lập với tabbar dưới. Có gạch
+   chân dưới tab active (Vinh phản hồi 2026-09-20: cần dấu hiệu rõ đang ở
+   màn nào) — dùng currentColor nên tự đổi màu theo state, không cần
+   khai riêng cho on-light. */
 .comm-subtabs{
   position:sticky;top:0;z-index:5;
   display:flex;align-items:center;gap:.4rem;
   padding:.7rem .5rem;margin-bottom:.4rem;
   background:transparent;
 }
+.comm-subtabs::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:88px;z-index:-1;
+  background:linear-gradient(to bottom, rgba(20,10,5,.4) 0%, rgba(20,10,5,.14) 55%, transparent 100%);
+  pointer-events:none;transition:opacity .25s ease;
+}
+.comm-subtabs.on-light::before{opacity:0}
 .comm-hdr-iconbtn{
   width:34px;height:34px;border-radius:50%;flex-shrink:0;
   background:none;border:none;display:flex;align-items:center;justify-content:center;
@@ -1144,13 +1154,18 @@ body.map-full .tabbar{transform:translateY(105%)}
 .comm-subtabs-center{flex:1;display:flex;align-items:center;justify-content:center;gap:1.3rem}
 .comm-subtab{
   background:none;border:none;font-family:var(--font-display);font-weight:800;
-  font-size:1rem;color:rgba(251,243,217,.78);padding:.2rem 0 .3rem;position:relative;
+  font-size:1rem;color:rgba(251,243,217,.78);padding:.2rem 0 .4rem;position:relative;
   text-shadow:0 1px 3px rgba(20,10,5,.45);
   transition:color .18s,font-size .15s,text-shadow .18s;
 }
 .comm-subtab.active{font-size:1.18rem;color:var(--cream)}
+.comm-subtab.active::after{
+  content:'';position:absolute;bottom:0;left:12%;right:12%;height:2.5px;
+  background:currentColor;border-radius:2px;
+}
 /* Nền trắng/kem thật phía dưới (post-head/post-body, không ảnh che) —
-   chữ sáng sẽ chìm nên đổi hẳn sang tối, bỏ shadow vì không cần nữa. */
+   chữ sáng sẽ chìm nên đổi hẳn sang tối, bỏ shadow + gradient vì không
+   cần nữa (nền đã đủ sáng, gradient tối sẽ làm xấu và giảm tương phản). */
 .comm-subtabs.on-light .comm-subtab{color:var(--text3);text-shadow:none}
 .comm-subtabs.on-light .comm-subtab.active{color:var(--primary)}
 .comm-subtabs.on-light .comm-hdr-iconbtn{color:var(--text2);filter:none}

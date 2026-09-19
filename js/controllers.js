@@ -255,29 +255,41 @@ const HomeCtrl = {
   // xuống dưới nếu thật sự không đủ chỗ phía trên (màn rất thấp/pill bị
   // đẩy lên cao). transform-origin đổi theo hướng để hoạt ảnh scale bung
   // ra đúng từ phía pill, không phải từ giữa panel.
+  //
+  // Toạ độ tính theo document.body chứ KHÔNG theo window.innerWidth/Height:
+  // ở màn rộng ≥560px, body có transform:translateZ(0) (xem styles.css) để
+  // co lại thành cột 440px căn giữa — transform trên 1 ancestor biến nó
+  // thành containing block cho MỌI con position:fixed bên trong, nên
+  // left/top/bottom của panel thực chất tính từ mép body, không phải mép
+  // màn hình. Tính theo window.innerWidth như code cũ khiến panel bị đẩy
+  // lệch hẳn và phần vượt quá 440px bị body{overflow:hidden} cắt mất
+  // (bug Vinh chụp lại 2026-09-20 — chip "Ăn vặt" bị cắt cạnh phải).
   _positionCatDropdown() {
     const btn = document.getElementById('catPillBtn');
     const panel = document.getElementById('catDdPanel');
     const r = btn.getBoundingClientRect();
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const panelW = Math.min(300, vw - 26);
+    const b = document.body.getBoundingClientRect();
+    const panelW = Math.min(300, b.width - 26);
     panel.style.width = `${panelW}px`;
 
-    let left = r.right - panelW;
-    if (left < 12) left = 12;
-    if (left + panelW > vw - 12) left = vw - panelW - 12;
-    panel.style.left = `${left}px`;
+    // Vị trí mong muốn tính theo hệ toạ độ màn hình (viewport) trước...
+    let leftViewport = r.right - panelW;
+    if (leftViewport < b.left + 12) leftViewport = b.left + 12;
+    if (leftViewport + panelW > b.right - 12) leftViewport = b.right - panelW - 12;
+    // ...rồi đổi sang hệ toạ độ của body (containing block thật) để gán
+    // style — trên màn hẹp b.left≈0 nên phép trừ này không đổi gì cả.
+    panel.style.left = `${leftViewport - b.left}px`;
 
-    const originX = r.right - left;
-    const spaceAbove = r.top - 12;
-    const spaceBelow = vh - r.bottom - 12;
+    const originX = r.right - leftViewport;
+    const spaceAbove = r.top - b.top - 12;
+    const spaceBelow = b.bottom - r.bottom - 12;
     if (spaceAbove >= 160 || spaceAbove >= spaceBelow) {
       panel.style.top = 'auto';
-      panel.style.bottom = `${vh - r.top + 8}px`;
+      panel.style.bottom = `${b.bottom - r.top + 8}px`;
       panel.style.transformOrigin = `${originX}px bottom`;
     } else {
       panel.style.bottom = 'auto';
-      panel.style.top = `${r.bottom + 8}px`;
+      panel.style.top = `${r.bottom - b.top + 8}px`;
       panel.style.transformOrigin = `${originX}px top`;
     }
   },
