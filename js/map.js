@@ -64,35 +64,6 @@ const TabNav = {
   },
 };
 
-/* ═══════════════════════════════════════════════
-   TAB SWIPE — vuốt trái/phải trên nội dung màn hình để đổi tab,
-   theo đúng thứ tự hiện trên tabbar (home → checkin → community → profile).
-   Ngưỡng theo trục ngang rõ rệt hơn trục dọc để không đụng cuộn dọc.
-═══════════════════════════════════════════════ */
-const TabSwipe = {
-  order: ['home', 'checkin', 'community', 'profile'],
-  init() {
-    let startX = 0, startY = 0, tracking = false;
-    document.addEventListener('touchstart', (e) => {
-      if (e.touches.length !== 1) return;
-      startX = e.touches[0].clientX;
-      startY = e.touches[0].clientY;
-      tracking = true;
-    }, { passive: true });
-    document.addEventListener('touchend', (e) => {
-      if (!tracking) return;
-      tracking = false;
-      const dx = e.changedTouches[0].clientX - startX;
-      const dy = e.changedTouches[0].clientY - startY;
-      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-      const i = this.order.indexOf(State.currentTab);
-      if (i === -1) return;
-      const next = i + (dx < 0 ? 1 : -1);
-      if (next < 0 || next >= this.order.length) return;
-      TabNav.switchTo(this.order[next]);
-    }, { passive: true });
-  },
-};
 
 /* ═══════════════════════════════════════════════
    TILE LAYER — Esri World Street Map, grayscale-filtered; OSM fallback.
