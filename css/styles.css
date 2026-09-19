@@ -98,26 +98,26 @@ input,textarea,select{font-family:var(--font-body)}
 .tabbar{
   position:fixed;left:10px;right:10px;bottom:calc(var(--safe-bottom) + 10px);
   z-index:100;
-  background:var(--white);border-top:none;border-radius:24px;
-  display:flex;align-items:center;padding:7px 4px;
-  box-shadow:0 10px 26px rgba(42,24,16,.22);
+  background:var(--white);border-top:none;border-radius:28px;
+  display:flex;align-items:center;padding:10px 6px;
+  box-shadow:0 12px 30px rgba(42,24,16,.24);
   transition:transform .25s ease,opacity .2s ease;
 }
 .tabbar.scroll-hidden{
   transform:translateY(140%);opacity:0;pointer-events:none;
 }
 .tab-btn{
-  flex:1;padding:4px 0;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  flex:1;padding:5px 0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
   color:var(--text3);position:relative;
   transition:color .18s;background:none;border:none;
 }
 .tab-btn .tab-ico{
-  font-size:1.15rem;line-height:1;display:flex;align-items:center;justify-content:center;
+  font-size:1.45rem;line-height:1;display:flex;align-items:center;justify-content:center;
   transition:transform .2s cubic-bezier(.34,1.56,.64,1);
 }
 .tab-btn .tab-lbl{
-  font-family:var(--font-body);font-size:.62rem;font-weight:800;letter-spacing:.2px;
+  font-family:var(--font-body);font-size:.68rem;font-weight:800;letter-spacing:.2px;
   line-height:1;
 }
 .tab-btn:active .tab-ico{transform:scale(.9)}
@@ -160,10 +160,10 @@ input,textarea,select{font-family:var(--font-body)}
 /* Brand pill — góc trái map, chỉ chữ "Nhóp Nhép ▾", không emoji không badge */
 .brand-float{
   position:absolute;top:calc(var(--safe-top) + .6rem);left:.7rem;z-index:14;
-  display:inline-flex;align-items:center;gap:.3rem;
-  background:rgba(255,253,245,.94);border:none;border-radius:22px;
-  padding:.4rem .8rem .4rem .95rem;box-shadow:0 4px 14px rgba(42,24,16,.18);
-  font-family:var(--font-display);font-weight:900;font-size:1rem;
+  display:inline-flex;align-items:center;gap:.35rem;
+  background:var(--white);border:none;border-radius:24px;
+  padding:.6rem 1.05rem .6rem 1.15rem;box-shadow:0 6px 18px rgba(42,24,16,.2);
+  font-family:var(--font-display);font-weight:900;font-size:1.05rem;
   color:var(--primary);letter-spacing:-.3px;line-height:1;
 }
 .brand-float em{font-style:italic;color:var(--accent);font-weight:900}
@@ -193,22 +193,22 @@ input,textarea,select{font-family:var(--font-body)}
 .row-label-flex{display:flex;align-items:center;justify-content:space-between}
 .row-label-flex .row-label{margin:.7rem 0 .45rem}
 .radius-pill{
-  display:flex;align-items:center;gap:.25rem;background:var(--primary);color:var(--cream);
-  border:none;font-family:var(--font-display);font-size:.72rem;font-weight:800;
-  padding:.3rem .65rem;border-radius:20px;
+  display:flex;align-items:center;gap:.3rem;background:var(--primary);color:var(--cream);
+  border:none;font-family:var(--font-display);font-size:.78rem;font-weight:800;
+  padding:.42rem .85rem;border-radius:22px;
 }
-.radius-pill .chevron{font-size:.6rem}
+.radius-pill .chevron{font-size:.65rem}
 
 /* Cụm nút nổi — bookmark/thông báo/GPS gộp 1 viên, góc phải trên map */
 .map-btn-cluster{
   position:absolute;top:calc(var(--safe-top) + .6rem);right:.7rem;z-index:14;
   display:flex;align-items:center;gap:1px;
-  background:rgba(255,253,245,.9);border-radius:22px;padding:4px;
-  box-shadow:0 4px 14px rgba(42,24,16,.18);
+  background:var(--white);border-radius:24px;padding:5px;
+  box-shadow:0 6px 18px rgba(42,24,16,.2);
 }
 .cluster-btn{
-  width:34px;height:34px;border-radius:50%;background:none;border:none;
-  display:flex;align-items:center;justify-content:center;color:var(--text2);
+  width:38px;height:38px;border-radius:50%;background:none;border:none;
+  display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:1.1rem;
 }
 .cluster-btn-gps{color:var(--primary);transition:transform .2s var(--ease-spring)}
 .cluster-btn-gps.pulse{transform:scale(1.2)}
