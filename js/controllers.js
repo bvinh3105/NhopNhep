@@ -65,7 +65,8 @@ const HomeCtrl = {
 
     // Dropdown "Tôi muốn ăn" — mở/đóng khi bấm pill "Loại quán" cạnh ô
     // "Tìm món/quán" (trước đây mở từ logo, đã chuyển xuống đây 2026-09-19
-    // để logo chỉ còn easter egg).
+    // để logo chỉ còn easter egg). Popover xổ lên NGAY TẠI vị trí pill
+    // (xem _positionCatDropdown) thay vì slide từ cạnh trên màn hình.
     const catToggle = document.getElementById('catPillBtn');
     const catDdPanel = document.getElementById('catDdPanel');
     const catDdOverlay = document.getElementById('catDdOverlay');
@@ -74,9 +75,17 @@ const HomeCtrl = {
       catToggle.setAttribute('aria-expanded', 'false');
       catDdPanel.classList.remove('show');
       catDdOverlay.classList.remove('show');
+      window.removeEventListener('resize', this._positionCatDropdownBound);
     };
+    this._positionCatDropdownBound = () => this._positionCatDropdown();
     catToggle.addEventListener('click', () => {
       const opening = !catDdPanel.classList.contains('show');
+      if (opening) {
+        this._positionCatDropdown();
+        window.addEventListener('resize', this._positionCatDropdownBound);
+      } else {
+        window.removeEventListener('resize', this._positionCatDropdownBound);
+      }
       catToggle.classList.toggle('open', opening);
       catToggle.setAttribute('aria-expanded', String(opening));
       catDdPanel.classList.toggle('show', opening);
@@ -237,6 +246,39 @@ const HomeCtrl = {
       val.textContent = CATEGORIES[active[0]]?.label || I18N.t('home.catAll');
     } else {
       val.textContent = I18N.t('home.catCount', { n: active.length, total });
+    }
+  },
+
+  // Đặt vị trí popover "Tôi muốn ăn" NGAY TẠI #catPillBtn — ưu tiên xổ LÊN
+  // (bottom neo sát mép trên của pill) vì pill nằm gần đáy sheet, gần nút
+  // Quét ngay, nên khoảng trống phía trên luôn rộng hơn phía dưới. Chỉ rơi
+  // xuống dưới nếu thật sự không đủ chỗ phía trên (màn rất thấp/pill bị
+  // đẩy lên cao). transform-origin đổi theo hướng để hoạt ảnh scale bung
+  // ra đúng từ phía pill, không phải từ giữa panel.
+  _positionCatDropdown() {
+    const btn = document.getElementById('catPillBtn');
+    const panel = document.getElementById('catDdPanel');
+    const r = btn.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const panelW = Math.min(300, vw - 26);
+    panel.style.width = `${panelW}px`;
+
+    let left = r.right - panelW;
+    if (left < 12) left = 12;
+    if (left + panelW > vw - 12) left = vw - panelW - 12;
+    panel.style.left = `${left}px`;
+
+    const originX = r.right - left;
+    const spaceAbove = r.top - 12;
+    const spaceBelow = vh - r.bottom - 12;
+    if (spaceAbove >= 160 || spaceAbove >= spaceBelow) {
+      panel.style.top = 'auto';
+      panel.style.bottom = `${vh - r.top + 8}px`;
+      panel.style.transformOrigin = `${originX}px bottom`;
+    } else {
+      panel.style.bottom = 'auto';
+      panel.style.top = `${r.bottom + 8}px`;
+      panel.style.transformOrigin = `${originX}px top`;
     }
   },
 

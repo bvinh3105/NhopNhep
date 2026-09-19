@@ -177,20 +177,28 @@ input,textarea,select{font-family:var(--font-body)}
   box-shadow:0 4px 12px rgba(42,24,16,.18);max-width:220px;
 }
 
-/* Dropdown "Tôi muốn ăn" — mở từ badge cạnh logo, thay cho cat-chips cố định */
+/* Dropdown "Tôi muốn ăn" — popover xổ lên NGAY TẠI vị trí #catPillBtn
+   (bấm ở đâu, hiện ra ở đó), thay cho panel cũ slide từ cạnh trên màn
+   hình xuống (2026-09-19, theo yêu cầu Vinh: "cơ chế như điểm xuất
+   phát... hiện ra ngay đó thay vì slide từ trên xuống"). Overlay chỉ để
+   bắt tap-ra-ngoài-để-đóng, không tô tối màn hình nữa vì đây là popover
+   nhỏ neo theo nút, không phải panel toàn màn hình. left/top hoặc
+   left/bottom + transform-origin do HomeCtrl._positionCatDropdown() set
+   inline mỗi lần mở, tuỳ còn đủ chỗ phía trên hay phải rơi xuống dưới. */
 .cat-dd-overlay{
-  position:fixed;top:var(--ribbon-h);bottom:var(--tab-h);left:0;right:0;z-index:16;
-  background:rgba(42,24,16,.32);opacity:0;pointer-events:none;transition:opacity .2s;
+  position:fixed;top:0;bottom:0;left:0;right:0;z-index:16;
+  background:transparent;opacity:0;pointer-events:none;transition:opacity .2s;
 }
 .cat-dd-overlay.show{opacity:1;pointer-events:auto}
 .cat-dd-panel{
-  position:absolute;top:0;left:0;right:0;z-index:17;
-  background:var(--white);border-radius:0 0 var(--radius-lg) var(--radius-lg);
-  box-shadow:0 12px 28px rgba(42,24,16,.18);
-  padding:calc(var(--safe-top) + 3.4rem) 1.1rem 1rem;
-  transform:translateY(-100%);transition:transform .28s cubic-bezier(.32,.8,.4,1);
+  position:fixed;z-index:17;width:min(300px, calc(100vw - 1.6rem));
+  background:var(--white);border-radius:var(--radius-lg);
+  box-shadow:0 10px 26px rgba(42,24,16,.24);
+  padding:.9rem 1rem;
+  transform:scale(.85);opacity:0;pointer-events:none;
+  transition:transform .22s cubic-bezier(.34,1.56,.64,1),opacity .16s ease;
 }
-.cat-dd-panel.show{transform:translateY(0)}
+.cat-dd-panel.show{transform:scale(1);opacity:1;pointer-events:auto}
 .dd-sec-title{
   font-family:var(--font-display);font-style:italic;font-weight:800;font-size:.75rem;
   color:var(--primary);letter-spacing:1px;text-transform:uppercase;margin-bottom:.5rem;

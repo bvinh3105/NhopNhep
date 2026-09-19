@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2648">
+<link rel="stylesheet" href="css/styles.css?v=2649">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -369,7 +369,10 @@
   <!-- Node ẩn cho _updateBadge() ghi số quán quét được — giữ ID cũ để không phải sửa controller -->
   <span id="scanCountBadge" hidden></span>
 
-  <!-- Dropdown "Tôi muốn ăn" — thay cho dãy cat-chips cố định trên sheet -->
+  <!-- Dropdown "Tôi muốn ăn" — popover xổ lên ngay tại vị trí #catPillBtn
+       (trong sheet), vị trí .style.left/top/bottom tính bởi
+       HomeCtrl._positionCatDropdown() mỗi lần mở, không còn cố định
+       top:0 slide từ cạnh trên màn hình xuống như bản trước. -->
   <div class="cat-dd-overlay" id="catDdOverlay"></div>
   <div class="cat-dd-panel" id="catDdPanel">
     <div class="dd-sec-title" data-i18n="home.wantToEat">Tôi muốn ăn</div>
@@ -421,15 +424,16 @@
     </div>
 
     <!-- Món cụ thể — cuối cùng, tuỳ chọn. Loại quán ("Tôi muốn ăn") gộp vào
-         đây thay vì dropdown riêng ở logo. Pill mở lại đúng catDdPanel/
-         catDdOverlay cũ (multi-select), chỉ đổi nơi bấm mở. Pill giờ nằm
-         bên TRÁI, NGAY TRONG ô nhập (gộp 1 khối bo tròn với input), cùng
-         pattern merged-box với "Điểm xuất phát" ở trên. -->
+         đây thay vì dropdown riêng ở logo. Pill giờ nằm bên PHẢI, cùng vị
+         trí với radiusPillBtn ở "Điểm xuất phát" (input trước, pill sau).
+         Bấm pill mở catDdPanel dạng POPOVER xổ lên ngay tại vị trí pill
+         (xem CSS .cat-dd-panel + HomeCtrl._positionCatDropdown), không
+         còn slide từ cạnh trên màn hình xuống như trước. -->
     <div class="row-label mini" data-i18n="home.findDish">Tìm <em>món / quán</em> · tuỳ chọn</div>
     <div class="loc-row-wrap">
       <div class="loc-row">
-        <button class="radius-pill" id="catPillBtn" type="button" aria-expanded="false"><span id="catPillVal" data-i18n="home.catAll">Tất cả loại</span><span class="chevron">▾</span></button>
         <input id="dishInput" class="loc-input" type="text" data-i18n="home.dishPlaceholder" data-i18n-attr="placeholder" placeholder="VD: phở, bánh mì, tên quán… (bỏ trống = mọi món)" autocomplete="off" spellcheck="false" maxlength="60">
+        <button class="radius-pill" id="catPillBtn" type="button" aria-expanded="false"><span id="catPillVal" data-i18n="home.catAll">Tất cả loại</span><span class="chevron">▾</span></button>
         <button class="loc-gps-btn" id="dishClearBtn" data-i18n="home.clearDish" data-i18n-attr="title" title="Xoá bộ lọc món" style="display:none"><svg class="icon" width="20" height="20"><use href="#ic-action-close"></use></svg></button>
       </div>
       <div class="dish-suggest" id="dishSuggest">
@@ -1110,19 +1114,19 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2639"></script>
-<script src="js/i18n.js?v=2639"></script>
-<script src="js/utils.js?v=2639"></script>
-<script src="js/state.js?v=2639"></script>
-<script src="js/poi.js?v=2639"></script>
-<script src="js/geocoder.js?v=2639"></script>
-<script src="js/gemini.js?v=2639"></script>
-<script src="js/community.js?v=2639"></script>
-<script src="js/push.js?v=2639"></script>
-<script src="js/analytics.js?v=2639"></script>
-<script src="js/map.js?v=2639"></script>
-<script src="js/gps.js?v=2639"></script>
-<script src="js/locationPicker.js?v=2639"></script>
+<script src="js/security.js?v=2640"></script>
+<script src="js/i18n.js?v=2640"></script>
+<script src="js/utils.js?v=2640"></script>
+<script src="js/state.js?v=2640"></script>
+<script src="js/poi.js?v=2640"></script>
+<script src="js/geocoder.js?v=2640"></script>
+<script src="js/gemini.js?v=2640"></script>
+<script src="js/community.js?v=2640"></script>
+<script src="js/push.js?v=2640"></script>
+<script src="js/analytics.js?v=2640"></script>
+<script src="js/map.js?v=2640"></script>
+<script src="js/gps.js?v=2640"></script>
+<script src="js/locationPicker.js?v=2640"></script>
 <!-- Trip name dialog — thay thế window.prompt() native -->
 <div class="trip-name-overlay" id="tripNameOverlay" role="dialog" aria-modal="true">
   <div class="trip-name-card">
@@ -1135,8 +1139,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2639"></script>
-<script src="js/app.js?v=2639"></script>
+<script src="js/controllers.js?v=2640"></script>
+<script src="js/app.js?v=2640"></script>
 
 </body>
 </html>
