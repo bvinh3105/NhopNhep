@@ -196,13 +196,14 @@ input,textarea,select{font-family:var(--font-body)}
   color:var(--primary);letter-spacing:1px;text-transform:uppercase;margin-bottom:.5rem;
 }
 
-/* Label + pill bán kính trên cùng 1 dòng, thay cho dãy radius-chips riêng */
-.row-label-flex{display:flex;align-items:center;justify-content:space-between}
-.row-label-flex .row-label{margin:.7rem 0 .45rem}
+/* Pill bán kính / loại quán — giờ nằm NGAY TRONG khối .loc-row cùng ô
+   nhập (xem .loc-row bên dưới), không còn tách riêng 1 dòng phía trên
+   label nữa. flex-shrink:0 + white-space:nowrap để input (flex:1) cạnh
+   nó không bóp méo/xuống dòng chữ trong pill. */
 .radius-pill{
   display:flex;align-items:center;gap:.3rem;background:var(--primary);color:var(--cream);
   border:none;font-family:var(--font-display);font-size:.78rem;font-weight:800;
-  padding:.42rem .85rem;border-radius:22px;
+  padding:.42rem .85rem;border-radius:22px;flex-shrink:0;white-space:nowrap;
 }
 .radius-pill .chevron{font-size:.65rem;transition:transform .25s}
 .radius-pill.open .chevron{transform:rotate(180deg)}
@@ -391,10 +392,19 @@ input,textarea,select{font-family:var(--font-body)}
 .radius-chip:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
 .radius-chip.active{background:var(--primary);color:var(--cream);border-color:var(--primary-2);box-shadow:2px 2px 0 var(--primary-2)}
 
-/* Location row + geocode suggestions dropdown */
+/* Location row + geocode suggestions dropdown.
+   .loc-row giờ CHÍNH LÀ khối bo tròn nền cream (input + pill bán kính/loại
+   quán nằm phẳng bên trong nó, không lồng khối-trong-khối nữa) — đúng
+   pattern ảnh mẫu Vinh gửi 2026-09-19. Trước đây .loc-row chỉ là flex
+   container trống, còn input tự có nền trắng/viền/bóng riêng. */
 .loc-row-wrap{position:relative;margin-top:.75rem}
 .loc-row-wrap .loc-row{margin-top:0}
-.loc-row{display:flex;gap:.5rem;margin-top:.75rem}
+.loc-row{
+  display:flex;align-items:center;gap:.5rem;margin-top:.75rem;
+  background:var(--cream);border-radius:20px;padding:.5rem .6rem;
+  transition:box-shadow .18s ease;
+}
+.loc-row:focus-within{box-shadow:0 0 0 2px var(--primary-2)}
 
 /* Geocode suggestion dropdown — used on home input, modal address input,
    and friend search. position:fixed, coordinates computed by
@@ -439,20 +449,27 @@ input,textarea,select{font-family:var(--font-body)}
 .follows-you-tag{font-size:.62rem;font-weight:700;color:var(--text3);background:var(--cream-2);border-radius:8px;padding:.1rem .45rem;white-space:nowrap}
 .go-empty{padding:.75rem;text-align:center;font-size:.78rem;color:var(--text3);font-style:italic}
 
+/* Input giờ chỉ là phần chữ nằm PHẲNG bên trong khối .loc-row — bỏ hết
+   nền/viền/bo góc/box-shadow riêng (trước là 1 khối brutalist độc lập)
+   để cả .loc-row đọc thành MỘT khối bo tròn liền mạch duy nhất. Focus
+   ring chuyển sang .loc-row:focus-within ở trên thay vì border-color. */
 .loc-input{
-  flex:1;background:var(--white);border:2px solid var(--text);border-radius:14px;
-  padding:.6rem .9rem;font-size:.9rem;color:var(--text);outline:none;font-weight:600;
-  transition:border-color .18s;box-shadow:2px 2px 0 var(--text);
+  flex:1;min-width:0;background:transparent;border:none;
+  padding:.15rem 0;font-size:.9rem;color:var(--text);outline:none;font-weight:600;
+  box-shadow:none;
 }
-.loc-input:focus{border-color:var(--primary);box-shadow:2px 2px 0 var(--primary-2)}
 .loc-input::placeholder{color:var(--text3);font-weight:500}
+/* Nút phụ trong khối (#gpsBtn ẩn / #dishClearBtn "xoá món") — trước là ô
+   vuông brutalist viền dày+đổ bóng, hợp khi đứng riêng NGOÀI khối; giờ
+   nằm lọt bên trong khối phẳng nên thu gọn thành icon tròn tối giản. */
 .loc-gps-btn{
-  width:2.8rem;height:2.8rem;border-radius:14px;background:var(--white);
-  border:2px solid var(--text);display:flex;align-items:center;justify-content:center;
-  font-size:1.15rem;transition:all .15s;flex-shrink:0;box-shadow:2px 2px 0 var(--text);
+  flex-shrink:0;width:1.8rem;height:1.8rem;border-radius:50%;
+  background:transparent;border:none;box-shadow:none;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.05rem;color:var(--text3);transition:background-color .15s,color .15s;
 }
-.loc-gps-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
-.loc-gps-btn.active{background:var(--primary);color:var(--cream);border-color:var(--primary-2);box-shadow:2px 2px 0 var(--primary-2)}
+.loc-gps-btn:active{background:var(--cream-2)}
+.loc-gps-btn.active{background:var(--primary);color:var(--cream)}
 
 /* Scan CTA */
 .scan-btn{
@@ -1090,8 +1107,15 @@ body.map-full .tabbar{transform:translateY(105%)}
    opacity fade + pointer-events + preserve translateX(-50%) của pill nổi. */
 
 /* Cộng đồng — header sticky kiểu IG Reels/Friends: nút thêm bài viết bên
-   trái, 2 tab Quán ăn/Lộ trình ở giữa (chữ to/đậm hơn khi active, giống
-   tỉ lệ tab Reels/Friends), spacer bên phải để nhóm tab thực sự nằm giữa.
+   trái, 2 tab Quán ăn/Lộ trình ở giữa, spacer bên phải để nhóm tab thực
+   sự nằm giữa. Đối chiếu pixel thật trên ảnh chụp thanh Reels/Friends
+   của IG (2026-09-19): active/inactive gần như CÙNG cỡ chữ (~22px cap-
+   height cả hai, lệch không đáng kể) và KHÔNG có gạch chân dưới tab
+   active — phân biệt active/inactive gần như thuần bằng độ sáng màu chữ
+   (trắng ~255 vs xám nhạt ~210), không phải bằng size hay underline. Giữ
+   lại 1 chênh lệch size nhỏ (không xoá hẳn về bằng nhau) vì NhopNhep
+   không có avatar bạn bè để mắt "quét" nhanh tab đang chọn như IG, nên
+   cần thêm 1 chút size để dễ nhận ra khi lướt nhanh trên màn nhỏ.
    Nền LUÔN là màu cream đặc (không đổi, không mờ) — chỉ MÀU CHỮ của tab
    đổi khi lướt tới bài có nền trắng (post-head/post-body) so với bài có
    ảnh (post-photo), xem CommunityCtrl._initSubtabContrastObserver(). Sticky
@@ -1110,17 +1134,13 @@ body.map-full .tabbar{transform:translateY(105%)}
 }
 .comm-hdr-iconbtn.hidden{display:none}
 .comm-hdr-spacer{visibility:hidden;pointer-events:none}
-.comm-subtabs-center{flex:1;display:flex;align-items:center;justify-content:center;gap:1.5rem}
+.comm-subtabs-center{flex:1;display:flex;align-items:center;justify-content:center;gap:1.2rem}
 .comm-subtab{
   background:none;border:none;font-family:var(--font-display);font-weight:800;
-  font-size:.82rem;color:var(--text3);padding:.2rem 0 .5rem;position:relative;
+  font-size:.86rem;color:var(--text3);padding:.2rem 0 .3rem;position:relative;
   transition:color .18s,font-size .15s;
 }
-.comm-subtab.active{font-size:.98rem;color:var(--primary)}
-.comm-subtab.active::after{
-  content:'';position:absolute;bottom:0;left:8%;right:8%;height:2.5px;
-  background:var(--primary);border-radius:2px;
-}
+.comm-subtab.active{font-size:.92rem;color:var(--primary)}
 /* Đổi màu chữ khi bài viết ngay dưới header có nền trắng/kem (post-head,
    post-body) thay vì ảnh — chỉ đổi màu chữ, KHÔNG đổi nền .comm-subtabs
    hay thêm khung/box nào (yêu cầu Vinh 2026-09-19). */

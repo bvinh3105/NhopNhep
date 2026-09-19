@@ -53,8 +53,11 @@ const HomeCtrl = {
     // Cụm nút nổi trên map (header full-bleed). GPS dùng chung logic thật
     // với #gpsBtn; bookmark/thông báo chưa có tính năng, chỉ báo tạm.
     document.getElementById('homeGpsFloatBtn').addEventListener('click', (e) => {
-      e.currentTarget.classList.add('pulse');
-      setTimeout(() => e.currentTarget.classList.remove('pulse'), 300);
+      // e.currentTarget is nulled out once the event finishes dispatching,
+      // so it must be captured before the setTimeout callback runs.
+      const btn = e.currentTarget;
+      btn.classList.add('pulse');
+      setTimeout(() => btn.classList.remove('pulse'), 300);
       GPS.toggle();
     });
     document.getElementById('homeBookmarkBtn').addEventListener('click', () => showToast('🚧 Tính năng đang cập nhật'));
