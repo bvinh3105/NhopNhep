@@ -143,9 +143,13 @@ const I18N = {
       'community.searchPlaceholder': '🔎 Tìm theo tên, thẻ, hashtag…',
       'community.backToBrowse': '← Xem quán trước',
       // ── Tab bar ──
-      'tab.profile': 'Cá nhân', 'tab.community': 'Cộng đồng',
+      'tab.profile': 'Cá nhân', 'tab.community': 'Cộng đồng', 'tab.checkin': 'Check-in',
+      // ── Community sub-tabs (Quán ăn / Lộ trình) ──
+      'community.tabFood': 'Quán ăn', 'community.tabRoutes': 'Lộ trình',
       // ── Common (dùng lại khắp modal) ──
       'common.close': 'Đóng', 'common.cancel': 'Huỷ',
+      'common.comingSoon': '🚧 Tính năng đang cập nhật',
+      'common.comingSoonSub': 'Chúng tôi đang hoàn thiện tính năng này. Quay lại sau nhé!',
       'common.openMaps': '<svg class="icon" width="20" height="20"><use href="#ic-map-external"></use></svg> Mở Google Maps',
       // ── Trip history modal ──
       'trips.title': 'Chuyến <em>ăn đã đi</em>',
@@ -563,8 +567,11 @@ const I18N = {
       'community.post': '＋ Post a place',
       'community.searchPlaceholder': '🔎 Search by name, tag, hashtag…',
       'community.backToBrowse': '← Back to browsing',
-      'tab.profile': 'Profile', 'tab.community': 'Community',
+      'tab.profile': 'Profile', 'tab.community': 'Community', 'tab.checkin': 'Check-in',
+      'community.tabFood': 'Restaurants', 'community.tabRoutes': 'Routes',
       'common.close': 'Close', 'common.cancel': 'Cancel',
+      'common.comingSoon': '🚧 Feature coming soon',
+      'common.comingSoonSub': "We're still polishing this feature. Check back soon!",
       'common.openMaps': '<svg class="icon" width="20" height="20"><use href="#ic-map-external"></use></svg> Open Google Maps',
       'saved.title': '<em>Saved</em> quán',
       'saved.openTitle': 'Saved quán',

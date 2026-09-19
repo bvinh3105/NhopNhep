@@ -9,6 +9,24 @@ const TabNav = {
       });
     });
   },
+
+  // Ẩn tab bar khi cuộn xuống, hiện lại khi cuộn lên — dùng chung cho mọi
+  // scroll container muốn hành xử giống feed (community, results, plan,
+  // sheet Trang chủ). Tránh mỗi controller viết lại listener riêng.
+  wireScrollHide(scrollEl) {
+    if (!scrollEl || scrollEl.__scrollHideWired) return;
+    scrollEl.__scrollHideWired = true;
+    const tabbar = document.querySelector('.tabbar');
+    if (!tabbar) return;
+    let last = 0;
+    scrollEl.addEventListener('scroll', () => {
+      const st = scrollEl.scrollTop;
+      if (st > last && st > 30) tabbar.classList.add('scroll-hidden');
+      else if (st < last) tabbar.classList.remove('scroll-hidden');
+      last = st <= 0 ? 0 : st;
+    }, { passive: true });
+  },
+
   switchTo(tab) {
     if (State.currentTab === tab) return;
     State.currentTab = tab;
@@ -16,6 +34,9 @@ const TabNav = {
     // has no legitimate reason to hang around and just stacks over the
     // new screen's contents (verified user-facing bug 2026-09-11).
     document.querySelectorAll('.modal-overlay.show').forEach(m => m.classList.remove('show'));
+    // Đổi tab thì reset trạng thái ẩn của tab bar — nếu người dùng đã
+    // scroll ẩn ở tab cũ, sang tab mới tab bar phải hiện lại luôn.
+    document.querySelector('.tabbar')?.classList.remove('scroll-hidden');
     document.querySelectorAll('.tab-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.tab === tab);
     });
@@ -24,6 +45,7 @@ const TabNav = {
     document.getElementById('planScreen').classList.add('hidden');
     document.getElementById('profileScreen').classList.add('hidden');
     document.getElementById('communityScreen').classList.add('hidden');
+    document.getElementById('checkinScreen').classList.add('hidden');
     // Rời tab Cộng đồng → tắt poller feed. Nhánh 'community' bên dưới gọi
     // CommunityCtrl.render(), trong đó tự bật lại.
     if (tab !== 'community') CommunityCtrl._stopLive();
@@ -36,7 +58,39 @@ const TabNav = {
     } else if (tab === 'community') {
       document.getElementById('communityScreen').classList.remove('hidden');
       CommunityCtrl.render();
+    } else if (tab === 'checkin') {
+      document.getElementById('checkinScreen').classList.remove('hidden');
     }
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   TAB SWIPE — vuốt trái/phải trên nội dung màn hình để đổi tab,
+   theo đúng thứ tự hiện trên tabbar (home → checkin → community → profile).
+   Ngưỡng theo trục ngang rõ rệt hơn trục dọc để không đụng cuộn dọc.
+═══════════════════════════════════════════════ */
+const TabSwipe = {
+  order: ['home', 'checkin', 'community', 'profile'],
+  init() {
+    let startX = 0, startY = 0, tracking = false;
+    document.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      tracking = true;
+    }, { passive: true });
+    document.addEventListener('touchend', (e) => {
+      if (!tracking) return;
+      tracking = false;
+      const dx = e.changedTouches[0].clientX - startX;
+      const dy = e.changedTouches[0].clientY - startY;
+      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      const i = this.order.indexOf(State.currentTab);
+      if (i === -1) return;
+      const next = i + (dx < 0 ? 1 : -1);
+      if (next < 0 || next >= this.order.length) return;
+      TabNav.switchTo(this.order[next]);
+    }, { passive: true });
   },
 };
 

@@ -82,32 +82,57 @@ button{border:none;background:none;color:inherit;cursor:pointer;font:inherit;fon
 input,textarea,select{font-family:var(--font-body)}
 
 /* ─── Screens ─── */
-.screen{position:fixed;top:var(--ribbon-h);bottom:var(--tab-h);left:0;right:0;display:flex;flex-direction:column;overflow:hidden;background:var(--cream)}
+/* Screens tràn viền — chạm hẳn cạnh dưới màn hình. Tab bar là pill nổi
+   phía trên, không chiếm layout height nữa (trước dùng bottom:var(--tab-h)
+   để chừa chỗ; giờ tab bar overlay lên trên nội dung, đúng như prototype). */
+.screen{position:fixed;top:var(--ribbon-h);bottom:0;left:0;right:0;display:flex;flex-direction:column;overflow:hidden;background:var(--cream)}
 .screen.hidden{display:none}
 
 /* ═══════════════════════════════════════════════
    BOTTOM TAB BAR
 ═══════════════════════════════════════════════ */
+/* Tab bar — floating pill với margin 10px mọi cạnh (đúng prototype:
+   position:absolute; left:10px; right:10px; bottom:10px; border-radius:24px).
+   Có label bé dưới icon. Check-in là vòng tròn đỏ nhỏ inline với các tab khác.
+   Ẩn khi lướt feed xuống, hiện lại khi lướt lên. */
 .tabbar{
-  position:fixed;bottom:0;left:0;right:0;height:var(--tab-h);z-index:100;
-  background:var(--white);border-top:1.5px solid var(--line);
-  display:flex;padding-bottom:var(--safe-bottom);
-  transition:transform .32s cubic-bezier(.32,1,.56,1);
-  box-shadow:0 -4px 24px rgba(42,24,16,.06);
+  position:fixed;left:10px;right:10px;bottom:calc(var(--safe-bottom) + 10px);
+  z-index:100;
+  background:rgba(255,253,245,.94);border-top:none;border-radius:24px;
+  display:flex;align-items:center;padding:7px 4px;
+  box-shadow:0 10px 26px rgba(42,24,16,.22);
+  transition:transform .25s ease,opacity .2s ease;
+}
+.tabbar.scroll-hidden{
+  transform:translateY(140%);opacity:0;pointer-events:none;
 }
 .tab-btn{
-  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  color:var(--text3);font-size:.7rem;font-weight:700;letter-spacing:.3px;
-  transition:color .18s;position:relative;
+  flex:1;padding:4px 0;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  color:var(--text3);position:relative;
+  transition:color .18s;background:none;border:none;
 }
-.tab-btn .tab-ico{font-size:1.3rem;line-height:1;margin-bottom:1px;transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
-.tab-btn.active{color:var(--primary)}
-.tab-btn.active .tab-ico{transform:scale(1.15)}
+.tab-btn .tab-ico{
+  font-size:1.15rem;line-height:1;display:flex;align-items:center;justify-content:center;
+  transition:transform .2s cubic-bezier(.34,1.56,.64,1);
+}
+.tab-btn .tab-lbl{
+  font-family:var(--font-body);font-size:.62rem;font-weight:800;letter-spacing:.2px;
+  line-height:1;
+}
 .tab-btn:active .tab-ico{transform:scale(.9)}
-.tab-btn.active::before{
-  content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
-  width:32px;height:3px;background:var(--primary);border-radius:0 0 4px 4px;
+.tab-btn.active{color:var(--primary)}
+.tab-btn.active .tab-ico{transform:scale(1.1)}
+.tab-btn.active::before{display:none}
+
+/* Check-in — vòng tròn đỏ nhỏ (34x34), inline với các tab khác, không label */
+.tab-btn-checkin .tab-ico{
+  width:34px;height:34px;border-radius:50%;background:var(--primary);color:var(--cream);
+  display:flex;align-items:center;justify-content:center;font-size:1rem;
+  box-shadow:0 3px 0 var(--primary-2);
+  margin-bottom:1px;
 }
+.tab-btn-checkin.active .tab-ico{transform:none;background:var(--primary-2)}
 
 /* ═══════════════════════════════════════════════
    TYPOGRAPHY
@@ -134,26 +159,69 @@ input,textarea,select{font-family:var(--font-body)}
 /* ═══════════════════════════════════════════════
    HOME (Nhóp Nhép tab)
 ═══════════════════════════════════════════════ */
-#homeScreen{background:var(--cream);overflow-y:auto;scrollbar-width:none}
-#homeScreen::-webkit-scrollbar{display:none}
-.home-hero{
-  flex-shrink:0;padding:1rem 1.1rem .8rem;background:var(--cream);position:relative;z-index:5;
+/* Map tràn viền — homeScreen không còn tự cuộn, mainMapWrap phủ kín,
+   brand pill + sheet nổi đè lên trên bằng position:absolute. */
+#homeScreen{background:var(--cream)}
+
+/* Brand pill — góc trái map, chỉ chữ "Nhóp Nhép ▾", không emoji không badge */
+.brand-float{
+  position:absolute;top:calc(var(--safe-top) + .6rem);left:.7rem;z-index:14;
+  display:inline-flex;align-items:center;gap:.3rem;
+  background:rgba(255,253,245,.94);border:none;border-radius:22px;
+  padding:.4rem .8rem .4rem .95rem;box-shadow:0 4px 14px rgba(42,24,16,.18);
+  font-family:var(--font-display);font-weight:900;font-size:1rem;
+  color:var(--primary);letter-spacing:-.3px;line-height:1;
 }
-.hero-row{display:flex;align-items:flex-end;justify-content:space-between;gap:.5rem}
-.hero-sub{
-  font-family:var(--font-body);font-weight:600;font-size:.78rem;color:var(--text2);
-  margin-top:.3rem;
+.brand-float em{font-style:italic;color:var(--accent);font-weight:900}
+.brand-float .chevron{font-size:.62rem;color:var(--text3);transition:transform .25s;margin-top:1px}
+.brand-float.open .chevron{transform:rotate(180deg)}
+
+/* Dropdown "Tôi muốn ăn" — mở từ badge cạnh logo, thay cho cat-chips cố định */
+.cat-dd-overlay{
+  position:fixed;top:var(--ribbon-h);bottom:var(--tab-h);left:0;right:0;z-index:16;
+  background:rgba(42,24,16,.32);opacity:0;pointer-events:none;transition:opacity .2s;
 }
-.hero-badge{
-  display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .7rem;border-radius:20px;
-  background:var(--white);border:1.5px solid var(--line-2);font-weight:800;font-size:.72rem;color:var(--text2);
-  box-shadow:0 2px 8px rgba(42,24,16,.06);
+.cat-dd-overlay.show{opacity:1;pointer-events:auto}
+.cat-dd-panel{
+  position:absolute;top:0;left:0;right:0;z-index:17;
+  background:var(--white);border-radius:0 0 var(--radius-lg) var(--radius-lg);
+  box-shadow:0 12px 28px rgba(42,24,16,.18);
+  padding:calc(var(--safe-top) + 3.4rem) 1.1rem 1rem;
+  transform:translateY(-100%);transition:transform .28s cubic-bezier(.32,.8,.4,1);
+}
+.cat-dd-panel.show{transform:translateY(0)}
+.dd-sec-title{
+  font-family:var(--font-display);font-style:italic;font-weight:800;font-size:.75rem;
+  color:var(--primary);letter-spacing:1px;text-transform:uppercase;margin-bottom:.5rem;
 }
 
+/* Label + pill bán kính trên cùng 1 dòng, thay cho dãy radius-chips riêng */
+.row-label-flex{display:flex;align-items:center;justify-content:space-between}
+.row-label-flex .row-label{margin:.7rem 0 .45rem}
+.radius-pill{
+  display:flex;align-items:center;gap:.25rem;background:var(--primary);color:var(--cream);
+  border:none;font-family:var(--font-display);font-size:.72rem;font-weight:800;
+  padding:.3rem .65rem;border-radius:20px;
+}
+.radius-pill .chevron{font-size:.6rem}
+
+/* Cụm nút nổi — bookmark/thông báo/GPS gộp 1 viên, góc phải trên map */
+.map-btn-cluster{
+  position:absolute;top:calc(var(--safe-top) + .6rem);right:.7rem;z-index:14;
+  display:flex;align-items:center;gap:1px;
+  background:rgba(255,253,245,.9);border-radius:22px;padding:4px;
+  box-shadow:0 4px 14px rgba(42,24,16,.18);
+}
+.cluster-btn{
+  width:34px;height:34px;border-radius:50%;background:none;border:none;
+  display:flex;align-items:center;justify-content:center;color:var(--text2);
+}
+.cluster-btn-gps{color:var(--primary);transition:transform .2s var(--ease-spring)}
+.cluster-btn-gps.pulse{transform:scale(1.2)}
+
 #mainMapWrap{
-  position:relative;z-index:0;margin:0 1.1rem;border-radius:var(--radius-lg);overflow:hidden;
-  border:2px solid var(--text);background:var(--cream-2);flex:0 0 auto;
-  height:min(38vh,260px);
+  position:absolute;inset:0;z-index:0;margin:0;border-radius:0;
+  border:none;background:var(--cream-2);height:auto;
 }
 #mainMap{position:absolute;inset:0}
 /* Neutral light-gray ground so panning never reveals the app's warm
@@ -171,11 +239,21 @@ input,textarea,select{font-family:var(--font-body)}
 .leaflet-tile-pane{filter:grayscale(1) brightness(1.16) contrast(.9)}
 
 #homeSheet{
-  flex-shrink:0;background:var(--paper);border-top:2px solid var(--text);
-  padding:1rem 1.1rem .9rem;margin-top:.8rem;
+  position:absolute;left:0;right:0;bottom:0;z-index:7;
+  background:var(--paper);border-top:2px solid var(--text);
+  padding:.7rem 1.1rem 1rem;margin-top:0;
   border-radius:var(--radius-lg) var(--radius-lg) 0 0;
-  box-shadow:0 -8px 24px rgba(42,24,16,.08);
+  box-shadow:0 -8px 24px rgba(42,24,16,.14);
+  max-height:68%;display:flex;flex-direction:column;
+  -webkit-mask-image:linear-gradient(to bottom, black 0%, black 90%, rgba(0,0,0,.68) 100%);
+  mask-image:linear-gradient(to bottom, black 0%, black 90%, rgba(0,0,0,.68) 100%);
 }
+.sheet-drag-handle{width:34px;height:4px;background:var(--line-2);border-radius:2px;margin:0 auto .6rem;flex-shrink:0}
+.sheet-inner-scroll{flex:1 1 auto;overflow-y:auto;min-height:0;scrollbar-width:none}
+.sheet-inner-scroll::-webkit-scrollbar{display:none}
+/* Chừa chỗ cho tab bar pill nổi (54px pill + 10px margin + safe area + hơi thở
+   16px) — trước để 14px nên nút Quét ngay bị che. */
+.sheet-bg-extend{height:calc(var(--tab-h) + var(--safe-bottom) + 20px);flex-shrink:0}
 
 .row-label{
   font-family:var(--font-display);font-style:italic;font-weight:800;
@@ -490,7 +568,9 @@ input,textarea,select{font-family:var(--font-body)}
 .restaurant-grid{
   flex:1;overflow-y:auto;padding:.8rem 1.1rem;display:grid;
   grid-template-columns:1fr 1fr;gap:.7rem;align-content:start;
-  padding-bottom:calc(var(--safe-bottom) + 5.5rem);
+  /* Padding cuối = .results-action (~5.5rem) + tab bar pill (--tab-h) +
+     safe-area, để card cuối cuộn hết vẫn không bị 2 lớp UI dưới che. */
+  padding-bottom:calc(var(--safe-bottom) + var(--tab-h) + 5.5rem);
 }
 .restaurant-grid::-webkit-scrollbar{display:none}
 
@@ -580,8 +660,12 @@ input,textarea,select{font-family:var(--font-body)}
 .r-gmaps-link:active{background:#BBDEFB;transform:scale(0.95)}
 
 .results-action{
-  position:absolute;bottom:0;left:0;right:0;z-index:5;
-  padding:.75rem 1.1rem calc(var(--safe-bottom) + .9rem);
+  /* Ngồi trên tab bar pill (bottom: safe+10px, cao ~54px) — cộng thêm 4px
+     đệm để không sát mép trên pill. Tab bar tự ẩn khi lướt xuống, khi ẩn
+     action bar này vẫn ở nguyên vị trí (không đi theo). */
+  position:absolute;bottom:calc(var(--safe-bottom) + var(--tab-h) + 4px);
+  left:0;right:0;z-index:5;
+  padding:.75rem 1.1rem .5rem;
   background:linear-gradient(to top,var(--cream) 70%,transparent);
 }
 .action-btn{
@@ -877,7 +961,9 @@ body.map-full .tabbar{transform:translateY(105%)}
 @keyframes offroute-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion: reduce){.pmap-offroute-icon{animation:none}}
 
-.timeline{flex:1;overflow-y:auto;padding:.5rem 1.1rem calc(var(--safe-bottom) + 1rem);scrollbar-width:none}
+/* Timeline scroll — chừa chỗ cho tab bar pill nổi ở đáy, không thì trạm cuối
+   lộ trình bị pill che khi cuộn xuống hết. */
+.timeline{flex:1;overflow-y:auto;padding:.5rem 1.1rem calc(var(--safe-bottom) + var(--tab-h) + 1rem);scrollbar-width:none}
 .timeline::-webkit-scrollbar{display:none}
 
 .tl-item{display:flex;gap:.75rem;margin-bottom:.25rem}
@@ -931,7 +1017,7 @@ body.map-full .tabbar{transform:translateY(105%)}
    PERSONAL TAB
 ═══════════════════════════════════════════════ */
 #profileScreen{background:var(--cream);overflow-y:auto}
-.profile-scroll{flex:1;overflow-y:auto;scrollbar-width:none}
+.profile-scroll{flex:1;overflow-y:auto;scrollbar-width:none;padding-bottom:calc(var(--safe-bottom) + var(--tab-h) + 24px)}
 .profile-scroll::-webkit-scrollbar{display:none}
 
 .profile-hero{
@@ -985,6 +1071,46 @@ body.map-full .tabbar{transform:translateY(105%)}
 .psec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem}
 .psec-title{font-family:var(--font-display);font-size:1.15rem;font-weight:900;color:var(--text);letter-spacing:-.3px}
 .psec-title em{font-style:italic;color:var(--primary)}
+
+/* Ô tìm kiếm + tabbar tự ẩn khi lướt feed xuống, hiện lại khi lướt lên */
+#communitySearchGroup{
+  max-height:60px;overflow:hidden;
+  transition:max-height .25s ease,opacity .2s ease,margin-bottom .25s ease;
+}
+#communitySearchGroup.scroll-collapsed{max-height:0;opacity:0;margin-bottom:0}
+/* .tabbar.scroll-hidden rule sống ở khối tabbar chính phía trên — nơi có cả
+   opacity fade + pointer-events + preserve translateX(-50%) của pill nổi. */
+
+/* Cộng đồng — sub-tab Quán ăn / Lộ trình. Sticky ở trên khi lướt feed,
+   giống prototype (sub-tabs nằm cố định trong khi các post cuộn phía dưới). */
+.comm-subtabs{
+  position:sticky;top:0;z-index:5;
+  display:flex;justify-content:center;gap:1.6rem;
+  padding:.9rem 0 .8rem;margin-bottom:.4rem;
+  background:var(--cream);
+  border-bottom:1px solid var(--line);
+}
+.comm-subtab{
+  background:none;border:none;font-family:var(--font-display);font-size:.9rem;font-weight:800;
+  color:var(--text3);padding:.15rem 0 .5rem;position:relative;
+}
+.comm-subtab.active{color:var(--primary)}
+.comm-subtab.active::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2.5px;
+  background:var(--primary);border-radius:2px;
+}
+
+/* Placeholder "tính năng đang cập nhật" — dùng chung cho Check-in & Lộ trình */
+.coming-soon-wrap{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;gap:.6rem;padding:2.5rem 1.5rem;
+}
+.coming-soon-ico{
+  width:72px;height:72px;border-radius:50%;background:var(--primary-tint);
+  color:var(--primary);display:flex;align-items:center;justify-content:center;margin-bottom:.4rem;
+}
+.coming-soon-title{font-family:var(--font-display);font-size:1.1rem;font-weight:900;color:var(--text)}
+.coming-soon-sub{font-size:.85rem;color:var(--text2);max-width:280px;line-height:1.5}
 .add-btn{
   display:flex;align-items:center;gap:.3rem;padding:.4rem .75rem;
   background:var(--primary);color:var(--cream);border-radius:20px;
@@ -1579,7 +1705,9 @@ body.map-full .tabbar{transform:translateY(105%)}
 }
 @media (prefers-reduced-motion:reduce){.new-posts-pill{animation:none}}
 
-.comm-r-list{display:flex;flex-direction:column;gap:.75rem;padding-bottom:calc(var(--safe-bottom) + 1rem)}
+/* padding-bottom = tab-h (56) + bottom margin (14) + safe area + hơi thở
+   để post cuối không nằm dưới pill tab bar khi cuộn hết feed. */
+.comm-r-list{display:flex;flex-direction:column;gap:.75rem;padding-bottom:calc(var(--safe-bottom) + var(--tab-h) + 24px)}
 /* Feed reads as one continuous scroll (posts separated by their own
    border-bottom divider, not a container gap) — the grid-based profile
    views (myRestaurantList/userQuanBody) keep the normal .75rem gap between
@@ -1650,7 +1778,10 @@ body.map-full .tabbar{transform:translateY(105%)}
 .post-dot.active{background:var(--white)}
 
 .post-body{padding:.6rem .8rem .8rem}
-.post-actions{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem}
+/* Icon row: ❤ 14 · 💬 · ↗ ................ 🔖 (save pushed right, mimic IG) */
+.post-actions{display:flex;align-items:center;gap:1rem;margin-bottom:.35rem}
+.heart-count{margin-left:-.55rem} /* kéo count sát heart, thoát cái gap chung */
+.save-icon-btn{margin-left:auto}
 .heart-btn{
   border:none;background:none;padding:0;font-size:1.5rem;line-height:1;cursor:pointer;
   color:var(--text);transition:transform .15s var(--ease-spring);
@@ -1671,7 +1802,8 @@ body.map-full .tabbar{transform:translateY(105%)}
    là ký tự outline/filled thường, không phải emoji, nên color áp được). */
 .post-action-btn.save-icon-btn{opacity:.5}
 .post-action-btn.save-icon-btn.on{opacity:1}
-.post-cat-pill{margin-left:auto;font-size:.68rem;font-weight:800;padding:.25rem .6rem;border-radius:20px;white-space:nowrap}
+.post-cat-pill{font-size:.68rem;font-weight:800;padding:.25rem .6rem;border-radius:20px;white-space:nowrap}
+.post-badge-row{display:flex;justify-content:flex-end;padding:2px 0 6px}
 .post-caption{font-size:.85rem;line-height:1.5;color:var(--text)}
 .post-caption b{font-weight:900}
 .dup-group-hint{font-size:.72rem;color:var(--accent-2);font-weight:700;margin-top:.4rem}

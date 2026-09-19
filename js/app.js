@@ -36,6 +36,7 @@ function boot() {
   Storage.load();
   DropdownPosition.init();
   TabNav.init();
+  TabSwipe.init();
   MapHome.init();
   HomeCtrl.init();
   ResultsCtrl.init();

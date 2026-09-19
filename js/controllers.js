@@ -18,12 +18,16 @@ const HomeCtrl = {
       this._updateBadge();
     });
 
-    document.getElementById('radiusChips').addEventListener('click', e => {
-      const chip = e.target.closest('.radius-chip');
-      if (!chip) return;
-      document.querySelectorAll('#radiusChips .radius-chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      State.radius = parseInt(chip.dataset.r);
+    // Bán kính — gộp thành 1 pill bên cạnh label "Điểm xuất phát", bấm để
+    // đổi vòng qua các mốc (thay cho dãy 4 nút riêng trước đây).
+    const RADIUS_STEPS = [500, 1000, 2000, 5000];
+    const RADIUS_LABELS = ['500m', '1 km', '2 km', '5 km'];
+    let radiusIdx = RADIUS_STEPS.indexOf(State.radius);
+    if (radiusIdx === -1) radiusIdx = 1;
+    document.getElementById('radiusPillBtn').addEventListener('click', () => {
+      radiusIdx = (radiusIdx + 1) % RADIUS_STEPS.length;
+      document.getElementById('radiusPillVal').textContent = RADIUS_LABELS[radiusIdx];
+      State.radius = RADIUS_STEPS[radiusIdx];
       MapHome.updateRadius();
     });
 
@@ -43,25 +47,34 @@ const HomeCtrl = {
       this._updateBadge();
     });
 
-    // Min rating chips
-    document.getElementById('minRatingChips').addEventListener('click', e => {
-      const chip = e.target.closest('.radius-chip');
-      if (!chip) return;
-      document.querySelectorAll('#minRatingChips .radius-chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      State.minRating = parseFloat(chip.dataset.rating);
-    });
-
     document.getElementById('gpsBtn').addEventListener('click', () => GPS.toggle());
 
-    // Advanced filters collapsible
-    const advBtn = document.getElementById('advToggle');
-    const advBody = document.getElementById('advBody');
-    advBtn.addEventListener('click', () => {
-      const isOpen = advBtn.getAttribute('aria-expanded') === 'true';
-      advBtn.setAttribute('aria-expanded', String(!isOpen));
-      advBody.classList.toggle('open', !isOpen);
+    // Cụm nút nổi trên map (header full-bleed). GPS dùng chung logic thật
+    // với #gpsBtn; bookmark/thông báo chưa có tính năng, chỉ báo tạm.
+    document.getElementById('homeGpsFloatBtn').addEventListener('click', (e) => {
+      e.currentTarget.classList.add('pulse');
+      setTimeout(() => e.currentTarget.classList.remove('pulse'), 300);
+      GPS.toggle();
     });
+    document.getElementById('homeBookmarkBtn').addEventListener('click', () => showToast('🚧 Tính năng đang cập nhật'));
+    document.getElementById('homeBellBtn').addEventListener('click', () => showToast('🚧 Tính năng đang cập nhật'));
+
+    // Dropdown "Tôi muốn ăn" — mở/đóng khi bấm badge cạnh logo
+    const catToggle = document.getElementById('heroCatToggle');
+    const catDdPanel = document.getElementById('catDdPanel');
+    const catDdOverlay = document.getElementById('catDdOverlay');
+    const closeCatDd = () => {
+      catToggle.classList.remove('open');
+      catDdPanel.classList.remove('show');
+      catDdOverlay.classList.remove('show');
+    };
+    catToggle.addEventListener('click', () => {
+      const opening = !catDdPanel.classList.contains('show');
+      catToggle.classList.toggle('open', opening);
+      catDdPanel.classList.toggle('show', opening);
+      catDdOverlay.classList.toggle('show', opening);
+    });
+    catDdOverlay.addEventListener('click', closeCatDd);
 
     document.getElementById('scanBtn').addEventListener('click', () => this.scan());
 
@@ -72,6 +85,11 @@ const HomeCtrl = {
     this._initLocInput();
 
     this._initEasterEgg();
+
+    // Sheet Trang chủ có riêng vùng cuộn (.sheet-inner-scroll) — bind
+    // scroll-hide để lướt danh sách filter dài cũng làm tab bar tự ẩn,
+    // giải phóng chỗ nhìn thấy nút "Quét ngay!" ở đáy sheet.
+    TabNav.wireScrollHide(document.querySelector('#homeSheet .sheet-inner-scroll'));
 
     this._initRandomPickDrag();
     this._updateRandomPickVisibility();
@@ -621,7 +639,7 @@ const HomeCtrl = {
   // screen corner is nearest, position remembered across visits. Can be
   // turned off entirely from Cài đặt (see ProfileCtrl._renderRandomPickToggle).
   RP_CORNER_KEY: 'nhopnhep_rp_corner',
-  RP_SIDE: 16, RP_TOP: 90, RP_BOTTOM: 24,
+  RP_SIDE: 16, RP_TOP: 90, RP_BOTTOM: 220,
 
   _updateRandomPickVisibility() {
     const fab = document.getElementById('randomPickBubble');
@@ -756,7 +774,7 @@ const HomeCtrl = {
     const fab = document.getElementById('randomPickBubble');
     let startX = 0, startY = 0, startRect = null, moved = false, pid = null;
 
-    let savedCorner = 'rb';
+    let savedCorner = 'rt';
     try {
       const s = localStorage.getItem(this.RP_CORNER_KEY);
       if (s && /^[lr][tb]$/.test(s)) savedCorner = s;
@@ -966,6 +984,9 @@ const ResultsCtrl = {
     document.getElementById('resultsBack').addEventListener('click', () => {
       document.getElementById('homeScreen').classList.remove('hidden');
       document.getElementById('resultsScreen').classList.add('hidden');
+      // Reset trạng thái ẩn của tab bar khi rời màn results (đề phòng lướt
+      // xuống ẩn rồi back về home, tab bar vẫn ở trạng thái hidden).
+      document.querySelector('.tabbar')?.classList.remove('scroll-hidden');
       setTimeout(() => State.mainMap?.invalidateSize(), 60);
     });
     document.getElementById('reshuffleBtn').addEventListener('click', () => {
@@ -989,6 +1010,10 @@ const ResultsCtrl = {
       if (!tab) return;
       this._setTabFilter(tab.dataset.filter);
     });
+    // Lướt danh sách quán → tab bar tự ẩn giống feed (giải phóng chỗ nhìn
+    // thấy .results-action "Tạo phiên chọn quán / Lên lịch" ở đáy).
+    TabNav.wireScrollHide(document.getElementById('restaurantGrid'));
+
     document.getElementById('restaurantGrid').addEventListener('click', e => {
       const card = e.target.closest('.r-card');
       if (!card) return;
@@ -1812,6 +1837,8 @@ const PlanCtrl = {
       this._stopLiveTracking();
       document.getElementById('planMapWrap')?.classList.remove('fullscreen');
       document.getElementById('planScreen').classList.add('hidden');
+      // Reset scroll-hide state khi rời plan (xem chú thích ở resultsBack).
+      document.querySelector('.tabbar')?.classList.remove('scroll-hidden');
       if (this._returnTo === 'profile') {
         document.getElementById('profileScreen').classList.remove('hidden');
         ProfileCtrl.render();
@@ -1826,6 +1853,8 @@ const PlanCtrl = {
         if (wrap?.classList.contains('fullscreen')) this._toggleFullscreen();
       }
     });
+    // Lướt timeline → tab bar tự ẩn để không che nội dung cuối lộ trình.
+    TabNav.wireScrollHide(document.getElementById('timeline'));
   },
 
   // ── Fullscreen + live tracking ────────────────────────────────────────
@@ -2919,6 +2948,8 @@ function communityCardHtml(r, groupCount = 0) {
         <button class="post-action-btn comment-icon-btn" type="button" data-id="${r.id}" title="${I18N.t('comment.title')}">${svgIcon('social-comment')}</button>
         <button class="post-action-btn share-icon-btn" type="button" data-id="${r.id}" title="${I18N.t('detail.copyLink')}">${svgIcon('action-copy-link')}</button>
         <button class="post-action-btn save-icon-btn${isSaved ? ' on' : ''}" type="button" data-id="${r.id}" title="${I18N.t('detail.save')}">${svgIcon('action-bookmark')}</button>
+      </div>
+      <div class="post-badge-row">
         <span class="post-cat-pill" style="color:${cat.color};background:${cat.color}18">${cat.icon} ${cat.label}${priceLabel ? ' · ' + priceLabel : ''}</span>
       </div>
       <div class="post-caption"><b>${escapeHtml(r.name)}</b>${r.description ? ' ' + escapeHtml(r.description) : ''}</div>
@@ -3221,6 +3252,29 @@ const CommunityCtrl = {
       clearTimeout(this._searchDebounce);
       this._searchDebounce = setTimeout(() => this._loadList(search.value.trim()), 350);
     });
+
+    // Quán ăn / Lộ trình — Lộ trình chưa xây tính năng, chỉ đổi pane hiện/ẩn.
+    document.querySelectorAll('.comm-subtab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.comm-subtab').forEach(b => b.classList.toggle('active', b === btn));
+        const isRoutes = btn.dataset.commSubtab === 'routes';
+        document.getElementById('communityFoodPane').classList.toggle('hidden', isRoutes);
+        document.getElementById('communityRoutesPane').classList.toggle('hidden', !isRoutes);
+      });
+    });
+
+    // Lướt feed → tab bar tự ẩn/hiện qua TabNav.wireScrollHide, còn ô tìm kiếm
+    // ẩn/hiện riêng ở đây vì chỉ áp dụng cho màn cộng đồng.
+    const commScroll = document.querySelector('#communityScreen .profile-scroll');
+    TabNav.wireScrollHide(commScroll);
+    const commSearchGroup = document.getElementById('communitySearchGroup');
+    let commLastScrollTop = 0;
+    commScroll.addEventListener('scroll', () => {
+      const st = commScroll.scrollTop;
+      if (st > commLastScrollTop && st > 30) commSearchGroup.classList.add('scroll-collapsed');
+      else if (st < commLastScrollTop) commSearchGroup.classList.remove('scroll-collapsed');
+      commLastScrollTop = st <= 0 ? 0 : st;
+    }, { passive: true });
 
     // Small "Đăng nhập" header button (guest only) opens the auth form.
     // Defaults to login mode — the button label says "Đăng nhập", so

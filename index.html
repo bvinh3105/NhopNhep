@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2637">
+<link rel="stylesheet" href="css/styles.css?v=2642">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -229,6 +229,8 @@
 <symbol id="ic-map-saved-route" viewBox="0 0 24 24"><path d="M3,6 L9,3 L15,6 L21,3 V18 L15,21 L9,18 L3,21 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M9,3 L9,18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M15,6 L15,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-nav-checkin" viewBox="0 0 24 24"><path d="M4,9 a2,2 0 0 1 2,-2 H8 L9.5,5 H14.5 L16,7 H18 a2,2 0 0 1 2,2 V17 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8.5,13 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
 <symbol id="ic-nav-community" viewBox="0 0 24 24"><path d="M6,9 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M3,20 a6,6 0 0 1 12,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M14.7,10 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -347,15 +349,32 @@
     <span id="rpbIcon"><svg class="icon" width="20" height="20"><use href="#ic-action-dice"></use></svg></span>
   </button>
 
-  <!-- Hero -->
-  <div class="home-hero">
-    <div class="hero-row">
-      <div>
-        <div class="hero-title" id="heroTitle">Nhóp <em>Nhép</em> 🍜</div>
-        <div class="hero-tagline" id="heroTagline" data-i18n="hero.tagline">vi vu cùng <em>Vinh</em> và <em>Thảo</em> ♥</div>
-        <div class="hero-sub" data-i18n="hero.sub">Random quán ngon · Lên lịch tự động</div>
-      </div>
-      <div class="hero-badge" id="scanCountBadge" data-i18n="hero.badge">✦ Quét để tìm</div>
+  <!-- Cụm nút nổi trên map — bookmark/thông báo chưa có tính năng gắn kèm,
+       để sẵn chỗ cho sau này. GPS bấm là kích hoạt luôn #gpsBtn thật. -->
+  <div class="map-btn-cluster">
+    <button class="cluster-btn" id="homeBookmarkBtn" type="button" title="Quán đã lưu"><svg class="icon" width="20" height="20"><use href="#ic-action-bookmark"></use></svg></button>
+    <button class="cluster-btn" id="homeBellBtn" type="button" title="Thông báo"><svg class="icon" width="20" height="20"><use href="#ic-social-bell"></use></svg></button>
+    <button class="cluster-btn cluster-btn-gps" id="homeGpsFloatBtn" type="button" title="Bật GPS"><svg class="icon" width="20" height="20"><use href="#ic-action-gps"></use></svg></button>
+  </div>
+
+  <!-- Hero — brand pill nổi trên map, kiêm nút mở dropdown lọc loại quán.
+       Chỉ chữ "Nhóp Nhép", không emoji, không badge (đúng theo bản phác thảo). -->
+  <button class="brand-float" id="heroCatToggle" type="button" aria-expanded="false">
+    <span id="heroTitle">Nhóp <em>Nhép</em></span>
+    <span class="chevron">▾</span>
+  </button>
+  <!-- Node ẩn cho _updateBadge() ghi số quán quét được — giữ ID cũ để không phải sửa controller -->
+  <span id="scanCountBadge" hidden></span>
+
+  <!-- Dropdown "Tôi muốn ăn" — thay cho dãy cat-chips cố định trên sheet -->
+  <div class="cat-dd-overlay" id="catDdOverlay"></div>
+  <div class="cat-dd-panel" id="catDdPanel">
+    <div class="dd-sec-title" data-i18n="home.wantToEat">Tôi muốn ăn</div>
+    <div class="cat-chips" id="catChips">
+      <button class="cat-chip active" data-cat="restaurant"><svg class="icon" width="20" height="20"><use href="#ic-cat-nhahang"></use></svg> <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
+      <button class="cat-chip active" data-cat="street"><svg class="icon" width="20" height="20"><use href="#ic-cat-viahe"></use></svg> <span data-i18n="catLabel.street">Vỉa hè</span></button>
+      <button class="cat-chip active" data-cat="snack"><svg class="icon" width="20" height="20"><use href="#ic-cat-anvat"></use></svg> <span data-i18n="catLabel.snack">Ăn vặt</span></button>
+      <button class="cat-chip active" data-cat="cafe"><svg class="icon" width="20" height="20"><use href="#ic-cat-caphe"></use></svg> <span data-i18n="catLabel.cafe">Cà phê</span></button>
     </div>
   </div>
 
@@ -369,19 +388,36 @@
     </div>
   </div>
 
-  <!-- Bottom sheet -->
+  <!-- Bottom sheet — nổi trên map, cuộn riêng bên trong, phai mờ dần ở đáy -->
   <div id="homeSheet">
+  <div class="sheet-drag-handle"></div>
+  <div class="sheet-inner-scroll">
 
-    <!-- Categories -->
-    <div class="row-label" data-i18n="home.wantToEat">Tôi muốn ăn</div>
-    <div class="cat-chips" id="catChips">
-      <button class="cat-chip active" data-cat="restaurant"><svg class="icon" width="20" height="20"><use href="#ic-cat-nhahang"></use></svg> <span data-i18n="catLabel.restaurant">Nhà hàng</span></button>
-      <button class="cat-chip active" data-cat="street"><svg class="icon" width="20" height="20"><use href="#ic-cat-viahe"></use></svg> <span data-i18n="catLabel.street">Vỉa hè</span></button>
-      <button class="cat-chip active" data-cat="snack"><svg class="icon" width="20" height="20"><use href="#ic-cat-anvat"></use></svg> <span data-i18n="catLabel.snack">Ăn vặt</span></button>
-      <button class="cat-chip active" data-cat="cafe"><svg class="icon" width="20" height="20"><use href="#ic-cat-caphe"></use></svg> <span data-i18n="catLabel.cafe">Cà phê</span></button>
+    <!-- Điểm xuất phát — lên đầu tiên. GPS đã ở cluster trên map, không cần
+         nút GPS trong input này nữa. Bán kính vẫn là pill cạnh label. -->
+    <div class="row-label-flex">
+      <div class="row-label" data-i18n="home.startPoint">Điểm xuất phát</div>
+      <button class="radius-pill" id="radiusPillBtn" type="button"><span id="radiusPillVal">1 km</span><span class="chevron">▾</span></button>
+    </div>
+    <div class="loc-row-wrap">
+      <div class="loc-row">
+        <input id="locInput" class="loc-input" type="text" data-i18n="home.locPlaceholder" data-i18n-attr="placeholder" placeholder="Địa chỉ, tên đường…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="search">
+        <!-- #gpsBtn giữ trong DOM cho gps.js còn set active/state, nhưng ẩn khỏi UI. -->
+        <button class="loc-gps-btn" id="gpsBtn" title="GPS" style="display:none" type="button"><svg class="icon" width="20" height="20"><use href="#ic-action-gps"></use></svg></button>
+      </div>
+      <div class="geocode-suggest" id="locSuggest"></div>
+    </div>
+    <div class="gps-hint" id="gpsHint"></div>
+
+    <!-- Nguồn dữ liệu -->
+    <div class="row-label mini" data-i18n="home.dataSource">Nguồn dữ liệu</div>
+    <div class="cat-chips" id="srcChips">
+      <button class="cat-chip active" data-src="osm"><svg class="icon" width="20" height="20"><use href="#ic-privacy-globe"></use></svg> <span data-i18n="src.osm">Địa điểm công khai</span></button>
+      <button class="cat-chip active" data-src="mine"><svg class="icon" width="20" height="20"><use href="#ic-rating-star-filled"></use></svg> <span data-i18n="src.mine">Của tôi</span></button>
+      <button class="cat-chip" data-src="community"><svg class="icon" width="20" height="20"><use href="#ic-nav-community"></use></svg> <span data-i18n="src.community">Cộng đồng</span></button>
     </div>
 
-    <!-- Dish search — compact input; chip gợi ý hiện khi focus -->
+    <!-- Món cụ thể — cuối cùng, tuỳ chọn -->
     <div class="row-label mini" data-i18n="home.findDish">Tìm <em>món / quán</em> · tuỳ chọn</div>
     <div class="loc-row-wrap">
       <div class="loc-row">
@@ -404,49 +440,11 @@
       </div>
     </div>
 
-    <!-- Radius -->
-    <div class="row-label" data-i18n="home.radius">Bán kính tìm kiếm</div>
-    <div class="radius-chips" id="radiusChips">
-      <button class="radius-chip" data-r="500">500m</button>
-      <button class="radius-chip active" data-r="1000">1 km</button>
-      <button class="radius-chip" data-r="2000">2 km</button>
-      <button class="radius-chip" data-r="5000">5 km</button>
-    </div>
+  </div>
 
-    <!-- Advanced filters — collapsed by default -->
-    <button class="advanced-toggle" id="advToggle" type="button" aria-expanded="false">
-      <span data-i18n="home.advancedFilters">⚙️ Bộ lọc <em>nâng cao</em></span>
-      <span class="chevron">▾</span>
-    </button>
-    <div class="advanced-body" id="advBody">
-      <div class="row-label mini" data-i18n="home.dataSource">Nguồn dữ liệu</div>
-      <div class="cat-chips" id="srcChips">
-        <button class="cat-chip active" data-src="osm"><svg class="icon" width="20" height="20"><use href="#ic-privacy-globe"></use></svg> <span data-i18n="src.osm">Địa điểm công khai</span></button>
-        <button class="cat-chip active" data-src="mine"><svg class="icon" width="20" height="20"><use href="#ic-rating-star-filled"></use></svg> <span data-i18n="src.mine">Của tôi</span></button>
-        <button class="cat-chip" data-src="community"><svg class="icon" width="20" height="20"><use href="#ic-nav-community"></use></svg> <span data-i18n="src.community">Cộng đồng</span></button>
-      </div>
-      <div class="row-label mini" data-i18n="home.rating">Đánh giá</div>
-      <div class="radius-chips" id="minRatingChips">
-        <button class="radius-chip active" data-rating="0"><span data-i18n="filter.all">Tất cả</span></button>
-        <button class="radius-chip" data-rating="3.5">3.5<svg class="icon" width="20" height="20"><use href="#ic-rating-star-filled"></use></svg></button>
-        <button class="radius-chip" data-rating="4">4<svg class="icon" width="20" height="20"><use href="#ic-rating-star-filled"></use></svg></button>
-        <button class="radius-chip" data-rating="4.5">4.5<svg class="icon" width="20" height="20"><use href="#ic-rating-star-filled"></use></svg></button>
-      </div>
-    </div>
-
-    <!-- Location -->
-    <div class="row-label" data-i18n="home.startPoint">Điểm xuất phát</div>
-    <div class="loc-row-wrap">
-      <div class="loc-row">
-        <input id="locInput" class="loc-input" type="text" data-i18n="home.locPlaceholder" data-i18n-attr="placeholder" placeholder="Gõ địa chỉ, tên đường, quán… hoặc dùng GPS" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="search">
-        <button class="loc-gps-btn" id="gpsBtn" data-i18n="home.gpsTitle" data-i18n-attr="title" title="Bật GPS · nhấn giữ để tracking liên tục"><svg class="icon" width="20" height="20"><use href="#ic-action-gps"></use></svg></button>
-      </div>
-      <div class="geocode-suggest" id="locSuggest"></div>
-    </div>
-    <div class="gps-hint" id="gpsHint"></div>
-
-    <!-- Scan CTA -->
+    <!-- Scan CTA — nằm ngoài vùng cuộn, luôn hiện -->
     <button class="scan-btn" id="scanBtn" data-i18n="home.scanNow"><svg class="icon" width="20" height="20"><use href="#ic-action-scan"></use></svg> Quét <em>ngay</em>!</button>
+    <div class="sheet-bg-extend"></div>
 
   </div>
 </div>
@@ -645,7 +643,13 @@
          the 10 newest quán (capped); logged-in users see the "+ Đăng
          quán" button, search box, and full list. -->
     <div id="communityMain">
-      <div class="profile-section">
+      <!-- Quán ăn / Lộ trình — Lộ trình chưa xây, hiện placeholder -->
+      <div class="comm-subtabs">
+        <button class="comm-subtab active" data-comm-subtab="food" data-i18n="community.tabFood">Quán ăn</button>
+        <button class="comm-subtab" data-comm-subtab="routes" data-i18n="community.tabRoutes">Lộ trình</button>
+      </div>
+
+      <div class="profile-section" id="communityFoodPane">
         <div class="psec-head">
           <div class="psec-title" data-i18n="community.restaurants">Quán <em>cộng đồng</em></div>
           <!-- Guest sees "Đăng nhập" (opens auth form). Logged-in user sees "+ Đăng quán". -->
@@ -658,26 +662,50 @@
         <div class="new-posts-dock"><button type="button" class="new-posts-pill hidden" id="communityNewPill"></button></div>
         <div class="comm-r-list" id="communityList"></div>
       </div>
+
+      <div class="profile-section hidden" id="communityRoutesPane">
+        <div class="coming-soon-wrap">
+          <div class="coming-soon-ico"><svg class="icon" width="40" height="40"><use href="#ic-map-saved-route"></use></svg></div>
+          <div class="coming-soon-title" data-i18n="common.comingSoon">🚧 Tính năng đang cập nhật</div>
+          <p class="coming-soon-sub" data-i18n="common.comingSoonSub">Chúng tôi đang hoàn thiện tính năng này. Quay lại sau nhé!</p>
+        </div>
+      </div>
     </div>
 
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════
+     CHECK-IN SCREEN — chưa xây tính năng thật, hiện placeholder
+═══════════════════════════════════════════════ -->
+<div id="checkinScreen" class="screen hidden">
+  <div class="coming-soon-wrap">
+    <div class="coming-soon-ico"><svg class="icon" width="40" height="40"><use href="#ic-nav-checkin"></use></svg></div>
+    <div class="coming-soon-title" data-i18n="common.comingSoon">🚧 Tính năng đang cập nhật</div>
+    <p class="coming-soon-sub" data-i18n="common.comingSoonSub">Chúng tôi đang hoàn thiện tính năng này. Quay lại sau nhé!</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
      BOTTOM TAB BAR
 ═══════════════════════════════════════════════ -->
+<!-- Tab bar — full-width, bám đáy, bo góc trên. Có label dưới icon. Check-in
+     là vòng tròn to nổi lên ở giữa. Ẩn khi lướt feed xuống. -->
 <div class="tabbar">
-  <button class="tab-btn" data-tab="profile">
-    <div class="tab-ico"><svg class="icon" width="20" height="20"><use href="#ic-nav-profile"></use></svg></div>
-    <div data-i18n="tab.profile">Cá nhân</div>
-  </button>
   <button class="tab-btn active" data-tab="home">
-    <div class="tab-ico"><svg class="icon" width="20" height="20"><use href="#ic-nav-home"></use></svg></div>
-    <div>Nhóp Nhép</div>
+    <div class="tab-ico"><svg class="icon" width="22" height="22"><use href="#ic-nav-home"></use></svg></div>
+    <div class="tab-lbl">Trang chủ</div>
+  </button>
+  <button class="tab-btn tab-btn-checkin" data-tab="checkin" aria-label="Check-in">
+    <div class="tab-ico"><svg class="icon" width="22" height="22"><use href="#ic-nav-checkin"></use></svg></div>
   </button>
   <button class="tab-btn" data-tab="community">
-    <div class="tab-ico"><svg class="icon" width="20" height="20"><use href="#ic-nav-community"></use></svg></div>
-    <div data-i18n="tab.community">Cộng đồng</div>
+    <div class="tab-ico"><svg class="icon" width="22" height="22"><use href="#ic-nav-community"></use></svg></div>
+    <div class="tab-lbl" data-i18n="tab.community">Cộng đồng</div>
+  </button>
+  <button class="tab-btn" data-tab="profile">
+    <div class="tab-ico"><svg class="icon" width="22" height="22"><use href="#ic-nav-profile"></use></svg></div>
+    <div class="tab-lbl" data-i18n="tab.profile">Cá nhân</div>
   </button>
 </div>
 
