@@ -1010,10 +1010,8 @@ const ResultsCtrl = {
       if (!tab) return;
       this._setTabFilter(tab.dataset.filter);
     });
-    // Lướt danh sách quán → tab bar tự ẩn giống feed (giải phóng chỗ nhìn
-    // thấy .results-action "Tạo phiên chọn quán / Lên lịch" ở đáy).
-    TabNav.wireScrollHide(document.getElementById('restaurantGrid'));
-
+    // Không bind scroll-hide cho grid — user muốn tab bar luôn hiện khi lướt
+    // kết quả quét (cơ chế giống màn Trang chủ, không ẩn xuống).
     document.getElementById('restaurantGrid').addEventListener('click', e => {
       const card = e.target.closest('.r-card');
       if (!card) return;

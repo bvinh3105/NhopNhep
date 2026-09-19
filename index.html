@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2642">
+<link rel="stylesheet" href="css/styles.css?v=2644">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -696,8 +696,9 @@
     <div class="tab-ico"><svg class="icon" width="22" height="22"><use href="#ic-nav-home"></use></svg></div>
     <div class="tab-lbl">Trang chủ</div>
   </button>
-  <button class="tab-btn tab-btn-checkin" data-tab="checkin" aria-label="Check-in">
+  <button class="tab-btn" data-tab="checkin">
     <div class="tab-ico"><svg class="icon" width="22" height="22"><use href="#ic-nav-checkin"></use></svg></div>
+    <div class="tab-lbl" data-i18n="tab.checkin">Check-in</div>
   </button>
   <button class="tab-btn" data-tab="community">
     <div class="tab-ico"><svg class="icon" width="22" height="22"><use href="#ic-nav-community"></use></svg></div>
