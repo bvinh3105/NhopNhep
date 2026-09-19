@@ -1125,8 +1125,9 @@ body.map-full .tabbar{transform:translateY(105%)}
    dung ngay dưới: mặc định giả định đang đè lên ảnh (post-photo, có thể
    sáng/tối/nhiều màu) nên dùng chữ SÁNG (cream) + text-shadow; khi lướt
    tới đoạn nền trắng/kem thật (post-head/post-body, không ảnh che) thì
-   đổi hẳn sang chữ TỐI, ẩn luôn gradient (nền đã sáng sẵn, gradient tối
-   sẽ làm xấu, không cần) — xem CommunityCtrl._initSubtabContrastObserver().
+   đổi hẳn sang chữ TỐI, gradient giảm bớt (không tắt hẳn — Vinh 2026-09-21
+   muốn feed/chức năng LUÔN tách rõ, kể cả trên nền trắng) — xem
+   CommunityCtrl._initSubtabContrastObserver().
    Sticky nên luôn hiện khi lướt feed, độc lập với tabbar dưới. Có gạch
    chân dưới tab active (Vinh phản hồi 2026-09-20: cần dấu hiệu rõ đang ở
    màn nào) — dùng currentColor nên tự đổi màu theo state, không cần
@@ -1142,14 +1143,28 @@ body.map-full .tabbar{transform:translateY(105%)}
   background:linear-gradient(to bottom, rgba(20,10,5,.4) 0%, rgba(20,10,5,.14) 55%, transparent 100%);
   pointer-events:none;transition:opacity .25s ease;
 }
-.comm-subtabs.on-light::before{opacity:0}
+/* Vẫn giữ gradient khi ở trạng thái nền trắng (on-light), chỉ giảm bớt —
+   tách feed/chức năng phải luôn rõ (Vinh 2026-09-21), không tắt hẳn như
+   bản trước (opacity:0), vì lúc đó header lại "trần trụi" trở lại. */
+.comm-subtabs.on-light::before{opacity:.4}
 .comm-hdr-iconbtn{
   width:34px;height:34px;border-radius:50%;flex-shrink:0;
   background:none;border:none;display:flex;align-items:center;justify-content:center;
   color:var(--cream);filter:drop-shadow(0 1px 3px rgba(20,10,5,.45));
-  transition:color .18s,filter .18s;
+  transition:color .18s,filter .18s,background-color .18s,width .18s,height .18s;
 }
 .comm-hdr-iconbtn.hidden{display:none}
+/* Nút "Đăng quán" — to hơn hẳn + nền đỏ đặc (Vinh 2026-09-21: khó bấm/khó
+   thấy vì trước chỉ là icon mảnh trong suốt). Có nền riêng nên không cần
+   ăn theo màu chữ sáng/tối của header nữa — luôn rõ bất kể đang đè lên
+   ảnh hay đoạn nền trắng. */
+#communityAddBtn{
+  width:42px;height:42px;font-size:1.25rem;
+  background:var(--primary);color:var(--cream);
+  box-shadow:0 3px 10px rgba(20,10,5,.35);filter:none;
+}
+#communityAddBtn:active{background:var(--primary-2)}
+.comm-subtabs.on-light #communityAddBtn{color:var(--cream);filter:none}
 .comm-hdr-spacer{visibility:hidden;pointer-events:none}
 .comm-subtabs-center{flex:1;display:flex;align-items:center;justify-content:center;gap:1.3rem}
 .comm-subtab{
