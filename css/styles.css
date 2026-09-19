@@ -167,8 +167,15 @@ input,textarea,select{font-family:var(--font-body)}
   color:var(--primary);letter-spacing:-.3px;line-height:1;
 }
 .brand-float em{font-style:italic;color:var(--accent);font-weight:900}
-.brand-float .chevron{font-size:.62rem;color:var(--text3);transition:transform .25s;margin-top:1px}
-.brand-float.open .chevron{transform:rotate(180deg)}
+
+/* Easter egg tagline — nổi ngay dưới brand pill trên map full-bleed.
+   Dùng lại class .hero-tagline (màu/animation) từ bản trước redesign,
+   chỉ thêm vị trí absolute cho khớp layout hiện tại. */
+#heroTagline{
+  position:absolute;top:calc(var(--safe-top) + 3rem);left:.9rem;z-index:14;
+  background:var(--white);padding:.3rem .75rem;border-radius:14px;
+  box-shadow:0 4px 12px rgba(42,24,16,.18);max-width:220px;
+}
 
 /* Dropdown "Tôi muốn ăn" — mở từ badge cạnh logo, thay cho cat-chips cố định */
 .cat-dd-overlay{
@@ -197,7 +204,8 @@ input,textarea,select{font-family:var(--font-body)}
   border:none;font-family:var(--font-display);font-size:.78rem;font-weight:800;
   padding:.42rem .85rem;border-radius:22px;
 }
-.radius-pill .chevron{font-size:.65rem}
+.radius-pill .chevron{font-size:.65rem;transition:transform .25s}
+.radius-pill.open .chevron{transform:rotate(180deg)}
 
 /* Cụm nút nổi — bookmark/thông báo/GPS gộp 1 viên, góc phải trên map */
 .map-btn-cluster{
@@ -1081,24 +1089,44 @@ body.map-full .tabbar{transform:translateY(105%)}
 /* .tabbar.scroll-hidden rule sống ở khối tabbar chính phía trên — nơi có cả
    opacity fade + pointer-events + preserve translateX(-50%) của pill nổi. */
 
-/* Cộng đồng — sub-tab Quán ăn / Lộ trình. Sticky ở trên khi lướt feed,
-   giống prototype (sub-tabs nằm cố định trong khi các post cuộn phía dưới). */
+/* Cộng đồng — header sticky kiểu IG Reels/Friends: nút thêm bài viết bên
+   trái, 2 tab Quán ăn/Lộ trình ở giữa (chữ to/đậm hơn khi active, giống
+   tỉ lệ tab Reels/Friends), spacer bên phải để nhóm tab thực sự nằm giữa.
+   Nền LUÔN là màu cream đặc (không đổi, không mờ) — chỉ MÀU CHỮ của tab
+   đổi khi lướt tới bài có nền trắng (post-head/post-body) so với bài có
+   ảnh (post-photo), xem CommunityCtrl._initSubtabContrastObserver(). Sticky
+   nên luôn hiện khi lướt feed, độc lập với tabbar dưới (có thể tự ẩn riêng). */
 .comm-subtabs{
   position:sticky;top:0;z-index:5;
-  display:flex;justify-content:center;gap:1.6rem;
-  padding:.9rem 0 .8rem;margin-bottom:.4rem;
+  display:flex;align-items:center;gap:.4rem;
+  padding:.6rem .5rem;margin-bottom:.4rem;
   background:var(--cream);
   border-bottom:1px solid var(--line);
 }
-.comm-subtab{
-  background:none;border:none;font-family:var(--font-display);font-size:.9rem;font-weight:800;
-  color:var(--text3);padding:.15rem 0 .5rem;position:relative;
+.comm-hdr-iconbtn{
+  width:34px;height:34px;border-radius:50%;flex-shrink:0;
+  background:none;border:none;display:flex;align-items:center;justify-content:center;
+  color:var(--text2);
 }
-.comm-subtab.active{color:var(--primary)}
+.comm-hdr-iconbtn.hidden{display:none}
+.comm-hdr-spacer{visibility:hidden;pointer-events:none}
+.comm-subtabs-center{flex:1;display:flex;align-items:center;justify-content:center;gap:1.5rem}
+.comm-subtab{
+  background:none;border:none;font-family:var(--font-display);font-weight:800;
+  font-size:.82rem;color:var(--text3);padding:.2rem 0 .5rem;position:relative;
+  transition:color .18s,font-size .15s;
+}
+.comm-subtab.active{font-size:.98rem;color:var(--primary)}
 .comm-subtab.active::after{
-  content:'';position:absolute;bottom:0;left:0;right:0;height:2.5px;
+  content:'';position:absolute;bottom:0;left:8%;right:8%;height:2.5px;
   background:var(--primary);border-radius:2px;
 }
+/* Đổi màu chữ khi bài viết ngay dưới header có nền trắng/kem (post-head,
+   post-body) thay vì ảnh — chỉ đổi màu chữ, KHÔNG đổi nền .comm-subtabs
+   hay thêm khung/box nào (yêu cầu Vinh 2026-09-19). */
+.comm-subtabs.on-light .comm-subtab{color:var(--text2)}
+.comm-subtabs.on-light .comm-subtab.active{color:var(--primary-2)}
+.comm-subtabs.on-light .comm-hdr-iconbtn{color:var(--text)}
 
 /* Placeholder "tính năng đang cập nhật" — dùng chung cho Check-in & Lộ trình */
 .coming-soon-wrap{

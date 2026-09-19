@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2646">
+<link rel="stylesheet" href="css/styles.css?v=2647">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -46,6 +46,8 @@
 <symbol id="ic-action-bookmark" viewBox="0 0 24 24"><path d="M6,3 H18 V21 L12,17 L6,21 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
 <symbol id="ic-action-close" viewBox="0 0 24 24"><path d="M5,5 L19,19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M19,5 L5,19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-plus" viewBox="0 0 24 24"><path d="M12,4 L12,20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M4,12 L20,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
 <symbol id="ic-action-copy-link" viewBox="0 0 24 24"><path d="M6,4 h8 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-8 a2,2 0 0 1 -2,-2 v-8 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M11,9 h8 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-8 a2,2 0 0 1 -2,-2 v-8 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
 <symbol id="ic-action-delete" viewBox="0 0 24 24"><path d="M7,8 h10 a1,1 0 0 1 1,1 v10 a1,1 0 0 1 -1,1 h-10 a1,1 0 0 1 -1,-1 v-10 a1,1 0 0 1 1,-1 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -357,12 +359,13 @@
     <button class="cluster-btn cluster-btn-gps" id="homeGpsFloatBtn" type="button" title="Bật GPS"><svg class="icon" width="20" height="20"><use href="#ic-action-gps"></use></svg></button>
   </div>
 
-  <!-- Hero — brand pill nổi trên map, kiêm nút mở dropdown lọc loại quán.
-       Chỉ chữ "Nhóp Nhép", không emoji, không badge (đúng theo bản phác thảo). -->
-  <button class="brand-float" id="heroCatToggle" type="button" aria-expanded="false">
+  <!-- Hero — brand pill nổi trên map. Loại quán đã chuyển xuống pill cạnh
+       "Tìm món/quán" trong sheet; logo giờ chỉ còn easter egg (bấm liên
+       tiếp 5 lần vào #heroTitle — xem HomeCtrl._initEasterEgg). -->
+  <button class="brand-float" id="heroCatToggle" type="button">
     <span id="heroTitle">Nhóp <em>Nhép</em></span>
-    <span class="chevron">▾</span>
   </button>
+  <div id="heroTagline" class="hero-tagline" data-i18n="hero.tagline"></div>
   <!-- Node ẩn cho _updateBadge() ghi số quán quét được — giữ ID cũ để không phải sửa controller -->
   <span id="scanCountBadge" hidden></span>
 
@@ -417,8 +420,14 @@
       <button class="cat-chip" data-src="community"><svg class="icon" width="20" height="20"><use href="#ic-nav-community"></use></svg> <span data-i18n="src.community">Cộng đồng</span></button>
     </div>
 
-    <!-- Món cụ thể — cuối cùng, tuỳ chọn -->
-    <div class="row-label mini" data-i18n="home.findDish">Tìm <em>món / quán</em> · tuỳ chọn</div>
+    <!-- Món cụ thể — cuối cùng, tuỳ chọn. Loại quán ("Tôi muốn ăn") gộp vào
+         đây thay vì dropdown riêng ở logo, cùng pattern label+pill với
+         "Điểm xuất phát" ở trên. Pill mở lại đúng catDdPanel/catDdOverlay
+         cũ (multi-select), chỉ đổi nơi bấm mở. -->
+    <div class="row-label-flex">
+      <div class="row-label mini" data-i18n="home.findDish">Tìm <em>món / quán</em> · tuỳ chọn</div>
+      <button class="radius-pill" id="catPillBtn" type="button" aria-expanded="false"><span id="catPillVal" data-i18n="home.catAll">Tất cả loại</span><span class="chevron">▾</span></button>
+    </div>
     <div class="loc-row-wrap">
       <div class="loc-row">
         <input id="dishInput" class="loc-input" type="text" data-i18n="home.dishPlaceholder" data-i18n-attr="placeholder" placeholder="VD: phở, bánh mì, tên quán… (bỏ trống = mọi món)" autocomplete="off" spellcheck="false" maxlength="60">
@@ -643,18 +652,23 @@
          the 10 newest quán (capped); logged-in users see the "+ Đăng
          quán" button, search box, and full list. -->
     <div id="communityMain">
-      <!-- Quán ăn / Lộ trình — Lộ trình chưa xây, hiện placeholder -->
+      <!-- Quán ăn / Lộ trình — kiểu sticky header IG (Reels/Friends): nút
+           thêm bài viết bên trái, 2 tab giữa co-giãn chữ theo trạng thái
+           active/inactive, luôn hiện khi lướt (không ẩn theo tabbar dưới).
+           Đăng nhập/Đăng quán chuyển từ psec-head vào đây làm icon-btn gọn. -->
       <div class="comm-subtabs">
-        <button class="comm-subtab active" data-comm-subtab="food" data-i18n="community.tabFood">Quán ăn</button>
-        <button class="comm-subtab" data-comm-subtab="routes" data-i18n="community.tabRoutes">Lộ trình</button>
+        <button class="comm-hdr-iconbtn hidden" id="communityAddBtn" type="button" data-i18n="community.post" data-i18n-attr="title" title="Đăng quán"><svg class="icon" width="20" height="20"><use href="#ic-action-plus"></use></svg></button>
+        <button class="comm-hdr-iconbtn hidden" id="communityGuestSignIn" type="button" data-i18n="community.signIn" data-i18n-attr="title" title="Đăng nhập"><svg class="icon" width="20" height="20"><use href="#ic-social-author"></use></svg></button>
+        <div class="comm-subtabs-center">
+          <button class="comm-subtab active" data-comm-subtab="food" data-i18n="community.tabFood">Quán ăn</button>
+          <button class="comm-subtab" data-comm-subtab="routes" data-i18n="community.tabRoutes">Lộ trình</button>
+        </div>
+        <span class="comm-hdr-iconbtn comm-hdr-spacer" aria-hidden="true"></span>
       </div>
 
       <div class="profile-section" id="communityFoodPane">
         <div class="psec-head">
           <div class="psec-title" data-i18n="community.restaurants">Quán <em>cộng đồng</em></div>
-          <!-- Guest sees "Đăng nhập" (opens auth form). Logged-in user sees "+ Đăng quán". -->
-          <button class="add-btn hidden" id="communityGuestSignIn" type="button" data-i18n="community.signIn">Đăng nhập</button>
-          <button class="add-btn hidden" id="communityAddBtn" data-i18n="community.post">＋ Đăng quán</button>
         </div>
         <div class="form-group hidden" id="communitySearchGroup">
           <input class="form-input" id="communitySearchInput" type="text" data-i18n="community.searchPlaceholder" data-i18n-attr="placeholder" placeholder="🔎 Tìm theo tên, thẻ, hashtag…" autocomplete="off">
@@ -1097,19 +1111,19 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2637"></script>
-<script src="js/i18n.js?v=2637"></script>
-<script src="js/utils.js?v=2637"></script>
-<script src="js/state.js?v=2637"></script>
-<script src="js/poi.js?v=2637"></script>
-<script src="js/geocoder.js?v=2637"></script>
-<script src="js/gemini.js?v=2637"></script>
-<script src="js/community.js?v=2637"></script>
-<script src="js/push.js?v=2637"></script>
-<script src="js/analytics.js?v=2637"></script>
-<script src="js/map.js?v=2637"></script>
-<script src="js/gps.js?v=2637"></script>
-<script src="js/locationPicker.js?v=2637"></script>
+<script src="js/security.js?v=2638"></script>
+<script src="js/i18n.js?v=2638"></script>
+<script src="js/utils.js?v=2638"></script>
+<script src="js/state.js?v=2638"></script>
+<script src="js/poi.js?v=2638"></script>
+<script src="js/geocoder.js?v=2638"></script>
+<script src="js/gemini.js?v=2638"></script>
+<script src="js/community.js?v=2638"></script>
+<script src="js/push.js?v=2638"></script>
+<script src="js/analytics.js?v=2638"></script>
+<script src="js/map.js?v=2638"></script>
+<script src="js/gps.js?v=2638"></script>
+<script src="js/locationPicker.js?v=2638"></script>
 <!-- Trip name dialog — thay thế window.prompt() native -->
 <div class="trip-name-overlay" id="tripNameOverlay" role="dialog" aria-modal="true">
   <div class="trip-name-card">
@@ -1122,8 +1136,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2637"></script>
-<script src="js/app.js?v=2637"></script>
+<script src="js/controllers.js?v=2638"></script>
+<script src="js/app.js?v=2638"></script>
 
 </body>
 </html>

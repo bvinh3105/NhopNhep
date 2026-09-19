@@ -16,6 +16,7 @@ const HomeCtrl = {
         chip.classList.add('active');
       }
       this._updateBadge();
+      this._updateCatPillLabel();
     });
 
     // Bán kính — gộp thành 1 pill bên cạnh label "Điểm xuất phát", bấm để
@@ -59,22 +60,27 @@ const HomeCtrl = {
     document.getElementById('homeBookmarkBtn').addEventListener('click', () => showToast('🚧 Tính năng đang cập nhật'));
     document.getElementById('homeBellBtn').addEventListener('click', () => showToast('🚧 Tính năng đang cập nhật'));
 
-    // Dropdown "Tôi muốn ăn" — mở/đóng khi bấm badge cạnh logo
-    const catToggle = document.getElementById('heroCatToggle');
+    // Dropdown "Tôi muốn ăn" — mở/đóng khi bấm pill "Loại quán" cạnh ô
+    // "Tìm món/quán" (trước đây mở từ logo, đã chuyển xuống đây 2026-09-19
+    // để logo chỉ còn easter egg).
+    const catToggle = document.getElementById('catPillBtn');
     const catDdPanel = document.getElementById('catDdPanel');
     const catDdOverlay = document.getElementById('catDdOverlay');
     const closeCatDd = () => {
       catToggle.classList.remove('open');
+      catToggle.setAttribute('aria-expanded', 'false');
       catDdPanel.classList.remove('show');
       catDdOverlay.classList.remove('show');
     };
     catToggle.addEventListener('click', () => {
       const opening = !catDdPanel.classList.contains('show');
       catToggle.classList.toggle('open', opening);
+      catToggle.setAttribute('aria-expanded', String(opening));
       catDdPanel.classList.toggle('show', opening);
       catDdOverlay.classList.toggle('show', opening);
     });
     catDdOverlay.addEventListener('click', closeCatDd);
+    this._updateCatPillLabel();
 
     document.getElementById('scanBtn').addEventListener('click', () => this.scan());
 
@@ -212,6 +218,23 @@ const HomeCtrl = {
     const badge = document.getElementById('scanCountBadge');
     const total = allRestaurants().length;
     badge.textContent = total > 0 ? I18N.t('hero.badgeCount', { n: total }) : I18N.t('hero.badge');
+  },
+
+  // Nhãn pill "Loại quán" cạnh ô "Tìm món/quán" — tóm tắt State.activeCats
+  // (multi-select, giống hệt dữ liệu catDdPanel dùng): tất cả → "Tất cả
+  // loại", 1 loại → tên loại đó, 2-3 loại → "n/tổng loại".
+  _updateCatPillLabel() {
+    const val = document.getElementById('catPillVal');
+    if (!val) return;
+    const total = CATEGORIES ? Object.keys(CATEGORIES).length : 4;
+    const active = [...State.activeCats];
+    if (active.length >= total) {
+      val.textContent = I18N.t('home.catAll');
+    } else if (active.length === 1) {
+      val.textContent = CATEGORIES[active[0]]?.label || I18N.t('home.catAll');
+    } else {
+      val.textContent = I18N.t('home.catCount', { n: active.length, total });
+    }
   },
 
   _scanning: false,
@@ -3274,6 +3297,11 @@ const CommunityCtrl = {
       commLastScrollTop = st <= 0 ? 0 : st;
     }, { passive: true });
 
+    // Observer màu chữ header được (re)tạo trong render() thay vì ở đây —
+    // #communityScreen còn "hidden" lúc init() chạy (boot app), nên
+    // commScroll.clientHeight = 0 và rootMargin tính sai. render() chạy
+    // mỗi lần mở tab Cộng đồng, lúc đó màn đã hiện, kích thước mới đúng.
+
     // Small "Đăng nhập" header button (guest only) opens the auth form.
     // Defaults to login mode — the button label says "Đăng nhập", so
     // that's what the user expects to land on.
@@ -3493,6 +3521,13 @@ const CommunityCtrl = {
     document.getElementById('communitySearchGroup').classList.toggle('hidden', !loggedIn);
     // Small "Đăng nhập" header button — visible only to guests
     document.getElementById('communityGuestSignIn').classList.toggle('hidden', loggedIn);
+    // Tạo lại observer màu chữ header MỖI LẦN mở tab — màn hình vừa hết
+    // "hidden" nên kích thước đo được ở đây mới đúng (init() chạy lúc boot,
+    // màn còn ẩn, đo lúc đó sẽ ra 0). Rẻ: chỉ 1 observer, huỷ cái cũ trước.
+    this._initSubtabContrastObserver(
+      document.querySelector('#communityScreen .profile-scroll'),
+      document.querySelector('.comm-subtabs')
+    );
     this._loadList('');
     this._startLive();
   },
@@ -3628,6 +3663,41 @@ const CommunityCtrl = {
     wireCarousels(list);
     wireCardDetail(list, items);
     wireCardActions(list, items);
+    this._observeSubtabPhotos();
+  },
+
+  // ── Header .comm-subtabs — màu chữ tự đổi theo nội dung ngay dưới ────
+  // Nền .comm-subtabs LUÔN đặc (không đổi — yêu cầu Vinh 2026-09-19).
+  // Chỉ màu CHỮ đổi: khi có .post-photo (ảnh, nhiều màu/tối) nằm ngay
+  // dưới header, giữ màu chữ mặc định; khi vùng ngay dưới header là
+  // .post-head/.post-body (nền trắng/kem, cùng tông với header) thì thêm
+  // class .on-light để chữ đổi tối hơn, tránh chìm vào nền liền màu.
+  // Dùng IntersectionObserver (rẻ hơn nhiều so với đọc getBoundingClientRect
+  // của mọi .post-photo trên mỗi sự kiện scroll) — root là chính khung cuộn
+  // feed, rootMargin thu hẹp vùng "visible" xuống đúng dải cao bằng header.
+  _subtabContrastObserver: null,
+  _initSubtabContrastObserver(scrollEl, subtabsEl) {
+    if (!scrollEl || !subtabsEl || !('IntersectionObserver' in window)) return;
+    this._subtabContrastObserver?.disconnect();
+    const hdrH = subtabsEl.offsetHeight || 50;
+    const intersecting = new Set();
+    this._subtabContrastObserver = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) intersecting.add(e.target);
+        else intersecting.delete(e.target);
+      });
+      subtabsEl.classList.toggle('on-light', intersecting.size === 0);
+    }, {
+      root: scrollEl,
+      rootMargin: `0px 0px -${Math.max(scrollEl.clientHeight - hdrH, 0)}px 0px`,
+      threshold: 0,
+    });
+  },
+  _observeSubtabPhotos() {
+    if (!this._subtabContrastObserver) return;
+    document.querySelectorAll('#communityScreen .post-photo').forEach(el => {
+      this._subtabContrastObserver.observe(el);
+    });
   },
 };
 
