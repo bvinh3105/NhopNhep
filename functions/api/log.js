@@ -15,7 +15,7 @@
 // updated together whenever the tunnel rotates. See PROJECT_HANDOFF
 // section 4 for the watchdog that normally handles this.
 
-const PB_URL = 'https://narrative-ben-screw-harvard.trycloudflare.com';
+const PB_URL = 'https://provides-turning-moving-serious.trycloudflare.com';
 const COLLECTION = 'analytics_events';
 const MAX_BODY = 8 * 1024; // 8 KB — a single event is ~500 bytes tops
 
