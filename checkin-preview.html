@@ -1,0 +1,1694 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Bản preview riêng — Check-in feature Nhóp Nhép. Chỉ tài khoản được cấp quyền mới xem được.">
+<title>Check-in Preview · Nhóp Nhép</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap">
+<style>
+/* ═══ Access gate — client-side allowlist ═══ */
+#gate{
+  position:fixed;inset:0;z-index:99999;
+  background:linear-gradient(180deg,#2A1810 0%,#5F0F0F 100%);
+  color:#FBF3D9;display:flex;align-items:center;justify-content:center;padding:24px;
+  font-family:'Nunito',system-ui,sans-serif;overflow-y:auto;
+}
+#gate.pass{display:none}
+.gate-card{
+  max-width:380px;width:100%;text-align:center;
+  background:#FBF3D9;color:#2A1810;
+  border:3px solid #2A1810;border-radius:24px;
+  box-shadow:5px 5px 0 #000,0 20px 60px rgba(0,0,0,.5);
+  padding:32px 24px;
+}
+.gate-lock{font-size:2.8rem;line-height:1;margin-bottom:12px}
+.gate-title{font-weight:900;font-size:1.35rem;margin:0 0 8px;color:#B92626;letter-spacing:-.5px}
+.gate-title em{color:#E8843C;font-style:italic}
+.gate-msg{font-size:.85rem;color:#6B4A38;font-weight:700;line-height:1.55;margin:0 0 16px}
+.gate-msg b{color:#2A1810;font-weight:900}
+.gate-cta{
+  display:inline-block;padding:.75rem 1.35rem;margin-top:4px;
+  background:#B92626;color:#FBF3D9;text-decoration:none;
+  border:2px solid #2A1810;border-radius:14px;box-shadow:3px 3px 0 #2A1810;
+  font-weight:900;font-size:.9rem;
+}
+.gate-cta:active{transform:translate(1px,1px);box-shadow:2px 2px 0 #2A1810}
+.gate-hint{margin-top:12px;font-size:.7rem;color:#9C7F6B;font-weight:700;line-height:1.4}
+.gate-hint code{background:#EEE0A6;padding:.05rem .35rem;border-radius:4px;font-size:.9em;font-weight:800}
+/* Hide prototype until gate passes */
+.stage{display:none!important}
+body.gate-pass .stage{display:flex!important}
+
+/* ═══ Real tokens (from css/styles.css) ═══ */
+:root{
+  --cream:#FBF3D9; --cream-2:#F5EBC1; --cream-3:#EEE0A6;
+  --paper:#FEF9E5; --white:#FFFDF5;
+  --primary:#B92626; --primary-2:#8C1919; --primary-3:#5F0F0F;
+  --primary-tint:#F8DFD3; --primary-glow:rgba(185,38,38,.28);
+  --accent:#E8843C; --accent-2:#D66A22;
+  --cat-restaurant:#B92626; --cat-street:#E8843C;
+  --cat-snack:#D64B7A; --cat-snack-2:#A8365F;
+  --cat-cafe:#7A4E2F; --cat-cafe-2:#5A3B24;
+  --checkin:#D64B7A; --checkin-2:#A83359; --checkin-tint:#FBE3EC;
+  --verified:#2B7A3B; --verified-tint:#DAEDDF;
+  --text:#2A1810; --text2:#6B4A38; --text3:#9C7F6B;
+  --line:rgba(42,24,16,.10); --line-2:rgba(42,24,16,.18);
+  --map-ground:#E7E4DA;
+  --cam-bg:#0e0806;
+  --radius:18px; --radius-lg:24px;
+  --tab-h:64px;
+  --safe-bottom:0px;
+  --font-display:'Nunito',system-ui,sans-serif;
+  --font-body:'Nunito',system-ui,sans-serif;
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:#2A1810;color:var(--text);font-family:var(--font-body);height:100%;-webkit-font-smoothing:antialiased}
+img,svg{max-width:100%;display:block}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+input,textarea{font:inherit;color:inherit}
+
+/* ═══ Stage (desktop = phone frame; mobile = full) ═══ */
+.stage{min-height:100%;display:flex;flex-direction:column;align-items:center;padding:20px 16px;gap:14px}
+.stage-hint{color:rgba(255,253,245,.85);font-size:.82rem;font-weight:700;max-width:420px;text-align:center;line-height:1.45}
+.stage-hint b{color:var(--accent);font-weight:900}
+.stage-hint kbd{display:inline-block;padding:.1rem .35rem;background:rgba(255,253,245,.15);border:1.5px solid rgba(255,253,245,.35);border-radius:5px;font:inherit;font-size:.68rem;font-weight:800}
+.stage-tools{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:440px}
+.stage-tools button{
+  padding:.4rem .8rem;background:rgba(255,253,245,.12);color:var(--white);
+  border:1.5px solid rgba(255,253,245,.35);border-radius:999px;
+  font-size:.72rem;font-weight:800;transition:transform .12s,background .15s;
+}
+.stage-tools button:hover{background:rgba(255,253,245,.22)}
+.stage-tools button:active{transform:scale(.96)}
+
+.app{
+  width:100%;max-width:420px;height:min(880px,calc(100vh - 130px));
+  background:var(--cream);position:relative;overflow:hidden;
+  border-radius:32px;border:3px solid #000;
+  box-shadow:0 20px 60px rgba(0,0,0,.6),0 4px 0 rgba(0,0,0,.4);
+}
+@media (max-width:520px){
+  .stage{padding:0;gap:0}
+  .stage-hint,.stage-tools{display:none}
+  .app{max-width:none;height:100vh;border-radius:0;border:0;box-shadow:none}
+}
+
+.notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:22px;background:#000;border-radius:0 0 14px 14px;z-index:200}
+
+/* ═══ Screens ═══ */
+.screens{position:absolute;inset:0;overflow:hidden}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .22s ease}
+.screen.active{opacity:1;pointer-events:auto}
+.screen.dark{background:var(--cam-bg);color:var(--white)}
+.screen.overlay-scr{background:rgba(20,10,5,.6);z-index:180}
+
+/* ═══ Floating tab bar (matches real .tabbar) ═══ */
+.tabbar{
+  position:absolute;left:10px;right:10px;bottom:calc(var(--safe-bottom) + 10px);z-index:100;
+  background:var(--white);border-radius:28px;
+  display:flex;align-items:center;padding:10px 6px;
+  box-shadow:0 12px 30px rgba(42,24,16,.24);
+  transition:transform .25s ease;
+}
+.app.no-tabs .tabbar{transform:translateY(140%)}
+.tab-btn{
+  flex:1;padding:5px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  color:var(--text3);position:relative;transition:color .18s;
+}
+.tab-btn .tab-ico{
+  width:24px;height:24px;display:flex;align-items:center;justify-content:center;
+  font-size:1.35rem;line-height:1;transition:transform .2s var(--ease-spring);
+}
+.tab-btn .tab-lbl{font-size:.68rem;font-weight:800;letter-spacing:.2px;line-height:1}
+.tab-btn:active .tab-ico{transform:scale(.9)}
+.tab-btn.active{color:var(--primary)}
+.tab-btn.active .tab-ico{transform:scale(1.1)}
+
+/* ═══ Icons (SVG line-style, matching real app) ═══ */
+.ico{width:24px;height:24px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+
+/* ═══ HOME ═══ */
+.brand-float{
+  position:absolute;top:calc(env(safe-area-inset-top,0px) + .6rem);left:.7rem;z-index:14;
+  display:inline-flex;align-items:center;gap:.35rem;
+  background:var(--white);border-radius:24px;padding:.55rem 1rem .55rem 1.1rem;
+  box-shadow:0 6px 18px rgba(42,24,16,.2);
+  font-weight:900;font-size:1.05rem;color:var(--primary);letter-spacing:-.3px;
+}
+.brand-float em{font-style:italic;color:var(--accent);font-weight:900}
+
+.map-btn-cluster{
+  position:absolute;top:calc(env(safe-area-inset-top,0px) + .6rem);right:.7rem;z-index:14;
+  display:flex;align-items:center;gap:1px;
+  background:var(--white);border-radius:24px;padding:5px;
+  box-shadow:0 6px 18px rgba(42,24,16,.2);
+}
+.cluster-btn{
+  width:38px;height:38px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:var(--text2);
+  transition:transform .12s;
+}
+.cluster-btn:active{transform:scale(.9)}
+.cluster-btn.gps{color:var(--primary)}
+
+.rp-fab{
+  position:absolute;top:calc(env(safe-area-inset-top,0px) + 4.5rem);right:1rem;z-index:13;
+  width:52px;height:52px;border-radius:50%;
+  background:var(--primary);color:var(--white);
+  border:2.5px solid var(--text);box-shadow:3px 3px 0 var(--text);
+  display:flex;align-items:center;justify-content:center;font-size:1.3rem;
+  transition:transform .12s;
+}
+.rp-fab:active{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--text)}
+
+.home-map{
+  position:absolute;inset:0;z-index:0;
+  background:
+    radial-gradient(ellipse at 30% 40%,rgba(181,212,165,.6) 0 8%,transparent 12%),
+    radial-gradient(ellipse at 70% 55%,rgba(181,212,165,.5) 0 10%,transparent 14%),
+    radial-gradient(ellipse at 20% 70%,rgba(181,212,165,.4) 0 6%,transparent 10%),
+    linear-gradient(180deg,var(--map-ground) 0%,#d5d1c5 100%);
+}
+.home-map::after{
+  content:'';position:absolute;inset:0;opacity:.4;
+  background:
+    linear-gradient(45deg,transparent 47%,#c8b892 48% 52%,transparent 53%),
+    linear-gradient(-25deg,transparent 47%,#c8b892 48% 52%,transparent 53%),
+    linear-gradient(75deg,transparent 47%,#c8b892 48% 52%,transparent 53%);
+  background-size:80px 80px,120px 120px,100px 100px;
+}
+.home-radius{
+  position:absolute;top:38%;left:50%;transform:translate(-50%,-50%);
+  width:280px;height:280px;border-radius:50%;
+  background:rgba(185,38,38,.06);border:2px dashed rgba(185,38,38,.5);
+  pointer-events:none;z-index:1;
+}
+
+.home-sheet{
+  position:absolute;left:0;right:0;bottom:0;z-index:7;
+  background:var(--paper);border-top:2px solid var(--text);
+  padding:.7rem 1.1rem 1rem;border-radius:24px 24px 0 0;
+  box-shadow:0 -8px 24px rgba(42,24,16,.14);
+  max-height:70%;display:flex;flex-direction:column;
+  padding-bottom:calc(var(--tab-h) + 20px);
+}
+.sheet-handle{width:34px;height:4px;background:var(--line-2);border-radius:2px;margin:0 auto .6rem;flex-shrink:0}
+.sheet-scroll{flex:1;overflow-y:auto;scrollbar-width:none}
+.sheet-scroll::-webkit-scrollbar{display:none}
+
+.row-label{
+  font-weight:800;font-size:.78rem;color:var(--primary);
+  text-transform:uppercase;letter-spacing:.5px;margin:.7rem 0 .35rem;
+}
+.row-label::before{content:'· ';color:var(--accent);font-weight:900}
+.row-label.mini{font-size:.72rem}
+.row-label em{color:var(--accent);font-style:italic;text-transform:none;letter-spacing:normal;font-weight:900}
+.row-label:first-child{margin-top:0}
+
+.loc-row{
+  display:flex;align-items:center;gap:.5rem;
+  background:var(--cream);border-radius:20px;padding:.5rem .6rem;
+}
+.loc-input{
+  flex:1;min-width:0;background:transparent;border:0;outline:0;
+  padding:.45rem .6rem;font-size:.88rem;font-weight:600;color:var(--text);
+}
+.loc-input::placeholder{color:var(--text3)}
+.radius-pill{
+  display:flex;align-items:center;gap:.3rem;background:var(--primary);color:var(--cream);
+  font-weight:800;font-size:.78rem;padding:.42rem .85rem;border-radius:22px;flex-shrink:0;white-space:nowrap;
+}
+.radius-pill .chev{font-size:.65rem}
+
+.gps-hint{
+  margin-top:.5rem;padding:.5rem .7rem;background:var(--primary-tint);border:1.5px dashed var(--primary);
+  border-radius:12px;font-size:.72rem;color:var(--primary-2);font-weight:700;line-height:1.35;
+}
+.gps-hint::before{content:'📍 ';font-size:.85rem}
+
+.cat-chips{
+  display:flex;gap:.5rem;flex-wrap:nowrap;overflow-x:auto;
+  padding:12px 6px 8px;margin:-10px -6px -6px -6px;scrollbar-width:none;
+}
+.cat-chips::-webkit-scrollbar{display:none}
+.cat-chip{
+  display:flex;align-items:center;gap:.3rem;padding:.5rem .85rem;border-radius:24px;
+  border:2px solid var(--text);background:var(--white);color:var(--text);
+  font-size:.82rem;font-weight:700;white-space:nowrap;flex-shrink:0;
+  transition:all .18s var(--ease-spring);box-shadow:2px 2px 0 var(--text);
+}
+.cat-chip:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.cat-chip.active{background:var(--primary);color:var(--cream);border-color:var(--primary-2);box-shadow:2px 2px 0 var(--primary-2)}
+.cat-chip[data-cat="street"].active{background:var(--accent);border-color:var(--accent-2);box-shadow:2px 2px 0 var(--accent-2)}
+.cat-chip[data-cat="snack"].active{background:var(--cat-snack);border-color:var(--cat-snack-2);box-shadow:2px 2px 0 var(--cat-snack-2)}
+.cat-chip[data-cat="cafe"].active{background:var(--cat-cafe);color:var(--cream);border-color:var(--cat-cafe-2);box-shadow:2px 2px 0 var(--cat-cafe-2)}
+
+.scan-btn{
+  width:100%;margin-top:1rem;padding:1.05rem;border-radius:16px;
+  background:var(--primary);color:var(--cream);
+  font-size:1.15rem;font-weight:900;letter-spacing:.5px;
+  border:2px solid var(--text);box-shadow:4px 4px 0 var(--text);transition:all .15s;
+  display:flex;align-items:center;justify-content:center;gap:.5rem;
+}
+.scan-btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--text)}
+.scan-btn em{font-style:italic;color:var(--accent)}
+
+/* ═══ RESULTS ═══ */
+.top-bar{
+  flex-shrink:0;display:flex;align-items:center;gap:.6rem;
+  padding:calc(env(safe-area-inset-top,0px) + .9rem) 1.1rem .8rem;
+  background:var(--cream);border-bottom:2px solid var(--text);position:relative;z-index:5;
+}
+.back-btn{
+  width:2.2rem;height:2.2rem;border-radius:50%;background:var(--white);
+  border:2px solid var(--text);display:flex;align-items:center;justify-content:center;
+  font-size:1rem;flex-shrink:0;box-shadow:2px 2px 0 var(--text);transition:all .12s;font-weight:900;
+}
+.back-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.results-title{font-size:1rem;font-weight:900;line-height:1.15;color:var(--text)}
+.results-sub{font-size:.72rem;color:var(--text2);font-weight:700;margin-top:2px}
+.reshuffle-btn{
+  padding:.5rem .8rem;border-radius:20px;background:var(--white);color:var(--text);
+  border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);font-weight:800;font-size:.78rem;
+  display:flex;align-items:center;gap:.3rem;flex-shrink:0;
+}
+
+.cat-tabs{
+  flex-shrink:0;display:flex;gap:.4rem;overflow-x:auto;scrollbar-width:none;
+  background:var(--cream);padding:.65rem 1.1rem;border-bottom:2px solid var(--text);
+}
+.cat-tabs::-webkit-scrollbar{display:none}
+.cat-tab{
+  padding:.4rem .8rem;font-size:.78rem;font-weight:700;color:var(--text);white-space:nowrap;
+  border:2px solid var(--text);border-radius:20px;background:var(--white);
+  box-shadow:2px 2px 0 var(--text);flex-shrink:0;
+}
+.cat-tab.active{background:var(--text);color:var(--cream)}
+
+.r-grid{
+  flex:1;overflow-y:auto;padding:.8rem 1.1rem calc(var(--tab-h) + 6rem);
+  display:grid;grid-template-columns:1fr 1fr;gap:.7rem;align-content:start;scrollbar-width:none;
+}
+.r-grid::-webkit-scrollbar{display:none}
+.r-card{
+  background:var(--white);border-radius:18px;border:2px solid var(--text);
+  padding:.6rem;box-shadow:3px 3px 0 var(--text);cursor:pointer;
+  display:flex;flex-direction:column;gap:.4rem;transition:all .18s;
+  animation:card-in .3s ease both;
+}
+@keyframes card-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.r-card:active{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--text)}
+.r-card.selected{background:var(--primary-tint);border-color:var(--primary);box-shadow:3px 3px 0 var(--primary-2)}
+.r-thumb{
+  aspect-ratio:1.4;border-radius:12px;border:1.5px solid var(--text);
+  display:flex;align-items:center;justify-content:center;font-size:2.2rem;
+  background:linear-gradient(135deg,var(--cream-3),var(--accent));
+}
+.r-name{font-weight:900;font-size:.82rem;line-height:1.15;color:var(--text);
+  overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.r-meta{font-size:.62rem;color:var(--text2);font-weight:700;display:flex;justify-content:space-between}
+.r-meta .rating{color:var(--accent-2);font-weight:900}
+.r-visited{font-size:.55rem;font-weight:800;color:var(--verified);display:flex;align-items:center;gap:2px}
+
+.results-action{
+  position:absolute;bottom:0;left:0;right:0;z-index:5;
+  padding:.75rem 1.1rem calc(var(--tab-h) + 20px);
+}
+.results-action::before{
+  content:'';position:absolute;inset:0;z-index:-1;background:var(--cream);
+  -webkit-mask-image:linear-gradient(to bottom,black 0,black 78%,rgba(0,0,0,.62) 100%);
+          mask-image:linear-gradient(to bottom,black 0,black 78%,rgba(0,0,0,.62) 100%);
+}
+.session-create-btn{
+  width:100%;padding:.7rem;border-radius:14px;margin-bottom:.5rem;
+  background:var(--white);color:var(--text);font-weight:800;font-size:.85rem;
+  border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
+  display:flex;align-items:center;justify-content:center;gap:.4rem;
+}
+.session-create-btn:disabled{opacity:.6}
+.action-btn{
+  width:100%;padding:1rem;border-radius:16px;
+  background:var(--primary);color:var(--cream);
+  font-size:1.05rem;font-weight:900;letter-spacing:.4px;
+  border:2px solid var(--text);box-shadow:4px 4px 0 var(--text);
+}
+.action-btn:disabled{opacity:.65;pointer-events:none}
+.action-btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--text)}
+
+/* ═══ PROFILE-SCROLL (used by community + profile + checkin list) ═══ */
+.profile-scroll{
+  flex:1;overflow-y:auto;scrollbar-width:none;
+  padding-bottom:calc(var(--tab-h) + 24px);
+}
+.profile-scroll::-webkit-scrollbar{display:none}
+
+.settings-gears{
+  position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;z-index:20;
+  display:flex;flex-direction:column;gap:8px;
+}
+.settings-gear{
+  width:38px;height:38px;border-radius:50%;background:var(--white);
+  border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
+  display:flex;align-items:center;justify-content:center;font-size:1rem;color:var(--text);
+}
+.settings-gear:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+
+/* ═══ PROFILE identity header ═══ */
+.prof-hd{padding:calc(env(safe-area-inset-top,0px) + 1.2rem) 1.1rem 0;text-align:center}
+.avatar{
+  width:80px;height:80px;border-radius:50%;background:var(--accent);
+  border:3px solid var(--text);box-shadow:3px 3px 0 var(--text);
+  display:inline-flex;align-items:center;justify-content:center;font-size:2.4rem;margin-bottom:.6rem;
+}
+.prof-name{font-weight:900;font-size:1.1rem;color:var(--text);letter-spacing:-.3px}
+.prof-tag{font-size:.78rem;color:var(--text2);font-weight:700;font-style:italic;margin-top:.2rem}
+.prof-badges{display:flex;gap:.35rem;justify-content:center;margin-top:.5rem;flex-wrap:wrap}
+.badge{
+  padding:.25rem .65rem;background:var(--checkin);color:var(--white);
+  border:1.5px solid var(--text);border-radius:12px;box-shadow:1.5px 1.5px 0 var(--text);
+  font-size:.62rem;font-weight:900;
+}
+.badge.acc{background:var(--accent)}
+
+.prof-stats{
+  display:grid;grid-template-columns:repeat(5,1fr);gap:.35rem;
+  padding:.8rem 1.1rem .5rem;
+}
+.prof-stat{
+  text-align:center;padding:.5rem .2rem;background:var(--paper);
+  border:2px solid var(--text);border-radius:12px;box-shadow:2px 2px 0 var(--text);
+}
+.prof-stat.hi{background:var(--checkin-tint);border-color:var(--checkin);box-shadow:2px 2px 0 var(--checkin-2)}
+.prof-stat-n{font-size:1rem;font-weight:900;color:var(--primary);line-height:1}
+.prof-stat.hi .prof-stat-n{color:var(--checkin-2)}
+.prof-stat-l{font-size:.5rem;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-top:3px}
+
+.subtabs{
+  display:flex;gap:0;padding:0 1.1rem;border-bottom:2px solid var(--line-2);
+  margin-top:.5rem;
+}
+.subtab{
+  flex:1;text-align:center;padding:.65rem .3rem;
+  font-size:.78rem;font-weight:800;color:var(--text3);
+  border-bottom:3px solid transparent;margin-bottom:-2px;
+}
+.subtab.on{color:var(--checkin);border-bottom-color:var(--checkin)}
+
+.diary-list{padding:.8rem 1.1rem;display:flex;flex-direction:column;gap:.5rem}
+.diary-row{
+  display:flex;gap:.6rem;padding:.6rem .75rem;background:var(--white);
+  border:2px solid var(--text);border-radius:14px;box-shadow:2px 2px 0 var(--text);
+  align-items:center;
+}
+.diary-row.new{border-color:var(--checkin);background:var(--checkin-tint);box-shadow:2px 2px 0 var(--checkin-2)}
+.diary-date{flex:0 0 40px;text-align:center;color:var(--text2);font-weight:900;font-size:.55rem;line-height:1.1}
+.diary-date b{display:block;color:var(--primary);font-size:1.1rem;font-weight:900}
+.diary-body{flex:1;min-width:0}
+.diary-body .n{font-weight:900;font-size:.78rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.diary-body .m{color:var(--text2);font-size:.68rem;font-weight:700;line-height:1.35}
+.diary-tail{flex:0 0 auto;color:var(--accent-2);font-weight:900;font-size:.68rem}
+.diary-tail.priv::before{content:'🔒 ';font-size:.65rem}
+.diary-tail.pub::before{content:'👥 ';font-size:.65rem}
+
+.empty-state{
+  padding:2rem 1rem;text-align:center;color:var(--text2);font-weight:700;font-size:.85rem;
+}
+.empty-state .em{font-size:2.5rem;display:block;margin-bottom:.5rem}
+
+/* ═══ COMMUNITY ═══ */
+.comm-subtabs{
+  position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:.4rem;
+  padding:.7rem .8rem;background:var(--cream);
+  border-bottom:1.5px solid var(--line-2);
+}
+.comm-iconbtn{
+  width:34px;height:34px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;color:var(--text2);
+  font-size:1rem;
+}
+.comm-subtabs-center{flex:1;display:flex;justify-content:center;gap:.8rem}
+.comm-subtab{
+  font-weight:900;font-size:.95rem;color:var(--text3);
+  padding:.3rem 0;border-bottom:2.5px solid transparent;line-height:1;
+}
+.comm-subtab.active{color:var(--text);border-bottom-color:var(--primary)}
+
+.comm-r-list{padding:.8rem 1rem calc(var(--tab-h) + 24px);display:flex;flex-direction:column;gap:.8rem}
+
+/* Regular community card */
+.comm-card{
+  background:var(--white);border:2px solid var(--text);border-radius:18px;
+  box-shadow:3px 3px 0 var(--text);overflow:hidden;
+}
+.comm-card-hd{
+  display:flex;align-items:center;gap:.55rem;padding:.55rem .75rem;
+}
+.comm-card-hd .avatar-sm{
+  width:32px;height:32px;border-radius:50%;background:var(--accent);
+  border:1.5px solid var(--text);display:flex;align-items:center;justify-content:center;
+  font-size:1rem;flex-shrink:0;
+}
+.comm-card-hd b{font-weight:900;font-size:.85rem;color:var(--text)}
+.comm-card-hd .t{margin-left:auto;color:var(--text3);font-size:.68rem;font-weight:700}
+.comm-card-photo{
+  height:200px;border-block:1.5px solid var(--text);
+  display:flex;align-items:center;justify-content:center;font-size:3.5rem;
+  filter:drop-shadow(0 3px 6px rgba(0,0,0,.3));position:relative;
+}
+.comm-card-body{padding:.6rem .8rem .7rem}
+.comm-card-name{font-weight:900;font-size:.9rem;color:var(--text);letter-spacing:-.2px}
+.comm-card-loc{font-size:.7rem;color:var(--text2);font-weight:700;margin-top:2px}
+.comm-card-actions{display:flex;gap:.75rem;padding:.4rem .8rem;font-size:1rem;align-items:center;border-top:1.5px dashed var(--line-2)}
+.comm-card-actions .chip{
+  padding:.15rem .5rem;background:var(--paper);color:var(--text);
+  border:1.5px solid var(--text);border-radius:8px;font-size:.6rem;font-weight:800;
+}
+.comm-card-actions .save{margin-left:auto;font-size:.85rem}
+
+/* Locket-style check-in card */
+.loc-card{
+  background:var(--white);border:2.5px solid var(--checkin);border-radius:18px;
+  box-shadow:3px 3px 0 var(--checkin-2);overflow:hidden;position:relative;
+  cursor:pointer;transition:all .18s;
+}
+.loc-card:active{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--checkin-2)}
+.loc-card::before{
+  content:'📸 CHỤP LIVE';position:absolute;top:-10px;left:16px;z-index:3;
+  padding:.15rem .55rem;background:var(--checkin);color:var(--white);
+  font-size:.55rem;font-weight:900;letter-spacing:.05em;
+  border:1.5px solid var(--text);border-radius:6px;
+}
+.loc-card-hd{display:flex;align-items:center;gap:.55rem;padding:.6rem .75rem}
+.loc-card-photo{
+  height:220px;border-block:2px solid var(--text);position:relative;
+  display:flex;align-items:center;justify-content:center;
+}
+.loc-card-food{font-size:4rem;filter:drop-shadow(0 4px 8px rgba(0,0,0,.45));user-select:none}
+.loc-card-info{
+  position:absolute;bottom:8px;left:8px;right:8px;
+  padding:.5rem .7rem;background:rgba(0,0,0,.65);border-radius:10px;
+  color:var(--white);backdrop-filter:blur(6px);
+  display:flex;justify-content:space-between;align-items:center;gap:.5rem;
+}
+.loc-card-info b{font-weight:900;font-size:.78rem;line-height:1.15}
+.loc-card-info b small{display:block;font-weight:700;font-size:.55rem;color:rgba(255,255,255,.75);margin-top:2px}
+.loc-card-rate{
+  color:var(--white);background:var(--accent);font-size:.62rem;font-weight:900;
+  padding:.22rem .55rem;border-radius:8px;flex-shrink:0;white-space:nowrap;
+}
+.loc-card-cap{padding:.6rem .8rem .3rem;font-size:.78rem;color:var(--text);font-style:italic;line-height:1.35}
+.loc-card-actions{display:flex;gap:.75rem;padding:.3rem .8rem .7rem;font-size:.95rem;align-items:center}
+.loc-card-actions .save{margin-left:auto;color:var(--text2);font-size:.7rem;font-weight:800}
+
+/* ═══ CHECK-IN — camera-first (Locket-inspired) ═══ */
+.map-pin{
+  position:absolute;width:12px;height:12px;border-radius:50%;
+  background:var(--primary);border:2px solid var(--white);box-shadow:0 1.5px 0 var(--text);z-index:2;
+}
+
+.ci-tab{
+  flex:1;display:flex;flex-direction:column;background:var(--cream);
+  padding-bottom:calc(var(--tab-h) + 24px);
+}
+.ci-tab-hd{
+  padding:calc(env(safe-area-inset-top,0px) + .8rem) 1rem .7rem;
+  display:flex;justify-content:center;
+}
+.quan-auto-pill{
+  display:inline-flex;align-items:center;gap:.4rem;
+  padding:.55rem 1rem;background:var(--white);
+  border:2px solid var(--text);border-radius:999px;box-shadow:2px 2px 0 var(--text);
+  font-size:.82rem;font-weight:800;color:var(--text);max-width:92%;
+  transition:transform .12s;
+}
+.quan-auto-pill:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.quan-auto-pill b{color:var(--primary);font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+.quan-auto-pill .dist{
+  color:var(--white);background:var(--checkin);
+  padding:.1rem .45rem;border-radius:6px;font-size:.62rem;font-weight:900;flex-shrink:0;
+}
+.quan-auto-pill .chev{color:var(--text2);font-size:.7rem;margin-left:2px}
+
+.ci-cam-frame{
+  flex:1;margin:0 .9rem;background:var(--cam-bg);
+  border:3px solid var(--text);border-radius:24px;box-shadow:4px 4px 0 var(--text);
+  overflow:hidden;position:relative;
+  display:flex;flex-direction:column;
+  min-height:0;
+}
+.ci-cam-view{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:1.2rem;padding:1.5rem;text-align:center;position:relative;
+  background:
+    radial-gradient(circle at center,rgba(232,132,60,.22) 0,transparent 60%),
+    linear-gradient(180deg,#1a1210 0,var(--cam-bg) 100%);
+}
+.ci-cam-view::before{
+  content:'';position:absolute;top:8%;left:8%;right:8%;bottom:26%;
+  border:1.5px solid rgba(255,255,255,.16);border-radius:14px;
+  animation:focus-in 1.8s ease-in-out infinite alternate;pointer-events:none;
+}
+.ci-cam-view::after{
+  content:'';position:absolute;top:calc(8% - 8px);left:calc(8% - 8px);
+  width:20px;height:20px;
+  border-top:2.5px solid rgba(255,255,255,.7);border-left:2.5px solid rgba(255,255,255,.7);
+  border-top-left-radius:5px;pointer-events:none;
+}
+.ci-cam-food{
+  font-size:5.5rem;line-height:1;filter:drop-shadow(0 6px 14px rgba(0,0,0,.55));user-select:none;z-index:2;
+}
+.ci-cam-hint{
+  font-size:.72rem;color:rgba(255,255,255,.78);font-weight:700;
+  padding:.35rem .8rem;background:rgba(0,0,0,.5);border-radius:999px;
+  border:1px solid rgba(255,255,255,.22);z-index:2;backdrop-filter:blur(4px);
+}
+.ci-cam-stars{
+  display:flex;gap:.5rem;justify-content:center;font-size:1.55rem;line-height:1;z-index:2;
+  padding:.3rem .9rem;background:rgba(0,0,0,.4);border-radius:999px;
+  border:1px solid rgba(255,255,255,.2);
+}
+.ci-cam-stars .star{color:rgba(255,255,255,.35);transition:color .15s}
+.ci-cam-stars .star.on{color:var(--accent);text-shadow:0 0 10px rgba(232,132,60,.7)}
+
+.ci-controls{
+  padding:1rem 1.5rem 0;
+  display:flex;align-items:center;justify-content:space-between;gap:1rem;
+}
+.ci-side{
+  width:52px;display:flex;flex-direction:column;align-items:center;gap:3px;
+  color:var(--text);
+}
+.ci-side:active{transform:scale(.94)}
+.ci-side-ico{
+  width:46px;height:46px;border-radius:50%;background:var(--white);
+  border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
+  display:flex;align-items:center;justify-content:center;font-size:1.2rem;
+}
+.ci-side-lbl{font-size:.6rem;font-weight:800;color:var(--text2);letter-spacing:.2px}
+.ci-shutter{
+  width:82px;height:82px;border-radius:50%;background:var(--white);
+  border:3.5px solid var(--text);position:relative;
+  box-shadow:0 0 0 5px rgba(214,75,122,.5),4px 4px 0 var(--text);
+  transition:transform .1s;
+}
+.ci-shutter:active{transform:translate(1px,1px);box-shadow:0 0 0 5px rgba(214,75,122,.5),2px 2px 0 var(--text)}
+.ci-shutter.busy{animation:shutter-pulse .35s ease}
+.ci-shutter-inner{
+  position:absolute;inset:6px;background:var(--checkin);
+  border-radius:50%;border:2px solid var(--text);
+  display:flex;align-items:center;justify-content:center;
+}
+.ci-shutter-inner::after{content:'📸';font-size:1.4rem;filter:grayscale(1) brightness(2)}
+
+/* Quán picker */
+.qp-sheet{
+  position:absolute;bottom:calc(var(--tab-h) + 16px);left:14px;right:14px;
+  max-height:60%;background:var(--cream);
+  border:2.5px solid var(--text);border-radius:22px;
+  box-shadow:4px 4px 0 var(--text);
+  padding:.6rem .9rem 1rem;display:flex;flex-direction:column;
+  animation:slide-up .3s var(--ease-spring);
+}
+.qp-handle{width:38px;height:4px;background:var(--line-2);border-radius:2px;margin:0 auto .6rem;flex-shrink:0}
+.qp-title{font-weight:900;font-size:1rem;color:var(--text);text-align:center}
+.qp-sub{font-size:.72rem;color:var(--text2);font-weight:700;text-align:center;margin-top:.15rem;margin-bottom:.7rem}
+.qp-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:.5rem;scrollbar-width:none}
+.qp-list::-webkit-scrollbar{display:none}
+.qp-item{
+  display:flex;gap:.55rem;padding:.55rem;background:var(--white);
+  border:2px solid var(--text);border-radius:12px;box-shadow:2px 2px 0 var(--text);
+  align-items:center;transition:all .12s;
+}
+.qp-item:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.qp-item.current{border-color:var(--checkin);background:var(--checkin-tint);box-shadow:2px 2px 0 var(--checkin-2)}
+.qp-thumb{
+  width:38px;height:38px;flex:0 0 38px;border-radius:10px;border:1.5px solid var(--text);
+  display:flex;align-items:center;justify-content:center;font-size:1.1rem;
+}
+.qp-body{flex:1;min-width:0}
+.qp-name{font-weight:900;font-size:.78rem;color:var(--text);line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qp-meta{color:var(--text2);font-size:.62rem;font-weight:700;display:flex;gap:.5rem;margin-top:2px}
+.qp-meta .prev{color:var(--verified);font-weight:800}
+.qp-tag{font-size:.65rem;font-weight:900;color:var(--checkin-2);flex-shrink:0;padding:.2rem .4rem;background:var(--white);border:1.5px solid var(--checkin);border-radius:6px}
+.qp-close{
+  margin-top:.7rem;padding:.55rem;background:var(--white);color:var(--text);
+  border:2px solid var(--text);border-radius:12px;box-shadow:2px 2px 0 var(--text);
+  font-weight:900;font-size:.8rem;
+}
+
+/* ═══ CAMERA (Locket) ═══ */
+.cam,.prev,.sent{
+  flex:1;background:var(--cam-bg);color:var(--white);
+  display:flex;flex-direction:column;position:relative;overflow:hidden;
+}
+.cam-top,.prev-top{
+  position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:0;right:0;
+  padding:.5rem .9rem;display:flex;justify-content:space-between;align-items:center;z-index:10;
+}
+.cam-place{
+  padding:.4rem .8rem;background:rgba(0,0,0,.55);color:var(--white);
+  border:1.5px solid rgba(255,255,255,.4);border-radius:999px;
+  font-size:.75rem;font-weight:800;backdrop-filter:blur(6px);
+}
+.cam-btn-round{
+  min-width:34px;height:34px;padding:0 .7rem;border-radius:17px;background:rgba(0,0,0,.55);
+  border:1.5px solid rgba(255,255,255,.4);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.85rem;font-weight:800;color:var(--white);
+  backdrop-filter:blur(4px);
+}
+.cam-btn-round:active{transform:scale(.94)}
+.cam-view{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+  background:radial-gradient(circle at center,rgba(232,132,60,.2) 0,transparent 60%),
+    linear-gradient(180deg,#1a1210 0,var(--cam-bg) 100%);
+  position:relative;
+}
+.cam-view::before{
+  content:'';position:absolute;top:14%;left:14%;right:14%;bottom:22%;
+  border:1px solid rgba(255,255,255,.16);border-radius:10px;
+  animation:focus-in 1.6s ease-in-out infinite alternate;
+}
+@keyframes focus-in{
+  from{opacity:.5;transform:scale(1)}
+  to{opacity:1;transform:scale(1.02)}
+}
+.cam-view::after{
+  content:'';position:absolute;top:calc(14% - 8px);left:calc(14% - 8px);
+  width:18px;height:18px;
+  border-top:2.5px solid rgba(255,255,255,.75);border-left:2.5px solid rgba(255,255,255,.75);
+  border-top-left-radius:4px;
+}
+.cam-food{font-size:6rem;line-height:1;filter:drop-shadow(0 6px 12px rgba(0,0,0,.5));z-index:2;user-select:none}
+.cam-hint{
+  font-size:.72rem;color:rgba(255,255,255,.75);
+  padding:.35rem .85rem;background:rgba(0,0,0,.55);border-radius:999px;
+  border:1px solid rgba(255,255,255,.2);z-index:2;backdrop-filter:blur(4px);
+}
+.cam-controls{
+  padding:12px 24px 28px;
+  background:linear-gradient(180deg,transparent 0,rgba(0,0,0,.9) 45%);
+  position:relative;z-index:5;
+}
+.cam-stars{
+  display:flex;gap:8px;justify-content:center;padding:6px 0 14px;font-size:1.7rem;line-height:1;
+}
+.star{cursor:pointer;user-select:none;transition:transform .12s}
+.star:active{transform:scale(1.3)}
+.cam-stars .star{color:rgba(255,255,255,.35);transition:color .15s}
+.cam-stars .star.on{color:var(--accent);text-shadow:0 0 12px rgba(232,132,60,.7)}
+.cam-controls-row{display:flex;align-items:center;justify-content:space-between;padding:0 4px}
+.cam-side{
+  min-width:52px;font-size:.75rem;font-weight:800;color:rgba(255,255,255,.85);text-align:center;padding:8px;
+}
+.cam-side:active{transform:scale(.94)}
+.cam-flip{
+  width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);
+  border:1.5px solid rgba(255,255,255,.45);
+  display:flex;align-items:center;justify-content:center;font-size:1.1rem;
+  transition:transform .3s;
+}
+.cam-flip:active{transform:rotate(180deg)}
+.cam-shutter{
+  width:76px;height:76px;border-radius:50%;background:var(--white);
+  border:6px solid rgba(255,255,255,.4);
+  position:relative;box-shadow:0 0 0 2px #000;transition:transform .1s;
+}
+.cam-shutter::after{
+  content:'';position:absolute;inset:5px;background:var(--white);
+  border-radius:50%;border:1.5px solid var(--text2);
+}
+.cam-shutter:active{transform:scale(.9)}
+.cam-shutter.busy{animation:shutter-pulse .4s ease}
+@keyframes shutter-pulse{0%,100%{transform:scale(1)}50%{transform:scale(.8)}}
+
+.flash{position:absolute;inset:0;background:var(--white);z-index:200;opacity:0;pointer-events:none;transition:opacity .15s}
+.flash.on{opacity:.9}
+
+/* Preview */
+.prev-photo{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:6rem;
+  filter:brightness(.92) saturate(1.15);z-index:1;user-select:none;
+}
+.prev-top .cam-btn-round{padding:0 .7rem;font-size:.72rem;font-weight:800}
+.prev-sheet{
+  position:absolute;bottom:0;left:0;right:0;
+  padding:16px 16px 24px;
+  background:linear-gradient(180deg,transparent 0,rgba(0,0,0,.55) 25%,rgba(0,0,0,.94) 100%);
+  color:var(--white);z-index:5;display:flex;flex-direction:column;gap:10px;
+}
+.prev-stars{display:flex;gap:6px;justify-content:center;font-size:1.5rem;line-height:1}
+.prev-stars .star{color:rgba(255,255,255,.35);transition:color .15s}
+.prev-stars .star.on{color:var(--accent);text-shadow:0 0 10px rgba(232,132,60,.7)}
+.prev-cap{
+  padding:.6rem .8rem;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.3);
+  border-radius:12px;font-size:.8rem;color:var(--white);font-style:italic;font-weight:600;
+  outline:none;resize:none;width:100%;line-height:1.35;
+}
+.prev-cap::placeholder{color:rgba(255,255,255,.5)}
+.prev-cap:focus{border-color:var(--accent);background:rgba(0,0,0,.65)}
+.prev-tog{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;
+  background:rgba(255,255,255,.13);border:1.5px solid rgba(255,255,255,.4);border-radius:14px;
+}
+.knob{
+  width:42px;height:24px;background:var(--cream-2);border:1.5px solid var(--white);
+  border-radius:13px;position:relative;flex-shrink:0;transition:background .2s;
+}
+.knob::after{
+  content:'';position:absolute;top:1px;left:1px;
+  width:18px;height:18px;background:var(--white);border-radius:50%;transition:transform .2s;
+}
+.prev-tog.on .knob{background:var(--checkin)}
+.prev-tog.on .knob::after{transform:translateX(18px)}
+.prev-tog-body{flex:1;font-size:.72rem;color:var(--white);font-weight:800;line-height:1.3}
+.prev-tog-body small{display:block;color:rgba(255,255,255,.7);font-size:.6rem;margin-top:2px;font-weight:600}
+.prev-send{
+  padding:.9rem;background:var(--checkin);color:var(--white);
+  border:2px solid var(--white);border-radius:16px;
+  font-size:.95rem;font-weight:900;text-align:center;
+  box-shadow:0 4px 0 rgba(0,0,0,.5);transition:transform .1s;
+}
+.prev-send:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.5)}
+
+/* Sent */
+.sent-photo{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:6rem;
+  filter:brightness(.55);z-index:1;user-select:none;
+}
+.sent-overlay{
+  position:relative;z-index:5;flex:1;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  padding:24px 20px;text-align:center;
+  background:linear-gradient(180deg,rgba(0,0,0,.4) 0%,rgba(0,0,0,.8) 100%);
+}
+.sent-check{
+  width:72px;height:72px;border-radius:50%;background:var(--checkin);
+  border:3.5px solid var(--white);display:flex;align-items:center;justify-content:center;
+  font-size:2rem;box-shadow:0 0 0 8px rgba(214,75,122,.3);animation:pop .5s var(--ease-spring) both;
+}
+@keyframes pop{0%{transform:scale(0);opacity:0}100%{transform:scale(1);opacity:1}}
+.sent-title{font-weight:900;font-size:1.35rem;color:var(--white);margin:0;line-height:1.15}
+.sent-streak{
+  padding:.4rem .9rem;background:var(--accent);border:1.5px solid var(--white);
+  border-radius:999px;font-size:.75rem;font-weight:900;color:var(--white);box-shadow:0 2px 0 rgba(0,0,0,.3);
+}
+.sent-preview{
+  padding:10px;background:rgba(255,255,255,.13);border:1px dashed rgba(255,255,255,.4);
+  border-radius:12px;font-size:.62rem;color:rgba(255,255,255,.9);width:100%;text-align:left;font-weight:700;
+}
+.loc-mini{
+  margin-top:6px;padding:8px;background:var(--white);color:var(--text);
+  border:1.5px solid var(--text);border-radius:10px;font-size:.62rem;box-shadow:2px 2px 0 var(--text);
+}
+.loc-mini-au{font-weight:800;color:var(--text2);font-size:.56rem;margin-bottom:4px}
+.loc-mini-photo{
+  height:64px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;border:1px solid var(--text);
+}
+.loc-mini-info{margin-top:5px;font-size:.58rem;color:var(--text);font-weight:800;display:flex;justify-content:space-between}
+.loc-mini-info .r{color:var(--accent-2)}
+.sent-actions{display:flex;gap:8px;width:100%;margin-top:6px}
+.btn-full{
+  flex:1;padding:.7rem;font-size:.78rem;font-weight:900;text-align:center;
+  border:2px solid var(--white);border-radius:14px;color:var(--white);transition:transform .1s;
+}
+.btn-full:active{transform:scale(.96)}
+.btn-full.pink{background:var(--checkin);box-shadow:0 3px 0 rgba(0,0,0,.4)}
+.btn-full.ghost{background:rgba(255,255,255,.15)}
+
+/* Confetti */
+.confetti-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:8}
+.confetti{position:absolute;top:-40px;font-size:1.6rem;user-select:none;animation:fall linear}
+@keyframes fall{
+  0%{top:-40px;transform:translateX(0) rotate(0)}
+  100%{top:120%;transform:translateX(calc(var(--dx,0)*1px)) rotate(720deg)}
+}
+
+/* ═══ Detail modal (community) ═══ */
+.modal-sheet{
+  position:absolute;left:12px;right:12px;top:calc(env(safe-area-inset-top,0px) + 44px);bottom:calc(var(--tab-h) + 24px);
+  background:var(--cream);border:2.5px solid var(--text);border-radius:22px;
+  box-shadow:4px 4px 0 var(--text);overflow:hidden;display:flex;flex-direction:column;
+  animation:sheet-in .3s var(--ease-spring);
+}
+@keyframes sheet-in{from{transform:translateY(20px);opacity:0}to{transform:none;opacity:1}}
+.modal-hd{
+  padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:2px solid var(--line-2);background:var(--paper);
+}
+.modal-hd h4{margin:0;font-size:1rem;font-weight:900;color:var(--text)}
+.modal-close{
+  width:30px;height:30px;border-radius:50%;background:var(--white);
+  border:2px solid var(--text);display:flex;align-items:center;justify-content:center;
+  font-size:.85rem;font-weight:900;box-shadow:1.5px 1.5px 0 var(--text);
+}
+.modal-body{flex:1;overflow-y:auto;padding:.8rem;display:flex;flex-direction:column;gap:.7rem;scrollbar-width:none}
+.modal-body::-webkit-scrollbar{display:none}
+
+.detail-photo{
+  height:140px;border-radius:14px;border:2px solid var(--text);
+  display:flex;align-items:center;justify-content:center;font-size:3rem;
+}
+.eaten-strip{
+  display:flex;align-items:center;gap:.6rem;padding:.6rem .8rem;
+  background:var(--verified-tint);border:2px solid var(--verified);border-radius:14px;
+  font-size:.72rem;font-weight:700;
+}
+.eaten-avatars{display:flex;margin-right:2px}
+.eaten-avatars .avatar-sm{
+  width:24px;height:24px;font-size:.78rem;margin-left:-6px;border:2px solid var(--white);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;background:var(--accent);
+}
+.eaten-avatars .avatar-sm:first-child{margin-left:0}
+.eaten-strip b{color:var(--verified);font-weight:900}
+
+.rating-double{display:flex;gap:.4rem;flex-wrap:wrap}
+.rating-double .r{
+  flex:1;min-width:130px;padding:.4rem .6rem;background:var(--paper);
+  border:2px solid var(--text);border-radius:12px;
+  font-size:.7rem;color:var(--text2);font-weight:700;
+}
+.rating-double .r b{color:var(--accent-2);font-weight:900}
+.rating-double .r.verified{background:var(--verified-tint);border-color:var(--verified)}
+.rating-double .r.verified b{color:var(--verified)}
+
+.detail-desc{font-size:.78rem;color:var(--text2);line-height:1.5}
+
+.detail-actions{display:flex;gap:.4rem}
+.detail-actions .btn{
+  flex:1;padding:.55rem;font-size:.75rem;font-weight:900;
+  border:2px solid var(--text);border-radius:12px;box-shadow:2px 2px 0 var(--text);
+  display:flex;align-items:center;justify-content:center;gap:.25rem;
+}
+.detail-actions .btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.detail-actions .btn.ghost{background:var(--white);color:var(--text)}
+.detail-actions .btn.pink{background:var(--checkin);color:var(--white)}
+
+.detail-diary-hd{font-size:.72rem;font-weight:900;color:var(--text2);padding-top:.4rem;border-top:1.5px dashed var(--line-2)}
+.dm-diary-item{
+  display:flex;gap:.5rem;padding:.5rem .7rem;background:var(--white);
+  border:1.5px solid var(--text);border-radius:12px;box-shadow:1.5px 1.5px 0 var(--text);align-items:center;
+}
+.dm-diary-item .avatar-sm{width:32px;height:32px;flex-shrink:0;border-radius:50%;background:var(--cat-snack);border:2px solid var(--text);display:flex;align-items:center;justify-content:center;font-size:1rem}
+.dm-diary-item .n{font-weight:900;font-size:.75rem;color:var(--text)}
+.dm-diary-item .m{color:var(--text2);font-size:.65rem;font-weight:700;font-style:italic;line-height:1.35}
+
+/* Post-nav sheet */
+.postnav-sheet{
+  position:absolute;bottom:calc(var(--tab-h) + 20px);left:12px;right:12px;
+  background:var(--cream);border:2.5px solid var(--text);border-radius:20px;
+  box-shadow:4px 4px 0 var(--text);padding:16px;
+  animation:slide-up .35s var(--ease-spring);
+}
+@keyframes slide-up{from{transform:translateY(100%);opacity:0}to{transform:none;opacity:1}}
+.postnav-tag{
+  display:inline-block;padding:.2rem .6rem;background:var(--checkin);color:var(--white);
+  font-size:.6rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;
+  border:1.5px solid var(--text);border-radius:6px;
+}
+.postnav-title{font-size:1.05rem;font-weight:900;margin:8px 0 6px;line-height:1.2;color:var(--text)}
+.postnav-sub{font-size:.72rem;color:var(--text2);font-weight:700;line-height:1.4;margin-bottom:12px}
+.postnav-actions{display:flex;gap:.5rem}
+.postnav-actions .btn{
+  flex:1;padding:.65rem;border:2px solid var(--text);border-radius:12px;
+  font-size:.82rem;font-weight:900;text-align:center;box-shadow:2px 2px 0 var(--text);
+}
+.postnav-actions .btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.postnav-actions .btn.pink{background:var(--checkin);color:var(--white)}
+.postnav-actions .btn.ghost{background:var(--white);color:var(--text)}
+
+/* Toast */
+.toast{
+  position:absolute;bottom:calc(var(--tab-h) + 20px);left:50%;
+  transform:translate(-50%,50px);padding:.7rem 1.1rem;
+  background:var(--text);color:var(--white);border-radius:999px;
+  font-size:.78rem;font-weight:800;opacity:0;pointer-events:none;
+  transition:all .3s;z-index:150;box-shadow:0 4px 12px rgba(0,0,0,.4);white-space:nowrap;
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ Gate overlay — shown until email allowlist check passes ═══ -->
+<div id="gate">
+  <div class="gate-card">
+    <div class="gate-lock">🔒</div>
+    <h1 class="gate-title">Check-in · <em>Nhóp Nhép</em></h1>
+    <p class="gate-msg" id="gate-msg">
+      Đây là bản <b>preview riêng</b> của tính năng Check-in.<br/>
+      Chỉ 2 tài khoản test đầu tiên được cấp quyền xem.
+    </p>
+    <a class="gate-cta" href="/">→ Về Nhóp Nhép để đăng nhập</a>
+    <div class="gate-hint" id="gate-hint">
+      Sau khi đăng nhập ở tab <code>👥 Cộng đồng</code>, quay lại link này và reload.
+    </div>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="stage-hint">
+    Prototype thao tác được · khớp với UI thật đang chạy ở nhopnhep.pages.dev. Thử: chọn tab <b>Check-in</b> → tap 1 quán → chấm sao → tap shutter → gửi.
+  </div>
+
+  <div class="app" id="app">
+    <div class="notch"></div>
+
+    <div class="screens">
+
+      <!-- ═══ HOME ═══ -->
+      <div class="screen active" id="s-home">
+        <div class="home-map">
+          <div class="home-radius"></div>
+          <div class="map-pin" style="top:30%;left:38%"></div>
+          <div class="map-pin" style="top:38%;left:60%"></div>
+          <div class="map-pin" style="top:42%;left:45%"></div>
+        </div>
+        <button class="brand-float">Nhóp <em>Nhép</em></button>
+        <div class="map-btn-cluster">
+          <button class="cluster-btn" title="Quán đã lưu" onclick="toast('Quán đã lưu')">🔖</button>
+          <button class="cluster-btn" title="Thông báo" onclick="toast('Thông báo')">🔔</button>
+          <button class="cluster-btn gps" title="Bật GPS" onclick="toast('Đang bắt GPS...')">◎</button>
+        </div>
+        <button class="rp-fab" onclick="toast('Random pick — chưa xây')">🎲</button>
+
+        <div class="home-sheet">
+          <div class="sheet-handle"></div>
+          <div class="sheet-scroll">
+            <div class="row-label">Điểm xuất phát</div>
+            <div class="loc-row">
+              <input class="loc-input" placeholder="Địa chỉ, tên đường…" value="Cầu Giấy (ước tính)">
+              <button class="radius-pill">1 km <span class="chev">▾</span></button>
+            </div>
+            <div class="gps-hint">Đang đoán vị trí qua IP · bấm 📍 GPS để chính xác cấp quận</div>
+
+            <div class="row-label mini">Nguồn dữ liệu</div>
+            <div class="cat-chips">
+              <button class="cat-chip active" onclick="toggleChip(this)">🌐 Địa điểm công khai</button>
+              <button class="cat-chip active" onclick="toggleChip(this)">⭐ Của tôi</button>
+              <button class="cat-chip" onclick="toggleChip(this)">👥 Cộng đồng</button>
+            </div>
+
+            <div class="row-label mini">Tìm <em>món / quán</em> · tuỳ chọn</div>
+            <div class="loc-row">
+              <input class="loc-input" placeholder="VD: phở, bánh mì, tên quán…">
+              <button class="radius-pill" style="background:var(--white);color:var(--text);border:2px solid var(--text)">Tất cả loại <span class="chev">▾</span></button>
+            </div>
+          </div>
+          <button class="scan-btn" onclick="toast('Đang quét… (chưa xây trong prototype này)')">🔍 Quét <em>ngay</em>!</button>
+        </div>
+      </div>
+
+      <!-- ═══ CHECK-IN — camera-first (Locket-style) ═══ -->
+      <div class="screen" id="s-checkin">
+        <div class="ci-tab">
+          <div class="ci-tab-hd">
+            <button class="quan-auto-pill" onclick="openQuanPicker()">
+              📍 <b id="ci-quan-name">Bún riêu Ngô Sĩ Liên</b>
+              <span class="dist" id="ci-quan-dist">15m</span>
+              <span class="chev">▾</span>
+            </button>
+          </div>
+          <div class="ci-cam-frame">
+            <div class="ci-cam-view">
+              <div class="ci-cam-food" id="ci-cam-food">🍜</div>
+              <div class="ci-cam-hint">Đây có phải quán bạn đang ăn?</div>
+              <div class="ci-cam-stars" id="ci-cam-stars" data-rating="0">
+                <span class="star" data-value="1">★</span>
+                <span class="star" data-value="2">★</span>
+                <span class="star" data-value="3">★</span>
+                <span class="star" data-value="4">★</span>
+                <span class="star" data-value="5">★</span>
+              </div>
+            </div>
+          </div>
+          <div class="ci-controls">
+            <button class="ci-side" onclick="viewDiaryFromCi()">
+              <span class="ci-side-ico">📔</span>
+              <span class="ci-side-lbl">Diary</span>
+            </button>
+            <button class="ci-shutter" id="ci-shutter" onclick="tapShutterInline()">
+              <span class="ci-shutter-inner"></span>
+            </button>
+            <button class="ci-side" onclick="toast('Đổi camera trước/sau')">
+              <span class="ci-side-ico">🔄</span>
+              <span class="ci-side-lbl">Đổi</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ Quán picker overlay ═══ -->
+      <div class="screen overlay-scr" id="s-quan-picker">
+        <div class="qp-sheet">
+          <div class="qp-handle"></div>
+          <div class="qp-title">Chọn quán bạn đang ngồi</div>
+          <div class="qp-sub">Auto-detect theo GPS trong 200m · tap để đổi</div>
+          <div class="qp-list" id="qp-list"></div>
+          <button class="qp-close" onclick="closeQuanPicker()">Đóng</button>
+        </div>
+      </div>
+
+      <!-- ═══ CAMERA ═══ -->
+      <div class="screen dark" id="s-camera">
+        <div class="cam">
+          <div class="cam-top">
+            <div class="cam-place">📍 <span id="cam-quan-name">Bún riêu NSL</span></div>
+            <button class="cam-btn-round" onclick="cancelCheckin()">✕</button>
+          </div>
+          <div class="cam-view">
+            <div class="cam-food" id="cam-food">🍜</div>
+            <div class="cam-hint">Chấm sao rồi tap nút trắng để chụp</div>
+          </div>
+          <div class="cam-controls">
+            <div class="cam-stars" id="cam-stars" data-rating="0">
+              <span class="star" data-value="1">★</span>
+              <span class="star" data-value="2">★</span>
+              <span class="star" data-value="3">★</span>
+              <span class="star" data-value="4">★</span>
+              <span class="star" data-value="5">★</span>
+            </div>
+            <div class="cam-controls-row">
+              <button class="cam-flip" onclick="toast('Đổi camera trước/sau')">🔄</button>
+              <button class="cam-shutter" id="cam-shutter" onclick="tapShutter()"></button>
+              <button class="cam-side" onclick="cancelCheckin()">Huỷ</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ PREVIEW ═══ -->
+      <div class="screen dark" id="s-preview">
+        <div class="prev">
+          <div class="prev-photo" id="prev-photo">🍜</div>
+          <div class="prev-top">
+            <button class="cam-btn-round" onclick="retake()">← Chụp lại</button>
+            <button class="cam-btn-round" onclick="cancelCheckin()">✕</button>
+          </div>
+          <div class="prev-sheet">
+            <div class="prev-stars" id="prev-stars" data-rating="4">
+              <span class="star" data-value="1">★</span>
+              <span class="star" data-value="2">★</span>
+              <span class="star" data-value="3">★</span>
+              <span class="star" data-value="4">★</span>
+              <span class="star" data-value="5">★</span>
+            </div>
+            <textarea class="prev-cap" id="prev-cap" rows="1" placeholder="Ghi chú ngắn (tuỳ chọn)..."></textarea>
+            <div class="prev-tog on" id="prev-tog" onclick="toggleShare()">
+              <div class="knob"></div>
+              <div class="prev-tog-body">
+                <span id="tog-label">Chia sẻ với bạn bè</span>
+                <small id="tog-sub">Rating tính vào ✓ verified</small>
+              </div>
+            </div>
+            <button class="prev-send" onclick="tapSend()">📍 Gửi check-in</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ SENT ═══ -->
+      <div class="screen dark" id="s-sent">
+        <div class="sent">
+          <div class="sent-photo" id="sent-photo">🍜</div>
+          <div class="sent-overlay">
+            <div class="sent-check">✅</div>
+            <h2 class="sent-title" id="sent-title">Đã gửi tới bạn bè!</h2>
+            <div class="sent-streak">🔥 <span id="streak-n">5</span> ngày liên tiếp</div>
+            <div class="sent-preview">
+              <span id="preview-lbl">Bạn bè thấy card thế này:</span>
+              <div class="loc-mini">
+                <div class="loc-mini-au">@vinh.mien · vừa xong</div>
+                <div class="loc-mini-photo" id="loc-mini-photo">🍜</div>
+                <div class="loc-mini-info">
+                  <span id="loc-mini-name">Bún riêu NSL</span>
+                  <span class="r" id="loc-mini-rate">★★★★☆</span>
+                </div>
+              </div>
+            </div>
+            <div class="sent-actions">
+              <button class="btn-full ghost" onclick="goDiary()">📔 Xem Diary</button>
+              <button class="btn-full pink" onclick="showTab('checkin')">📸 Chụp tiếp</button>
+            </div>
+          </div>
+          <div class="confetti-layer" id="confetti-layer"></div>
+        </div>
+      </div>
+
+      <!-- ═══ COMMUNITY ═══ -->
+      <div class="screen" id="s-community">
+        <div class="profile-scroll">
+          <div class="comm-subtabs">
+            <button class="comm-iconbtn" onclick="toast('Đăng nhập')">👤</button>
+            <div class="comm-subtabs-center">
+              <div class="comm-subtab active">Quán <span style="color:var(--primary);font-style:italic">ăn</span></div>
+              <div class="comm-subtab">Lộ trình</div>
+            </div>
+            <button class="comm-iconbtn" onclick="toast('+ Đăng quán')">+</button>
+          </div>
+          <div class="comm-r-list" id="feed-list"></div>
+        </div>
+      </div>
+
+      <!-- ═══ DETAIL modal ═══ -->
+      <div class="screen overlay-scr" id="s-detail">
+        <div class="modal-sheet">
+          <div class="modal-hd">
+            <h4 id="detail-name">Bún riêu NSL</h4>
+            <button class="modal-close" onclick="closeDetail()">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="detail-photo" id="detail-photo">🍜</div>
+            <div class="eaten-strip">
+              <div class="eaten-avatars">
+                <div class="avatar-sm">🦊</div>
+                <div class="avatar-sm" style="background:var(--cat-cafe)">🐨</div>
+                <div class="avatar-sm" style="background:var(--cat-snack)">🐝</div>
+              </div>
+              <span><b id="eaten-n">Bạn + 4 người</b> đã check-in ở đây</span>
+            </div>
+            <div class="rating-double">
+              <div class="r">⭐ Chung <b>★ 4.6</b> · 12 người</div>
+              <div class="r verified">✓ Verified <b>★ 4.8</b> · 5 lần thật</div>
+            </div>
+            <div class="detail-desc">Quán ruột gần chợ Hôm — riêu cua thơm, có sườn sụn. Đi sớm trước 12h, đông từ 12h15.</div>
+            <div class="detail-actions">
+              <button class="btn ghost" onclick="toast('Đã lưu quán')">🔖 Lưu</button>
+              <button class="btn ghost" onclick="toast('Đã copy link')">📋 Link</button>
+              <button class="btn pink" onclick="startCheckinFromDetail()">📸 Check-in</button>
+            </div>
+            <div class="detail-diary-hd">📔 Diary của những người đã ăn</div>
+            <div class="dm-diary-item">
+              <div class="avatar-sm">🐝</div>
+              <div>
+                <div class="n">@long.nhep · ★★★★★</div>
+                <div class="m">"Ngon nhất Hà Nội, tuần mình đi 2 lần"</div>
+              </div>
+            </div>
+            <div class="dm-diary-item">
+              <div class="avatar-sm" style="background:var(--cat-cafe)">🐨</div>
+              <div>
+                <div class="n">@hai.au · ★★★★★</div>
+                <div class="m">"Riêu chuẩn — đúng gu Bắc, sườn thơm"</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ PROFILE ═══ -->
+      <div class="screen" id="s-profile">
+        <div class="settings-gears">
+          <button class="settings-gear" onclick="toast('Cài đặt')">⚙</button>
+          <button class="settings-gear" onclick="toast('Quán đã lưu')">🔖</button>
+          <button class="settings-gear" onclick="toast('Lộ trình đã lưu')">🗺</button>
+        </div>
+        <div class="profile-scroll">
+          <div class="prof-hd">
+            <div class="avatar">🦊</div>
+            <div class="prof-name">@vinh.mien</div>
+            <div class="prof-tag">Fan của quán ngon 🍴</div>
+            <div class="prof-badges">
+              <span class="badge">🔥 Chuỗi <span id="prof-streak">5</span> ngày</span>
+              <span class="badge acc">🍜 Level 3</span>
+            </div>
+          </div>
+          <div class="prof-stats">
+            <div class="prof-stat"><div class="prof-stat-n">12</div><div class="prof-stat-l">Quán</div></div>
+            <div class="prof-stat"><div class="prof-stat-n">45</div><div class="prof-stat-l">★</div></div>
+            <div class="prof-stat hi"><div class="prof-stat-n" id="prof-checkins">27</div><div class="prof-stat-l">Check-in</div></div>
+            <div class="prof-stat"><div class="prof-stat-n">8</div><div class="prof-stat-l">Follower</div></div>
+            <div class="prof-stat"><div class="prof-stat-n">14</div><div class="prof-stat-l">Follow</div></div>
+          </div>
+          <div class="subtabs">
+            <div class="subtab" onclick="toast('Bài đăng — chưa demo')">Bài đăng</div>
+            <div class="subtab on">📔 Diary</div>
+            <div class="subtab" onclick="toast('Đã lưu — chưa demo')">Đã lưu</div>
+          </div>
+          <div class="diary-list" id="diary-list"></div>
+        </div>
+      </div>
+
+      <!-- ═══ POST-NAV auto-suggest ═══ -->
+      <div class="screen overlay-scr" id="s-postnav">
+        <div class="postnav-sheet">
+          <span class="postnav-tag">Đã tới nơi</span>
+          <div class="postnav-title">Chúc ngon miệng ở<br/>Bún riêu Ngô Sĩ Liên 🍜</div>
+          <div class="postnav-sub">Sau khi ăn xong, chụp 1 ảnh check-in để lưu vào diary + (tuỳ chọn) rủ bạn bè.</div>
+          <div class="postnav-actions">
+            <button class="btn ghost" onclick="dismissPostNav()">Để sau</button>
+            <button class="btn pink" onclick="startCheckinFromNav()">📸 Chụp ngay</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="tabbar" id="tabbar">
+      <button class="tab-btn active" data-tab="home" onclick="showTab('home')">
+        <div class="tab-ico">🍽</div><div class="tab-lbl">Trang chủ</div>
+      </button>
+      <button class="tab-btn" data-tab="checkin" onclick="showTab('checkin')">
+        <div class="tab-ico">📸</div><div class="tab-lbl">Check-in</div>
+      </button>
+      <button class="tab-btn" data-tab="community" onclick="showTab('community')">
+        <div class="tab-ico">👥</div><div class="tab-lbl">Cộng đồng</div>
+      </button>
+      <button class="tab-btn" data-tab="profile" onclick="showTab('profile')">
+        <div class="tab-ico">👤</div><div class="tab-lbl">Cá nhân</div>
+      </button>
+    </div>
+
+    <div class="flash" id="flash"></div>
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div class="stage-tools">
+    <button onclick="triggerPostNav()">▷ Auto-suggest cuối Nav</button>
+    <button onclick="resetDemo()">↻ Reset demo</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+const QUANS = [
+  { id:'bun-rieu', name:'Bún riêu Ngô Sĩ Liên', shortName:'Bún riêu NSL', emoji:'🍜', gradient:'linear-gradient(135deg,#F9A870 0%,#E8843C 40%,#B92626 100%)', dist:'15m', rating:'★ 4.6', visited:0 },
+  { id:'cafe-giang', name:'Cà phê Giảng', shortName:'Cà phê Giảng', emoji:'☕', gradient:'linear-gradient(135deg,#C89A7C 0%,#7A4E2F 60%,#5F0F0F 100%)', dist:'85m', rating:'★ 4.8', visited:3 },
+  { id:'che-bon-mua', name:'Chè Bốn Mùa', shortName:'Chè Bốn Mùa', emoji:'🍡', gradient:'linear-gradient(135deg,#F4A0B8 0%,#D64B7A 50%,#8C1919 100%)', dist:'170m', rating:'★ 4.4', visited:0 },
+  { id:'pho-thin', name:'Phở Thìn Lò Đúc', shortName:'Phở Thìn', emoji:'🍲', gradient:'linear-gradient(135deg,#F8B77E 0%,#B92626 100%)', dist:'190m', rating:'★ 4.7', visited:1 },
+  { id:'banh-cuon', name:'Bánh cuốn Kỳ Đồng', shortName:'Bánh cuốn', emoji:'🥟', gradient:'linear-gradient(135deg,#FCE4B3 0%,#E8843C 100%)', dist:'195m', rating:'★ 4.5', visited:0 },
+];
+
+const INITIAL_DIARY = [
+  { date:19, month:'Th9', name:'Cà phê Giảng', rating:5, note:'"Đúng vibe HN"', shared:false },
+  { date:18, month:'Th9', name:'Chè Bốn Mùa', rating:3, note:'Hơi ngọt', shared:false },
+  { date:17, month:'Th9', name:'Phở Thìn Lò Đúc', rating:5, note:'"Béo ngậy đúng chất"', shared:true },
+];
+
+const INITIAL_FEED = [
+  { type:'locket', user:'hai.au', avatar:'🐨', avatarBg:'var(--cat-cafe)', t:'2h', quanName:'Bún riêu NSL', quanLoc:'Đống Đa', quanEmoji:'🍜', rating:5, cap:'"Riêu chuẩn — đúng gu Bắc, sườn thơm."', gradient:QUANS[0].gradient, hearts:3, quanId:'bun-rieu' },
+  { type:'normal', user:'phuc.me.an', avatar:'🐝', avatarBg:'var(--cat-snack)', t:'3 ngày trước', title:'MEATPLUS & CHA CHA CHA', sub:'8 năm liền được nhận sao Michelin', loc:'55 Nguyễn Đăng Giai, Q2', emoji:'🥩', cats:['Nhà hàng','Tầm trung'] },
+];
+
+const state = {
+  currentQuan: QUANS[0],  // Auto-detect default = nearest
+  streak:5,
+  totalCheckins:27,
+  diary:[...INITIAL_DIARY],
+  feed:[...INITIAL_FEED],
+};
+
+const NO_TABS = new Set(['camera','preview','sent']);
+let currentScreen = 'home';
+
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  const el = document.getElementById('s-'+name);
+  if (!el) return;
+  el.classList.add('active');
+  document.getElementById('app').classList.toggle('no-tabs', NO_TABS.has(name));
+  currentScreen = name;
+}
+function showTab(name){
+  showScreen(name);
+  document.querySelectorAll('.tab-btn').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  if (name === 'checkin') refreshCheckinTab();
+}
+function toggleChip(el){ el.classList.toggle('active'); }
+
+function refreshCheckinTab(){
+  const q = state.currentQuan || QUANS[0];
+  state.currentQuan = q;
+  document.getElementById('ci-quan-name').textContent = q.name;
+  document.getElementById('ci-quan-dist').textContent = q.dist;
+  document.getElementById('ci-cam-food').textContent = q.emoji;
+  setStars('ci-cam-stars', 0);
+}
+
+/* Legacy path — auto-suggest sheet + Community detail button call this.
+   Skip the intermediate camera screen and open Check-in tab directly. */
+function startCheckin(quanId){
+  const q = QUANS.find(x=>x.id===quanId); if (!q) return;
+  state.currentQuan = q;
+  showTab('checkin');
+}
+
+function cancelCheckin(){ showTab('checkin'); }
+
+/* Legacy camera-screen shutter (still used from post-nav path if we ever
+   route back through the full-screen camera) */
+function tapShutter(){
+  const sh = document.getElementById('cam-shutter');
+  sh.classList.add('busy');
+  const flash = document.getElementById('flash');
+  flash.classList.add('on');
+  setTimeout(()=>flash.classList.remove('on'), 150);
+  setTimeout(()=>{ sh.classList.remove('busy'); goPreview(); }, 300);
+}
+
+/* Inline shutter (new default) — user is on Check-in tab, tap the round pink
+   shutter, we flash + go to Preview which handles rating/caption/send. */
+function tapShutterInline(){
+  const sh = document.getElementById('ci-shutter');
+  sh.classList.add('busy');
+  const flash = document.getElementById('flash');
+  flash.classList.add('on');
+  setTimeout(()=>flash.classList.remove('on'), 150);
+  setTimeout(()=>{
+    sh.classList.remove('busy');
+    // Carry over any rating pre-selected on the inline stars
+    const inlineR = +document.getElementById('ci-cam-stars').dataset.rating || 0;
+    setStars('cam-stars', inlineR);
+    goPreview();
+  }, 300);
+}
+
+function viewDiaryFromCi(){ showTab('profile'); }
+
+/* Quán picker */
+function openQuanPicker(){
+  const wrap = document.getElementById('qp-list'); wrap.innerHTML='';
+  const currentId = state.currentQuan?.id;
+  QUANS.forEach(q=>{
+    const done = q.visited > 0;
+    const isCurrent = q.id === currentId;
+    const el = document.createElement('div');
+    el.className = 'qp-item' + (isCurrent?' current':'');
+    el.onclick = ()=>selectQuanFromPicker(q.id);
+    el.innerHTML = `
+      <div class="qp-thumb" style="background:${q.gradient}">${q.emoji}</div>
+      <div class="qp-body">
+        <div class="qp-name">${q.name}</div>
+        <div class="qp-meta">
+          <span>${q.dist}</span>
+          ${done ? `<span class="prev">✓ đã ăn ${q.visited} lần</span>` : `<span>${q.rating}</span>`}
+        </div>
+      </div>
+      ${isCurrent ? '<div class="qp-tag">Đang chọn</div>' : ''}
+    `;
+    wrap.appendChild(el);
+  });
+  showScreen('quan-picker');
+}
+function closeQuanPicker(){ showTab('checkin'); }
+function selectQuanFromPicker(id){
+  const q = QUANS.find(x=>x.id===id); if (!q) return;
+  state.currentQuan = q;
+  showTab('checkin');
+  toast('Đã đổi quán: '+q.shortName);
+}
+
+function goPreview(){
+  const q = state.currentQuan; if (!q) return;
+  const camR = +document.getElementById('cam-stars').dataset.rating || 0;
+  const r = camR || 4;
+  setStars('prev-stars', r);
+  const photo = document.getElementById('prev-photo');
+  photo.textContent = q.emoji;
+  photo.style.background = q.gradient;
+  document.getElementById('prev-cap').value = '';
+  document.getElementById('prev-tog').classList.add('on');
+  updateToggle();
+  showScreen('preview');
+  setTimeout(()=>document.getElementById('prev-cap').focus(), 300);
+}
+
+function retake(){ showScreen('camera'); }
+
+function toggleShare(){
+  document.getElementById('prev-tog').classList.toggle('on');
+  updateToggle();
+}
+function updateToggle(){
+  const on = document.getElementById('prev-tog').classList.contains('on');
+  document.getElementById('tog-label').textContent = on ? 'Chia sẻ với bạn bè' : 'Chỉ lưu vào diary riêng';
+  document.getElementById('tog-sub').textContent = on ? 'Rating tính vào ✓ verified' : 'Không hiện ở feed cộng đồng';
+}
+
+function tapSend(){
+  const q = state.currentQuan; if (!q) return;
+  const shared = document.getElementById('prev-tog').classList.contains('on');
+  const rating = +document.getElementById('prev-stars').dataset.rating || 4;
+  const caption = document.getElementById('prev-cap').value.trim();
+  q.visited++;
+  state.streak++;
+  state.totalCheckins++;
+  const today = new Date();
+  const entry = {
+    date: today.getDate(), month:'Th'+(today.getMonth()+1),
+    name: q.name, rating, note: caption ? '"'+caption+'"' : '',
+    shared, isNew:true,
+  };
+  state.diary.unshift(entry);
+  if (shared){
+    state.feed.unshift({
+      type:'locket', user:'vinh.mien', avatar:'🦊', avatarBg:'var(--accent)',
+      t:'vừa xong', quanName:q.shortName, quanLoc:'gần bạn', quanEmoji:q.emoji,
+      rating, cap: caption ? '"'+caption+'"' : '', gradient:q.gradient, hearts:0, quanId:q.id,
+    });
+  }
+  const sPhoto = document.getElementById('sent-photo');
+  sPhoto.textContent = q.emoji; sPhoto.style.background = q.gradient;
+  document.getElementById('sent-title').textContent = shared ? 'Đã gửi tới bạn bè!' : 'Đã lưu vào diary riêng!';
+  document.getElementById('preview-lbl').textContent = shared ? 'Bạn bè thấy card thế này:' : 'Preview card (chỉ bạn thấy):';
+  document.getElementById('streak-n').textContent = state.streak;
+  document.getElementById('loc-mini-name').textContent = q.shortName;
+  const lmp = document.getElementById('loc-mini-photo');
+  lmp.textContent = q.emoji; lmp.style.background = q.gradient;
+  document.getElementById('loc-mini-rate').textContent = starsText(rating);
+  showScreen('sent');
+  spawnConfetti();
+  renderFeed(); renderDiary(); updateProfileStats();
+}
+
+function goDiary(){ showTab('profile'); }
+
+function setStars(id, n){
+  const c = document.getElementById(id);
+  c.dataset.rating = n;
+  c.querySelectorAll('.star').forEach(s=>s.classList.toggle('on', +s.dataset.value <= n));
+}
+function bindStars(id){
+  const c = document.getElementById(id);
+  c.querySelectorAll('.star').forEach(s=>{
+    s.addEventListener('click', ()=>{
+      const v = +s.dataset.value;
+      const cur = +c.dataset.rating || 0;
+      setStars(id, cur === v ? 0 : v);
+    });
+  });
+}
+function starsText(n){ return '★★★★★'.slice(0,n)+'☆☆☆☆☆'.slice(0,5-n); }
+
+function renderQuans(){
+  const wrap = document.getElementById('quan-list'); wrap.innerHTML = '';
+  QUANS.forEach(q=>{
+    const done = q.visited > 0;
+    const el = document.createElement('div');
+    el.className = 'ci-quan-row';
+    el.onclick = ()=>startCheckin(q.id);
+    el.innerHTML = `
+      <div class="ci-quan-thumb" style="background:${q.gradient}">${q.emoji}</div>
+      <div class="ci-quan-body">
+        <div class="ci-quan-name">${q.name}</div>
+        <div class="ci-quan-meta">
+          <span>${q.dist}</span>
+          ${done ? `<span class="prev">✓ Bạn đã ăn ${q.visited} lần</span>` : `<span>${q.rating}</span>`}
+        </div>
+      </div>
+      <div class="ci-quan-cta ${done?'done':''}">${done?'Ăn lại':'📸'}</div>
+    `;
+    wrap.appendChild(el);
+  });
+  document.getElementById('quan-count').textContent = `${QUANS.length} quán · ${QUANS.filter(q=>q.visited===0).length} mới`;
+}
+
+function renderFeed(){
+  const wrap = document.getElementById('feed-list'); wrap.innerHTML = '';
+  state.feed.forEach(post=>{
+    if (post.type === 'locket'){
+      const el = document.createElement('div');
+      el.className = 'loc-card';
+      el.onclick = ()=>openDetail(post);
+      el.innerHTML = `
+        <div class="loc-card-hd">
+          <div class="comm-card-hd" style="padding:0;flex:1">
+            <div class="avatar-sm" style="background:${post.avatarBg}">${post.avatar}</div>
+            <b>@${post.user}</b>
+            <span class="t">${post.t}</span>
+          </div>
+        </div>
+        <div class="loc-card-photo" style="background:${post.gradient}">
+          <div class="loc-card-food">${post.quanEmoji}</div>
+          <div class="loc-card-info">
+            <b>${post.quanName}<small>📍 ${post.quanLoc}</small></b>
+            <div class="loc-card-rate">✓ ${starsText(post.rating)}</div>
+          </div>
+        </div>
+        ${post.cap ? `<div class="loc-card-cap">${post.cap}</div>` : ''}
+        <div class="loc-card-actions">
+          <span>♥ ${post.hearts}</span><span>💬</span>
+          <span class="save">🔖 Lưu quán</span>
+        </div>
+      `;
+      wrap.appendChild(el);
+    } else {
+      const el = document.createElement('div');
+      el.className = 'comm-card';
+      el.innerHTML = `
+        <div class="comm-card-hd">
+          <div class="avatar-sm" style="background:${post.avatarBg}">${post.avatar}</div>
+          <b>${post.user}</b>
+          <span class="t">${post.t}</span>
+        </div>
+        <div class="comm-card-photo" style="background:linear-gradient(135deg,#7A4E2F 0%,#B92626 100%)">${post.emoji}</div>
+        <div class="comm-card-body">
+          <div class="comm-card-name">${post.title}</div>
+          <div class="comm-card-loc">${post.sub} · ${post.loc}</div>
+        </div>
+        <div class="comm-card-actions">
+          <span>♡</span>
+          ${post.cats.map(c=>`<span class="chip">${c}</span>`).join('')}
+          <span class="save">🔖</span>
+        </div>
+      `;
+      wrap.appendChild(el);
+    }
+  });
+}
+
+function renderDiary(){
+  const wrap = document.getElementById('diary-list'); wrap.innerHTML = '';
+  if (state.diary.length === 0){
+    wrap.innerHTML = '<div class="empty-state"><span class="em">📔</span>Chưa có check-in nào — tap tab Check-in để bắt đầu.</div>';
+    return;
+  }
+  state.diary.forEach(e=>{
+    const row = document.createElement('div');
+    row.className = 'diary-row' + (e.isNew ? ' new' : '');
+    row.innerHTML = `
+      <div class="diary-date"><b>${e.date}</b>${e.month}</div>
+      <div class="diary-body">
+        <div class="n">${e.name}</div>
+        <div class="m">${starsText(e.rating)} ${e.note?'· '+e.note:''}</div>
+      </div>
+      <div class="diary-tail ${e.shared?'pub':'priv'}">${e.shared?'Share':'Riêng'}</div>
+    `;
+    wrap.appendChild(row);
+  });
+}
+
+function updateProfileStats(){
+  document.getElementById('prof-streak').textContent = state.streak;
+  document.getElementById('prof-checkins').textContent = state.totalCheckins;
+}
+
+function openDetail(post){
+  document.getElementById('detail-name').textContent = post.quanName;
+  const dp = document.getElementById('detail-photo');
+  dp.textContent = post.quanEmoji;
+  dp.style.background = post.gradient;
+  showScreen('detail');
+}
+function closeDetail(){ showTab('community'); }
+function startCheckinFromDetail(){ startCheckin('bun-rieu'); }
+
+function triggerPostNav(){ showScreen('postnav'); }
+function dismissPostNav(){ toast('Sẽ nhắc lại sau 30 phút'); showTab('checkin'); }
+function startCheckinFromNav(){ startCheckin('bun-rieu'); }
+
+function spawnConfetti(){
+  const layer = document.getElementById('confetti-layer'); layer.innerHTML = '';
+  const symbols = ['🍜','🎉','🍡','⭐','❤️','🥟','🎊'];
+  for (let i=0;i<24;i++){
+    const el = document.createElement('div'); el.className = 'confetti';
+    el.textContent = symbols[i % symbols.length];
+    el.style.left = Math.random()*100 + '%';
+    el.style.setProperty('--dx', (Math.random()*200-100).toFixed(0));
+    el.style.animationDelay = (Math.random()*0.4).toFixed(2)+'s';
+    el.style.animationDuration = (1.8+Math.random()*1.2).toFixed(2)+'s';
+    el.style.fontSize = (1.2+Math.random()*.9).toFixed(1)+'rem';
+    layer.appendChild(el);
+  }
+  setTimeout(()=>{ layer.innerHTML=''; }, 3500);
+}
+
+let toastTimer = null;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('on'), 2200);
+}
+
+function resetDemo(){
+  state.diary = [...INITIAL_DIARY];
+  state.feed = [...INITIAL_FEED];
+  state.streak = 5; state.totalCheckins = 27;
+  state.currentQuan = QUANS[0];
+  QUANS.forEach((q,i)=>{ q.visited = [0,3,0,1,0][i]; });
+  renderFeed(); renderDiary(); updateProfileStats();
+  showTab('home');
+  toast('Đã reset demo');
+}
+
+bindStars('cam-stars'); bindStars('prev-stars'); bindStars('ci-cam-stars');
+renderFeed(); renderDiary(); updateProfileStats(); refreshCheckinTab();
+</script>
+
+<script>
+/* ═══════════════════════════════════════════════
+   ACCESS GATE — client-side allowlist
+   ───────────────────────────────────────────────
+   Reads localStorage['community_user'] (set by js/community.js when the
+   user logs in on the main app at /). If the email in that record is on
+   the allowlist below, the gate hides and the prototype becomes usable.
+   Otherwise the gate stays covering the whole page.
+
+   This is a soft gate, not a security boundary — the HTML/CSS/JS of the
+   prototype is served publicly and anyone opening devtools can bypass.
+   Purpose is just "keep the preview URL scoped to invited testers" while
+   we iterate before wider rollout.
+═══════════════════════════════════════════════ */
+(function(){
+  var ALLOW = [
+    'bachvinhtran@gmail.com',
+    'bacvinhtran@gmail.com',  // typo-tolerant — allowlist request wrote it without the 'h'
+    'hthaoan0108@gmail.com'
+  ];
+  var email = null;
+  try {
+    var u = JSON.parse(localStorage.getItem('community_user') || 'null');
+    email = (u && u.email || '').toLowerCase().trim();
+  } catch(e) {}
+
+  var ok = email && ALLOW.indexOf(email) >= 0;
+  var gate = document.getElementById('gate');
+  if (ok) {
+    gate.classList.add('pass');
+    document.body.classList.add('gate-pass');
+    console.log('[gate] Access granted for', email);
+  } else {
+    var msg = document.getElementById('gate-msg');
+    var hint = document.getElementById('gate-hint');
+    if (email) {
+      msg.innerHTML = 'Tài khoản <b>' + email + '</b> chưa được cấp quyền xem preview này.<br/><br/>' +
+        'Preview chỉ dành cho 2 tài khoản test đầu tiên. Liên hệ Vinh nếu bạn cần được thêm vào.';
+      hint.innerHTML = 'Nếu đây là nhầm lẫn — thử đăng xuất và đăng nhập lại đúng tài khoản.';
+    }
+    console.log('[gate] Access denied. email =', email || '(not signed in)');
+  }
+})();
+</script>
+
+</body>
+</html>
