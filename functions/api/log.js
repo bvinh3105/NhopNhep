@@ -15,7 +15,7 @@
 // updated together whenever the tunnel rotates. See PROJECT_HANDOFF
 // section 4 for the watchdog that normally handles this.
 
-const PB_URL = 'https://returned-knowledgestorm-stephanie-robot.trycloudflare.com';
+const PB_URL = 'https://fifteen-dangerous-detected-explained.trycloudflare.com';
 const COLLECTION = 'analytics_events';
 const MAX_BODY = 8 * 1024; // 8 KB — a single event is ~500 bytes tops
 

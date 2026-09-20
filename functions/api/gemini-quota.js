@@ -23,7 +23,7 @@
 // updates log.js/register.js/error-report.js. Keep the constant name
 // identical so the watchdog's find/replace still catches this file.
 
-const PB_URL       = 'https://returned-knowledgestorm-stephanie-robot.trycloudflare.com';
+const PB_URL       = 'https://fifteen-dangerous-detected-explained.trycloudflare.com';
 const COLLECTION   = 'gemini_quota';
 const DAILY_LIMIT  = 15;
 
