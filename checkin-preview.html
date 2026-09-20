@@ -42,6 +42,11 @@
 .stage{display:none!important}
 body.gate-pass .stage{display:flex!important}
 
+/* Real app's icon convention (css/styles.css:70) — size is 1em so it
+   scales with the containing element's font-size, same as production. */
+.icon{display:inline-block;width:1em;height:1em;flex-shrink:0;vertical-align:-.15em;color:currentColor}
+.gate-lock .icon{width:1em;height:1em}
+
 /* ═══ Real tokens (from css/styles.css) ═══ */
 :root{
   --cream:#FBF3D9; --cream-2:#F5EBC1; --cream-3:#EEE0A6;
@@ -229,8 +234,6 @@ input,textarea{font:inherit;color:inherit}
   margin-top:.5rem;padding:.5rem .7rem;background:var(--primary-tint);border:1.5px dashed var(--primary);
   border-radius:12px;font-size:.72rem;color:var(--primary-2);font-weight:700;line-height:1.35;
 }
-.gps-hint::before{content:'📍 ';font-size:.85rem}
-
 .cat-chips{
   display:flex;gap:.5rem;flex-wrap:nowrap;overflow-x:auto;
   padding:12px 6px 8px;margin:-10px -6px -6px -6px;scrollbar-width:none;
@@ -412,8 +415,7 @@ input,textarea{font:inherit;color:inherit}
 .diary-body .n{font-weight:900;font-size:.78rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .diary-body .m{color:var(--text2);font-size:.68rem;font-weight:700;line-height:1.35}
 .diary-tail{flex:0 0 auto;color:var(--accent-2);font-weight:900;font-size:.68rem}
-.diary-tail.priv::before{content:'🔒 ';font-size:.65rem}
-.diary-tail.pub::before{content:'👥 ';font-size:.65rem}
+.diary-tail .icon{margin-right:2px}
 
 .empty-state{
   padding:2rem 1rem;text-align:center;color:var(--text2);font-weight:700;font-size:.85rem;
@@ -477,8 +479,9 @@ input,textarea{font:inherit;color:inherit}
   cursor:pointer;transition:all .18s;
 }
 .loc-card:active{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--checkin-2)}
-.loc-card::before{
-  content:'📸 CHỤP LIVE';position:absolute;top:-10px;left:16px;z-index:3;
+.loc-card-badge{
+  position:absolute;top:-10px;left:16px;z-index:3;
+  display:inline-flex;align-items:center;gap:3px;
   padding:.15rem .55rem;background:var(--checkin);color:var(--white);
   font-size:.55rem;font-weight:900;letter-spacing:.05em;
   border:1.5px solid var(--text);border-radius:6px;
@@ -573,7 +576,8 @@ input,textarea{font:inherit;color:inherit}
   border:1px solid rgba(255,255,255,.2);
 }
 .ci-cam-stars .star{color:rgba(255,255,255,.35);transition:color .15s}
-.ci-cam-stars .star.on{color:var(--accent);text-shadow:0 0 10px rgba(232,132,60,.7)}
+.ci-cam-stars .star.on{color:var(--accent)}
+.ci-cam-stars .star.on .star-ico{filter:drop-shadow(0 0 5px rgba(232,132,60,.7))}
 
 .ci-controls{
   padding:1rem 1.5rem 0;
@@ -601,9 +605,7 @@ input,textarea{font:inherit;color:inherit}
 .ci-shutter-inner{
   position:absolute;inset:6px;background:var(--checkin);
   border-radius:50%;border:2px solid var(--text);
-  display:flex;align-items:center;justify-content:center;
 }
-.ci-shutter-inner::after{content:'📸';font-size:1.4rem;filter:grayscale(1) brightness(2)}
 
 /* Quán picker */
 .qp-sheet{
@@ -701,7 +703,8 @@ input,textarea{font:inherit;color:inherit}
 .star{cursor:pointer;user-select:none;transition:transform .12s}
 .star:active{transform:scale(1.3)}
 .cam-stars .star{color:rgba(255,255,255,.35);transition:color .15s}
-.cam-stars .star.on{color:var(--accent);text-shadow:0 0 12px rgba(232,132,60,.7)}
+.cam-stars .star.on{color:var(--accent)}
+.cam-stars .star.on .star-ico{filter:drop-shadow(0 0 6px rgba(232,132,60,.7))}
 .cam-controls-row{display:flex;align-items:center;justify-content:space-between;padding:0 4px}
 .cam-side{
   min-width:52px;font-size:.75rem;font-weight:800;color:rgba(255,255,255,.85);text-align:center;padding:8px;
@@ -744,7 +747,8 @@ input,textarea{font:inherit;color:inherit}
 }
 .prev-stars{display:flex;gap:6px;justify-content:center;font-size:1.5rem;line-height:1}
 .prev-stars .star{color:rgba(255,255,255,.35);transition:color .15s}
-.prev-stars .star.on{color:var(--accent);text-shadow:0 0 10px rgba(232,132,60,.7)}
+.prev-stars .star.on{color:var(--accent)}
+.prev-stars .star.on .star-ico{filter:drop-shadow(0 0 5px rgba(232,132,60,.7))}
 .prev-cap{
   padding:.6rem .8rem;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.3);
   border-radius:12px;font-size:.8rem;color:var(--white);font-style:italic;font-weight:600;
@@ -939,10 +943,93 @@ input,textarea{font:inherit;color:inherit}
 </head>
 <body>
 
+<!-- ═══════════════════════════════════════════════
+     ICON SPRITE — copied verbatim from the real app's index.html so
+     these render pixel-identical to production (same paths, same
+     stroke-width 2.2 line-icon language). Only the subset actually
+     used below, not the full sprite.
+     ic-proto-diary is the ONE new symbol not in production yet — drawn
+     in the same visual grammar (24x24, stroke 2.2, round caps/joins)
+     since there's no existing "diary/notebook" icon to reuse.
+═══════════════════════════════════════════════ -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+<symbol id="ic-nav-home" viewBox="0 0 24 24"><path d="M4,12 a8,6 0 0 0 16,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,12 L21,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,5 L9,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,4 L12,7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15,5 L15,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-nav-checkin" viewBox="0 0 24 24"><path d="M4,9 a2,2 0 0 1 2,-2 H8 L9.5,5 H14.5 L16,7 H18 a2,2 0 0 1 2,2 V17 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8.5,13 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-nav-community" viewBox="0 0 24 24"><path d="M6,9 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,20 a6,6 0 0 1 12,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M14.7,10 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M13,20 a5,5 0 0 1 8.5,-0.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-nav-profile" viewBox="0 0 24 24"><path d="M8.8,8 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M5,20 A7,7 0 0 1 19,20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-bookmark" viewBox="0 0 24 24"><path d="M6,3 H18 V21 L12,17 L6,21 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-social-bell" viewBox="0 0 24 24"><path d="M6,10 a6,6 0 0 1 12,0 v5 l2,3 H4 l2,-3 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10,20 a2,2 0 0 0 4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-gps" viewBox="0 0 24 24"><path d="M12,3 C7.6,3 4,6.6 4,11 C4,17 12,22 12,22 C12,22 20,17 20,11 C20,6.6 16.4,3 12,3 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9.8,11 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-dice" viewBox="0 0 24 24"><path d="M8,4 h8 a4,4 0 0 1 4,4 v8 a4,4 0 0 1 -4,4 h-8 a4,4 0 0 1 -4,-4 v-8 a4,4 0 0 1 4,-4 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M7.9,9 a1.1,1.1 0 1,0 2.2,0 a1.1,1.1 0 1,0 -2.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M13.9,9 a1.1,1.1 0 1,0 2.2,0 a1.1,1.1 0 1,0 -2.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10.9,12 a1.1,1.1 0 1,0 2.2,0 a1.1,1.1 0 1,0 -2.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M7.9,15 a1.1,1.1 0 1,0 2.2,0 a1.1,1.1 0 1,0 -2.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M13.9,15 a1.1,1.1 0 1,0 2.2,0 a1.1,1.1 0 1,0 -2.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-scan" viewBox="0 0 24 24"><path d="M4,9 V5 H8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M16,5 H20 V9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M20,15 V19 H16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,19 H4 V15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M6,12 L18,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-settings" viewBox="0 0 24 24"><path d="M6,12 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10,12 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,6 L12,3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M18,12 L21,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,18 L12,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M6,12 L3,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-map-saved-route" viewBox="0 0 24 24"><path d="M3,6 L9,3 L15,6 L21,3 V18 L15,21 L9,18 L3,21 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,3 L9,18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M15,6 L15,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-close" viewBox="0 0 24 24"><path d="M5,5 L19,19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M19,5 L5,19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-plus" viewBox="0 0 24 24"><path d="M12,4 L12,20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M4,12 L20,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-social-author" viewBox="0 0 24 24"><path d="M8.8,8 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M5,20 A7,7 0 0 1 19,20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-copy-link" viewBox="0 0 24 24"><path d="M6,4 h8 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-8 a2,2 0 0 1 -2,-2 v-8 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M11,9 h8 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-8 a2,2 0 0 1 -2,-2 v-8 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-social-comment" viewBox="0 0 24 24"><path d="M4,5 H20 V16 H9 L5,20 V16 H4 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-heart-filled" viewBox="0 0 24 24"><path d="M12,20 C7,16.6 3,13.3 3,9.3 C3,6.4 5.3,4.2 8.1,4.2 C9.8,4.2 11.2,5 12,6.2 C12.8,5 14.2,4.2 15.9,4.2 C18.7,4.2 21,6.4 21,9.3 C21,13.3 17,16.6 12,20 Z" fill="#B92626" stroke="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-heart-outline" viewBox="0 0 24 24"><path d="M12,20 C7,16.6 3,13.3 3,9.3 C3,6.4 5.3,4.2 8.1,4.2 C9.8,4.2 11.2,5 12,6.2 C12.8,5 14.2,4.2 15.9,4.2 C18.7,4.2 21,6.4 21,9.3 C21,13.3 17,16.6 12,20 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-rating-star-filled" viewBox="0 0 24 24"><path d="M12.00,4.00 L13.94,9.33 L19.61,9.53 L15.14,13.02 L16.70,18.47 L12.00,15.30 L7.30,18.47 L8.86,13.02 L4.39,9.53 L10.06,9.33 Z" fill="currentColor" stroke="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-rating-star-outline" viewBox="0 0 24 24"><path d="M12.00,4.00 L13.94,9.33 L19.61,9.53 L15.14,13.02 L16.70,18.47 L12.00,15.30 L7.30,18.47 L8.86,13.02 L4.39,9.53 L10.06,9.33 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-privacy-friends" viewBox="0 0 24 24"><path d="M4.5,9 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M2.5,19 a4.5,4.5 0 0 1 9,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M14.5,9 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12.5,19 a4.5,4.5 0 0 1 9,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-privacy-globe" viewBox="0 0 24 24"><path d="M3,12 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,12 L21,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,3 A14,9 0 0 1 12,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,3 A14,9 0 0 0 12,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-privacy-lock" viewBox="0 0 24 24"><path d="M7,11 h10 a2,2 0 0 1 2,2 v6 a2,2 0 0 1 -2,2 h-10 a2,2 0 0 1 -2,-2 v-6 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,11 V7 a4,4 0 0 1 8,0 v4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-status-confirmed" viewBox="0 0 24 24"><path d="M3,12 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M8,12 L11,15 L16,9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-undo-reset" viewBox="0 0 24 24"><path d="M14.74,4.48 A8,8 0 1 1 5.07,8.00" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M5,7 L4,12 L9,11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-pin-static" viewBox="0 0 24 24"><path d="M9,3 H15 L14,8 L17,12 H7 L10,8 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M12,12 L12,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-proto-diary" viewBox="0 0 24 24"><path d="M6,4 h11 a1,1 0 0 1 1,1 v15 H7 a2,2 0 0 1 -2,-2 V5 a1,1 0 0 1 1,-1 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M5,17 a2,2 0 0 1 2,-2 H18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,8 L15,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,11.5 L13,11.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+</svg>
+
 <!-- ═══ Gate overlay — shown until email allowlist check passes ═══ -->
 <div id="gate">
   <div class="gate-card">
-    <div class="gate-lock">🔒</div>
+    <div class="gate-lock"><svg class="icon" width="1em" height="1em"><use href="#ic-privacy-lock"></use></svg></div>
     <h1 class="gate-title">Check-in · <em>Nhóp Nhép</em></h1>
     <p class="gate-msg" id="gate-msg">
       Đây là bản <b>preview riêng</b> của tính năng Check-in.<br/>
@@ -950,7 +1037,7 @@ input,textarea{font:inherit;color:inherit}
     </p>
     <a class="gate-cta" href="/">→ Về Nhóp Nhép để đăng nhập</a>
     <div class="gate-hint" id="gate-hint">
-      Sau khi đăng nhập ở tab <code>👥 Cộng đồng</code>, quay lại link này và reload.
+      Sau khi đăng nhập ở tab <code><svg class="icon" width="1em" height="1em"><use href="#ic-nav-community"></use></svg> Cộng đồng</code>, quay lại link này và reload.
     </div>
   </div>
 </div>
@@ -975,11 +1062,11 @@ input,textarea{font:inherit;color:inherit}
         </div>
         <button class="brand-float">Nhóp <em>Nhép</em></button>
         <div class="map-btn-cluster">
-          <button class="cluster-btn" title="Quán đã lưu" onclick="toast('Quán đã lưu')">🔖</button>
-          <button class="cluster-btn" title="Thông báo" onclick="toast('Thông báo')">🔔</button>
-          <button class="cluster-btn gps" title="Bật GPS" onclick="toast('Đang bắt GPS...')">◎</button>
+          <button class="cluster-btn" title="Quán đã lưu" onclick="toast('Quán đã lưu')"><svg class="icon" width="20" height="20"><use href="#ic-action-bookmark"></use></svg></button>
+          <button class="cluster-btn" title="Thông báo" onclick="toast('Thông báo')"><svg class="icon" width="20" height="20"><use href="#ic-social-bell"></use></svg></button>
+          <button class="cluster-btn gps" title="Bật GPS" onclick="toast('Đang bắt GPS...')"><svg class="icon" width="20" height="20"><use href="#ic-action-gps"></use></svg></button>
         </div>
-        <button class="rp-fab" onclick="toast('Random pick — chưa xây')">🎲</button>
+        <button class="rp-fab" onclick="toast('Random pick — chưa xây')"><svg class="icon" width="20" height="20"><use href="#ic-action-dice"></use></svg></button>
 
         <div class="home-sheet">
           <div class="sheet-handle"></div>
@@ -989,13 +1076,13 @@ input,textarea{font:inherit;color:inherit}
               <input class="loc-input" placeholder="Địa chỉ, tên đường…" value="Cầu Giấy (ước tính)">
               <button class="radius-pill">1 km <span class="chev">▾</span></button>
             </div>
-            <div class="gps-hint">Đang đoán vị trí qua IP · bấm 📍 GPS để chính xác cấp quận</div>
+            <div class="gps-hint">🎯 Đang đoán vị trí qua IP · bấm <svg class="icon" width="1em" height="1em"><use href="#ic-action-gps"></use></svg> GPS để chính xác cấp quận</div>
 
             <div class="row-label mini">Nguồn dữ liệu</div>
             <div class="cat-chips">
-              <button class="cat-chip active" onclick="toggleChip(this)">🌐 Địa điểm công khai</button>
-              <button class="cat-chip active" onclick="toggleChip(this)">⭐ Của tôi</button>
-              <button class="cat-chip" onclick="toggleChip(this)">👥 Cộng đồng</button>
+              <button class="cat-chip active" onclick="toggleChip(this)"><svg class="icon" width="20" height="20"><use href="#ic-privacy-globe"></use></svg> Địa điểm công khai</button>
+              <button class="cat-chip active" onclick="toggleChip(this)"><svg class="icon" width="20" height="20"><use href="#ic-rating-star-filled"></use></svg> Của tôi</button>
+              <button class="cat-chip" onclick="toggleChip(this)"><svg class="icon" width="20" height="20"><use href="#ic-nav-community"></use></svg> Cộng đồng</button>
             </div>
 
             <div class="row-label mini">Tìm <em>món / quán</em> · tuỳ chọn</div>
@@ -1004,7 +1091,7 @@ input,textarea{font:inherit;color:inherit}
               <button class="radius-pill" style="background:var(--white);color:var(--text);border:2px solid var(--text)">Tất cả loại <span class="chev">▾</span></button>
             </div>
           </div>
-          <button class="scan-btn" onclick="toast('Đang quét… (chưa xây trong prototype này)')">🔍 Quét <em>ngay</em>!</button>
+          <button class="scan-btn" onclick="toast('Đang quét… (chưa xây trong prototype này)')"><svg class="icon" width="20" height="20"><use href="#ic-action-scan"></use></svg> Quét <em>ngay</em>!</button>
         </div>
       </div>
 
@@ -1013,7 +1100,8 @@ input,textarea{font:inherit;color:inherit}
         <div class="ci-tab">
           <div class="ci-tab-hd">
             <button class="quan-auto-pill" onclick="openQuanPicker()">
-              📍 <b id="ci-quan-name">Bún riêu Ngô Sĩ Liên</b>
+              <svg class="icon" width="16" height="16"><use href="#ic-action-pin-static"></use></svg>
+              <b id="ci-quan-name">Bún riêu Ngô Sĩ Liên</b>
               <span class="dist" id="ci-quan-dist">15m</span>
               <span class="chev">▾</span>
             </button>
@@ -1023,24 +1111,24 @@ input,textarea{font:inherit;color:inherit}
               <div class="ci-cam-food" id="ci-cam-food">🍜</div>
               <div class="ci-cam-hint">Đây có phải quán bạn đang ăn?</div>
               <div class="ci-cam-stars" id="ci-cam-stars" data-rating="0">
-                <span class="star" data-value="1">★</span>
-                <span class="star" data-value="2">★</span>
-                <span class="star" data-value="3">★</span>
-                <span class="star" data-value="4">★</span>
-                <span class="star" data-value="5">★</span>
+                <span class="star" data-value="1"><svg class="icon star-ico" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
+                <span class="star" data-value="2"><svg class="icon star-ico" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
+                <span class="star" data-value="3"><svg class="icon star-ico" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
+                <span class="star" data-value="4"><svg class="icon star-ico" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
+                <span class="star" data-value="5"><svg class="icon star-ico" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
               </div>
             </div>
           </div>
           <div class="ci-controls">
             <button class="ci-side" onclick="viewDiaryFromCi()">
-              <span class="ci-side-ico">📔</span>
+              <span class="ci-side-ico"><svg class="icon" width="20" height="20"><use href="#ic-proto-diary"></use></svg></span>
               <span class="ci-side-lbl">Diary</span>
             </button>
             <button class="ci-shutter" id="ci-shutter" onclick="tapShutterInline()">
               <span class="ci-shutter-inner"></span>
             </button>
             <button class="ci-side" onclick="toast('Đổi camera trước/sau')">
-              <span class="ci-side-ico">🔄</span>
+              <span class="ci-side-ico"><svg class="icon" width="20" height="20"><use href="#ic-action-undo-reset"></use></svg></span>
               <span class="ci-side-lbl">Đổi</span>
             </button>
           </div>
@@ -1062,8 +1150,8 @@ input,textarea{font:inherit;color:inherit}
       <div class="screen dark" id="s-camera">
         <div class="cam">
           <div class="cam-top">
-            <div class="cam-place">📍 <span id="cam-quan-name">Bún riêu NSL</span></div>
-            <button class="cam-btn-round" onclick="cancelCheckin()">✕</button>
+            <div class="cam-place"><svg class="icon" width="1em" height="1em"><use href="#ic-action-pin-static"></use></svg> <span id="cam-quan-name">Bún riêu NSL</span></div>
+            <button class="cam-btn-round" onclick="cancelCheckin()"><svg class="icon" width="16" height="16"><use href="#ic-action-close"></use></svg></button>
           </div>
           <div class="cam-view">
             <div class="cam-food" id="cam-food">🍜</div>
@@ -1071,14 +1159,14 @@ input,textarea{font:inherit;color:inherit}
           </div>
           <div class="cam-controls">
             <div class="cam-stars" id="cam-stars" data-rating="0">
-              <span class="star" data-value="1">★</span>
-              <span class="star" data-value="2">★</span>
-              <span class="star" data-value="3">★</span>
-              <span class="star" data-value="4">★</span>
-              <span class="star" data-value="5">★</span>
+              <span class="star" data-value="1"><svg class="icon star-ico" width="26" height="26"><use href="#ic-rating-star-outline"></use></svg></span>
+              <span class="star" data-value="2"><svg class="icon star-ico" width="26" height="26"><use href="#ic-rating-star-outline"></use></svg></span>
+              <span class="star" data-value="3"><svg class="icon star-ico" width="26" height="26"><use href="#ic-rating-star-outline"></use></svg></span>
+              <span class="star" data-value="4"><svg class="icon star-ico" width="26" height="26"><use href="#ic-rating-star-outline"></use></svg></span>
+              <span class="star" data-value="5"><svg class="icon star-ico" width="26" height="26"><use href="#ic-rating-star-outline"></use></svg></span>
             </div>
             <div class="cam-controls-row">
-              <button class="cam-flip" onclick="toast('Đổi camera trước/sau')">🔄</button>
+              <button class="cam-flip" onclick="toast('Đổi camera trước/sau')"><svg class="icon" width="20" height="20"><use href="#ic-action-undo-reset"></use></svg></button>
               <button class="cam-shutter" id="cam-shutter" onclick="tapShutter()"></button>
               <button class="cam-side" onclick="cancelCheckin()">Huỷ</button>
             </div>
@@ -1091,16 +1179,16 @@ input,textarea{font:inherit;color:inherit}
         <div class="prev">
           <div class="prev-photo" id="prev-photo">🍜</div>
           <div class="prev-top">
-            <button class="cam-btn-round" onclick="retake()">← Chụp lại</button>
-            <button class="cam-btn-round" onclick="cancelCheckin()">✕</button>
+            <button class="cam-btn-round" onclick="retake()"><svg class="icon" width="14" height="14"><use href="#ic-action-undo-reset"></use></svg> Chụp lại</button>
+            <button class="cam-btn-round" onclick="cancelCheckin()"><svg class="icon" width="16" height="16"><use href="#ic-action-close"></use></svg></button>
           </div>
           <div class="prev-sheet">
             <div class="prev-stars" id="prev-stars" data-rating="4">
-              <span class="star" data-value="1">★</span>
-              <span class="star" data-value="2">★</span>
-              <span class="star" data-value="3">★</span>
-              <span class="star" data-value="4">★</span>
-              <span class="star" data-value="5">★</span>
+              <span class="star" data-value="1"><svg class="icon star-ico" width="24" height="24"><use href="#ic-rating-star-outline"></use></svg></span>
+              <span class="star" data-value="2"><svg class="icon star-ico" width="24" height="24"><use href="#ic-rating-star-outline"></use></svg></span>
+              <span class="star" data-value="3"><svg class="icon star-ico" width="24" height="24"><use href="#ic-rating-star-outline"></use></svg></span>
+              <span class="star" data-value="4"><svg class="icon star-ico" width="24" height="24"><use href="#ic-rating-star-outline"></use></svg></span>
+              <span class="star" data-value="5"><svg class="icon star-ico" width="24" height="24"><use href="#ic-rating-star-outline"></use></svg></span>
             </div>
             <textarea class="prev-cap" id="prev-cap" rows="1" placeholder="Ghi chú ngắn (tuỳ chọn)..."></textarea>
             <div class="prev-tog on" id="prev-tog" onclick="toggleShare()">
@@ -1110,7 +1198,7 @@ input,textarea{font:inherit;color:inherit}
                 <small id="tog-sub">Rating tính vào ✓ verified</small>
               </div>
             </div>
-            <button class="prev-send" onclick="tapSend()">📍 Gửi check-in</button>
+            <button class="prev-send" onclick="tapSend()"><svg class="icon" width="18" height="18"><use href="#ic-action-pin-static"></use></svg> Gửi check-in</button>
           </div>
         </div>
       </div>
@@ -1120,7 +1208,7 @@ input,textarea{font:inherit;color:inherit}
         <div class="sent">
           <div class="sent-photo" id="sent-photo">🍜</div>
           <div class="sent-overlay">
-            <div class="sent-check">✅</div>
+            <div class="sent-check"><svg class="icon" width="1em" height="1em"><use href="#ic-status-confirmed"></use></svg></div>
             <h2 class="sent-title" id="sent-title">Đã gửi tới bạn bè!</h2>
             <div class="sent-streak">🔥 <span id="streak-n">5</span> ngày liên tiếp</div>
             <div class="sent-preview">
@@ -1130,13 +1218,13 @@ input,textarea{font:inherit;color:inherit}
                 <div class="loc-mini-photo" id="loc-mini-photo">🍜</div>
                 <div class="loc-mini-info">
                   <span id="loc-mini-name">Bún riêu NSL</span>
-                  <span class="r" id="loc-mini-rate">★★★★☆</span>
+                  <span class="r" id="loc-mini-rate"></span>
                 </div>
               </div>
             </div>
             <div class="sent-actions">
-              <button class="btn-full ghost" onclick="goDiary()">📔 Xem Diary</button>
-              <button class="btn-full pink" onclick="showTab('checkin')">📸 Chụp tiếp</button>
+              <button class="btn-full ghost" onclick="goDiary()"><svg class="icon" width="16" height="16"><use href="#ic-proto-diary"></use></svg> Xem Diary</button>
+              <button class="btn-full pink" onclick="showTab('checkin')"><svg class="icon" width="16" height="16"><use href="#ic-nav-checkin"></use></svg> Chụp tiếp</button>
             </div>
           </div>
           <div class="confetti-layer" id="confetti-layer"></div>
@@ -1147,12 +1235,12 @@ input,textarea{font:inherit;color:inherit}
       <div class="screen" id="s-community">
         <div class="profile-scroll">
           <div class="comm-subtabs">
-            <button class="comm-iconbtn" onclick="toast('Đăng nhập')">👤</button>
+            <button class="comm-iconbtn" onclick="toast('Đăng nhập')"><svg class="icon" width="20" height="20"><use href="#ic-social-author"></use></svg></button>
             <div class="comm-subtabs-center">
               <div class="comm-subtab active">Quán <span style="color:var(--primary);font-style:italic">ăn</span></div>
               <div class="comm-subtab">Lộ trình</div>
             </div>
-            <button class="comm-iconbtn" onclick="toast('+ Đăng quán')">+</button>
+            <button class="comm-iconbtn" onclick="toast('+ Đăng quán')"><svg class="icon" width="20" height="20"><use href="#ic-action-plus"></use></svg></button>
           </div>
           <div class="comm-r-list" id="feed-list"></div>
         </div>
@@ -1163,7 +1251,7 @@ input,textarea{font:inherit;color:inherit}
         <div class="modal-sheet">
           <div class="modal-hd">
             <h4 id="detail-name">Bún riêu NSL</h4>
-            <button class="modal-close" onclick="closeDetail()">✕</button>
+            <button class="modal-close" onclick="closeDetail()"><svg class="icon" width="14" height="14"><use href="#ic-action-close"></use></svg></button>
           </div>
           <div class="modal-body">
             <div class="detail-photo" id="detail-photo">🍜</div>
@@ -1176,27 +1264,27 @@ input,textarea{font:inherit;color:inherit}
               <span><b id="eaten-n">Bạn + 4 người</b> đã check-in ở đây</span>
             </div>
             <div class="rating-double">
-              <div class="r">⭐ Chung <b>★ 4.6</b> · 12 người</div>
-              <div class="r verified">✓ Verified <b>★ 4.8</b> · 5 lần thật</div>
+              <div class="r">Chung <b>4.6 <svg class="icon star-ico" width="14" height="14"><use href="#ic-rating-star-filled"></use></svg></b> · 12 người</div>
+              <div class="r verified">✓ Verified <b>4.8 <svg class="icon star-ico" width="14" height="14"><use href="#ic-rating-star-filled"></use></svg></b> · 5 lần thật</div>
             </div>
             <div class="detail-desc">Quán ruột gần chợ Hôm — riêu cua thơm, có sườn sụn. Đi sớm trước 12h, đông từ 12h15.</div>
             <div class="detail-actions">
-              <button class="btn ghost" onclick="toast('Đã lưu quán')">🔖 Lưu</button>
-              <button class="btn ghost" onclick="toast('Đã copy link')">📋 Link</button>
-              <button class="btn pink" onclick="startCheckinFromDetail()">📸 Check-in</button>
+              <button class="btn ghost" onclick="toast('Đã lưu quán')"><svg class="icon" width="16" height="16"><use href="#ic-action-bookmark"></use></svg> Lưu</button>
+              <button class="btn ghost" onclick="toast('Đã copy link')"><svg class="icon" width="16" height="16"><use href="#ic-action-copy-link"></use></svg> Link</button>
+              <button class="btn pink" onclick="startCheckinFromDetail()"><svg class="icon" width="16" height="16"><use href="#ic-nav-checkin"></use></svg> Check-in</button>
             </div>
-            <div class="detail-diary-hd">📔 Diary của những người đã ăn</div>
+            <div class="detail-diary-hd"><svg class="icon" width="1em" height="1em"><use href="#ic-proto-diary"></use></svg> Diary của những người đã ăn</div>
             <div class="dm-diary-item">
               <div class="avatar-sm">🐝</div>
               <div>
-                <div class="n">@long.nhep · ★★★★★</div>
+                <div class="n">@long.nhep · <span class="stars-static"></span></div>
                 <div class="m">"Ngon nhất Hà Nội, tuần mình đi 2 lần"</div>
               </div>
             </div>
             <div class="dm-diary-item">
               <div class="avatar-sm" style="background:var(--cat-cafe)">🐨</div>
               <div>
-                <div class="n">@hai.au · ★★★★★</div>
+                <div class="n">@hai.au · <span class="stars-static"></span></div>
                 <div class="m">"Riêu chuẩn — đúng gu Bắc, sườn thơm"</div>
               </div>
             </div>
@@ -1207,9 +1295,9 @@ input,textarea{font:inherit;color:inherit}
       <!-- ═══ PROFILE ═══ -->
       <div class="screen" id="s-profile">
         <div class="settings-gears">
-          <button class="settings-gear" onclick="toast('Cài đặt')">⚙</button>
-          <button class="settings-gear" onclick="toast('Quán đã lưu')">🔖</button>
-          <button class="settings-gear" onclick="toast('Lộ trình đã lưu')">🗺</button>
+          <button class="settings-gear" onclick="toast('Cài đặt')"><svg class="icon" width="18" height="18"><use href="#ic-action-settings"></use></svg></button>
+          <button class="settings-gear" onclick="toast('Quán đã lưu')"><svg class="icon" width="18" height="18"><use href="#ic-action-bookmark"></use></svg></button>
+          <button class="settings-gear" onclick="toast('Lộ trình đã lưu')"><svg class="icon" width="18" height="18"><use href="#ic-map-saved-route"></use></svg></button>
         </div>
         <div class="profile-scroll">
           <div class="prof-hd">
@@ -1223,14 +1311,14 @@ input,textarea{font:inherit;color:inherit}
           </div>
           <div class="prof-stats">
             <div class="prof-stat"><div class="prof-stat-n">12</div><div class="prof-stat-l">Quán</div></div>
-            <div class="prof-stat"><div class="prof-stat-n">45</div><div class="prof-stat-l">★</div></div>
+            <div class="prof-stat"><div class="prof-stat-n">45</div><div class="prof-stat-l"><svg class="icon star-ico" width="1em" height="1em"><use href="#ic-rating-star-filled"></use></svg></div></div>
             <div class="prof-stat hi"><div class="prof-stat-n" id="prof-checkins">27</div><div class="prof-stat-l">Check-in</div></div>
             <div class="prof-stat"><div class="prof-stat-n">8</div><div class="prof-stat-l">Follower</div></div>
             <div class="prof-stat"><div class="prof-stat-n">14</div><div class="prof-stat-l">Follow</div></div>
           </div>
           <div class="subtabs">
             <div class="subtab" onclick="toast('Bài đăng — chưa demo')">Bài đăng</div>
-            <div class="subtab on">📔 Diary</div>
+            <div class="subtab on"><svg class="icon" width="1em" height="1em"><use href="#ic-proto-diary"></use></svg> Diary</div>
             <div class="subtab" onclick="toast('Đã lưu — chưa demo')">Đã lưu</div>
           </div>
           <div class="diary-list" id="diary-list"></div>
@@ -1245,7 +1333,7 @@ input,textarea{font:inherit;color:inherit}
           <div class="postnav-sub">Sau khi ăn xong, chụp 1 ảnh check-in để lưu vào diary + (tuỳ chọn) rủ bạn bè.</div>
           <div class="postnav-actions">
             <button class="btn ghost" onclick="dismissPostNav()">Để sau</button>
-            <button class="btn pink" onclick="startCheckinFromNav()">📸 Chụp ngay</button>
+            <button class="btn pink" onclick="startCheckinFromNav()"><svg class="icon" width="16" height="16"><use href="#ic-nav-checkin"></use></svg> Chụp ngay</button>
           </div>
         </div>
       </div>
@@ -1254,16 +1342,16 @@ input,textarea{font:inherit;color:inherit}
 
     <div class="tabbar" id="tabbar">
       <button class="tab-btn active" data-tab="home" onclick="showTab('home')">
-        <div class="tab-ico">🍽</div><div class="tab-lbl">Trang chủ</div>
+        <div class="tab-ico"><svg class="icon" width="22" height="22"><use href="#ic-nav-home"></use></svg></div><div class="tab-lbl">Trang chủ</div>
       </button>
       <button class="tab-btn" data-tab="checkin" onclick="showTab('checkin')">
-        <div class="tab-ico">📸</div><div class="tab-lbl">Check-in</div>
+        <div class="tab-ico"><svg class="icon" width="22" height="22"><use href="#ic-nav-checkin"></use></svg></div><div class="tab-lbl">Check-in</div>
       </button>
       <button class="tab-btn" data-tab="community" onclick="showTab('community')">
-        <div class="tab-ico">👥</div><div class="tab-lbl">Cộng đồng</div>
+        <div class="tab-ico"><svg class="icon" width="22" height="22"><use href="#ic-nav-community"></use></svg></div><div class="tab-lbl">Cộng đồng</div>
       </button>
       <button class="tab-btn" data-tab="profile" onclick="showTab('profile')">
-        <div class="tab-ico">👤</div><div class="tab-lbl">Cá nhân</div>
+        <div class="tab-ico"><svg class="icon" width="22" height="22"><use href="#ic-nav-profile"></use></svg></div><div class="tab-lbl">Cá nhân</div>
       </button>
     </div>
 
@@ -1281,11 +1369,11 @@ input,textarea{font:inherit;color:inherit}
 'use strict';
 
 const QUANS = [
-  { id:'bun-rieu', name:'Bún riêu Ngô Sĩ Liên', shortName:'Bún riêu NSL', emoji:'🍜', gradient:'linear-gradient(135deg,#F9A870 0%,#E8843C 40%,#B92626 100%)', dist:'15m', rating:'★ 4.6', visited:0 },
-  { id:'cafe-giang', name:'Cà phê Giảng', shortName:'Cà phê Giảng', emoji:'☕', gradient:'linear-gradient(135deg,#C89A7C 0%,#7A4E2F 60%,#5F0F0F 100%)', dist:'85m', rating:'★ 4.8', visited:3 },
-  { id:'che-bon-mua', name:'Chè Bốn Mùa', shortName:'Chè Bốn Mùa', emoji:'🍡', gradient:'linear-gradient(135deg,#F4A0B8 0%,#D64B7A 50%,#8C1919 100%)', dist:'170m', rating:'★ 4.4', visited:0 },
-  { id:'pho-thin', name:'Phở Thìn Lò Đúc', shortName:'Phở Thìn', emoji:'🍲', gradient:'linear-gradient(135deg,#F8B77E 0%,#B92626 100%)', dist:'190m', rating:'★ 4.7', visited:1 },
-  { id:'banh-cuon', name:'Bánh cuốn Kỳ Đồng', shortName:'Bánh cuốn', emoji:'🥟', gradient:'linear-gradient(135deg,#FCE4B3 0%,#E8843C 100%)', dist:'195m', rating:'★ 4.5', visited:0 },
+  { id:'bun-rieu', name:'Bún riêu Ngô Sĩ Liên', shortName:'Bún riêu NSL', emoji:'🍜', gradient:'linear-gradient(135deg,#F9A870 0%,#E8843C 40%,#B92626 100%)', dist:'15m', rating:4.6, visited:0 },
+  { id:'cafe-giang', name:'Cà phê Giảng', shortName:'Cà phê Giảng', emoji:'☕', gradient:'linear-gradient(135deg,#C89A7C 0%,#7A4E2F 60%,#5F0F0F 100%)', dist:'85m', rating:4.8, visited:3 },
+  { id:'che-bon-mua', name:'Chè Bốn Mùa', shortName:'Chè Bốn Mùa', emoji:'🍡', gradient:'linear-gradient(135deg,#F4A0B8 0%,#D64B7A 50%,#8C1919 100%)', dist:'170m', rating:4.4, visited:0 },
+  { id:'pho-thin', name:'Phở Thìn Lò Đúc', shortName:'Phở Thìn', emoji:'🍲', gradient:'linear-gradient(135deg,#F8B77E 0%,#B92626 100%)', dist:'190m', rating:4.7, visited:1 },
+  { id:'banh-cuon', name:'Bánh cuốn Kỳ Đồng', shortName:'Bánh cuốn', emoji:'🥟', gradient:'linear-gradient(135deg,#FCE4B3 0%,#E8843C 100%)', dist:'195m', rating:4.5, visited:0 },
 ];
 
 const INITIAL_DIARY = [
@@ -1390,7 +1478,7 @@ function openQuanPicker(){
         <div class="qp-name">${q.name}</div>
         <div class="qp-meta">
           <span>${q.dist}</span>
-          ${done ? `<span class="prev">✓ đã ăn ${q.visited} lần</span>` : `<span>${q.rating}</span>`}
+          ${done ? `<span class="prev">✓ đã ăn ${q.visited} lần</span>` : `<span>${ratingBadge(q.rating)}</span>`}
         </div>
       </div>
       ${isCurrent ? '<div class="qp-tag">Đang chọn</div>' : ''}
@@ -1464,7 +1552,7 @@ function tapSend(){
   document.getElementById('loc-mini-name').textContent = q.shortName;
   const lmp = document.getElementById('loc-mini-photo');
   lmp.textContent = q.emoji; lmp.style.background = q.gradient;
-  document.getElementById('loc-mini-rate').textContent = starsText(rating);
+  document.getElementById('loc-mini-rate').innerHTML = starsRow(rating);
   showScreen('sent');
   spawnConfetti();
   renderFeed(); renderDiary(); updateProfileStats();
@@ -1472,10 +1560,19 @@ function tapSend(){
 
 function goDiary(){ showTab('profile'); }
 
+/* Tappable star row: each .star span holds a single <use> referencing
+   either the filled or outline icon symbol — swapped here on select,
+   same shape the real app's svgIcon('rating-star-filled'/'-outline')
+   uses, not the plain text ★ glyph. */
 function setStars(id, n){
   const c = document.getElementById(id);
   c.dataset.rating = n;
-  c.querySelectorAll('.star').forEach(s=>s.classList.toggle('on', +s.dataset.value <= n));
+  c.querySelectorAll('.star').forEach(s=>{
+    const on = +s.dataset.value <= n;
+    s.classList.toggle('on', on);
+    const use = s.querySelector('use');
+    if (use) use.setAttribute('href', on ? '#ic-rating-star-filled' : '#ic-rating-star-outline');
+  });
 }
 function bindStars(id){
   const c = document.getElementById(id);
@@ -1487,7 +1584,15 @@ function bindStars(id){
     });
   });
 }
-function starsText(n){ return '★★★★★'.slice(0,n)+'☆☆☆☆☆'.slice(0,5-n); }
+/* Read-only star display — HTML string, not text, since it's markup.
+   Order matches the real app's ratingLabel: number then icon. */
+const STAR_ICO = (filled) => `<svg class="icon star-ico" width="12" height="12"><use href="#ic-rating-star-${filled?'filled':'outline'}"></use></svg>`;
+function starsRow(n){
+  let out = '';
+  for (let i=1;i<=5;i++) out += STAR_ICO(i<=n);
+  return out;
+}
+function ratingBadge(n){ return `${n.toFixed(1)} ${STAR_ICO(true)}`; }
 
 function renderQuans(){
   const wrap = document.getElementById('quan-list'); wrap.innerHTML = '';
@@ -1520,6 +1625,7 @@ function renderFeed(){
       el.className = 'loc-card';
       el.onclick = ()=>openDetail(post);
       el.innerHTML = `
+        <div class="loc-card-badge"><svg class="icon" width="12" height="12"><use href="#ic-nav-checkin"></use></svg> CHỤP LIVE</div>
         <div class="loc-card-hd">
           <div class="comm-card-hd" style="padding:0;flex:1">
             <div class="avatar-sm" style="background:${post.avatarBg}">${post.avatar}</div>
@@ -1530,14 +1636,15 @@ function renderFeed(){
         <div class="loc-card-photo" style="background:${post.gradient}">
           <div class="loc-card-food">${post.quanEmoji}</div>
           <div class="loc-card-info">
-            <b>${post.quanName}<small>📍 ${post.quanLoc}</small></b>
-            <div class="loc-card-rate">✓ ${starsText(post.rating)}</div>
+            <b>${post.quanName}<small><svg class="icon" width="1em" height="1em"><use href="#ic-action-pin-static"></use></svg> ${post.quanLoc}</small></b>
+            <div class="loc-card-rate">✓ ${starsRow(post.rating)}</div>
           </div>
         </div>
         ${post.cap ? `<div class="loc-card-cap">${post.cap}</div>` : ''}
         <div class="loc-card-actions">
-          <span>♥ ${post.hearts}</span><span>💬</span>
-          <span class="save">🔖 Lưu quán</span>
+          <span><svg class="icon" width="18" height="18"><use href="#ic-heart-${post.hearts>0?'filled':'outline'}"></use></svg> ${post.hearts}</span>
+          <span><svg class="icon" width="18" height="18"><use href="#ic-social-comment"></use></svg></span>
+          <span class="save"><svg class="icon" width="16" height="16"><use href="#ic-action-bookmark"></use></svg> Lưu quán</span>
         </div>
       `;
       wrap.appendChild(el);
@@ -1556,9 +1663,9 @@ function renderFeed(){
           <div class="comm-card-loc">${post.sub} · ${post.loc}</div>
         </div>
         <div class="comm-card-actions">
-          <span>♡</span>
+          <span><svg class="icon" width="18" height="18"><use href="#ic-heart-outline"></use></svg></span>
           ${post.cats.map(c=>`<span class="chip">${c}</span>`).join('')}
-          <span class="save">🔖</span>
+          <span class="save"><svg class="icon" width="16" height="16"><use href="#ic-action-bookmark"></use></svg></span>
         </div>
       `;
       wrap.appendChild(el);
@@ -1569,7 +1676,7 @@ function renderFeed(){
 function renderDiary(){
   const wrap = document.getElementById('diary-list'); wrap.innerHTML = '';
   if (state.diary.length === 0){
-    wrap.innerHTML = '<div class="empty-state"><span class="em">📔</span>Chưa có check-in nào — tap tab Check-in để bắt đầu.</div>';
+    wrap.innerHTML = `<div class="empty-state"><span class="em"><svg class="icon" width="1em" height="1em"><use href="#ic-proto-diary"></use></svg></span>Chưa có check-in nào — tap tab Check-in để bắt đầu.</div>`;
     return;
   }
   state.diary.forEach(e=>{
@@ -1579,9 +1686,9 @@ function renderDiary(){
       <div class="diary-date"><b>${e.date}</b>${e.month}</div>
       <div class="diary-body">
         <div class="n">${e.name}</div>
-        <div class="m">${starsText(e.rating)} ${e.note?'· '+e.note:''}</div>
+        <div class="m">${starsRow(e.rating)} ${e.note?'· '+e.note:''}</div>
       </div>
-      <div class="diary-tail ${e.shared?'pub':'priv'}">${e.shared?'Share':'Riêng'}</div>
+      <div class="diary-tail ${e.shared?'pub':'priv'}"><svg class="icon" width="14" height="14"><use href="#ic-privacy-${e.shared?'friends':'lock'}"></use></svg> ${e.shared?'Share':'Riêng'}</div>
     `;
     wrap.appendChild(row);
   });
@@ -1642,6 +1749,7 @@ function resetDemo(){
 }
 
 bindStars('cam-stars'); bindStars('prev-stars'); bindStars('ci-cam-stars');
+document.querySelectorAll('.stars-static').forEach(el => el.innerHTML = starsRow(5));
 renderFeed(); renderDiary(); updateProfileStats(); refreshCheckinTab();
 </script>
 
