@@ -1920,6 +1920,11 @@ const PlanCtrl = {
       if (this._returnTo === 'profile') {
         document.getElementById('profileScreen').classList.remove('hidden');
         ProfileCtrl.render();
+      } else if (this._returnTo === 'community') {
+        // Entered from a check-in's "Đi tới" → back returns to Cộng đồng.
+        // Added 2026-09-22 alongside CheckinViewerCtrl integration.
+        document.getElementById('communityScreen').classList.remove('hidden');
+        CommunityCtrl.render();
       } else {
         document.getElementById('resultsScreen').classList.remove('hidden');
       }
@@ -5980,7 +5985,7 @@ const CheckinPostViewCtrl = {
     const r = this._current;
     if (!r) return;
     this.close();
-    showLocationOnMap(r.restaurant_lat, r.restaurant_lng, r.restaurant_name);
+    showCheckinItinerary(r);
   },
 
   async _share() {
@@ -6015,51 +6020,50 @@ const CheckinPostViewCtrl = {
 
 
 /* ═══════════════════════════════════════════════
-   IN-APP MAP — "Đi tới" helper
-   Instead of opening Google Maps in an external tab, jump to the Home
-   tab, center the main Leaflet map on the check-in's lat/lng, and drop
-   a temporary marker with the quán name in a popup. The marker auto-
-   removes after 30s so it doesn't clutter the map on the user's next
-   dice roll / scan.
+   "Đi tới" — open the itinerary planner with the check-in as sole stop
+   Instead of opening an external map, feed the check-in's coords into
+   PlanCtrl.buildItinerary() and show the plan screen. User gets the
+   app's own route drawn from their current GPS to the quán — same UI
+   as replayTrip / a fresh planned trip, so "Save trip" and the map's
+   turn-by-turn tracking all work out of the box. Back button returns
+   to Cộng đồng (see PlanCtrl.init back handler).
 ═══════════════════════════════════════════════ */
-let _ciDirectMarker = null;
-let _ciDirectMarkerTimer = null;
-function showLocationOnMap(lat, lng, name) {
-  if (lat == null || lng == null) {
-    // Fall back to a name search on the map — pan to user location and
-    // toast that we couldn't pin the exact spot.
+function showCheckinItinerary(rec) {
+  if (!rec) return;
+  if (rec.restaurant_lat == null || rec.restaurant_lng == null) {
     showToast(I18N.t('checkinFeed.noCoords'));
     return;
   }
+  if (State.userLat == null || State.userLng == null) {
+    // No origin → we can't compute a route. Nudge user to enable GPS
+    // (Home tab has the button + toast for that flow already).
+    showToast(I18N.t('trips.needGps'));
+    return;
+  }
+  // Adapter — match the shape trip.stops uses in replayTrip so the
+  // downstream renderers (timeline, map, save-trip) treat this the
+  // same as any other planned stop. `cat` MUST be a valid CATEGORIES
+  // key; use 'restaurant' as a safe default (dwell = 60min).
+  const stop = {
+    id: 'checkin-' + (rec.id || Date.now()),
+    name: (rec.restaurant_name && rec.restaurant_name.trim()) || I18N.t('checkin.anonSpot'),
+    cat: 'restaurant',
+    // Timeline renders `${cat.label} · ${stop.price}` raw (see
+    // PlanCtrl._renderTimeline). Normal stops carry a display-ready
+    // string like "80k–200k"; we don't know that for a check-in, so
+    // "—" is a safe placeholder rather than a stray "binh_dan" token.
+    price: '—',
+    address: rec.restaurant_name || '',
+    lat: +rec.restaurant_lat,
+    lng: +rec.restaurant_lng,
+  };
+  PlanCtrl._returnTo = 'community';
+  PlanCtrl.buildItinerary([stop]);
+  // TabNav.switchTo('home') first so every other screen (including
+  // #checkinScreen — which PlanCtrl.show() doesn't hide) is properly
+  // hidden. show() then flips home → plan on top of a clean state.
   TabNav.switchTo('home');
-  // Small delay so #homeScreen has un-hidden and Leaflet's container
-  // knows its real size before setView (otherwise centering is off).
-  setTimeout(() => {
-    if (!State.mainMap || typeof L === 'undefined') return;
-    try { State.mainMap.invalidateSize(); } catch (_) {}
-    State.mainMap.setView([lat, lng], 16, { animate: true });
-
-    if (_ciDirectMarker) {
-      try { State.mainMap.removeLayer(_ciDirectMarker); } catch (_) {}
-    }
-    clearTimeout(_ciDirectMarkerTimer);
-
-    const icon = L.divIcon({
-      html: `<div class="ci-direct-pin">📍</div>`,
-      iconSize: [30, 30], iconAnchor: [15, 30], className: '',
-    });
-    _ciDirectMarker = L.marker([lat, lng], { icon, zIndexOffset: 1200 }).addTo(State.mainMap);
-    const label = name && String(name).trim() ? escapeHtml(String(name).trim()) : I18N.t('checkin.anonSpot');
-    _ciDirectMarker.bindPopup(`<b>${label}</b>`).openPopup();
-
-    // Auto-remove after 30s so the pin doesn't stick around forever.
-    _ciDirectMarkerTimer = setTimeout(() => {
-      if (_ciDirectMarker) {
-        try { State.mainMap.removeLayer(_ciDirectMarker); } catch (_) {}
-        _ciDirectMarker = null;
-      }
-    }, 30_000);
-  }, 220);
+  PlanCtrl.show();
 }
 
 
@@ -6237,7 +6241,7 @@ const CheckinViewerCtrl = {
     if (!rec) return;
     clearTimeout(this._timer);
     this.close();
-    showLocationOnMap(rec.restaurant_lat, rec.restaurant_lng, rec.restaurant_name);
+    showCheckinItinerary(rec);
   },
 
   _toggleLike() {
