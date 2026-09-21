@@ -2346,7 +2346,10 @@ body.map-full .tabbar{transform:translateY(105%)}
    are the ONLY overlays; every input sits inside the sheet in a proper
    column with real gaps, so nothing overlaps like the pink prototype. */
 .checkin-preview{
-  position:absolute;inset:0;z-index:30;
+  position:absolute;inset:0;z-index:70;
+  /* Above .rp-fab (z:60 in Home's dice-button base rule) — otherwise
+     the shutter button pokes through the preview sheet (2026-09-22
+     user bug report). */
   background:var(--cam-bg,#0e0806);
   display:flex;flex-direction:column;
 }

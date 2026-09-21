@@ -5637,7 +5637,23 @@ const CheckinCtrl = {
     btn.disabled = false;
     if (spanEl) spanEl.textContent = originalLabel;
 
-    if (!r.ok) { showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
+    if (!r.ok) {
+      // Surface field-level errors from PocketBase so users (and me
+      // debugging remotely) see WHAT failed instead of just the generic
+      // "Failed to create record." Empty _pbData on a 400 is the
+      // canonical shape of createRule failure — token expired counts.
+      let detail = '';
+      if (r._pbData && typeof r._pbData === 'object' && Object.keys(r._pbData).length > 0) {
+        detail = ' — ' + Object.entries(r._pbData)
+          .map(([k, v]) => `${k}: ${(v && (v.message || v.code)) || JSON.stringify(v)}`)
+          .join(', ');
+      } else if (r.status === 400) {
+        detail = ' — ' + I18N.t('err.maybeSessionExpired');
+      }
+      console.warn('[checkin] createCheckin failed:', r);
+      showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}${detail}`);
+      return;
+    }
 
     if (typeof Analytics !== 'undefined') Analytics.track('checkin', {
       shared: isShared, has_rating: rating > 0, has_note: !!note, source,
