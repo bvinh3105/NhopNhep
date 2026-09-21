@@ -5614,6 +5614,12 @@ const CheckinCtrl = {
 
     showToast(I18N.t(isShared ? 'checkin.toastShared' : 'checkin.toastPrivate'));
 
+    // Bump the community strip so the poster's own check-in shows up
+    // right away — force:true bypasses the 5s debounce inside refresh.
+    if (isShared && typeof CheckinFeedCtrl !== 'undefined') {
+      CheckinFeedCtrl.refresh({ force: true });
+    }
+
     // Reset for the next check-in
     this._retake();
     this._setStars(document.getElementById('checkinStars'), 0);
@@ -5671,5 +5677,233 @@ const CheckinCtrl = {
       out += `<svg class="icon" width="12" height="12" style="color:${i<=n?'var(--accent-2)':'var(--text3)'}"><use href="#ic-rating-star-${i<=n?'filled':'outline'}"></use></svg>`;
     }
     return out;
+  },
+};
+
+
+/* ═══════════════════════════════════════════════
+   CHECK-IN FEED STRIP  (v1.1)
+   Horizontal-scroll section at the top of the Cộng đồng feed, showing
+   the newest is_shared=true check-ins across all users. Tap a card →
+   CheckinPostViewCtrl.open(record). Refresh triggers: (1) Community
+   tab becomes visible (MutationObserver on #communityScreen.hidden),
+   (2) CheckinCtrl._submit() calls .refresh() after a successful shared
+   post. Fetches Community.listSharedCheckins() with a small 20-item
+   cap — enough for a strip, not a full history (that lives in Diary).
+═══════════════════════════════════════════════ */
+const CheckinFeedCtrl = {
+  MAX: 20,
+  _items: [],
+  _lastAt: 0,
+  _refreshing: false,
+
+  init() {
+    // Auto-refresh when Cộng đồng tab becomes visible. Cheaper than
+    // hooking into CommunityCtrl.render() and keeps this feature self-
+    // contained (no cross-file coupling to a controller I don't own).
+    const screen = document.getElementById('communityScreen');
+    if (screen) {
+      new MutationObserver(() => {
+        if (!screen.classList.contains('hidden')) this.refresh();
+      }).observe(screen, { attributes: true, attributeFilter: ['class'] });
+    }
+    // Kick a first fetch if the tab is already open on load (rare, but
+    // possible via deep-link ?q= handling that lands on Cộng đồng).
+    if (screen && !screen.classList.contains('hidden')) this.refresh();
+  },
+
+  async refresh({ force = false } = {}) {
+    if (this._refreshing) return;
+    // Debounce — no need to hit the server more than once per 5s even
+    // if MutationObserver fires from multiple class toggles at once.
+    // Callers with new data to insert (a just-posted check-in) pass
+    // {force:true} to bypass this and see their post immediately.
+    if (!force && Date.now() - this._lastAt < 5000) return;
+    this._refreshing = true;
+    const wrap = document.getElementById('checkinStripWrap');
+    const list = document.getElementById('checkinStripList');
+    if (!wrap || !list) { this._refreshing = false; return; }
+
+    // Skeletons on first fetch only; subsequent refreshes keep the last
+    // rendered cards visible so the UI doesn't flash empty.
+    if (!this._items.length) {
+      list.innerHTML = Array.from({length: 5}, () => `<div class="ci-strip-card skel"></div>`).join('');
+      wrap.classList.remove('hidden');
+    }
+
+    try {
+      const r = await Community.listSharedCheckins({ page: 1, perPage: this.MAX });
+      this._lastAt = Date.now();
+      if (!r.ok) throw new Error(r.error || 'fetch');
+      this._items = (r.data && r.data.items) || [];
+      this._render();
+    } catch (e) {
+      // Silent failure — the strip is nice-to-have; on error just hide
+      // the wrapper. Feed below (quán) still works from its own fetch.
+      if (!this._items.length) wrap.classList.add('hidden');
+    } finally {
+      this._refreshing = false;
+    }
+  },
+
+  _render() {
+    const wrap = document.getElementById('checkinStripWrap');
+    const list = document.getElementById('checkinStripList');
+    if (!wrap || !list) return;
+    if (!this._items.length) { wrap.classList.add('hidden'); return; }
+    wrap.classList.remove('hidden');
+
+    list.innerHTML = this._items.map((it) => {
+      const photoUrl = it.photo ? Community.checkinPhotoUrl(it, '240x320') : '';
+      const author = it.expand && it.expand.user;
+      const authorName = (author && author.name) || I18N.t('common.anonymous');
+      const rating = Math.max(0, Math.min(5, +it.rating || 0));
+      const photoLayer = photoUrl
+        ? `<div class="ci-strip-card-photo" style="background-image:url('${escapeHtml(photoUrl)}')"></div>`
+        : `<div class="ci-strip-card-photo empty">${escapeHtml(it.restaurant_emoji || '🍜')}</div>`;
+      const ratingBadge = rating > 0
+        ? `<div class="ci-strip-card-rating"><svg class="icon"><use href="#ic-rating-star-filled"></use></svg>${rating}</div>`
+        : '';
+      return `<div class="ci-strip-card" data-id="${it.id}">
+        ${photoLayer}
+        ${ratingBadge}
+        <div class="ci-strip-card-name">${escapeHtml(authorName)}</div>
+      </div>`;
+    }).join('');
+
+    // Tap → open post view
+    list.querySelectorAll('.ci-strip-card[data-id]').forEach(el => {
+      el.addEventListener('click', () => {
+        const rec = this._items.find(x => x.id === el.dataset.id);
+        if (rec) CheckinPostViewCtrl.open(rec);
+      });
+    });
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   CHECK-IN POST VIEW MODAL  (v1.1)
+   Single-post modal opened when the user taps a card in the strip
+   above. Approved layout: 3:5.2 frame · 3:4 photo · header (avatar +
+   uppercase username + 📍 location + 🕐 time) + 3 actions (♥ · 🔖 · 🔗).
+
+   v1 note: check-ins have NO like/save backend yet. Buttons persist
+   state client-side (localStorage keys ci_liked / ci_saved) so the
+   toggle is visible for the user reviewing this UI layer. Wire the
+   real endpoints in a follow-up PR — the DOM/CSS stays identical.
+═══════════════════════════════════════════════ */
+const CheckinPostViewCtrl = {
+  LIKES_KEY: 'nhopnhep_ci_liked',
+  SAVES_KEY: 'nhopnhep_ci_saved',
+  _current: null,
+  _liked: null, _saved: null,
+
+  init() {
+    this._liked = this._loadSet(this.LIKES_KEY);
+    this._saved = this._loadSet(this.SAVES_KEY);
+
+    const ov = document.getElementById('checkinPostOverlay');
+    if (!ov) return;
+    // Backdrop / close button — mirrors the diary overlay wiring at
+    // controllers.js:5270-5272 exactly, so behaviour is consistent.
+    ov.addEventListener('click', (e) => { if (e.target === ov) this.close(); });
+    document.getElementById('checkinPostClose').addEventListener('click', () => this.close());
+
+    document.getElementById('ciPostLikeBtn').addEventListener('click', () => this._toggleLike());
+    document.getElementById('ciPostSaveBtn').addEventListener('click', () => this._toggleSave());
+    document.getElementById('ciPostShareBtn').addEventListener('click', () => this._share());
+  },
+
+  open(record) {
+    if (!record) return;
+    this._current = record;
+    const author = record.expand && record.expand.user;
+    const authorName = (author && author.name) || I18N.t('common.anonymous');
+
+    document.getElementById('ciPostUsername').textContent = authorName;
+    document.getElementById('ciPostLoc').textContent = record.restaurant_name || '—';
+    document.getElementById('ciPostTime').textContent = timeAgo(record.created);
+
+    // Avatar — reuse the app's avatarIcon() via authorAvatar() so it
+    // matches whatever icon the user picked in ProfileCtrl.
+    const av = document.getElementById('ciPostAvatar');
+    av.innerHTML = author && typeof authorAvatar === 'function' ? authorAvatar(author) : (record.restaurant_emoji || '🦊');
+
+    // Photo — falls back to emoji when the check-in was posted without
+    // one (allowed by the backend schema, see checkins migration).
+    const photoEl = document.getElementById('ciPostPhoto');
+    const photoUrl = record.photo ? Community.checkinPhotoUrl(record, '640x800') : '';
+    if (photoUrl) {
+      photoEl.className = 'ci-post-photo';
+      photoEl.style.backgroundImage = "url('" + photoUrl.replace(/'/g, "\\'") + "')";
+      photoEl.textContent = '';
+    } else {
+      photoEl.className = 'ci-post-photo empty';
+      photoEl.style.backgroundImage = '';
+      photoEl.textContent = record.restaurant_emoji || '🍜';
+    }
+
+    // Sync like/save state from localStorage
+    document.getElementById('ciPostLikeBtn').classList.toggle('on', this._liked.has(record.id));
+    document.getElementById('ciPostLikeIco').innerHTML = this._liked.has(record.id)
+      ? '<use href="#ic-heart-filled"></use>' : '<use href="#ic-heart-outline"></use>';
+    document.getElementById('ciPostSaveBtn').classList.toggle('on', this._saved.has(record.id));
+
+    document.getElementById('checkinPostOverlay').classList.add('show');
+  },
+
+  close() {
+    document.getElementById('checkinPostOverlay').classList.remove('show');
+    this._current = null;
+  },
+
+  _toggleLike() {
+    if (!this._current) return;
+    const id = this._current.id;
+    const on = !this._liked.has(id);
+    if (on) this._liked.add(id); else this._liked.delete(id);
+    this._saveSet(this.LIKES_KEY, this._liked);
+    document.getElementById('ciPostLikeBtn').classList.toggle('on', on);
+    document.getElementById('ciPostLikeIco').innerHTML = on
+      ? '<use href="#ic-heart-filled"></use>' : '<use href="#ic-heart-outline"></use>';
+  },
+
+  _toggleSave() {
+    if (!this._current) return;
+    const id = this._current.id;
+    const on = !this._saved.has(id);
+    if (on) this._saved.add(id); else this._saved.delete(id);
+    this._saveSet(this.SAVES_KEY, this._saved);
+    document.getElementById('ciPostSaveBtn').classList.toggle('on', on);
+    showToast(I18N.t(on ? 'toast.postSaved' : 'toast.postUnsaved'));
+  },
+
+  async _share() {
+    if (!this._current) return;
+    // Deep-link handler for ?checkin=<id> is not wired yet — plain link
+    // still opens the app; CheckinFeedCtrl re-fetches on tab open so the
+    // recipient sees the post appear in the strip.
+    const url = location.origin + '/?checkin=' + encodeURIComponent(this._current.id);
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast(I18N.t('toast.linkCopied'));
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); showToast(I18N.t('toast.linkCopied')); }
+      catch (_) { showToast(I18N.t('toast.linkCopyFail')); }
+      document.body.removeChild(ta);
+    }
+  },
+
+  _loadSet(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch (_) { return new Set(); }
+  },
+  _saveSet(key, set) {
+    try { localStorage.setItem(key, JSON.stringify([...set])); } catch (_) {}
   },
 };

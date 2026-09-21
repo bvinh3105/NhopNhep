@@ -56,6 +56,8 @@ function boot() {
   SessionCreateModal.init();
   SessionVoteModal.init();
   CheckinCtrl.init();
+  CheckinFeedCtrl.init();
+  CheckinPostViewCtrl.init();
   wireScrollMasks();
 
   // Deep-link handler: ?q=<pb_id> auto-opens the community detail
