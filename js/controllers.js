@@ -5298,7 +5298,12 @@ const CheckinCtrl = {
     this._startStream();
   },
 
-  leave() { this._stopStream(); },
+  leave() {
+    this._stopStream();
+    // Belt-and-braces: if the user swaps tabs mid-preview, put the tab
+    // bar back so the destination tab isn't stuck with a hidden bar.
+    document.querySelector('.tabbar')?.classList.remove('checkin-hidden');
+  },
 
   // Show/hide the floating controls (pill, cluster, stars, shutter) —
   // hidden when the sign-in overlay or the no-perm fallback is up.
@@ -5565,10 +5570,14 @@ const CheckinCtrl = {
     document.getElementById('checkinCaption').value = '';
     document.getElementById('checkinShareTog').classList.add('on');
     document.getElementById('checkinPreview').classList.remove('hidden');
+    // Slide the floating tab bar off so the Send/toggle/caption strip
+    // at bottom:0 isn't covered. Restored in _retake and _submit.
+    document.querySelector('.tabbar')?.classList.add('checkin-hidden');
   },
 
   _retake() {
     document.getElementById('checkinPreview').classList.add('hidden');
+    document.querySelector('.tabbar')?.classList.remove('checkin-hidden');
     this._captured = null;
   },
 

@@ -103,7 +103,11 @@ input,textarea,select{font-family:var(--font-body)}
   box-shadow:0 12px 30px rgba(42,24,16,.24);
   transition:transform .25s ease,opacity .2s ease;
 }
-.tabbar.scroll-hidden{
+.tabbar.scroll-hidden,
+/* Same off-screen state, but toggled by CheckinCtrl when the capture-
+   preview sheet is open so the send/toggle/caption controls at
+   bottom:0 aren't covered by the floating tab bar (2026-09-21). */
+.tabbar.checkin-hidden{
   transform:translateY(140%);opacity:0;pointer-events:none;
 }
 .tab-btn{
@@ -2283,7 +2287,13 @@ body.map-full .tabbar{transform:translateY(105%)}
    over any camera background. */
 .checkin-star-pill{
   position:absolute;left:50%;transform:translateX(-50%);
-  bottom:calc(var(--tab-h) + 90px);z-index:14;
+  /* On a phone with a home indicator, env(safe-area-inset-bottom) is
+     ~34px and the floating tab bar pill sits 10px above that, giving
+     an effective bottom footprint of ~110px before content clearance.
+     Using env() here so this works on both notchless and notched
+     phones — the old calc(var(--tab-h) + 90px) evaluated to only 154px
+     which put the shutter half-behind the tab bar on iPhones (2026-09-21). */
+  bottom:calc(env(safe-area-inset-bottom, 0px) + 190px);z-index:14;
   display:flex;gap:.35rem;padding:.5rem 1rem;
   background:var(--white);border:2px solid var(--text);border-radius:999px;
   box-shadow:2px 2px 0 var(--text);
@@ -2303,7 +2313,12 @@ body.map-full .tabbar{transform:translateY(105%)}
    which suits Home's dice FAB). */
 .rp-fab.checkin-shutter{
   right:auto;left:50%;transform:translateX(-50%);
-  bottom:calc(var(--tab-h) + 20px);
+  /* Cleared above the floating tab bar on all phones — see .checkin-star-pill
+     comment above for the env() reasoning. Shutter is 54px tall, so with
+     bottom:120px + safe-inset the TOP of the shutter is well clear of the
+     tab bar's ~72px effective height. Star pill above at bottom:190 has
+     ~16px gap, tight but intentional. */
+  bottom:calc(env(safe-area-inset-bottom, 0px) + 120px);
   background:var(--checkin,#D64B7A);
   color:var(--cream);
 }
@@ -2333,6 +2348,10 @@ body.map-full .tabbar{transform:translateY(105%)}
 .checkin-preview-close{right:.7rem}
 .checkin-preview-back:active,.checkin-preview-close:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
 
+/* Preview overlays sit above the tab bar which we ALSO hide via
+   .tabbar.checkin-hidden in CheckinCtrl._tapShutter, so the send
+   button at bottom:0 becomes tappable. Offsets below assume the
+   tab bar is off-screen — no need to clear it. */
 .checkin-preview-stars{bottom:172px}
 
 .checkin-preview-cap{
