@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2656">
+<link rel="stylesheet" href="css/styles.css?v=2657">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -767,32 +767,38 @@
   <!-- Flash overlay for the capture moment. -->
   <div class="checkin-flash" id="checkinFlash"></div>
 
-  <!-- Preview + send sheet — shown after the shutter fires, over the still frame. -->
+  <!-- Preview sheet — shown after the shutter fires. Two stacked regions:
+       (1) 3:4 photo card at the top (sticker frame, matches post-view)
+       (2) Cream sheet with rounded top corners containing the inputs
+       so the whole thing reads like the rest of the app instead of a
+       full-bleed camera overlay. Retake/close move inside the photo. -->
   <div class="checkin-preview hidden" id="checkinPreview">
-    <img class="checkin-preview-photo" id="checkinPreviewPhoto" alt="">
-    <button class="checkin-preview-back" id="checkinRetakeBtn" type="button" title="Chụp lại"><svg class="icon" width="16" height="16"><use href="#ic-action-undo-reset"></use></svg></button>
-    <button class="checkin-preview-close" id="checkinPreviewClose" type="button" title="Huỷ"><svg class="icon" width="14" height="14"><use href="#ic-action-close"></use></svg></button>
-
-    <div class="checkin-star-pill checkin-preview-stars" id="checkinPreviewStars" data-rating="4">
-      <button class="checkin-star" type="button" data-value="1"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
-      <button class="checkin-star" type="button" data-value="2"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
-      <button class="checkin-star" type="button" data-value="3"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
-      <button class="checkin-star" type="button" data-value="4"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
-      <button class="checkin-star" type="button" data-value="5"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+    <div class="checkin-preview-photo-wrap">
+      <img class="checkin-preview-photo" id="checkinPreviewPhoto" alt="">
+      <button class="checkin-preview-back" id="checkinRetakeBtn" type="button" title="Chụp lại"><svg class="icon" width="16" height="16"><use href="#ic-action-undo-reset"></use></svg></button>
+      <button class="checkin-preview-close" id="checkinPreviewClose" type="button" title="Huỷ"><svg class="icon" width="14" height="14"><use href="#ic-action-close"></use></svg></button>
     </div>
 
-    <input class="checkin-preview-addr" id="checkinAddress" type="text" maxlength="120" autocomplete="off" data-i18n="checkin.addrPlaceholder" data-i18n-attr="placeholder" placeholder="📍 Địa điểm (có thể bỏ trống)…">
-    <textarea class="checkin-preview-cap" id="checkinCaption" rows="1" maxlength="200" data-i18n="checkin.capPlaceholder" data-i18n-attr="placeholder" placeholder="Ghi chú ngắn (tuỳ chọn)…"></textarea>
-
-    <div class="checkin-share-tog on" id="checkinShareTog">
-      <div class="checkin-share-knob"></div>
-      <div class="checkin-share-body">
-        <span data-i18n="checkin.shareOn">Chia sẻ với bạn bè</span>
-        <small data-i18n="checkin.shareHint">Rating tính vào ✓ verified</small>
+    <div class="checkin-preview-sheet">
+      <div class="checkin-star-pill checkin-preview-stars" id="checkinPreviewStars" data-rating="4">
+        <button class="checkin-star" type="button" data-value="1"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+        <button class="checkin-star" type="button" data-value="2"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+        <button class="checkin-star" type="button" data-value="3"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+        <button class="checkin-star" type="button" data-value="4"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+        <button class="checkin-star" type="button" data-value="5"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
       </div>
-    </div>
 
-    <div class="checkin-send-wrap">
+      <input class="checkin-preview-addr" id="checkinAddress" type="text" maxlength="120" autocomplete="off" data-i18n="checkin.addrPlaceholder" data-i18n-attr="placeholder" placeholder="📍 Địa điểm (có thể bỏ trống)…">
+      <textarea class="checkin-preview-cap" id="checkinCaption" rows="1" maxlength="200" data-i18n="checkin.capPlaceholder" data-i18n-attr="placeholder" placeholder="Ghi chú ngắn (tuỳ chọn)…"></textarea>
+
+      <div class="checkin-share-tog on" id="checkinShareTog">
+        <div class="checkin-share-knob"></div>
+        <div class="checkin-share-body">
+          <span data-i18n="checkin.shareOn">Chia sẻ với bạn bè</span>
+          <small data-i18n="checkin.shareHint">Rating tính vào ✓ verified</small>
+        </div>
+      </div>
+
       <button class="scan-btn checkin-send-btn" id="checkinSendBtn" type="button">
         <svg class="icon" width="20" height="20"><use href="#ic-action-pin-static"></use></svg>
         <span data-i18n="checkin.send">Gửi check-in</span>
@@ -1280,19 +1286,19 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2656"></script>
-<script src="js/i18n.js?v=2656"></script>
-<script src="js/utils.js?v=2656"></script>
-<script src="js/state.js?v=2656"></script>
-<script src="js/poi.js?v=2656"></script>
-<script src="js/geocoder.js?v=2656"></script>
-<script src="js/gemini.js?v=2656"></script>
-<script src="js/community.js?v=2656"></script>
-<script src="js/push.js?v=2656"></script>
-<script src="js/analytics.js?v=2656"></script>
-<script src="js/map.js?v=2656"></script>
-<script src="js/gps.js?v=2656"></script>
-<script src="js/locationPicker.js?v=2656"></script>
+<script src="js/security.js?v=2657"></script>
+<script src="js/i18n.js?v=2657"></script>
+<script src="js/utils.js?v=2657"></script>
+<script src="js/state.js?v=2657"></script>
+<script src="js/poi.js?v=2657"></script>
+<script src="js/geocoder.js?v=2657"></script>
+<script src="js/gemini.js?v=2657"></script>
+<script src="js/community.js?v=2657"></script>
+<script src="js/push.js?v=2657"></script>
+<script src="js/analytics.js?v=2657"></script>
+<script src="js/map.js?v=2657"></script>
+<script src="js/gps.js?v=2657"></script>
+<script src="js/locationPicker.js?v=2657"></script>
 <!-- Trip name dialog — thay thế window.prompt() native -->
 <div class="trip-name-overlay" id="tripNameOverlay" role="dialog" aria-modal="true">
   <div class="trip-name-card">
@@ -1305,8 +1311,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2656"></script>
-<script src="js/app.js?v=2656"></script>
+<script src="js/controllers.js?v=2657"></script>
+<script src="js/app.js?v=2657"></script>
 
 </body>
 </html>

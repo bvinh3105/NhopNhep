@@ -2334,83 +2334,124 @@ body.map-full .tabbar{transform:translateY(105%)}
 .checkin-flash{position:absolute;inset:0;background:var(--white);opacity:0;pointer-events:none;transition:opacity .15s;z-index:50}
 .checkin-flash.on{opacity:.9}
 
-/* ── Preview sheet — full-bleed still frame, floating sticker chrome ── */
-.checkin-preview{position:absolute;inset:0;z-index:30;background:var(--cam-bg,#0e0806)}
+/* ── Live camera: hide the rating pill BEFORE capture — user 2026-09-22
+   requested it clean, rating only appears in the preview sheet. Keeps
+   the DOM around so _tapShutter's dataset.rating read still works. ── */
+#checkinStars{display:none}
+
+/* ── Preview: 3:4 photo card + cream sheet ────────────────────────────
+   Two stacked flex rows. Photo card up top with sticker frame (matches
+   the post-view artefact 3:4 aesthetic). Cream sheet below with rounded
+   top corners like a menu — the app's own visual language. Retake/close
+   are the ONLY overlays; every input sits inside the sheet in a proper
+   column with real gaps, so nothing overlaps like the pink prototype. */
+.checkin-preview{
+  position:absolute;inset:0;z-index:30;
+  background:var(--cam-bg,#0e0806);
+  display:flex;flex-direction:column;
+}
 .checkin-preview.hidden{display:none}
-.checkin-preview-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.94) saturate(1.1);z-index:1;user-select:none}
+
+/* Photo card — 3:4, sticker frame. align-self:center centres horizontally,
+   flex-shrink:0 keeps the aspect ratio intact on small phones. */
+.checkin-preview-photo-wrap{
+  position:relative;align-self:center;flex-shrink:0;
+  width:min(88vw,330px);aspect-ratio:3/4;
+  margin:calc(env(safe-area-inset-top, 0px) + 18px) 0 0;
+  border-radius:22px;
+}
+.checkin-preview-photo{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  border-radius:22px;
+  border:2.5px solid var(--text);
+  box-shadow:5px 5px 0 var(--text);
+  filter:brightness(.98) saturate(1.05);user-select:none;
+}
 .checkin-preview-back,.checkin-preview-close{
-  position:absolute;top:calc(var(--safe-top,env(safe-area-inset-top,0px)) + .6rem);z-index:14;
-  width:2.4rem;height:2.4rem;border-radius:50%;background:var(--white);
+  position:absolute;top:11px;z-index:5;
+  width:38px;height:38px;border-radius:50%;background:var(--white);
   border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
   display:flex;align-items:center;justify-content:center;color:var(--text);font-weight:900;
+  padding:0;cursor:pointer;
 }
-.checkin-preview-back{left:.7rem}
-.checkin-preview-close{right:.7rem}
+.checkin-preview-back{left:11px}
+.checkin-preview-close{right:11px}
 .checkin-preview-back:active,.checkin-preview-close:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
 
-/* Preview overlays sit above the tab bar which we ALSO hide via
-   .tabbar.checkin-hidden in CheckinCtrl._tapShutter, so the send
-   button at bottom:0 becomes tappable. Offsets below assume the
-   tab bar is off-screen — no need to clear it. */
-.checkin-preview-stars{bottom:220px}
+/* Cream sheet — rounded top corners, sits under the photo. flex:1 lets
+   the sheet fill the remaining vertical space cleanly on any device.
+   overflow:visible so the star pill's negative margin can straddle the
+   top border (the "handle" effect). Content easily fits on all phones. */
+.checkin-preview-sheet{
+  flex:1;margin:24px 0 0;
+  background:var(--cream,#FBF3D9);
+  border:2.5px solid var(--text);border-bottom:none;
+  border-top-left-radius:28px;border-top-right-radius:28px;
+  padding:26px 18px calc(env(safe-area-inset-bottom, 0px) + 18px);
+  display:flex;flex-direction:column;gap:12px;
+  overflow:visible;
+}
 
-/* Address input — optional free-text where the user was, sits above
-   the caption. Same visual shape as .checkin-preview-cap so the two
-   read as a stacked pair. Non-italic + bold so a typed address looks
-   like "location", not "note". Skip = ẩn danh, GPS-only. */
-.checkin-preview-addr{
-  position:absolute;left:.7rem;right:.7rem;bottom:158px;z-index:14;
-  padding:.55rem .8rem;background:var(--white);border:2px solid var(--text);border-radius:14px;
-  box-shadow:2px 2px 0 var(--text);font-size:.85rem;color:var(--text);font-weight:800;
-  outline:none;width:auto;line-height:1.3;
+/* Star pill inside the sheet — reset .checkin-star-pill's absolute
+   positioning (which the live-view pill uses), lift slightly so it
+   straddles the sheet's top border like a "handle" element. */
+.checkin-preview-stars{
+  position:relative;left:auto;right:auto;bottom:auto;transform:none;
+  align-self:center;margin:-46px 0 6px;z-index:2;
+  background:var(--white);
+}
+
+/* Address + caption — rounder, more airy padding, same rounded corners
+   (20px) so the whole sheet has a consistent radius rhythm. Focus ring
+   picks up the primary red (app brand) instead of the old pink. */
+.checkin-preview-addr,.checkin-preview-cap{
+  position:relative;left:auto;right:auto;bottom:auto;width:100%;
+  padding:.72rem 1rem;
+  background:var(--white);border:2px solid var(--text);border-radius:20px;
+  box-shadow:2px 2px 0 var(--text);
+  font-size:.88rem;color:var(--text);font-weight:800;
+  outline:none;line-height:1.35;
   font-family:var(--font-body);
+}
+.checkin-preview-cap{
+  color:var(--text2);font-style:italic;font-weight:600;font-size:.82rem;resize:none;
 }
 .checkin-preview-addr::placeholder{color:var(--text3);font-weight:700}
-.checkin-preview-addr:focus{border-color:var(--checkin,#D64B7A)}
-
-.checkin-preview-cap{
-  position:absolute;left:.7rem;right:.7rem;bottom:112px;z-index:14;
-  padding:.55rem .8rem;background:var(--white);border:2px solid var(--text);border-radius:14px;
-  box-shadow:2px 2px 0 var(--text);font-size:.8rem;color:var(--text2);font-style:italic;font-weight:600;
-  outline:none;resize:none;width:auto;line-height:1.3;
-  font-family:var(--font-body);
-}
 .checkin-preview-cap::placeholder{color:var(--text3);font-style:italic}
-.checkin-preview-cap:focus{border-color:var(--checkin,#D64B7A)}
+.checkin-preview-addr:focus,.checkin-preview-cap:focus{border-color:var(--primary,#B92626)}
 
+/* Share toggle — cream/orange scheme matches the rest of the app.
+   Off = white, on = accent orange knob + soft accent tint background. */
 .checkin-share-tog{
-  position:absolute;left:.7rem;right:.7rem;bottom:68px;z-index:14;
-  display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;
-  background:var(--checkin-tint,#FBE3EC);border:2px solid var(--checkin,#D64B7A);border-radius:14px;
-  box-shadow:2px 2px 0 var(--checkin-2,#A83359);
-  cursor:pointer;user-select:none;
+  position:relative;left:auto;right:auto;bottom:auto;
+  display:flex;align-items:center;gap:.65rem;padding:.7rem .9rem;
+  background:var(--white);border:2px solid var(--text);border-radius:20px;
+  box-shadow:2px 2px 0 var(--text);
+  cursor:pointer;user-select:none;transition:background .18s;
 }
+.checkin-share-tog.on{background:#FFEED9}
 .checkin-share-knob{
-  width:36px;height:20px;background:var(--cream-2);border:1.5px solid var(--text);
-  border-radius:11px;position:relative;flex-shrink:0;transition:background .2s;
+  width:40px;height:22px;background:var(--cream-3);border:1.5px solid var(--text);
+  border-radius:12px;position:relative;flex-shrink:0;transition:background .2s;
 }
 .checkin-share-knob::after{
   content:'';position:absolute;top:1px;left:1px;
-  width:14px;height:14px;background:var(--white);border-radius:50%;transition:transform .2s;
+  width:16px;height:16px;background:var(--white);border-radius:50%;transition:transform .2s;
   border:1px solid var(--text);
 }
-.checkin-share-tog.on .checkin-share-knob{background:var(--checkin,#D64B7A)}
-.checkin-share-tog.on .checkin-share-knob::after{transform:translateX(16px)}
-.checkin-share-body{flex:1;font-size:.75rem;color:var(--checkin-2,#A83359);font-weight:800;line-height:1.25}
-.checkin-share-body small{display:block;color:var(--text2);font-size:.6rem;margin-top:1px;font-weight:700;font-style:normal}
+.checkin-share-tog.on .checkin-share-knob{background:var(--accent,#E8843C)}
+.checkin-share-tog.on .checkin-share-knob::after{transform:translateX(18px)}
+.checkin-share-body{flex:1;font-size:.82rem;color:var(--text);font-weight:900;line-height:1.25}
+.checkin-share-body small{display:block;color:var(--text2);font-size:.66rem;margin-top:2px;font-weight:700;font-style:normal}
 
-/* Send CTA — the .scan-btn class carries the whole button visual
-   (border 2px, offset shadow 4px, radius 16px, font). The extra
-   .checkin-send-btn class only swaps the fill red → pink. */
-.checkin-send-wrap{
-  position:absolute;left:0;right:0;bottom:0;z-index:13;
-  padding:.7rem .8rem calc(env(safe-area-inset-bottom,0px) + .7rem);
+/* Send CTA — primary red, matches Home's "Random" button + all other
+   primary CTAs in the app. Slightly rounder (22px) than .scan-btn's
+   default 16px so it sits nicely with the 20px input rows above. */
+.scan-btn.checkin-send-btn{
+  background:var(--primary,#B92626);color:var(--white);
+  margin-top:4px;border-radius:22px;
 }
-.checkin-send-wrap::before{
-  content:'';position:absolute;inset:0;z-index:-1;
-  background:linear-gradient(to bottom,transparent,rgba(0,0,0,.75) 55%);
-}
-.scan-btn.checkin-send-btn{background:var(--checkin,#D64B7A);color:var(--white);margin-top:0}
+.scan-btn.checkin-send-btn:active{background:var(--primary-2,#8C1919)}
 
 /* ── Quán picker sheet (opens on tap of top pill) ─────────────────────── */
 .checkin-picker-list{
