@@ -55,6 +55,7 @@ function boot() {
   FriendsListModal.init();
   SessionCreateModal.init();
   SessionVoteModal.init();
+  CheckinCtrl.init();
   wireScrollMasks();
 
   // Deep-link handler: ?q=<pb_id> auto-opens the community detail

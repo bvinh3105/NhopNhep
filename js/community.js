@@ -685,6 +685,101 @@ const Community = {
     }, mime, 0.62);
   },
 
+  // ── Check-in — 1 photo + rating + optional note, camera-live only ─────
+  // Each check-in is a moment: 1 record, no updates (see migration file
+  // header for the design decisions). Photo capture happens client-side
+  // via getUserMedia + canvas (see CheckinCtrl); we receive it here as a
+  // ready-to-upload WebP Blob and pipe it through the same compressImage
+  // shrink pass createRestaurant uses so a huge phone shot doesn't blow
+  // the 5MB server cap.
+  //
+  // `restaurant` may be a PB relation id (community quán) or empty string
+  // (OSM/Gemini quán, snapshot fields carry the display). is_shared gates
+  // feed visibility — false stays in owner diary only.
+  async createCheckin({ restaurantId = '', restaurantName, restaurantLat = null, restaurantLng = null, restaurantEmoji = '', rating = 0, note = '', photoBlob = null, isShared = false, sessionId = '' } = {}) {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    if (!restaurantName || !restaurantName.trim()) return { ok: false, error: I18N.t('checkin.err.noRestaurant') };
+
+    const fd = new FormData();
+    fd.append('user', this.currentUser.id);
+    if (restaurantId) fd.append('restaurant', restaurantId);
+    fd.append('restaurant_name', restaurantName.trim().slice(0, 120));
+    if (restaurantLat != null) fd.append('restaurant_lat', restaurantLat);
+    if (restaurantLng != null) fd.append('restaurant_lng', restaurantLng);
+    if (restaurantEmoji) fd.append('restaurant_emoji', restaurantEmoji.slice(0, 8));
+    // Clamp rating to [0,5] regardless of client — cheap safety net.
+    const r = Math.max(0, Math.min(5, +rating || 0));
+    fd.append('rating', r);
+    if (note) fd.append('note', note.trim().slice(0, 200));
+    fd.append('is_shared', isShared ? true : false);
+    if (sessionId) fd.append('session', sessionId);
+
+    if (photoBlob && photoBlob.size) {
+      // Photo from camera is already a WebP-ish blob from CheckinCtrl's
+      // canvas.toBlob() — but a raw 4032×3024 frame captures around 3-4MB,
+      // often over the server cap. Reuse compressImage's shrink pass:
+      // wrap the Blob in a File so compressImage's Image() decode path
+      // works, then upload whatever it returns.
+      let filename = `checkin-${Date.now()}.webp`;
+      let uploadBlob = photoBlob;
+      try {
+        const f = new File([photoBlob], filename, { type: photoBlob.type || 'image/webp' });
+        const result = await this.compressImage(f);
+        if (result && result.blob && result.blob.size) {
+          uploadBlob = result.blob;
+          filename = `checkin-${Date.now()}.${result.ext}`;
+        }
+      } catch (_) { /* fall through with the raw blob */ }
+      fd.append('photo', uploadBlob, filename);
+    }
+
+    // Photo upload rides the same tunnel + upstream bandwidth path as
+    // regular quán posts, so use the same 20s+15s/photo budget (with
+    // just 1 photo the effective wait is ~35s worst case).
+    return this._fetch('/api/collections/checkins/records', {
+      method: 'POST', body: fd, timeoutMs: 35000,
+    });
+  },
+
+  // My check-ins, newest first. Powers the Diary sub-tab in Profile.
+  async getMyCheckins({ page = 1, perPage = 50 } = {}) {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    const filter = encodeURIComponent(`user="${this.currentUser.id}"`);
+    return this._fetch(`/api/collections/checkins/records?filter=${filter}&sort=-created&page=${page}&perPage=${perPage}`);
+  },
+
+  // Shared check-ins for a single community quán — feeds the "eaten
+  // strip" and verified rating aggregate on the detail modal. Server
+  // listRule already restricts is_shared=true entries to who can see
+  // the quán, so no extra client-side filtering needed.
+  async getCheckinsForRestaurant(restaurantId, { perPage = 50 } = {}) {
+    if (!restaurantId) return { ok: true, data: { items: [], totalItems: 0 } };
+    const filter = encodeURIComponent(`restaurant="${restaurantId}" && is_shared=true`);
+    return this._fetch(`/api/collections/checkins/records?filter=${filter}&sort=-created&perPage=${perPage}&expand=user`);
+  },
+
+  // Global feed of shared check-ins (mixed into the community list, or
+  // rendered as its own strip — caller decides). Returned newest first.
+  async listSharedCheckins({ page = 1, perPage = 30 } = {}) {
+    const filter = encodeURIComponent(`is_shared=true`);
+    return this._fetch(`/api/collections/checkins/records?filter=${filter}&sort=-created&page=${page}&perPage=${perPage}&expand=user`);
+  },
+
+  // Delete my own check-in — server rule enforces ownership too, but the
+  // client already knows and can skip the round-trip on a mistap.
+  async deleteCheckin(id) {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    return this._fetch(`/api/collections/checkins/records/${id}`, { method: 'DELETE' });
+  },
+
+  // Full URL to a check-in's photo file (thumb'd if size is passed).
+  // Same pattern the community feed uses for quán photos.
+  checkinPhotoUrl(record, size = '') {
+    if (!record || !record.photo) return '';
+    const q = size ? `?thumb=${encodeURIComponent(size)}` : '';
+    return `${this.BASE_URL}/api/files/checkins/${record.id}/${record.photo}${q}`;
+  },
+
   // ── Group Session ("Phiên chọn quán theo nhóm") ─────────────────────────
   // Host chọn 1 nhóm quán ứng viên (từ kết quả quét OSM/Gemini HOẶC quán
   // cộng đồng), chia sẻ 1 link, bạn bè vote, host chốt random trong nhóm

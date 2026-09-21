@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2671">
+<link rel="stylesheet" href="css/styles.css?v=2650">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -231,6 +231,10 @@
 <symbol id="ic-map-saved-route" viewBox="0 0 24 24"><path d="M3,6 L9,3 L15,6 L21,3 V18 L15,21 L9,18 L3,21 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M9,3 L9,18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M15,6 L15,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-proto-diary" viewBox="0 0 24 24"><path d="M6,4 h11 a1,1 0 0 1 1,1 v15 H7 a2,2 0 0 1 -2,-2 V5 a1,1 0 0 1 1,-1 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M5,17 a2,2 0 0 1 2,-2 H18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,8 L15,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9,11.5 L13,11.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
 <symbol id="ic-nav-checkin" viewBox="0 0 24 24"><path d="M4,9 a2,2 0 0 1 2,-2 H8 L9.5,5 H14.5 L16,7 H18 a2,2 0 0 1 2,2 V17 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M8.5,13 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
 <symbol id="ic-nav-community" viewBox="0 0 24 24"><path d="M6,9 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
@@ -693,13 +697,120 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════
-     CHECK-IN SCREEN — chưa xây tính năng thật, hiện placeholder
+     CHECK-IN SCREEN — camera-first, "chụp NGAY" real-time capture.
+     Full-bleed <video> stream + floating sticker chrome copied verbatim
+     from Home's own map+cluster+FAB pattern (brand-float, map-btn-cluster,
+     rp-fab) so this tab reads as "the app", not a foreign camera UI.
+     Guest / signed-out state: shown as an inline sign-in prompt overlay
+     (CheckinCtrl decides which layer to reveal on tab enter).
 ═══════════════════════════════════════════════ -->
 <div id="checkinScreen" class="screen hidden">
-  <div class="coming-soon-wrap">
+  <!-- Signed-out prompt — takes over the tab when Community.isLoggedIn() is false. -->
+  <div class="checkin-signin hidden" id="checkinSignInWrap">
     <div class="coming-soon-ico"><svg class="icon" width="40" height="40"><use href="#ic-nav-checkin"></use></svg></div>
-    <div class="coming-soon-title" data-i18n="common.comingSoon">🚧 Tính năng đang cập nhật</div>
-    <p class="coming-soon-sub" data-i18n="common.comingSoonSub">Chúng tôi đang hoàn thiện tính năng này. Quay lại sau nhé!</p>
+    <div class="coming-soon-title" data-i18n="checkin.signInTitle">Đăng nhập để check-in</div>
+    <p class="coming-soon-sub" data-i18n="checkin.signInSub">Check-in là nhật ký cá nhân của bạn — đăng nhập ở tab Cộng đồng để bắt đầu.</p>
+    <button class="cat-chip active" id="checkinGoSignIn" data-i18n="checkin.goSignIn" type="button" style="margin-top:.8rem">Đăng nhập ngay</button>
+  </div>
+
+  <!-- Camera live preview — CheckinCtrl fills this with a MediaStream. -->
+  <video id="checkinVideo" class="checkin-video" autoplay playsinline muted></video>
+
+  <!-- Focus reticle animation (pure CSS via .checkin-video::before below in styles.css). -->
+
+  <!-- No-permission fallback shown when getUserMedia is denied/unavailable. -->
+  <div class="checkin-noperm hidden" id="checkinNoPerm">
+    <div class="coming-soon-ico"><svg class="icon" width="40" height="40"><use href="#ic-nav-checkin"></use></svg></div>
+    <div class="coming-soon-title" data-i18n="checkin.noPermTitle">Chưa mở được camera</div>
+    <p class="coming-soon-sub" data-i18n="checkin.noPermSub">Bạn cần cho phép Nhóp Nhép dùng camera để check-in. Bấm 🔒 cạnh URL để bật lại quyền.</p>
+    <button class="cat-chip active" id="checkinRetryCam" data-i18n="checkin.retryCam" type="button" style="margin-top:.8rem">Thử lại</button>
+  </div>
+
+  <!-- Quán pill — top-left, reuses .brand-float construction. Tap opens picker. -->
+  <button class="brand-float checkin-quan-pill" id="checkinQuanPill" type="button">
+    <svg class="icon" width="16" height="16"><use href="#ic-action-pin-static"></use></svg>
+    <span id="checkinQuanName">—</span>
+    <span class="checkin-quan-dist" id="checkinQuanDist"></span>
+    <span class="chevron">▾</span>
+  </button>
+
+  <!-- Icon cluster — top-right, reuses .map-btn-cluster construction. -->
+  <div class="map-btn-cluster checkin-cluster">
+    <button class="cluster-btn" id="checkinDiaryBtn" type="button" data-i18n="checkin.diaryTitle" data-i18n-attr="title" title="Diary"><svg class="icon" width="20" height="20"><use href="#ic-proto-diary"></use></svg></button>
+    <button class="cluster-btn" id="checkinFlipBtn" type="button" data-i18n="checkin.flipTitle" data-i18n-attr="title" title="Đổi camera trước/sau"><svg class="icon" width="20" height="20"><use href="#ic-action-undo-reset"></use></svg></button>
+  </div>
+
+  <!-- Star rating pill — floats above the shutter. 0 = no rating (still valid). -->
+  <div class="checkin-star-pill" id="checkinStars" data-rating="0">
+    <button class="checkin-star" type="button" data-value="1"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+    <button class="checkin-star" type="button" data-value="2"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+    <button class="checkin-star" type="button" data-value="3"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+    <button class="checkin-star" type="button" data-value="4"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+    <button class="checkin-star" type="button" data-value="5"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+  </div>
+
+  <!-- Shutter — reuses .rp-fab construction (54px, 2px border, 3px offset shadow), recolored to --checkin. -->
+  <button class="rp-fab checkin-shutter" id="checkinShutterBtn" type="button" aria-label="Chụp check-in"></button>
+
+  <!-- Flash overlay for the capture moment. -->
+  <div class="checkin-flash" id="checkinFlash"></div>
+
+  <!-- Preview + send sheet — shown after the shutter fires, over the still frame. -->
+  <div class="checkin-preview hidden" id="checkinPreview">
+    <img class="checkin-preview-photo" id="checkinPreviewPhoto" alt="">
+    <button class="checkin-preview-back" id="checkinRetakeBtn" type="button" title="Chụp lại"><svg class="icon" width="16" height="16"><use href="#ic-action-undo-reset"></use></svg></button>
+    <button class="checkin-preview-close" id="checkinPreviewClose" type="button" title="Huỷ"><svg class="icon" width="14" height="14"><use href="#ic-action-close"></use></svg></button>
+
+    <div class="checkin-star-pill checkin-preview-stars" id="checkinPreviewStars" data-rating="4">
+      <button class="checkin-star" type="button" data-value="1"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+      <button class="checkin-star" type="button" data-value="2"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+      <button class="checkin-star" type="button" data-value="3"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+      <button class="checkin-star" type="button" data-value="4"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+      <button class="checkin-star" type="button" data-value="5"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
+    </div>
+
+    <textarea class="checkin-preview-cap" id="checkinCaption" rows="1" maxlength="200" data-i18n="checkin.capPlaceholder" data-i18n-attr="placeholder" placeholder="Ghi chú ngắn (tuỳ chọn)…"></textarea>
+
+    <div class="checkin-share-tog on" id="checkinShareTog">
+      <div class="checkin-share-knob"></div>
+      <div class="checkin-share-body">
+        <span data-i18n="checkin.shareOn">Chia sẻ với bạn bè</span>
+        <small data-i18n="checkin.shareHint">Rating tính vào ✓ verified</small>
+      </div>
+    </div>
+
+    <div class="checkin-send-wrap">
+      <button class="scan-btn checkin-send-btn" id="checkinSendBtn" type="button">
+        <svg class="icon" width="20" height="20"><use href="#ic-action-pin-static"></use></svg>
+        <span data-i18n="checkin.send">Gửi check-in</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Quán picker overlay — opens on tap of the top-left pill, shows nearby quán to switch. -->
+<div class="modal-overlay" id="checkinQuanPickerOverlay">
+  <div class="modal-sheet list-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" data-i18n="checkin.pickerTitle">Bạn đang ở <em>quán nào?</em></div>
+    <div class="modal-sub" data-i18n="checkin.pickerSub">Auto-detect theo GPS · tap để đổi</div>
+    <div class="checkin-picker-list" id="checkinPickerList"></div>
+    <div class="form-actions" style="justify-content:center">
+      <button class="btn-cancel" id="checkinPickerClose" data-i18n="common.close">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Diary modal — full history of my check-ins (opened from the ↖ cluster). -->
+<div class="modal-overlay" id="checkinDiaryOverlay">
+  <div class="modal-sheet list-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" data-i18n="checkin.diaryTitle2">📔 Diary — nhật ký ăn</div>
+    <div class="modal-sub" id="checkinDiaryCount">0 check-in</div>
+    <div class="checkin-diary-list" id="checkinDiaryList"></div>
+    <div class="form-actions" style="justify-content:center">
+      <button class="btn-cancel" id="checkinDiaryClose" data-i18n="common.close">Đóng</button>
+    </div>
   </div>
 </div>
 
@@ -1114,19 +1225,19 @@
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
-<script src="js/security.js?v=2641"></script>
-<script src="js/i18n.js?v=2641"></script>
-<script src="js/utils.js?v=2641"></script>
-<script src="js/state.js?v=2641"></script>
-<script src="js/poi.js?v=2641"></script>
-<script src="js/geocoder.js?v=2641"></script>
-<script src="js/gemini.js?v=2641"></script>
-<script src="js/community.js?v=2641"></script>
-<script src="js/push.js?v=2641"></script>
-<script src="js/analytics.js?v=2641"></script>
-<script src="js/map.js?v=2643"></script>
-<script src="js/gps.js?v=2641"></script>
-<script src="js/locationPicker.js?v=2641"></script>
+<script src="js/security.js?v=2650"></script>
+<script src="js/i18n.js?v=2650"></script>
+<script src="js/utils.js?v=2650"></script>
+<script src="js/state.js?v=2650"></script>
+<script src="js/poi.js?v=2650"></script>
+<script src="js/geocoder.js?v=2650"></script>
+<script src="js/gemini.js?v=2650"></script>
+<script src="js/community.js?v=2650"></script>
+<script src="js/push.js?v=2650"></script>
+<script src="js/analytics.js?v=2650"></script>
+<script src="js/map.js?v=2650"></script>
+<script src="js/gps.js?v=2650"></script>
+<script src="js/locationPicker.js?v=2650"></script>
 <!-- Trip name dialog — thay thế window.prompt() native -->
 <div class="trip-name-overlay" id="tripNameOverlay" role="dialog" aria-modal="true">
   <div class="trip-name-card">
@@ -1139,8 +1250,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2644"></script>
-<script src="js/app.js?v=2642"></script>
+<script src="js/controllers.js?v=2650"></script>
+<script src="js/app.js?v=2650"></script>
 
 </body>
 </html>

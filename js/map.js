@@ -60,7 +60,12 @@ const TabNav = {
       CommunityCtrl.render();
     } else if (tab === 'checkin') {
       document.getElementById('checkinScreen').classList.remove('hidden');
+      CheckinCtrl.enter();
     }
+    // Leaving check-in? Stop the camera stream so the OS in-use badge
+    // clears. The controller also watches for its own .hidden mutation
+    // as a belt-and-braces path (see CheckinCtrl.init()).
+    if (tab !== 'checkin' && typeof CheckinCtrl !== 'undefined') CheckinCtrl.leave();
   },
 };
 

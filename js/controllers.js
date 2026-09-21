@@ -5190,3 +5190,447 @@ const CommunityAddModal = {
     CommunityCtrl._loadList('');
   },
 };
+
+
+/* ═══════════════════════════════════════════════
+   CHECK-IN CONTROLLER — camera-first, "chụp NGAY" real-time capture
+   ───────────────────────────────────────────────
+   Owns the whole check-in tab lifecycle:
+
+     enter()   — called by TabNav.switchTo('checkin'). Decides which
+                 layer to show (signed-out prompt / no-perm fallback /
+                 live camera) and calls _startStream() if the user is
+                 logged in and the camera is grantable.
+     leave()   — called on tab switch away. Stops the MediaStream so
+                 the OS camera-in-use indicator doesn't stay lit.
+     _tapShutter() — grabs a frame from the <video> onto an offscreen
+                 <canvas>, converts to WebP, hands off to the preview
+                 sheet. NO gallery fallback here (see rationale below).
+     _submit() — sends the compressed Blob + rating/note/toggle through
+                 Community.createCheckin().
+
+   Design rationale (short — long form is in the checkins migration
+   header): camera capture MUST be live to keep the "verified" premise.
+   That's why we intentionally don't offer an <input type="file"> path
+   here; if getUserMedia is denied we render #checkinNoPerm with a
+   retry button that just calls _startStream() again.
+
+   The nearby-quán auto-detect is best-effort: it uses State.userLat/
+   userLng if the Home tab has already got GPS, otherwise falls back
+   to the closest saved quán from State (or an OSM/Gemini placeholder
+   the user picks manually via the top pill). Never blocks the shutter.
+═══════════════════════════════════════════════ */
+const CheckinCtrl = {
+  _stream: null,
+  _facing: 'environment',  // start with rear camera on phones
+  _selected: null,         // {id, name, lat, lng, emoji, source}
+  _captured: null,         // { blob: Blob, dataUrl: string } — the pending photo
+  _pickerCandidates: [],
+
+  init() {
+    document.getElementById('checkinQuanPill').addEventListener('click', () => this._openPicker());
+    document.getElementById('checkinDiaryBtn').addEventListener('click', () => this._openDiary());
+    document.getElementById('checkinFlipBtn').addEventListener('click', () => this._flipCamera());
+    document.getElementById('checkinShutterBtn').addEventListener('click', () => this._tapShutter());
+    document.getElementById('checkinRetryCam').addEventListener('click', () => this._startStream());
+    document.getElementById('checkinGoSignIn').addEventListener('click', () => TabNav.switchTo('community'));
+
+    // Star rating pills — both the live camera pill and the preview pill
+    // wire the same way; picking a star sets data-rating on the container.
+    ['checkinStars', 'checkinPreviewStars'].forEach(id => {
+      const c = document.getElementById(id);
+      if (!c) return;
+      c.querySelectorAll('.checkin-star').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const v = +btn.dataset.value;
+          const cur = +c.dataset.rating || 0;
+          this._setStars(c, cur === v ? 0 : v);
+        });
+      });
+    });
+
+    // Preview sheet controls
+    document.getElementById('checkinRetakeBtn').addEventListener('click', () => this._retake());
+    document.getElementById('checkinPreviewClose').addEventListener('click', () => this._retake());
+    document.getElementById('checkinShareTog').addEventListener('click', () => {
+      document.getElementById('checkinShareTog').classList.toggle('on');
+    });
+    document.getElementById('checkinSendBtn').addEventListener('click', () => this._submit());
+
+    // Quán picker overlay
+    const pickerOv = document.getElementById('checkinQuanPickerOverlay');
+    pickerOv.addEventListener('click', (e) => { if (e.target === pickerOv) this._closePicker(); });
+    document.getElementById('checkinPickerClose').addEventListener('click', () => this._closePicker());
+
+    // Diary overlay
+    const diaryOv = document.getElementById('checkinDiaryOverlay');
+    diaryOv.addEventListener('click', (e) => { if (e.target === diaryOv) this._closeDiary(); });
+    document.getElementById('checkinDiaryClose').addEventListener('click', () => this._closeDiary());
+
+    // Auto-teardown when the tab bar hides this screen. Belt-and-braces:
+    // TabNav.switchTo does the .hidden add first, we watch for it to know
+    // when to stop the stream (not everywhere calls .leave() explicitly).
+    const screen = document.getElementById('checkinScreen');
+    new MutationObserver((mutations) => {
+      const nowHidden = screen.classList.contains('hidden');
+      if (nowHidden && this._stream) this._stopStream();
+    }).observe(screen, { attributes: true, attributeFilter: ['class'] });
+  },
+
+  // Called by TabNav.switchTo when the check-in tab becomes visible.
+  enter() {
+    // Reset preview state — the tab always opens ready-to-shoot, never
+    // stuck on a stale preview from last visit.
+    document.getElementById('checkinPreview').classList.add('hidden');
+    this._captured = null;
+
+    if (!Community.isLoggedIn()) {
+      document.getElementById('checkinSignInWrap').classList.remove('hidden');
+      document.getElementById('checkinNoPerm').classList.add('hidden');
+      document.getElementById('checkinVideo').classList.add('hidden');
+      this._toggleChrome(false);
+      return;
+    }
+
+    document.getElementById('checkinSignInWrap').classList.add('hidden');
+    this._toggleChrome(true);
+    this._refreshQuan();
+    this._startStream();
+  },
+
+  leave() { this._stopStream(); },
+
+  // Show/hide the floating controls (pill, cluster, stars, shutter) —
+  // hidden when the sign-in overlay or the no-perm fallback is up.
+  _toggleChrome(show) {
+    ['checkinQuanPill','checkinStars','checkinShutterBtn'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = show ? '' : 'none';
+    });
+    document.querySelector('#checkinScreen .checkin-cluster').style.display = show ? '' : 'none';
+  },
+
+  async _startStream() {
+    const video = document.getElementById('checkinVideo');
+    const noperm = document.getElementById('checkinNoPerm');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      video.classList.add('hidden');
+      noperm.classList.remove('hidden');
+      this._toggleChrome(false);
+      return;
+    }
+    // If we already have a stream (e.g. flip), stop it first — the browser
+    // rejects two concurrent camera opens on the same device.
+    this._stopStream();
+    try {
+      this._stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: this._facing } },
+        audio: false,
+      });
+      video.srcObject = this._stream;
+      video.classList.remove('hidden');
+      noperm.classList.add('hidden');
+      this._toggleChrome(true);
+    } catch (e) {
+      // getUserMedia rejects with different error names depending on the
+      // failure mode (NotAllowedError, NotFoundError, NotReadableError,
+      // OverconstrainedError). Users don't care which — same fallback UI.
+      console.warn('[checkin] getUserMedia failed:', e && e.name || e);
+      video.classList.add('hidden');
+      noperm.classList.remove('hidden');
+      this._toggleChrome(false);
+    }
+  },
+
+  _stopStream() {
+    if (this._stream) {
+      try { this._stream.getTracks().forEach(t => t.stop()); } catch (_) {}
+      this._stream = null;
+    }
+    const video = document.getElementById('checkinVideo');
+    if (video) { try { video.srcObject = null; } catch (_) {} }
+  },
+
+  async _flipCamera() {
+    this._facing = this._facing === 'environment' ? 'user' : 'environment';
+    await this._startStream();
+  },
+
+  _refreshQuan() {
+    // Auto-pick the closest quán we know about: user's own posts (State
+    // has them cached) sorted by distance from State.userLat/userLng.
+    // If nothing usable, leave selected=null — user must pick via picker
+    // (which prompts them to enter a name for OSM/Gemini spots too).
+    if (!this._selected) {
+      const closest = this._findClosest();
+      if (closest) this._selected = closest;
+    }
+    const pill = document.getElementById('checkinQuanName');
+    const dist = document.getElementById('checkinQuanDist');
+    if (this._selected) {
+      pill.textContent = this._selected.name;
+      dist.textContent = this._selected.dist || '';
+    } else {
+      pill.textContent = I18N.t('checkin.pickQuan');
+      dist.textContent = '';
+    }
+  },
+
+  _findClosest() {
+    const lat = State.userLat, lng = State.userLng;
+    const pool = [];
+    // Community posts the user has authored (in Profile's list) —
+    // ProfileCtrl._loadedList caches these; if not yet loaded, skip.
+    const myR = ProfileCtrl && ProfileCtrl._loadedList || [];
+    myR.forEach(r => {
+      if (r && r.lat != null && r.lng != null) {
+        pool.push({
+          id: r.id,
+          name: r.name,
+          lat: r.lat, lng: r.lng,
+          emoji: (CATEGORIES[r.category] && CATEGORIES[r.category].icon) ? '' : '',  // svgIcon can't be inlined in emoji field; empty is fine
+          source: 'community',
+        });
+      }
+    });
+    // Recent scan results (Home tab already fetched them) — good for OSM
+    // places the user is currently near.
+    (State.results || []).slice(0, 40).forEach(r => {
+      if (r && r.lat != null && r.lng != null && r.name) {
+        pool.push({
+          id: r.id > 1e13 ? '' : (r._pb && r._pb.id) || '',
+          name: r.name,
+          lat: r.lat, lng: r.lng,
+          emoji: '',
+          source: r._community ? 'community' : (r._gemini ? 'gemini' : 'osm'),
+        });
+      }
+    });
+    if (!pool.length) return null;
+    if (lat == null || lng == null) return { ...pool[0], dist: '' };
+    // Cheap flat-earth distance — accurate enough at neighborhood scale.
+    const withDist = pool.map(p => {
+      const dLat = (p.lat - lat) * 111320;
+      const dLng = (p.lng - lng) * 111320 * Math.cos(lat * Math.PI / 180);
+      const d = Math.round(Math.hypot(dLat, dLng));
+      return { ...p, _d: d, dist: d < 1000 ? `${d}m` : `${(d/1000).toFixed(1)}km` };
+    });
+    withDist.sort((a, b) => a._d - b._d);
+    return withDist[0];
+  },
+
+  _openPicker() {
+    const list = document.getElementById('checkinPickerList');
+    const lat = State.userLat, lng = State.userLng;
+    // Rebuild the candidate pool same as _findClosest but keep the whole list.
+    const pool = [];
+    const myR = ProfileCtrl && ProfileCtrl._loadedList || [];
+    myR.forEach(r => {
+      if (r && r.name) pool.push({ id: r.id, name: r.name, lat: r.lat, lng: r.lng, source: 'community' });
+    });
+    (State.results || []).slice(0, 40).forEach(r => {
+      if (r && r.name) pool.push({
+        id: r.id > 1e13 ? '' : ((r._pb && r._pb.id) || ''),
+        name: r.name, lat: r.lat, lng: r.lng,
+        source: r._community ? 'community' : (r._gemini ? 'gemini' : 'osm'),
+      });
+    });
+    // Dedup by name+source — same quán can appear both in my posts and
+    // in the results feed if I scanned my own restaurant.
+    const seen = new Set();
+    const deduped = pool.filter(p => {
+      const k = `${p.name}::${p.source}`;
+      if (seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+    // Distance-sort if we have GPS.
+    if (lat != null && lng != null) {
+      deduped.forEach(p => {
+        if (p.lat != null && p.lng != null) {
+          const dLat = (p.lat - lat) * 111320;
+          const dLng = (p.lng - lng) * 111320 * Math.cos(lat * Math.PI / 180);
+          p._d = Math.round(Math.hypot(dLat, dLng));
+          p.dist = p._d < 1000 ? `${p._d}m` : `${(p._d/1000).toFixed(1)}km`;
+        } else { p._d = Infinity; p.dist = ''; }
+      });
+      deduped.sort((a, b) => a._d - b._d);
+    }
+    this._pickerCandidates = deduped.slice(0, 30);
+
+    if (!this._pickerCandidates.length) {
+      list.innerHTML = `<div class="empty" style="text-align:center;padding:1rem;color:var(--text2);font-size:.85rem">${I18N.t('checkin.pickerEmpty')}</div>`;
+    } else {
+      list.innerHTML = this._pickerCandidates.map((p, i) => `
+        <button class="checkin-picker-item" data-idx="${i}" type="button">
+          <div class="checkin-picker-body">
+            <div class="checkin-picker-name">${escapeHtml(p.name)}</div>
+            <div class="checkin-picker-meta">${p.dist ? `<span>${p.dist}</span>` : ''}<span>${p.source === 'community' ? 'Cộng đồng' : (p.source === 'gemini' ? 'AI' : 'OSM')}</span></div>
+          </div>
+          ${this._selected && this._selected.name === p.name ? '<span class="checkin-picker-tag">Đang chọn</span>' : ''}
+        </button>
+      `).join('');
+      list.querySelectorAll('.checkin-picker-item').forEach(btn => {
+        btn.addEventListener('click', () => this._pick(+btn.dataset.idx));
+      });
+    }
+    document.getElementById('checkinQuanPickerOverlay').classList.add('show');
+  },
+
+  _closePicker() { document.getElementById('checkinQuanPickerOverlay').classList.remove('show'); },
+
+  _pick(idx) {
+    const c = this._pickerCandidates[idx];
+    if (!c) return;
+    this._selected = c;
+    this._refreshQuan();
+    this._closePicker();
+  },
+
+  _setStars(container, n) {
+    container.dataset.rating = n;
+    container.querySelectorAll('.checkin-star').forEach(btn => {
+      const v = +btn.dataset.value;
+      const use = btn.querySelector('use');
+      const on = v <= n;
+      btn.classList.toggle('on', on);
+      if (use) use.setAttribute('href', on ? '#ic-rating-star-filled' : '#ic-rating-star-outline');
+    });
+  },
+
+  async _tapShutter() {
+    if (!this._selected) { this._openPicker(); return; }
+    if (!this._stream) { showToast(I18N.t('checkin.noStream')); return; }
+
+    // Flash effect first (feels responsive) then grab the frame async.
+    const flash = document.getElementById('checkinFlash');
+    flash.classList.add('on');
+    setTimeout(() => flash.classList.remove('on'), 150);
+
+    const video = document.getElementById('checkinVideo');
+    const w = video.videoWidth, h = video.videoHeight;
+    if (!w || !h) { showToast(I18N.t('checkin.noStream')); return; }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, w, h);
+
+    // WebP first (smaller); fall back to JPEG on Safari <14 or when the
+    // browser silently returns image/png (canvas.toBlob spec quirk).
+    const blob = await new Promise(res => {
+      canvas.toBlob(b => {
+        if (b && b.type === 'image/webp') return res(b);
+        canvas.toBlob(j => res(j), 'image/jpeg', 0.85);
+      }, 'image/webp', 0.85);
+    });
+    if (!blob) { showToast(I18N.t('checkin.captureErr')); return; }
+
+    this._captured = { blob, dataUrl: canvas.toDataURL(blob.type, 0.85) };
+
+    // Wire the preview: copy over the pre-selected rating from the live
+    // pill so user isn't asked twice. Default 4 stars if none set.
+    const liveR = +document.getElementById('checkinStars').dataset.rating || 0;
+    this._setStars(document.getElementById('checkinPreviewStars'), liveR || 4);
+    document.getElementById('checkinPreviewPhoto').src = this._captured.dataUrl;
+    document.getElementById('checkinCaption').value = '';
+    document.getElementById('checkinShareTog').classList.add('on');
+    document.getElementById('checkinPreview').classList.remove('hidden');
+  },
+
+  _retake() {
+    document.getElementById('checkinPreview').classList.add('hidden');
+    this._captured = null;
+  },
+
+  async _submit() {
+    const q = this._selected;
+    if (!q || !this._captured) return;
+    const btn = document.getElementById('checkinSendBtn');
+    const spanEl = btn.querySelector('span[data-i18n]');
+    const originalLabel = spanEl ? spanEl.textContent : '';
+    btn.disabled = true;
+    if (spanEl) spanEl.textContent = I18N.t('checkin.sending');
+
+    const rating = +document.getElementById('checkinPreviewStars').dataset.rating || 0;
+    const note = document.getElementById('checkinCaption').value.trim();
+    const isShared = document.getElementById('checkinShareTog').classList.contains('on');
+
+    const r = await Community.createCheckin({
+      restaurantId: q.source === 'community' && q.id ? q.id : '',
+      restaurantName: q.name,
+      restaurantLat: q.lat,
+      restaurantLng: q.lng,
+      restaurantEmoji: '',  // reserved for a future emoji picker
+      rating, note, photoBlob: this._captured.blob, isShared,
+    });
+
+    btn.disabled = false;
+    if (spanEl) spanEl.textContent = originalLabel;
+
+    if (!r.ok) { showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
+
+    if (typeof Analytics !== 'undefined') Analytics.track('checkin', {
+      shared: isShared, has_rating: rating > 0, has_note: !!note, source: q.source,
+    });
+
+    showToast(I18N.t(isShared ? 'checkin.toastShared' : 'checkin.toastPrivate'));
+
+    // Reset for the next check-in
+    this._retake();
+    this._setStars(document.getElementById('checkinStars'), 0);
+  },
+
+  async _openDiary() {
+    const overlay = document.getElementById('checkinDiaryOverlay');
+    const list = document.getElementById('checkinDiaryList');
+    const count = document.getElementById('checkinDiaryCount');
+    overlay.classList.add('show');
+    list.innerHTML = `<div class="empty" style="text-align:center;padding:1rem;color:var(--text2);font-size:.85rem">${I18N.t('common.loading')}</div>`;
+    if (!Community.isLoggedIn()) {
+      list.innerHTML = `<div class="empty" style="text-align:center;padding:1rem;color:var(--text2);font-size:.85rem">${I18N.t('err.needLogin')}</div>`;
+      count.textContent = '';
+      return;
+    }
+    const r = await Community.getMyCheckins({ perPage: 50 });
+    if (!r.ok) {
+      list.innerHTML = `<div class="empty" style="text-align:center;padding:1rem;color:var(--text2);font-size:.85rem">${r.error || I18N.t('err.serverGeneric')}</div>`;
+      count.textContent = '';
+      return;
+    }
+    const items = (r.data && r.data.items) || [];
+    count.textContent = I18N.t('checkin.diaryCount', { n: items.length });
+    if (!items.length) {
+      list.innerHTML = `<div class="empty" style="text-align:center;padding:1rem;color:var(--text2);font-size:.85rem">${I18N.t('checkin.diaryEmpty')}</div>`;
+      return;
+    }
+    list.innerHTML = items.map(it => {
+      const photo = it.photo ? Community.checkinPhotoUrl(it, '200x200') : '';
+      const stars = this._starsRow(it.rating || 0);
+      const d = new Date(it.created);
+      const dateLabel = `${d.getDate()}/${d.getMonth() + 1}`;
+      const noteHtml = it.note ? ` · ${escapeHtml(it.note)}` : '';
+      const share = it.is_shared
+        ? `<span class="checkin-diary-tag pub"><svg class="icon" width="12" height="12"><use href="#ic-privacy-friends"></use></svg> Share</span>`
+        : `<span class="checkin-diary-tag priv"><svg class="icon" width="12" height="12"><use href="#ic-privacy-lock"></use></svg> Riêng</span>`;
+      return `
+        <div class="checkin-diary-row" data-id="${it.id}">
+          <div class="checkin-diary-thumb">${photo ? `<img src="${photo}" alt="">` : `<span>🍜</span>`}</div>
+          <div class="checkin-diary-body">
+            <div class="checkin-diary-name">${escapeHtml(it.restaurant_name)}</div>
+            <div class="checkin-diary-meta">${stars} <span class="checkin-diary-date">· ${dateLabel}</span>${noteHtml}</div>
+          </div>
+          ${share}
+        </div>`;
+    }).join('');
+  },
+
+  _closeDiary() { document.getElementById('checkinDiaryOverlay').classList.remove('show'); },
+
+  _starsRow(n) {
+    let out = '';
+    for (let i = 1; i <= 5; i++) {
+      out += `<svg class="icon" width="12" height="12" style="color:${i<=n?'var(--accent-2)':'var(--text3)'}"><use href="#ic-rating-star-${i<=n?'filled':'outline'}"></use></svg>`;
+    }
+    return out;
+  },
+};
