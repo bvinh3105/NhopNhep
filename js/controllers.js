@@ -5313,10 +5313,24 @@ const CheckinCtrl = {
   async _startStream() {
     const video = document.getElementById('checkinVideo');
     const noperm = document.getElementById('checkinNoPerm');
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    const showNoperm = (titleKey, subKey, errName) => {
+      const tEl = noperm.querySelector('.coming-soon-title');
+      const sEl = noperm.querySelector('.coming-soon-sub');
+      if (tEl) tEl.textContent = I18N.t(titleKey);
+      if (sEl) sEl.textContent = I18N.t(subKey) + (errName ? ` [${errName}]` : '');
       video.classList.add('hidden');
       noperm.classList.remove('hidden');
       this._toggleChrome(false);
+    };
+
+    // Feature detection first — old browsers or non-HTTPS pages don't
+    // expose mediaDevices at all. Give the user a concrete reason.
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      const isSecure = window.isSecureContext || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      showNoperm(
+        isSecure ? 'checkin.noPermTitle' : 'checkin.needHttpsTitle',
+        isSecure ? 'checkin.notSupportedSub' : 'checkin.needHttpsSub',
+      );
       return;
     }
     // If we already have a stream (e.g. flip), stop it first — the browser
@@ -5332,13 +5346,29 @@ const CheckinCtrl = {
       noperm.classList.add('hidden');
       this._toggleChrome(true);
     } catch (e) {
-      // getUserMedia rejects with different error names depending on the
-      // failure mode (NotAllowedError, NotFoundError, NotReadableError,
-      // OverconstrainedError). Users don't care which — same fallback UI.
-      console.warn('[checkin] getUserMedia failed:', e && e.name || e);
-      video.classList.add('hidden');
-      noperm.classList.remove('hidden');
-      this._toggleChrome(false);
+      // getUserMedia rejects with different error names — map each to a
+      // message that tells the user what to do. Falling back to a single
+      // generic message hid the difference between "you denied it" and
+      // "no camera exists here", which the user can act on differently.
+      const name = (e && e.name) || 'Error';
+      console.warn('[checkin] getUserMedia failed:', name, e && e.message || '');
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        // NotAllowedError covers both "user just clicked Block" and the
+        // Permissions-Policy header (which produces the same DOMException
+        // name, only with a different message). If it's the header case,
+        // reloading won't help — but the retry button is still visible
+        // in case the user's browser lets them re-prompt.
+        showNoperm('checkin.noPermTitle', 'checkin.noPermSub', name);
+      } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+        // No camera on the device, or the requested facingMode doesn't
+        // match anything available.
+        showNoperm('checkin.noCamTitle', 'checkin.noCamSub', name);
+      } else if (name === 'NotReadableError' || name === 'AbortError') {
+        // Another app has the camera open (Zoom, Instagram, another tab).
+        showNoperm('checkin.camBusyTitle', 'checkin.camBusySub', name);
+      } else {
+        showNoperm('checkin.noPermTitle', 'checkin.noPermSub', name);
+      }
     }
   },
 

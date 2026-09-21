@@ -13,7 +13,7 @@
     X-Frame-Options = "SAMEORIGIN"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Permissions-Policy = "geolocation=(self), camera=(), microphone=()"
+    Permissions-Policy = "geolocation=(self), camera=(self), microphone=()"
 
 [[headers]]
   for = "/index.html"

@@ -5,7 +5,13 @@
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: geolocation=(self), camera=(), microphone=()
+  # camera=(self) — required for the Check-in tab's getUserMedia() call
+  # (2026-09-21). Empty parens `()` = deny for everyone, including own
+  # origin, which is why the browser was rejecting our own camera request
+  # with "Permissions policy violation: camera is not allowed in this
+  # document" before this line was changed. microphone stays denied — we
+  # don't need audio for check-in photos.
+  Permissions-Policy: geolocation=(self), camera=(self), microphone=()
 
 /index.html
   Cache-Control: no-cache, no-store, must-revalidate
