@@ -2509,95 +2509,209 @@ body.map-full .tabbar{transform:translateY(105%)}
 .checkin-diary-tag.pub{background:var(--checkin-tint,#FBE3EC);color:var(--checkin-2,#A83359);border-color:var(--checkin,#D64B7A)}
 
 /* ═══════════════════════════════════════════════════════════════════
-   CHECK-IN STRIP + POST-VIEW MODAL  (v1.1 — added 2026-09-21)
-   Strip: horizontal-scroll thumbnails at the top of the Cộng đồng feed
-   ­showing the newest shared check-ins across all users. Tap opens the
-   post-view modal below.
-   Post view: single check-in — approved mockup, 3:5.2 rounded frame with
-   3:4 photo. Uses the app's cream + sticker style (2.5px border, offset
-   shadow) so it drops into the current UI unchanged.
+   CHECK-IN SUBTAB — STORIES BUBBLES + FULLSCREEN VIEWER  (2026-09-22)
+   Rewrote the earlier horizontal strip into a dedicated subtab under
+   Cộng đồng. Each user with a check-in in the last 24h gets 1 bubble
+   (grouped by expand.user.id); tap a bubble → fullscreen viewer with
+   auto-advance 5s/post, progress bar segments, tap-left/right nav.
+   Feed still client-side filtered to 24h; Diary + trang quán aggregate
+   keep everything full-time.
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ─── Strip section header ───────────────────────────────────────── */
-.ci-strip-wrap{margin:6px 0 10px}
-.ci-strip-wrap.hidden{display:none}
-.ci-strip-hd{padding:0 14px 6px;display:flex;align-items:baseline;justify-content:space-between;gap:8px}
-.ci-strip-title{font-size:.95rem;font-weight:900;color:var(--text);letter-spacing:-.01em;font-style:italic}
-.ci-strip-title em{color:var(--checkin,#D64B7A);font-style:italic}
-.ci-strip-sub{font-size:.68rem;font-weight:700;color:var(--text-3,#9C7F6B)}
-
-/* ─── Strip horizontal scroll list ────────────────────────────────── */
-.ci-strip-list{
-  display:flex;gap:10px;padding:6px 14px 12px;overflow-x:auto;overflow-y:hidden;
-  scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;
+/* ─── Bubbles grid (subtab content) ──────────────────────────────── */
+.ci-bubbles{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));
+  gap:14px 12px;padding:8px 14px 18px;
 }
-.ci-strip-list::-webkit-scrollbar{display:none}
-.ci-strip-list{scrollbar-width:none}
+.ci-bubbles-empty{
+  padding:22px 18px;margin:8px 14px 18px;border-radius:16px;
+  background:var(--paper);border:2px dashed var(--cream-3);
+  display:flex;align-items:center;gap:12px;color:var(--text-2,#6B4A38);
+  font-size:.85rem;font-weight:700;line-height:1.4;
+}
+.ci-bubbles-empty.hidden{display:none}
+.ci-bubbles-empty-ico{font-size:1.9rem;flex-shrink:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}
+.ci-bubbles-empty-msg{flex:1}
 
-/* Each thumb: 3:4 ratio, sticker style. Photo fills the whole card,
-   bottom gradient carries the username so it stays readable on any
-   photo. Rating star (top-right) only rendered when rating > 0. */
-.ci-strip-card{
-  flex-shrink:0;width:96px;aspect-ratio:3/4;
-  border-radius:14px;overflow:hidden;position:relative;cursor:pointer;
-  border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
-  background:linear-gradient(135deg,var(--cream-3),var(--accent));
-  scroll-snap-align:start;
+/* One bubble: circular avatar with gradient ring (unseen) or gray
+   ring (all seen). Author name underneath truncates. Count badge
+   bottom-right when the user has >1 check-in in the window. */
+.ci-bubble{
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  cursor:pointer;user-select:none;
+}
+.ci-bubble-ring{
+  position:relative;width:72px;height:72px;border-radius:50%;
+  padding:3px;background:conic-gradient(from 210deg,var(--primary,#B92626),var(--accent,#E8843C),var(--checkin,#D64B7A),var(--primary,#B92626));
   transition:transform .12s;
 }
-.ci-strip-card:active{transform:scale(.96)}
-.ci-strip-card-photo{
-  position:absolute;inset:0;background-size:cover;background-position:center;
+.ci-bubble:active .ci-bubble-ring{transform:scale(.94)}
+.ci-bubble-ring.seen{background:var(--cream-3,#EEE0A6)}
+.ci-bubble-inner{
+  width:100%;height:100%;border-radius:50%;overflow:hidden;
+  background:var(--paper);border:2px solid var(--white,#FFFDF5);
+  display:flex;align-items:center;justify-content:center;font-size:1.7rem;
 }
-.ci-strip-card-photo.empty{
-  display:flex;align-items:center;justify-content:center;font-size:2rem;
-  filter:drop-shadow(0 2px 4px rgba(0,0,0,.3));
-}
-.ci-strip-card-name{
-  position:absolute;bottom:0;left:0;right:0;padding:16px 6px 5px;
-  background:linear-gradient(to top,rgba(0,0,0,.75),rgba(0,0,0,0));
-  color:var(--white,#FFFDF5);font-size:.62rem;font-weight:900;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;
-  letter-spacing:.01em;
-}
-.ci-strip-card-rating{
-  position:absolute;top:5px;right:5px;
-  padding:1px 5px 1px 3px;background:rgba(0,0,0,.65);color:var(--accent,#E8843C);
-  border-radius:999px;font-size:.6rem;font-weight:900;
-  display:inline-flex;align-items:center;gap:2px;
-  border:1px solid rgba(255,255,255,.25);
-}
-.ci-strip-card-rating .icon{width:.75em;height:.75em}
-
-/* "Vừa mới" pulse — thin red dot top-left for check-ins < 1h old.
-   Draws the eye to the freshest content in the strip without stealing
-   the star badge's slot. Added 2026-09-22. */
-.ci-strip-card-fresh{
-  position:absolute;top:5px;left:5px;z-index:1;
-  width:9px;height:9px;border-radius:50%;
-  background:var(--primary,#B92626);border:1.5px solid var(--white,#FFFDF5);
-  box-shadow:0 0 0 rgba(185,38,38,.6);
+.ci-bubble-inner.has-photo{background-size:cover;background-position:center}
+/* Small red pulse — user has a check-in <1h old. */
+.ci-bubble-fresh{
+  position:absolute;top:2px;right:2px;z-index:2;
+  width:11px;height:11px;border-radius:50%;
+  background:var(--primary,#B92626);border:2px solid var(--white,#FFFDF5);
   animation:ciFreshPulse 1.6s ease-in-out infinite;
 }
 @keyframes ciFreshPulse{
   0%,100%{box-shadow:0 0 0 0 rgba(185,38,38,.55)}
   50%{box-shadow:0 0 0 5px rgba(185,38,38,0)}
 }
-
-/* Skeleton loading placeholder (shown while first fetch is in flight) */
-.ci-strip-card.skel{background:linear-gradient(135deg,var(--cream-2),var(--cream-3));animation:ciSkel 1.2s infinite alternate}
-@keyframes ciSkel{from{opacity:.55}to{opacity:.9}}
-
-/* Empty state — shown when the strip is visible but no shared check-ins
-   exist yet. Feels welcoming (📸 + CTA), not "nothing to see here". */
-.ci-strip-empty{
-  flex:1;padding:14px 16px;border-radius:14px;
-  background:var(--paper);border:2px dashed var(--cream-3);
-  display:flex;align-items:center;gap:10px;color:var(--text-2,#6B4A38);
-  font-size:.78rem;font-weight:700;line-height:1.35;
+.ci-bubble-count{
+  position:absolute;bottom:0;right:0;z-index:2;
+  min-width:20px;height:20px;padding:0 4px;border-radius:999px;
+  background:var(--text);color:var(--white);border:2px solid var(--white,#FFFDF5);
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:.62rem;font-weight:900;
 }
-.ci-strip-empty-ico{font-size:1.5rem;flex-shrink:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}
-.ci-strip-empty-msg{flex:1}
+.ci-bubble-name{
+  font-size:.72rem;font-weight:800;color:var(--text);line-height:1.15;
+  max-width:82px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;
+}
+/* Bubble skeleton while first fetch loads */
+.ci-bubble.skel .ci-bubble-inner{background:linear-gradient(135deg,var(--cream-2),var(--cream-3));animation:ciBubSkel 1.2s infinite alternate}
+.ci-bubble.skel .ci-bubble-name{opacity:.4}
+@keyframes ciBubSkel{from{opacity:.55}to{opacity:.9}}
+
+/* ─── Fullscreen viewer ──────────────────────────────────────────── */
+/* Uses .modal-overlay.show for open/close (same as diary/picker); the
+   inner frame is what fills the viewport. Tab bar gets hidden via
+   .tabbar.checkin-hidden while viewer is up (see CheckinViewerCtrl). */
+#checkinViewer.ci-viewer-ov{background:rgba(0,0,0,.95)}
+#checkinViewer .ci-viewer-frame{
+  position:relative;width:100vw;height:100vh;max-width:520px;
+  display:flex;flex-direction:column;
+  color:var(--white,#FFFDF5);
+  background:transparent;
+}
+
+/* Progress bar segments at the top — 1 segment per post in the group,
+   current segment animates fill over 5s via CSS animation. */
+.ci-viewer-progress{
+  position:absolute;top:calc(env(safe-area-inset-top, 0px) + 10px);
+  left:12px;right:12px;z-index:20;
+  display:flex;gap:4px;
+}
+.ci-viewer-progress-seg{
+  flex:1;height:3px;border-radius:2px;
+  background:rgba(255,255,255,.35);overflow:hidden;
+}
+.ci-viewer-progress-seg-fill{
+  height:100%;width:0;background:var(--white,#FFFDF5);
+  transform-origin:left;
+}
+.ci-viewer-progress-seg.done .ci-viewer-progress-seg-fill{width:100%}
+.ci-viewer-progress-seg.active .ci-viewer-progress-seg-fill{
+  animation:ciViewerFill 5000ms linear forwards;
+}
+@keyframes ciViewerFill{from{width:0}to{width:100%}}
+
+/* Header — avatar + name + time on the left, close on the right */
+.ci-viewer-hd{
+  position:absolute;top:calc(env(safe-area-inset-top, 0px) + 22px);
+  left:12px;right:12px;z-index:15;
+  display:flex;align-items:center;gap:10px;padding:.5rem .6rem;
+}
+.ci-viewer-avatar{
+  width:38px;height:38px;border-radius:50%;
+  background:var(--accent,#E8843C);border:2px solid var(--white,#FFFDF5);
+  display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex-shrink:0;
+  color:var(--text);
+}
+.ci-viewer-avatar .icon{width:1.15rem;height:1.15rem;color:var(--text)}
+.ci-viewer-hd-txt{flex:1;min-width:0;line-height:1.15}
+.ci-viewer-username{
+  font-size:.95rem;font-weight:900;text-transform:uppercase;letter-spacing:-.01em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.ci-viewer-time{font-size:.68rem;font-weight:700;opacity:.85}
+.ci-viewer-close{
+  width:36px;height:36px;border-radius:50%;
+  background:rgba(0,0,0,.5);color:var(--white,#FFFDF5);
+  border:1.5px solid rgba(255,255,255,.35);
+  display:flex;align-items:center;justify-content:center;
+  padding:0;cursor:pointer;flex-shrink:0;
+}
+
+/* Photo cover — fills whole viewport behind everything */
+.ci-viewer-photo-wrap{
+  position:absolute;inset:0;z-index:1;
+  display:flex;align-items:center;justify-content:center;
+  background:#000;
+}
+.ci-viewer-photo{
+  width:100%;height:100%;
+  background-size:cover;background-position:center;background-repeat:no-repeat;
+}
+.ci-viewer-photo.empty{
+  display:flex;align-items:center;justify-content:center;font-size:6rem;
+  filter:drop-shadow(0 4px 12px rgba(0,0,0,.5));
+  background:linear-gradient(135deg,#F9A870,#B92626);
+}
+
+/* Tap zones — invisible, cover left/right thirds of the photo. On
+   desktop they still work as clickable areas. Keep in front of photo
+   but behind header/foot so those UI stays interactive. */
+.ci-viewer-tap{
+  position:absolute;top:0;bottom:0;z-index:10;
+  background:transparent;border:0;padding:0;cursor:pointer;
+}
+.ci-viewer-tap-prev{left:0;width:30%}
+.ci-viewer-tap-next{right:0;width:70%}
+
+/* Bottom bar — location + directions + actions */
+.ci-viewer-foot{
+  position:absolute;left:0;right:0;bottom:0;z-index:15;
+  padding:14px 14px calc(env(safe-area-inset-bottom, 0px) + 14px);
+  background:linear-gradient(to top,rgba(0,0,0,.72) 0%,rgba(0,0,0,0) 100%);
+  display:flex;flex-direction:column;gap:12px;
+}
+.ci-viewer-loc{
+  display:flex;align-items:center;gap:6px;
+  font-size:.85rem;font-weight:800;color:var(--white,#FFFDF5);
+}
+.ci-viewer-loc .icon{color:var(--white,#FFFDF5);width:.9em;height:.9em;flex-shrink:0}
+.ci-viewer-loc > span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.ci-viewer-direct{
+  flex-shrink:0;padding:.28rem .65rem;
+  background:var(--primary,#B92626);color:var(--white,#FFFDF5);
+  border:1.5px solid var(--white,#FFFDF5);border-radius:999px;
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:.7rem;font-weight:900;font-family:inherit;cursor:pointer;
+  box-shadow:0 2px 6px rgba(0,0,0,.35);
+}
+.ci-viewer-direct.hidden{display:none}
+.ci-viewer-direct .icon{width:.85em;height:.85em;color:var(--white,#FFFDF5)}
+.ci-viewer-direct:active{transform:translateY(1px)}
+
+.ci-viewer-actions{
+  display:flex;align-items:center;gap:10px;
+}
+.ci-viewer-act{
+  width:42px;height:42px;border-radius:50%;
+  background:rgba(0,0,0,.5);color:var(--white,#FFFDF5);
+  border:1.5px solid rgba(255,255,255,.35);
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:0;cursor:pointer;
+}
+.ci-viewer-act .icon{width:1.15rem;height:1.15rem}
+.ci-viewer-act.on{background:var(--primary,#B92626);border-color:var(--white,#FFFDF5)}
+.ci-viewer-share{margin-left:auto}
+
+/* Temporary marker for "Đi tới" landing on the Home map */
+.leaflet-marker-icon .ci-direct-pin{
+  font-size:1.6rem;line-height:1;
+  filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));
+  animation:ciDirectPinDrop .3s ease-out;
+}
+@keyframes ciDirectPinDrop{from{transform:translateY(-14px);opacity:0}to{transform:translateY(0);opacity:1}}
 
 /* ─── Post-view modal ────────────────────────────────────────────── */
 /* Reuses .modal-overlay .show pattern (see index.html:792) — no new

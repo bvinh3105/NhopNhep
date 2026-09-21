@@ -3331,13 +3331,20 @@ const CommunityCtrl = {
       this._searchDebounce = setTimeout(() => this._loadList(search.value.trim()), 350);
     });
 
-    // Quán ăn / Lộ trình — Lộ trình chưa xây tính năng, chỉ đổi pane hiện/ẩn.
+    // Quán ăn / Check-in / Lộ trình — 3 panes, exactly one visible.
+    // Switching to Check-in force-refreshes the bubbles (bypasses the 5s
+    // debounce inside CheckinFeedCtrl.refresh) so the user always lands
+    // on the freshest view.
     document.querySelectorAll('.comm-subtab').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.comm-subtab').forEach(b => b.classList.toggle('active', b === btn));
-        const isRoutes = btn.dataset.commSubtab === 'routes';
-        document.getElementById('communityFoodPane').classList.toggle('hidden', isRoutes);
-        document.getElementById('communityRoutesPane').classList.toggle('hidden', !isRoutes);
+        const which = btn.dataset.commSubtab;
+        document.getElementById('communityFoodPane').classList.toggle('hidden', which !== 'food');
+        document.getElementById('communityCheckinsPane').classList.toggle('hidden', which !== 'checkins');
+        document.getElementById('communityRoutesPane').classList.toggle('hidden', which !== 'routes');
+        if (which === 'checkins' && typeof CheckinFeedCtrl !== 'undefined') {
+          CheckinFeedCtrl.refresh({ force: true });
+        }
       });
     });
 
@@ -5729,120 +5736,135 @@ const CheckinCtrl = {
 
 
 /* ═══════════════════════════════════════════════
-   CHECK-IN FEED STRIP  (v1.1)
-   Horizontal-scroll section at the top of the Cộng đồng feed, showing
-   the newest is_shared=true check-ins across all users. Tap a card →
-   CheckinPostViewCtrl.open(record). Refresh triggers: (1) Community
-   tab becomes visible (MutationObserver on #communityScreen.hidden),
-   (2) CheckinCtrl._submit() calls .refresh() after a successful shared
-   post. Fetches Community.listSharedCheckins() with a small 20-item
-   cap — enough for a strip, not a full history (that lives in Diary).
+   CHECK-IN FEED  (v1.2 — 2026-09-22)
+   Subtab "Check-in" inside Cộng đồng. Bubbles grouped by user (one
+   bubble per user who has any is_shared=true check-in in the last
+   24h). Tap a bubble → fullscreen viewer (CheckinViewerCtrl) auto-
+   advances through that user's posts, 5s each.
+
+   Refresh triggers: (1) Cộng đồng tab first becomes visible
+   (MutationObserver on #communityScreen), (2) user switches to the
+   Check-in subtab (handled in CommunityCtrl.init subtab wiring),
+   (3) CheckinCtrl._submit() force-refreshes after a shared post so
+   the poster's own bubble shows up right away.
+
+   Data path stays cheap: 1 GET to Community.listSharedCheckins()
+   (perPage=50, we filter+group client-side). Diary and trang quán
+   aggregate still show every check-in full-time — the 24h cutoff
+   applies ONLY to this feed.
 ═══════════════════════════════════════════════ */
 const CheckinFeedCtrl = {
-  MAX: 20,
-  _items: [],
+  MAX: 50,
+  _items: [],   // flat list of records (post-24h filter)
+  _groups: [],  // [{user, items[], newestAt, hasFresh}], sorted newest-first
   _lastAt: 0,
   _refreshing: false,
 
   init() {
-    // Auto-refresh when Cộng đồng tab becomes visible. Cheaper than
-    // hooking into CommunityCtrl.render() and keeps this feature self-
-    // contained (no cross-file coupling to a controller I don't own).
     const screen = document.getElementById('communityScreen');
     if (screen) {
       new MutationObserver(() => {
         if (!screen.classList.contains('hidden')) this.refresh();
       }).observe(screen, { attributes: true, attributeFilter: ['class'] });
     }
-    // Kick a first fetch if the tab is already open on load (rare, but
-    // possible via deep-link ?q= handling that lands on Cộng đồng).
     if (screen && !screen.classList.contains('hidden')) this.refresh();
   },
 
   async refresh({ force = false } = {}) {
     if (this._refreshing) return;
-    // Debounce — no need to hit the server more than once per 5s even
-    // if MutationObserver fires from multiple class toggles at once.
-    // Callers with new data to insert (a just-posted check-in) pass
-    // {force:true} to bypass this and see their post immediately.
     if (!force && Date.now() - this._lastAt < 5000) return;
     this._refreshing = true;
-    const wrap = document.getElementById('checkinStripWrap');
-    const list = document.getElementById('checkinStripList');
-    if (!wrap || !list) { this._refreshing = false; return; }
+    const bubbles = document.getElementById('checkinBubbles');
+    const empty = document.getElementById('checkinBubblesEmpty');
+    if (!bubbles || !empty) { this._refreshing = false; return; }
 
-    // Skeletons on first fetch only; subsequent refreshes keep the last
-    // rendered cards visible so the UI doesn't flash empty.
     if (!this._items.length) {
-      list.innerHTML = Array.from({length: 5}, () => `<div class="ci-strip-card skel"></div>`).join('');
-      wrap.classList.remove('hidden');
+      bubbles.innerHTML = Array.from({length: 4}, () =>
+        `<div class="ci-bubble skel">
+          <div class="ci-bubble-ring seen"><div class="ci-bubble-inner"></div></div>
+          <div class="ci-bubble-name">&nbsp;</div>
+        </div>`).join('');
+      empty.classList.add('hidden');
     }
 
     try {
       const r = await Community.listSharedCheckins({ page: 1, perPage: this.MAX });
       this._lastAt = Date.now();
       if (!r.ok) throw new Error(r.error || 'fetch');
-      // 24-hour window — feed stays fresh, old check-ins fall off into
-      // Diary + trang quán aggregate (both still show them full-time).
-      // Client-side filter — no backend change, no wasted fetch.
       const cutoff = Date.now() - 24 * 3600 * 1000;
+      const freshCutoff = Date.now() - 3600 * 1000;
       const all = (r.data && r.data.items) || [];
-      this._items = all.filter(x => new Date(x.created).getTime() > cutoff);
+      this._items = all
+        .filter(x => new Date(x.created).getTime() > cutoff)
+        .sort((a, b) => new Date(b.created) - new Date(a.created));
+      // Group by user. Users with no expand fall into a shared 'anon'
+      // bucket so they still render (rare — happens when the users.
+      // viewRule blocks expansion for the caller).
+      const byUser = new Map();
+      for (const it of this._items) {
+        const u = (it.expand && it.expand.user) || { id: 'anon', name: I18N.t('common.anonymous') };
+        const key = u.id || 'anon';
+        if (!byUser.has(key)) byUser.set(key, { user: u, items: [], newestAt: 0, hasFresh: false });
+        const g = byUser.get(key);
+        g.items.push(it);
+        const t = new Date(it.created).getTime();
+        if (t > g.newestAt) g.newestAt = t;
+        if (t > freshCutoff) g.hasFresh = true;
+      }
+      this._groups = [...byUser.values()].sort((a, b) => b.newestAt - a.newestAt);
       this._render();
     } catch (e) {
-      // Silent failure — the strip is nice-to-have; on error just hide
-      // the wrapper. Feed below (quán) still works from its own fetch.
-      if (!this._items.length) wrap.classList.add('hidden');
+      if (!this._items.length) {
+        bubbles.innerHTML = '';
+        empty.classList.remove('hidden');
+      }
     } finally {
       this._refreshing = false;
     }
   },
 
   _render() {
-    const wrap = document.getElementById('checkinStripWrap');
-    const list = document.getElementById('checkinStripList');
-    if (!wrap || !list) return;
-    // Even with 0 items, keep the section visible so users know check-ins
-    // exist and can start one. Only hidden on outright fetch error (see
-    // refresh() catch block).
-    wrap.classList.remove('hidden');
-    if (!this._items.length) {
-      list.innerHTML = `<div class="ci-strip-empty">
-        <div class="ci-strip-empty-ico">📸</div>
-        <div class="ci-strip-empty-msg">${I18N.t('checkinFeed.emptyMsg')}</div>
-      </div>`;
+    const bubbles = document.getElementById('checkinBubbles');
+    const empty = document.getElementById('checkinBubblesEmpty');
+    if (!bubbles || !empty) return;
+    if (!this._groups.length) {
+      bubbles.innerHTML = '';
+      empty.classList.remove('hidden');
       return;
     }
+    empty.classList.add('hidden');
 
-    const freshCutoff = Date.now() - 3600 * 1000;
-    list.innerHTML = this._items.map((it) => {
-      const photoUrl = it.photo ? Community.checkinPhotoUrl(it, '240x320') : '';
-      const author = it.expand && it.expand.user;
-      const authorName = (author && author.name) || I18N.t('common.anonymous');
-      const rating = Math.max(0, Math.min(5, +it.rating || 0));
-      const isFresh = new Date(it.created).getTime() > freshCutoff;
-      const photoLayer = photoUrl
-        ? `<div class="ci-strip-card-photo" style="background-image:url('${escapeHtml(photoUrl)}')"></div>`
-        : `<div class="ci-strip-card-photo empty">${escapeHtml(it.restaurant_emoji || '🍜')}</div>`;
-      const ratingBadge = rating > 0
-        ? `<div class="ci-strip-card-rating"><svg class="icon"><use href="#ic-rating-star-filled"></use></svg>${rating}</div>`
-        : '';
-      // "Vừa mới" red pulse dot for check-ins < 1h old — pure visual, no
-      // extra state. Draws the eye to the freshest content in the strip.
-      const freshDot = isFresh ? `<div class="ci-strip-card-fresh" title="Vừa mới"></div>` : '';
-      return `<div class="ci-strip-card" data-id="${it.id}">
-        ${photoLayer}
-        ${freshDot}
-        ${ratingBadge}
-        <div class="ci-strip-card-name">${escapeHtml(authorName)}</div>
-      </div>`;
+    const seen = CheckinViewerCtrl._loadSeen();
+    bubbles.innerHTML = this._groups.map((g, gi) => {
+      // A group is "seen" only when EVERY post in it has been viewed.
+      const allSeen = g.items.every(it => seen.has(it.id));
+      // Preview: use the newest post's photo (or emoji fallback) as
+      // the inner circle. Avatar isn't used here — the bubble IS
+      // the user's identity, name is under it.
+      const preview = g.items[0];
+      const photoUrl = preview.photo ? Community.checkinPhotoUrl(preview, '160x160') : '';
+      const innerStyle = photoUrl
+        ? `style="background-image:url('${escapeHtml(photoUrl)}')"` : '';
+      const innerClass = 'ci-bubble-inner' + (photoUrl ? ' has-photo' : '');
+      const innerContent = photoUrl ? '' : escapeHtml(preview.restaurant_emoji || '🍜');
+      const name = (g.user && g.user.name) || I18N.t('common.anonymous');
+      const freshDot = g.hasFresh ? `<div class="ci-bubble-fresh" title="Vừa mới"></div>` : '';
+      const countBadge = g.items.length > 1
+        ? `<div class="ci-bubble-count">${g.items.length}</div>` : '';
+      return `<button class="ci-bubble" data-group-idx="${gi}" type="button">
+        <div class="ci-bubble-ring${allSeen ? ' seen' : ''}">
+          <div class="${innerClass}" ${innerStyle}>${innerContent}</div>
+          ${freshDot}
+          ${countBadge}
+        </div>
+        <div class="ci-bubble-name">${escapeHtml(name)}</div>
+      </button>`;
     }).join('');
 
-    // Tap → open post view
-    list.querySelectorAll('.ci-strip-card[data-id]').forEach(el => {
+    bubbles.querySelectorAll('.ci-bubble[data-group-idx]').forEach(el => {
       el.addEventListener('click', () => {
-        const rec = this._items.find(x => x.id === el.dataset.id);
-        if (rec) CheckinPostViewCtrl.open(rec);
+        const gi = +el.dataset.groupIdx;
+        if (this._groups[gi]) CheckinViewerCtrl.open(this._groups, gi);
       });
     });
   },
@@ -5957,17 +5979,8 @@ const CheckinPostViewCtrl = {
   _directions() {
     const r = this._current;
     if (!r) return;
-    // Google Maps universal search URL — opens the native app on
-    // Android/iOS when installed, falls back to maps.google.com on
-    // desktop. Prefer coords when we have them (unambiguous); fall back
-    // to name search when the record only carries the typed address.
-    let query;
-    if (r.restaurant_lat != null && r.restaurant_lng != null) {
-      query = `${r.restaurant_lat},${r.restaurant_lng}`;
-    } else {
-      query = encodeURIComponent(r.restaurant_name || '');
-    }
-    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank', 'noopener');
+    this.close();
+    showLocationOnMap(r.restaurant_lat, r.restaurant_lng, r.restaurant_name);
   },
 
   async _share() {
@@ -5997,5 +6010,291 @@ const CheckinPostViewCtrl = {
   },
   _saveSet(key, set) {
     try { localStorage.setItem(key, JSON.stringify([...set])); } catch (_) {}
+  },
+};
+
+
+/* ═══════════════════════════════════════════════
+   IN-APP MAP — "Đi tới" helper
+   Instead of opening Google Maps in an external tab, jump to the Home
+   tab, center the main Leaflet map on the check-in's lat/lng, and drop
+   a temporary marker with the quán name in a popup. The marker auto-
+   removes after 30s so it doesn't clutter the map on the user's next
+   dice roll / scan.
+═══════════════════════════════════════════════ */
+let _ciDirectMarker = null;
+let _ciDirectMarkerTimer = null;
+function showLocationOnMap(lat, lng, name) {
+  if (lat == null || lng == null) {
+    // Fall back to a name search on the map — pan to user location and
+    // toast that we couldn't pin the exact spot.
+    showToast(I18N.t('checkinFeed.noCoords'));
+    return;
+  }
+  TabNav.switchTo('home');
+  // Small delay so #homeScreen has un-hidden and Leaflet's container
+  // knows its real size before setView (otherwise centering is off).
+  setTimeout(() => {
+    if (!State.mainMap || typeof L === 'undefined') return;
+    try { State.mainMap.invalidateSize(); } catch (_) {}
+    State.mainMap.setView([lat, lng], 16, { animate: true });
+
+    if (_ciDirectMarker) {
+      try { State.mainMap.removeLayer(_ciDirectMarker); } catch (_) {}
+    }
+    clearTimeout(_ciDirectMarkerTimer);
+
+    const icon = L.divIcon({
+      html: `<div class="ci-direct-pin">📍</div>`,
+      iconSize: [30, 30], iconAnchor: [15, 30], className: '',
+    });
+    _ciDirectMarker = L.marker([lat, lng], { icon, zIndexOffset: 1200 }).addTo(State.mainMap);
+    const label = name && String(name).trim() ? escapeHtml(String(name).trim()) : I18N.t('checkin.anonSpot');
+    _ciDirectMarker.bindPopup(`<b>${label}</b>`).openPopup();
+
+    // Auto-remove after 30s so the pin doesn't stick around forever.
+    _ciDirectMarkerTimer = setTimeout(() => {
+      if (_ciDirectMarker) {
+        try { State.mainMap.removeLayer(_ciDirectMarker); } catch (_) {}
+        _ciDirectMarker = null;
+      }
+    }, 30_000);
+  }, 220);
+}
+
+
+/* ═══════════════════════════════════════════════
+   CHECK-IN VIEWER  (v1.2 — 2026-09-22)
+   Fullscreen Stories-style viewer for the Cộng đồng → Check-in subtab.
+   Opens with a group of one user's posts (from CheckinFeedCtrl._groups),
+   auto-advances 5s/post, progress bar segments up top, tap-left/right
+   to navigate. On finish (or tap next past the last post), closes back
+   to the bubbles grid.
+
+   State model:
+     _groups[] : all groups (users) in the current view — same array
+                 CheckinFeedCtrl rendered
+     _gi       : current group index
+     _pi       : current post index within that group
+     _timer    : setTimeout handle for auto-advance
+     _seen     : Set of check-in IDs already viewed (localStorage-backed;
+                 drives the bubble ring "seen" gray-vs-gradient state)
+
+   No swipe gestures in v1 — tap the left third to go back, tap
+   anywhere else to go forward. That's IG Stories' default too, and
+   works cleanly without a gesture handler.
+═══════════════════════════════════════════════ */
+const CheckinViewerCtrl = {
+  DURATION_MS: 5000,
+  SEEN_KEY: 'nhopnhep_ci_seen',
+  _groups: null, _gi: 0, _pi: 0,
+  _timer: null,
+  _seen: null,
+
+  init() {
+    this._seen = this._loadSeen();
+    const ov = document.getElementById('checkinViewer');
+    if (!ov) return;
+    // Backdrop tap → close (only when the tap lands on the backdrop
+    // itself, not the frame). Escape hatch for accidental opens.
+    ov.addEventListener('click', (e) => { if (e.target === ov) this.close(); });
+    document.getElementById('ciViewerClose').addEventListener('click', () => this.close());
+    document.getElementById('ciViewerNextZone').addEventListener('click', () => this._next());
+    document.getElementById('ciViewerPrevZone').addEventListener('click', () => this._prev());
+    document.getElementById('ciViewerDirectBtn').addEventListener('click', () => this._directions());
+    document.getElementById('ciViewerLikeBtn').addEventListener('click', () => this._toggleLike());
+    document.getElementById('ciViewerSaveBtn').addEventListener('click', () => this._toggleSave());
+    document.getElementById('ciViewerShareBtn').addEventListener('click', () => this._share());
+  },
+
+  open(groups, gi = 0) {
+    if (!groups || !groups[gi]) return;
+    this._groups = groups;
+    this._gi = gi;
+    this._pi = 0;
+    document.getElementById('checkinViewer').classList.add('show');
+    // Hide the floating tab bar while the viewer takes the whole screen.
+    document.querySelector('.tabbar')?.classList.add('checkin-hidden');
+    this._renderPost();
+  },
+
+  close() {
+    document.getElementById('checkinViewer').classList.remove('show');
+    document.querySelector('.tabbar')?.classList.remove('checkin-hidden');
+    clearTimeout(this._timer); this._timer = null;
+    this._groups = null;
+    // Re-render bubbles so newly-seen groups turn gray.
+    if (typeof CheckinFeedCtrl !== 'undefined') CheckinFeedCtrl._render();
+  },
+
+  _current() {
+    const g = this._groups && this._groups[this._gi];
+    if (!g) return null;
+    return g.items[this._pi];
+  },
+
+  _renderPost() {
+    const g = this._groups && this._groups[this._gi];
+    const rec = this._current();
+    if (!g || !rec) { this.close(); return; }
+
+    // Progress bar — 1 segment per post in this group. Rebuild every
+    // render so the CSS animation restarts cleanly (removing and re-
+    // adding the .active class doesn't reliably restart @keyframes).
+    const prog = document.getElementById('ciViewerProgress');
+    prog.innerHTML = g.items.map((_, i) => {
+      const cls = i < this._pi ? 'done' : (i === this._pi ? 'active' : '');
+      return `<div class="ci-viewer-progress-seg ${cls}">
+        <div class="ci-viewer-progress-seg-fill"></div>
+      </div>`;
+    }).join('');
+
+    // Header — avatar (uses avatarIcon() like everything else), name, time
+    const author = rec.expand && rec.expand.user;
+    const avEl = document.getElementById('ciViewerAvatar');
+    avEl.innerHTML = author && typeof authorAvatar === 'function'
+      ? authorAvatar(author) : (rec.restaurant_emoji || '🦊');
+    document.getElementById('ciViewerUsername').textContent =
+      (author && author.name) || I18N.t('common.anonymous');
+    document.getElementById('ciViewerTime').textContent = timeAgo(rec.created);
+
+    // Photo — fill background of .ci-viewer-photo; falls back to emoji
+    // background when the record has no photo (still valid per schema).
+    const photoEl = document.getElementById('ciViewerPhoto');
+    const photoUrl = rec.photo ? Community.checkinPhotoUrl(rec, '900x1200') : '';
+    if (photoUrl) {
+      photoEl.className = 'ci-viewer-photo';
+      photoEl.style.backgroundImage = "url('" + photoUrl.replace(/'/g, "\\'") + "')";
+      photoEl.textContent = '';
+    } else {
+      photoEl.className = 'ci-viewer-photo empty';
+      photoEl.style.backgroundImage = '';
+      photoEl.textContent = rec.restaurant_emoji || '🍜';
+    }
+
+    // Footer — location + "Đi tới" chip (hide on anon fallback) + actions.
+    document.getElementById('ciViewerLoc').textContent = rec.restaurant_name || '—';
+    const anonName = I18N.t('checkin.anonSpot');
+    const hasCoords = rec.restaurant_lat != null && rec.restaurant_lng != null;
+    const hasRealName = rec.restaurant_name && rec.restaurant_name !== anonName;
+    document.getElementById('ciViewerDirectBtn').classList.toggle('hidden', !hasCoords && !hasRealName);
+
+    // Like / save state — reuse the same localStorage sets the modal uses.
+    const liked = CheckinPostViewCtrl._liked;
+    const saved = CheckinPostViewCtrl._saved;
+    const likeBtn = document.getElementById('ciViewerLikeBtn');
+    likeBtn.classList.toggle('on', liked && liked.has(rec.id));
+    document.getElementById('ciViewerLikeIco').innerHTML = liked && liked.has(rec.id)
+      ? '<use href="#ic-heart-filled"></use>' : '<use href="#ic-heart-outline"></use>';
+    document.getElementById('ciViewerSaveBtn').classList.toggle('on', saved && saved.has(rec.id));
+
+    // Mark this record as seen (drives the bubble ring gray state on
+    // re-render). Doesn't affect this render — only the next bubbles pass.
+    this._seen.add(rec.id);
+    this._saveSeen();
+
+    // Kick auto-advance
+    clearTimeout(this._timer);
+    this._timer = setTimeout(() => this._next(), this.DURATION_MS);
+  },
+
+  _next() {
+    if (!this._groups) return;
+    const g = this._groups[this._gi];
+    if (!g) { this.close(); return; }
+    if (this._pi < g.items.length - 1) {
+      this._pi++;
+      this._renderPost();
+      return;
+    }
+    // Last post in this group — advance to next group, or close.
+    if (this._gi < this._groups.length - 1) {
+      this._gi++;
+      this._pi = 0;
+      this._renderPost();
+    } else {
+      this.close();
+    }
+  },
+
+  _prev() {
+    if (!this._groups) return;
+    if (this._pi > 0) { this._pi--; this._renderPost(); return; }
+    // First post in this group — go back one group's LAST post.
+    if (this._gi > 0) {
+      this._gi--;
+      const prev = this._groups[this._gi];
+      this._pi = Math.max(0, prev.items.length - 1);
+      this._renderPost();
+    } else {
+      // Already at the very first post; just restart the timer.
+      this._renderPost();
+    }
+  },
+
+  _directions() {
+    const rec = this._current();
+    if (!rec) return;
+    clearTimeout(this._timer);
+    this.close();
+    showLocationOnMap(rec.restaurant_lat, rec.restaurant_lng, rec.restaurant_name);
+  },
+
+  _toggleLike() {
+    const rec = this._current();
+    if (!rec) return;
+    // Delegate to the modal's like set so state stays consistent
+    // between the two entry points (modal + viewer).
+    const on = !CheckinPostViewCtrl._liked.has(rec.id);
+    if (on) CheckinPostViewCtrl._liked.add(rec.id); else CheckinPostViewCtrl._liked.delete(rec.id);
+    CheckinPostViewCtrl._saveSet(CheckinPostViewCtrl.LIKES_KEY, CheckinPostViewCtrl._liked);
+    document.getElementById('ciViewerLikeBtn').classList.toggle('on', on);
+    document.getElementById('ciViewerLikeIco').innerHTML = on
+      ? '<use href="#ic-heart-filled"></use>' : '<use href="#ic-heart-outline"></use>';
+  },
+
+  _toggleSave() {
+    const rec = this._current();
+    if (!rec) return;
+    const on = !CheckinPostViewCtrl._saved.has(rec.id);
+    if (on) CheckinPostViewCtrl._saved.add(rec.id); else CheckinPostViewCtrl._saved.delete(rec.id);
+    CheckinPostViewCtrl._saveSet(CheckinPostViewCtrl.SAVES_KEY, CheckinPostViewCtrl._saved);
+    document.getElementById('ciViewerSaveBtn').classList.toggle('on', on);
+    showToast(I18N.t(on ? 'toast.postSaved' : 'toast.postUnsaved'));
+  },
+
+  async _share() {
+    const rec = this._current();
+    if (!rec) return;
+    const url = location.origin + '/?checkin=' + encodeURIComponent(rec.id);
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast(I18N.t('toast.linkCopied'));
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); showToast(I18N.t('toast.linkCopied')); }
+      catch (_) { showToast(I18N.t('toast.linkCopyFail')); }
+      document.body.removeChild(ta);
+    }
+  },
+
+  _loadSeen() {
+    try {
+      const raw = localStorage.getItem(this.SEEN_KEY);
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch (_) { return new Set(); }
+  },
+  _saveSeen() {
+    try {
+      // Cap the stored set at 500 entries — bubbles turn gray for any
+      // check-in the user has seen in the last day, and old entries
+      // aging out of the 24h window are irrelevant, so an unbounded
+      // set is just waste. Take the newest 500 by insertion order.
+      const arr = [...this._seen];
+      const trimmed = arr.length > 500 ? arr.slice(arr.length - 500) : arr;
+      localStorage.setItem(this.SEEN_KEY, JSON.stringify(trimmed));
+    } catch (_) {}
   },
 };

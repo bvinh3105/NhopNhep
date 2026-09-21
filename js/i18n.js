@@ -147,7 +147,7 @@ const I18N = {
       // ── Tab bar ──
       'tab.profile': 'Cá nhân', 'tab.community': 'Cộng đồng', 'tab.checkin': 'Check-in',
       // ── Community sub-tabs (Quán ăn / Lộ trình) ──
-      'community.tabFood': 'Quán ăn', 'community.tabRoutes': 'Lộ trình',
+      'community.tabFood': 'Quán ăn', 'community.tabCheckins': 'Check-in', 'community.tabRoutes': 'Lộ trình',
       // ── Common (dùng lại khắp modal) ──
       'common.close': 'Đóng', 'common.cancel': 'Huỷ',
       'common.comingSoon': '🚧 Tính năng đang cập nhật',
@@ -282,6 +282,8 @@ const I18N = {
       'checkinFeed.like': 'Yêu thích',
       'checkinFeed.emptyMsg': 'Chưa có check-in nào hôm nay — chụp đầu tiên đi!',
       'checkinFeed.directions': 'Đi tới',
+      'checkinFeed.paneTitle': 'Check-in <em>hôm nay</em>',
+      'checkinFeed.noCoords': 'Check-in này chưa có toạ độ chính xác — thử bấm quán trên map.',
       'checkin.noStream': 'Camera chưa sẵn sàng — thử lại nhé',
       'checkin.captureErr': 'Chụp không được — thử lại',
       'checkin.err.noRestaurant': 'Chọn quán trước khi gửi',
@@ -616,7 +618,7 @@ const I18N = {
       'community.searchPlaceholder': '🔎 Search by name, tag, hashtag…',
       'community.backToBrowse': '← Back to browsing',
       'tab.profile': 'Profile', 'tab.community': 'Community', 'tab.checkin': 'Check-in',
-      'community.tabFood': 'Restaurants', 'community.tabRoutes': 'Routes',
+      'community.tabFood': 'Restaurants', 'community.tabCheckins': 'Check-ins', 'community.tabRoutes': 'Routes',
       'common.close': 'Close', 'common.cancel': 'Cancel',
       'common.comingSoon': '🚧 Feature coming soon',
       'common.comingSoonSub': "We're still polishing this feature. Check back soon!",
@@ -745,6 +747,8 @@ const I18N = {
       'checkinFeed.like': 'Like',
       'checkinFeed.emptyMsg': "No check-ins today — be the first!",
       'checkinFeed.directions': 'Go',
+      'checkinFeed.paneTitle': 'Check-ins <em>today</em>',
+      'checkinFeed.noCoords': 'No coordinates on this check-in — try tapping a quán on the map.',
       'checkin.noStream': "Camera isn't ready — try again",
       'checkin.captureErr': "Couldn't capture — try again",
       'checkin.err.noRestaurant': 'Pick a place before sending',
