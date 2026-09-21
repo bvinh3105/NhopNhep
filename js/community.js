@@ -155,13 +155,74 @@ const Community = {
     return loginResult;
   },
 
+  // Goes through the same-origin /api/login CF Function proxy (2026-09-22),
+  // not through _fetch() which points at PocketBase's tunnel URL directly.
+  // Rationale identical to register(): some networks (Vietnamese ISPs are
+  // the confirmed case) can reach nhopnhep.pages.dev but NOT the rotating
+  // *.trycloudflare.com URL that _fetch talks to, so a direct auth-with-
+  // password POST fails as "server unreachable" — while the tunnel is up
+  // and responding fine from other networks. Same problem as pre-Turnstile
+  // register() had; same fix — relay through Cloudflare's own edge.
   async login(email, password) {
-    const r = await this._fetch('/api/collections/users/auth-with-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identity: email, password }),
-    });
+    let r;
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 15000);
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identity: email, password }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      const data = await res.json().catch(() => null);
+      r = res.ok
+        ? { ok: true, data }
+        : { ok: false, status: res.status, error: (data && data.message) || I18N.t('err.connectionGeneric') };
+    } catch (e) {
+      r = e.name === 'AbortError'
+        ? { ok: false, status: 'timeout', error: I18N.t('err.serverSlow') }
+        : { ok: false, status: 0, error: I18N.t('err.serverUnreachable') };
+    }
     if (r.ok) { this.token = r.data.token; this.currentUser = r.data.record; }
+    return r;
+  },
+
+  // Refresh the current token via the same-origin /api/auth-refresh proxy.
+  // Only works while the token is still technically valid (PocketBase
+  // rejects refresh on an already-expired token with 401 — caller must
+  // sign in again in that case). Kept as an explicit method rather than
+  // wired into a boot-time auto-refresh; the client-side JWT-decode /
+  // proactive-expiry-check is a separate feature (not shipped yet).
+  async refreshToken() {
+    if (!this.token) return { ok: false, status: 401, error: I18N.t('err.needLogin') };
+    let r;
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 10000);
+      const res = await fetch('/api/auth-refresh', {
+        method: 'POST',
+        headers: { Authorization: this.token },
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      const data = await res.json().catch(() => null);
+      r = res.ok
+        ? { ok: true, data }
+        : { ok: false, status: res.status, error: (data && data.message) || I18N.t('err.connectionGeneric') };
+    } catch (e) {
+      r = e.name === 'AbortError'
+        ? { ok: false, status: 'timeout', error: I18N.t('err.serverSlow') }
+        : { ok: false, status: 0, error: I18N.t('err.serverUnreachable') };
+    }
+    if (r.ok && r.data && r.data.token) {
+      this.token = r.data.token;
+      if (r.data.record) this.currentUser = r.data.record;
+    } else if (r.status === 401) {
+      // Token really is dead — clear local session so UI reflects reality.
+      this.token = ''; this.currentUser = null;
+      document.dispatchEvent(new CustomEvent('community:session-expired'));
+    }
     return r;
   },
 
