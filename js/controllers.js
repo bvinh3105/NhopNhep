@@ -5533,7 +5533,9 @@ const CheckinCtrl = {
   },
 
   async _tapShutter() {
-    if (!this._selected) { this._openPicker(); return; }
+    // No picker gate — a quán selection is optional now. Snap first,
+    // let the user type an address (or skip) in the preview sheet, and
+    // fall back to GPS-only. Vỉa hè / spot chưa có tên vẫn check-in được.
     if (!this._stream) { showToast(I18N.t('checkin.noStream')); return; }
 
     // Flash effect first (feels responsive) then grab the frame async.
@@ -5568,6 +5570,9 @@ const CheckinCtrl = {
     this._setStars(document.getElementById('checkinPreviewStars'), liveR || 4);
     document.getElementById('checkinPreviewPhoto').src = this._captured.dataUrl;
     document.getElementById('checkinCaption').value = '';
+    // Prefill address with picked quán name if any — user can edit or clear.
+    const addrEl = document.getElementById('checkinAddress');
+    if (addrEl) addrEl.value = (this._selected && this._selected.name) || '';
     document.getElementById('checkinShareTog').classList.add('on');
     document.getElementById('checkinPreview').classList.remove('hidden');
     // Slide the floating tab bar off so the Send/toggle/caption strip
@@ -5578,12 +5583,13 @@ const CheckinCtrl = {
   _retake() {
     document.getElementById('checkinPreview').classList.add('hidden');
     document.querySelector('.tabbar')?.classList.remove('checkin-hidden');
+    const addrEl = document.getElementById('checkinAddress');
+    if (addrEl) addrEl.value = '';
     this._captured = null;
   },
 
   async _submit() {
-    const q = this._selected;
-    if (!q || !this._captured) return;
+    if (!this._captured) return;
     const btn = document.getElementById('checkinSendBtn');
     const spanEl = btn.querySelector('span[data-i18n]');
     const originalLabel = spanEl ? spanEl.textContent : '';
@@ -5593,12 +5599,37 @@ const CheckinCtrl = {
     const rating = +document.getElementById('checkinPreviewStars').dataset.rating || 0;
     const note = document.getElementById('checkinCaption').value.trim();
     const isShared = document.getElementById('checkinShareTog').classList.contains('on');
+    const typedAddr = (document.getElementById('checkinAddress')?.value || '').trim();
+    const q = this._selected;
+
+    // Resolve name + coords:
+    //  1. Typed address wins (user's override / ad-hoc spot)
+    //  2. Picked quán next
+    //  3. Anonymous fallback ("Chỗ này") with GPS coords
+    let restaurantId = '', restaurantName, restaurantLat, restaurantLng, source;
+    if (typedAddr) {
+      restaurantName = typedAddr;
+      restaurantLat = State.userLat ?? null;
+      restaurantLng = State.userLng ?? null;
+      source = 'freeform';
+    } else if (q) {
+      restaurantId = q.source === 'community' && q.id ? q.id : '';
+      restaurantName = q.name;
+      restaurantLat = q.lat ?? null;
+      restaurantLng = q.lng ?? null;
+      source = q.source;
+    } else {
+      restaurantName = I18N.t('checkin.anonSpot');
+      restaurantLat = State.userLat ?? null;
+      restaurantLng = State.userLng ?? null;
+      source = 'anon';
+    }
 
     const r = await Community.createCheckin({
-      restaurantId: q.source === 'community' && q.id ? q.id : '',
-      restaurantName: q.name,
-      restaurantLat: q.lat,
-      restaurantLng: q.lng,
+      restaurantId,
+      restaurantName,
+      restaurantLat,
+      restaurantLng,
       restaurantEmoji: '',  // reserved for a future emoji picker
       rating, note, photoBlob: this._captured.blob, isShared,
     });
@@ -5609,7 +5640,7 @@ const CheckinCtrl = {
     if (!r.ok) { showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
 
     if (typeof Analytics !== 'undefined') Analytics.track('checkin', {
-      shared: isShared, has_rating: rating > 0, has_note: !!note, source: q.source,
+      shared: isShared, has_rating: rating > 0, has_note: !!note, source,
     });
 
     showToast(I18N.t(isShared ? 'checkin.toastShared' : 'checkin.toastPrivate'));
@@ -5750,8 +5781,17 @@ const CheckinFeedCtrl = {
     const wrap = document.getElementById('checkinStripWrap');
     const list = document.getElementById('checkinStripList');
     if (!wrap || !list) return;
-    if (!this._items.length) { wrap.classList.add('hidden'); return; }
+    // Even with 0 items, keep the section visible so users know check-ins
+    // exist and can start one. Only hidden on outright fetch error (see
+    // refresh() catch block).
     wrap.classList.remove('hidden');
+    if (!this._items.length) {
+      list.innerHTML = `<div class="ci-strip-empty">
+        <div class="ci-strip-empty-ico">📸</div>
+        <div class="ci-strip-empty-msg">${I18N.t('checkinFeed.emptyMsg')}</div>
+      </div>`;
+      return;
+    }
 
     list.innerHTML = this._items.map((it) => {
       const photoUrl = it.photo ? Community.checkinPhotoUrl(it, '240x320') : '';

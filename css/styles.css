@@ -2352,7 +2352,21 @@ body.map-full .tabbar{transform:translateY(105%)}
    .tabbar.checkin-hidden in CheckinCtrl._tapShutter, so the send
    button at bottom:0 becomes tappable. Offsets below assume the
    tab bar is off-screen — no need to clear it. */
-.checkin-preview-stars{bottom:172px}
+.checkin-preview-stars{bottom:220px}
+
+/* Address input — optional free-text where the user was, sits above
+   the caption. Same visual shape as .checkin-preview-cap so the two
+   read as a stacked pair. Non-italic + bold so a typed address looks
+   like "location", not "note". Skip = ẩn danh, GPS-only. */
+.checkin-preview-addr{
+  position:absolute;left:.7rem;right:.7rem;bottom:158px;z-index:14;
+  padding:.55rem .8rem;background:var(--white);border:2px solid var(--text);border-radius:14px;
+  box-shadow:2px 2px 0 var(--text);font-size:.85rem;color:var(--text);font-weight:800;
+  outline:none;width:auto;line-height:1.3;
+  font-family:var(--font-body);
+}
+.checkin-preview-addr::placeholder{color:var(--text3);font-weight:700}
+.checkin-preview-addr:focus{border-color:var(--checkin,#D64B7A)}
 
 .checkin-preview-cap{
   position:absolute;left:.7rem;right:.7rem;bottom:112px;z-index:14;
@@ -2513,6 +2527,17 @@ body.map-full .tabbar{transform:translateY(105%)}
 /* Skeleton loading placeholder (shown while first fetch is in flight) */
 .ci-strip-card.skel{background:linear-gradient(135deg,var(--cream-2),var(--cream-3));animation:ciSkel 1.2s infinite alternate}
 @keyframes ciSkel{from{opacity:.55}to{opacity:.9}}
+
+/* Empty state — shown when the strip is visible but no shared check-ins
+   exist yet. Feels welcoming (📸 + CTA), not "nothing to see here". */
+.ci-strip-empty{
+  flex:1;padding:14px 16px;border-radius:14px;
+  background:var(--paper);border:2px dashed var(--cream-3);
+  display:flex;align-items:center;gap:10px;color:var(--text-2,#6B4A38);
+  font-size:.78rem;font-weight:700;line-height:1.35;
+}
+.ci-strip-empty-ico{font-size:1.5rem;flex-shrink:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}
+.ci-strip-empty-msg{flex:1}
 
 /* ─── Post-view modal ────────────────────────────────────────────── */
 /* Reuses .modal-overlay .show pattern (see index.html:792) — no new
