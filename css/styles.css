@@ -2568,6 +2568,22 @@ body.map-full .tabbar{transform:translateY(105%)}
   border:1px solid rgba(255,255,255,.25);
 }
 .ci-strip-card-rating .icon{width:.75em;height:.75em}
+
+/* "Vừa mới" pulse — thin red dot top-left for check-ins < 1h old.
+   Draws the eye to the freshest content in the strip without stealing
+   the star badge's slot. Added 2026-09-22. */
+.ci-strip-card-fresh{
+  position:absolute;top:5px;left:5px;z-index:1;
+  width:9px;height:9px;border-radius:50%;
+  background:var(--primary,#B92626);border:1.5px solid var(--white,#FFFDF5);
+  box-shadow:0 0 0 rgba(185,38,38,.6);
+  animation:ciFreshPulse 1.6s ease-in-out infinite;
+}
+@keyframes ciFreshPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(185,38,38,.55)}
+  50%{box-shadow:0 0 0 5px rgba(185,38,38,0)}
+}
+
 /* Skeleton loading placeholder (shown while first fetch is in flight) */
 .ci-strip-card.skel{background:linear-gradient(135deg,var(--cream-2),var(--cream-3));animation:ciSkel 1.2s infinite alternate}
 @keyframes ciSkel{from{opacity:.55}to{opacity:.9}}
@@ -2613,10 +2629,27 @@ body.map-full .tabbar{transform:translateY(105%)}
   text-transform:uppercase;letter-spacing:-.01em;line-height:1;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
-.ci-post-meta{display:flex;flex-direction:column;gap:1px;font-size:.72rem;font-weight:800;color:var(--text2);line-height:1.3}
+.ci-post-meta{display:flex;flex-direction:column;gap:3px;font-size:.72rem;font-weight:800;color:var(--text2);line-height:1.3}
 .ci-post-meta-line{display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .ci-post-meta-line .icon{color:var(--primary,#B92626);width:.85em;height:.85em;flex-shrink:0}
-.ci-post-meta-line span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-post-meta-line > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+
+/* "Đi tới" chip — inline on the 📍 line, opens Google Maps at the
+   check-in's lat/lng (deep-links to native app on mobile). Hidden when
+   the record has no coords AND no name to search on. Added 2026-09-22. */
+.ci-post-direct{
+  flex-shrink:0;margin-left:auto;
+  padding:.2rem .55rem;background:var(--primary,#B92626);color:var(--white,#FFFDF5);
+  border:1.5px solid var(--text);border-radius:999px;
+  box-shadow:1.5px 1.5px 0 var(--text);
+  display:inline-flex;align-items:center;gap:3px;
+  font-size:.68rem;font-weight:900;
+  cursor:pointer;font-family:inherit;line-height:1;
+}
+.ci-post-direct .icon{color:var(--white,#FFFDF5);width:.85em;height:.85em}
+.ci-post-direct > span{overflow:visible;text-overflow:clip;white-space:nowrap;flex:none;min-width:0}
+.ci-post-direct.hidden{display:none}
+.ci-post-direct:active{transform:translate(1px,1px);box-shadow:.5px .5px 0 var(--text)}
 .ci-post-close{
   width:34px;height:34px;border-radius:50%;background:var(--paper);color:var(--text);
   border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);

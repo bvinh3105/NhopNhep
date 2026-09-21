@@ -5782,7 +5782,12 @@ const CheckinFeedCtrl = {
       const r = await Community.listSharedCheckins({ page: 1, perPage: this.MAX });
       this._lastAt = Date.now();
       if (!r.ok) throw new Error(r.error || 'fetch');
-      this._items = (r.data && r.data.items) || [];
+      // 24-hour window — feed stays fresh, old check-ins fall off into
+      // Diary + trang quán aggregate (both still show them full-time).
+      // Client-side filter — no backend change, no wasted fetch.
+      const cutoff = Date.now() - 24 * 3600 * 1000;
+      const all = (r.data && r.data.items) || [];
+      this._items = all.filter(x => new Date(x.created).getTime() > cutoff);
       this._render();
     } catch (e) {
       // Silent failure — the strip is nice-to-have; on error just hide
@@ -5809,19 +5814,25 @@ const CheckinFeedCtrl = {
       return;
     }
 
+    const freshCutoff = Date.now() - 3600 * 1000;
     list.innerHTML = this._items.map((it) => {
       const photoUrl = it.photo ? Community.checkinPhotoUrl(it, '240x320') : '';
       const author = it.expand && it.expand.user;
       const authorName = (author && author.name) || I18N.t('common.anonymous');
       const rating = Math.max(0, Math.min(5, +it.rating || 0));
+      const isFresh = new Date(it.created).getTime() > freshCutoff;
       const photoLayer = photoUrl
         ? `<div class="ci-strip-card-photo" style="background-image:url('${escapeHtml(photoUrl)}')"></div>`
         : `<div class="ci-strip-card-photo empty">${escapeHtml(it.restaurant_emoji || '🍜')}</div>`;
       const ratingBadge = rating > 0
         ? `<div class="ci-strip-card-rating"><svg class="icon"><use href="#ic-rating-star-filled"></use></svg>${rating}</div>`
         : '';
+      // "Vừa mới" red pulse dot for check-ins < 1h old — pure visual, no
+      // extra state. Draws the eye to the freshest content in the strip.
+      const freshDot = isFresh ? `<div class="ci-strip-card-fresh" title="Vừa mới"></div>` : '';
       return `<div class="ci-strip-card" data-id="${it.id}">
         ${photoLayer}
+        ${freshDot}
         ${ratingBadge}
         <div class="ci-strip-card-name">${escapeHtml(authorName)}</div>
       </div>`;
@@ -5868,6 +5879,7 @@ const CheckinPostViewCtrl = {
     document.getElementById('ciPostLikeBtn').addEventListener('click', () => this._toggleLike());
     document.getElementById('ciPostSaveBtn').addEventListener('click', () => this._toggleSave());
     document.getElementById('ciPostShareBtn').addEventListener('click', () => this._share());
+    document.getElementById('ciPostDirectBtn').addEventListener('click', () => this._directions());
   },
 
   open(record) {
@@ -5905,6 +5917,14 @@ const CheckinPostViewCtrl = {
       ? '<use href="#ic-heart-filled"></use>' : '<use href="#ic-heart-outline"></use>';
     document.getElementById('ciPostSaveBtn').classList.toggle('on', this._saved.has(record.id));
 
+    // "Đi tới" chip — only meaningful when we have coords OR a real name
+    // to search on. Hides on the "Chỗ này" anonymous fallback since a
+    // Google Maps search for that literal string returns nothing useful.
+    const anonName = I18N.t('checkin.anonSpot');
+    const hasCoords = record.restaurant_lat != null && record.restaurant_lng != null;
+    const hasRealName = record.restaurant_name && record.restaurant_name !== anonName;
+    document.getElementById('ciPostDirectBtn').classList.toggle('hidden', !hasCoords && !hasRealName);
+
     document.getElementById('checkinPostOverlay').classList.add('show');
   },
 
@@ -5932,6 +5952,22 @@ const CheckinPostViewCtrl = {
     this._saveSet(this.SAVES_KEY, this._saved);
     document.getElementById('ciPostSaveBtn').classList.toggle('on', on);
     showToast(I18N.t(on ? 'toast.postSaved' : 'toast.postUnsaved'));
+  },
+
+  _directions() {
+    const r = this._current;
+    if (!r) return;
+    // Google Maps universal search URL — opens the native app on
+    // Android/iOS when installed, falls back to maps.google.com on
+    // desktop. Prefer coords when we have them (unambiguous); fall back
+    // to name search when the record only carries the typed address.
+    let query;
+    if (r.restaurant_lat != null && r.restaurant_lng != null) {
+      query = `${r.restaurant_lat},${r.restaurant_lng}`;
+    } else {
+      query = encodeURIComponent(r.restaurant_name || '');
+    }
+    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank', 'noopener');
   },
 
   async _share() {
