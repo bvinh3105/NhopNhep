@@ -161,15 +161,17 @@ input,textarea{font:inherit;color:inherit}
 .cluster-btn:active{transform:scale(.9)}
 .cluster-btn.gps{color:var(--primary)}
 
+/* Verbatim css/styles.css:773-780 — fixed bottom:100px/right:16px (clears
+   the floating tab bar), 54px, border 2px (not 2.5), color var(--cream). */
 .rp-fab{
-  position:absolute;top:calc(env(safe-area-inset-top,0px) + 4.5rem);right:1rem;z-index:13;
-  width:52px;height:52px;border-radius:50%;
-  background:var(--primary);color:var(--white);
-  border:2.5px solid var(--text);box-shadow:3px 3px 0 var(--text);
-  display:flex;align-items:center;justify-content:center;font-size:1.3rem;
-  transition:transform .12s;
+  position:absolute;z-index:60;right:16px;bottom:100px;
+  width:54px;height:54px;border-radius:50%;
+  background:var(--primary);color:var(--cream);border:2px solid var(--text);
+  box-shadow:3px 3px 0 var(--text);display:flex;align-items:center;justify-content:center;
+  font-size:1.5rem;line-height:1;
 }
-.rp-fab:active{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--text)}
+.rp-fab .icon{width:1.7em;height:1.7em}
+.rp-fab:active{transform:scale(.96)}
 
 .home-map{
   position:absolute;inset:0;z-index:0;
@@ -514,98 +516,80 @@ input,textarea{font:inherit;color:inherit}
   background:var(--primary);border:2px solid var(--white);box-shadow:0 1.5px 0 var(--text);z-index:2;
 }
 
-.ci-tab{
-  flex:1;display:flex;flex-direction:column;background:var(--cream);
-  padding-bottom:calc(var(--tab-h) + 24px);
-}
-.ci-tab-hd{
-  padding:calc(env(safe-area-inset-top,0px) + .8rem) 1rem .7rem;
-  display:flex;justify-content:center;
-}
-.quan-auto-pill{
-  display:inline-flex;align-items:center;gap:.4rem;
-  padding:.55rem 1rem;background:var(--white);
-  border:2px solid var(--text);border-radius:999px;box-shadow:2px 2px 0 var(--text);
-  font-size:.82rem;font-weight:800;color:var(--text);max-width:92%;
-  transition:transform .12s;
-}
-.quan-auto-pill:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
-.quan-auto-pill b{color:var(--primary);font-weight:900;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
-.quan-auto-pill .dist{
-  color:var(--white);background:var(--checkin);
-  padding:.1rem .45rem;border-radius:6px;font-size:.62rem;font-weight:900;flex-shrink:0;
-}
-.quan-auto-pill .chev{color:var(--text2);font-size:.7rem;margin-left:2px}
-
-.ci-cam-frame{
-  flex:1;margin:0 .9rem;background:var(--cam-bg);
-  border:3px solid var(--text);border-radius:24px;box-shadow:4px 4px 0 var(--text);
-  overflow:hidden;position:relative;
-  display:flex;flex-direction:column;
-  min-height:0;
-}
-.ci-cam-view{
-  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:1.2rem;padding:1.5rem;text-align:center;position:relative;
+/* Full-bleed camera — same construction as Home's #mainMapWrap (inset:0,
+   no card/border/margin) with the SAME floating sticker chrome Home uses
+   over its map, values copied verbatim from css/styles.css so this reads
+   as "the app", not a new UI language:
+     .brand-float (161-168)   → .ci-brand-pill  (quán pill, top-left)
+     .map-btn-cluster (220-225) + .cluster-btn (226-229) → .ci-cluster (top-right)
+     .rp-fab (773-780)        → .ci-shutter-fab (bottom, recolored to --checkin)
+   Only the star-pill and caption/toggle/send controls on the Preview step
+   are new (check-in has no existing equivalent in the app to copy). */
+.ci-cam-full{
+  position:absolute;inset:0;
   background:
-    radial-gradient(circle at center,rgba(232,132,60,.22) 0,transparent 60%),
+    radial-gradient(circle at center,rgba(232,132,60,.18) 0,transparent 60%),
     linear-gradient(180deg,#1a1210 0,var(--cam-bg) 100%);
+  display:flex;align-items:center;justify-content:center;
 }
-.ci-cam-view::before{
-  content:'';position:absolute;top:8%;left:8%;right:8%;bottom:26%;
-  border:1.5px solid rgba(255,255,255,.16);border-radius:14px;
+.ci-cam-full::before{
+  content:'';position:absolute;top:9%;left:8%;right:8%;bottom:30%;
+  border:1.5px solid rgba(255,255,255,.14);border-radius:16px;
   animation:focus-in 1.8s ease-in-out infinite alternate;pointer-events:none;
 }
-.ci-cam-view::after{
-  content:'';position:absolute;top:calc(8% - 8px);left:calc(8% - 8px);
-  width:20px;height:20px;
-  border-top:2.5px solid rgba(255,255,255,.7);border-left:2.5px solid rgba(255,255,255,.7);
-  border-top-left-radius:5px;pointer-events:none;
-}
-.ci-cam-food{
-  font-size:5.5rem;line-height:1;filter:drop-shadow(0 6px 14px rgba(0,0,0,.55));user-select:none;z-index:2;
-}
-.ci-cam-hint{
-  font-size:.72rem;color:rgba(255,255,255,.78);font-weight:700;
-  padding:.35rem .8rem;background:rgba(0,0,0,.5);border-radius:999px;
-  border:1px solid rgba(255,255,255,.22);z-index:2;backdrop-filter:blur(4px);
-}
-.ci-cam-stars{
-  display:flex;gap:.5rem;justify-content:center;font-size:1.55rem;line-height:1;z-index:2;
-  padding:.3rem .9rem;background:rgba(0,0,0,.4);border-radius:999px;
-  border:1px solid rgba(255,255,255,.2);
-}
-.ci-cam-stars .star{color:rgba(255,255,255,.35);transition:color .15s}
-.ci-cam-stars .star.on{color:var(--accent)}
-.ci-cam-stars .star.on .star-ico{filter:drop-shadow(0 0 5px rgba(232,132,60,.7))}
+.ci-cam-food{font-size:6rem;line-height:1;filter:drop-shadow(0 6px 14px rgba(0,0,0,.55));user-select:none}
 
-.ci-controls{
-  padding:1rem 1.5rem 0;
-  display:flex;align-items:center;justify-content:space-between;gap:1rem;
+.ci-brand-pill{
+  position:absolute;top:calc(env(safe-area-inset-top,0px) + .6rem);left:.7rem;z-index:14;
+  display:inline-flex;align-items:center;gap:.35rem;max-width:72%;
+  background:var(--white);border:none;border-radius:24px;
+  padding:.6rem 1.05rem .6rem 1.15rem;box-shadow:0 6px 18px rgba(42,24,16,.2);
+  font-weight:900;font-size:.9rem;color:var(--primary);letter-spacing:-.3px;line-height:1;
+  transition:transform .12s;
 }
-.ci-side{
-  width:52px;display:flex;flex-direction:column;align-items:center;gap:3px;
-  color:var(--text);
+.ci-brand-pill:active{transform:scale(.97)}
+.ci-brand-pill b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-brand-pill .dist{
+  color:var(--white);background:var(--checkin);flex-shrink:0;
+  padding:.15rem .45rem;border-radius:8px;font-size:.62rem;font-weight:900;
 }
-.ci-side:active{transform:scale(.94)}
-.ci-side-ico{
-  width:46px;height:46px;border-radius:50%;background:var(--white);
-  border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
-  display:flex;align-items:center;justify-content:center;font-size:1.2rem;
+.ci-brand-pill .chev{color:var(--text3);font-size:.7rem}
+
+.ci-cluster{
+  position:absolute;top:calc(env(safe-area-inset-top,0px) + .6rem);right:.7rem;z-index:14;
+  display:flex;align-items:center;gap:1px;
+  background:var(--white);border-radius:24px;padding:5px;
+  box-shadow:0 6px 18px rgba(42,24,16,.2);
 }
-.ci-side-lbl{font-size:.6rem;font-weight:800;color:var(--text2);letter-spacing:.2px}
-.ci-shutter{
-  width:82px;height:82px;border-radius:50%;background:var(--white);
-  border:3.5px solid var(--text);position:relative;
-  box-shadow:0 0 0 5px rgba(214,75,122,.5),4px 4px 0 var(--text);
-  transition:transform .1s;
+.ci-cluster-btn{
+  width:38px;height:38px;border-radius:50%;background:none;border:none;
+  display:flex;align-items:center;justify-content:center;color:var(--text2);
 }
-.ci-shutter:active{transform:translate(1px,1px);box-shadow:0 0 0 5px rgba(214,75,122,.5),2px 2px 0 var(--text)}
-.ci-shutter.busy{animation:shutter-pulse .35s ease}
-.ci-shutter-inner{
-  position:absolute;inset:6px;background:var(--checkin);
-  border-radius:50%;border:2px solid var(--text);
+.ci-cluster-btn:active{transform:scale(.9)}
+
+.ci-star-pill{
+  position:absolute;bottom:190px;left:50%;transform:translateX(-50%);z-index:14;
+  display:flex;gap:6px;padding:.5rem 1rem;
+  background:var(--white);border:2px solid var(--text);border-radius:999px;
+  box-shadow:2px 2px 0 var(--text);
 }
+.ci-star-pill .icon{width:22px;height:22px;color:var(--text3);transition:color .15s}
+.ci-star-pill .star.on .icon{color:var(--accent-2)}
+
+/* Verbatim .rp-fab (css/styles.css:773-780) — 54px, border 2px, shadow
+   3px 3px — only the background is swapped: primary red → checkin pink. */
+.ci-shutter-fab{
+  position:absolute;z-index:60;left:50%;transform:translateX(-50%);bottom:100px;
+  width:64px;height:64px;border-radius:50%;
+  background:var(--checkin);border:2px solid var(--text);
+  box-shadow:3px 3px 0 var(--text);transition:transform .1s;
+}
+.ci-shutter-fab::after{
+  content:'';position:absolute;inset:7px;background:var(--white);
+  border-radius:50%;border:1.5px solid rgba(42,24,16,.25);
+}
+.ci-shutter-fab:active{transform:translate(calc(-50% + 1px),1px);box-shadow:2px 2px 0 var(--text)}
+.ci-shutter-fab.busy{animation:shutter-pulse .35s ease}
 
 /* Quán picker */
 .qp-sheet{
@@ -643,142 +627,94 @@ input,textarea{font:inherit;color:inherit}
   font-weight:900;font-size:.8rem;
 }
 
-/* ═══ CAMERA (Locket) ═══ */
-.cam,.prev,.sent{
+/* ═══ PREVIEW / SENT shared shell ═══ */
+/* Renamed from bare .prev — that generic a name collided with the
+   unrelated "✓ đã ăn N lần" .prev label in the quán picker (qp-meta
+   .prev), which was silently inheriting this dark background/white
+   text through the cascade. */
+.prev-shell,.sent{
   flex:1;background:var(--cam-bg);color:var(--white);
   display:flex;flex-direction:column;position:relative;overflow:hidden;
-}
-.cam-top,.prev-top{
-  position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);left:0;right:0;
-  padding:.5rem .9rem;display:flex;justify-content:space-between;align-items:center;z-index:10;
-}
-.cam-place{
-  padding:.4rem .8rem;background:rgba(0,0,0,.55);color:var(--white);
-  border:1.5px solid rgba(255,255,255,.4);border-radius:999px;
-  font-size:.75rem;font-weight:800;backdrop-filter:blur(6px);
-}
-.cam-btn-round{
-  min-width:34px;height:34px;padding:0 .7rem;border-radius:17px;background:rgba(0,0,0,.55);
-  border:1.5px solid rgba(255,255,255,.4);
-  display:flex;align-items:center;justify-content:center;
-  font-size:.85rem;font-weight:800;color:var(--white);
-  backdrop-filter:blur(4px);
-}
-.cam-btn-round:active{transform:scale(.94)}
-.cam-view{
-  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
-  background:radial-gradient(circle at center,rgba(232,132,60,.2) 0,transparent 60%),
-    linear-gradient(180deg,#1a1210 0,var(--cam-bg) 100%);
-  position:relative;
-}
-.cam-view::before{
-  content:'';position:absolute;top:14%;left:14%;right:14%;bottom:22%;
-  border:1px solid rgba(255,255,255,.16);border-radius:10px;
-  animation:focus-in 1.6s ease-in-out infinite alternate;
 }
 @keyframes focus-in{
   from{opacity:.5;transform:scale(1)}
   to{opacity:1;transform:scale(1.02)}
 }
-.cam-view::after{
-  content:'';position:absolute;top:calc(14% - 8px);left:calc(14% - 8px);
-  width:18px;height:18px;
-  border-top:2.5px solid rgba(255,255,255,.75);border-left:2.5px solid rgba(255,255,255,.75);
-  border-top-left-radius:4px;
-}
-.cam-food{font-size:6rem;line-height:1;filter:drop-shadow(0 6px 12px rgba(0,0,0,.5));z-index:2;user-select:none}
-.cam-hint{
-  font-size:.72rem;color:rgba(255,255,255,.75);
-  padding:.35rem .85rem;background:rgba(0,0,0,.55);border-radius:999px;
-  border:1px solid rgba(255,255,255,.2);z-index:2;backdrop-filter:blur(4px);
-}
-.cam-controls{
-  padding:12px 24px 28px;
-  background:linear-gradient(180deg,transparent 0,rgba(0,0,0,.9) 45%);
-  position:relative;z-index:5;
-}
-.cam-stars{
-  display:flex;gap:8px;justify-content:center;padding:6px 0 14px;font-size:1.7rem;line-height:1;
-}
 .star{cursor:pointer;user-select:none;transition:transform .12s}
 .star:active{transform:scale(1.3)}
-.cam-stars .star{color:rgba(255,255,255,.35);transition:color .15s}
-.cam-stars .star.on{color:var(--accent)}
-.cam-stars .star.on .star-ico{filter:drop-shadow(0 0 6px rgba(232,132,60,.7))}
-.cam-controls-row{display:flex;align-items:center;justify-content:space-between;padding:0 4px}
-.cam-side{
-  min-width:52px;font-size:.75rem;font-weight:800;color:rgba(255,255,255,.85);text-align:center;padding:8px;
-}
-.cam-side:active{transform:scale(.94)}
-.cam-flip{
-  width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);
-  border:1.5px solid rgba(255,255,255,.45);
-  display:flex;align-items:center;justify-content:center;font-size:1.1rem;
-  transition:transform .3s;
-}
-.cam-flip:active{transform:rotate(180deg)}
-.cam-shutter{
-  width:76px;height:76px;border-radius:50%;background:var(--white);
-  border:6px solid rgba(255,255,255,.4);
-  position:relative;box-shadow:0 0 0 2px #000;transition:transform .1s;
-}
-.cam-shutter::after{
-  content:'';position:absolute;inset:5px;background:var(--white);
-  border-radius:50%;border:1.5px solid var(--text2);
-}
-.cam-shutter:active{transform:scale(.9)}
-.cam-shutter.busy{animation:shutter-pulse .4s ease}
 @keyframes shutter-pulse{0%,100%{transform:scale(1)}50%{transform:scale(.8)}}
 
 .flash{position:absolute;inset:0;background:var(--white);z-index:200;opacity:0;pointer-events:none;transition:opacity .15s}
 .flash.on{opacity:.9}
 
-/* Preview */
+/* Preview — full-bleed photo, every control is its own floating sticker
+   (no dark panel underneath), same language as the check-in screen above. */
 .prev-photo{
   position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:6rem;
   filter:brightness(.92) saturate(1.15);z-index:1;user-select:none;
 }
-.prev-top .cam-btn-round{padding:0 .7rem;font-size:.72rem;font-weight:800}
-.prev-sheet{
-  position:absolute;bottom:0;left:0;right:0;
-  padding:16px 16px 24px;
-  background:linear-gradient(180deg,transparent 0,rgba(0,0,0,.55) 25%,rgba(0,0,0,.94) 100%);
-  color:var(--white);z-index:5;display:flex;flex-direction:column;gap:10px;
+.ci-back-pill,.ci-close-pill{
+  position:absolute;top:calc(env(safe-area-inset-top,0px) + .6rem);z-index:14;
+  width:2.4rem;height:2.4rem;border-radius:50%;background:var(--white);
+  border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
+  display:flex;align-items:center;justify-content:center;color:var(--text);font-weight:900;
 }
-.prev-stars{display:flex;gap:6px;justify-content:center;font-size:1.5rem;line-height:1}
-.prev-stars .star{color:rgba(255,255,255,.35);transition:color .15s}
-.prev-stars .star.on{color:var(--accent)}
-.prev-stars .star.on .star-ico{filter:drop-shadow(0 0 5px rgba(232,132,60,.7))}
-.prev-cap{
-  padding:.6rem .8rem;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.3);
-  border-radius:12px;font-size:.8rem;color:var(--white);font-style:italic;font-weight:600;
-  outline:none;resize:none;width:100%;line-height:1.35;
+.ci-back-pill{left:.7rem}
+.ci-close-pill{right:.7rem}
+.ci-back-pill:active,.ci-close-pill:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+
+/* Reuses .ci-star-pill (defined above) at a lower position so it clears
+   the caption/toggle/send stack instead of the shutter. */
+#prev-stars.ci-star-pill{bottom:172px}
+
+.ci-cap-pill{
+  position:absolute;left:.7rem;right:.7rem;bottom:112px;z-index:14;
+  padding:.55rem .8rem;background:var(--white);border:2px solid var(--text);border-radius:14px;
+  box-shadow:2px 2px 0 var(--text);font-size:.8rem;color:var(--text2);font-style:italic;font-weight:600;
+  outline:none;resize:none;width:auto;line-height:1.3;font-family:inherit;
 }
-.prev-cap::placeholder{color:rgba(255,255,255,.5)}
-.prev-cap:focus{border-color:var(--accent);background:rgba(0,0,0,.65)}
-.prev-tog{
-  display:flex;align-items:center;gap:10px;padding:10px 12px;
-  background:rgba(255,255,255,.13);border:1.5px solid rgba(255,255,255,.4);border-radius:14px;
+.ci-cap-pill::placeholder{color:var(--text3);font-style:italic}
+.ci-cap-pill:focus{border-color:var(--checkin)}
+
+.ci-tog-pill{
+  position:absolute;left:.7rem;right:.7rem;bottom:68px;z-index:14;
+  display:flex;align-items:center;gap:8px;padding:.5rem .7rem;
+  background:var(--checkin-tint);border:2px solid var(--checkin);border-radius:14px;
+  box-shadow:2px 2px 0 var(--checkin-2);
 }
 .knob{
-  width:42px;height:24px;background:var(--cream-2);border:1.5px solid var(--white);
-  border-radius:13px;position:relative;flex-shrink:0;transition:background .2s;
+  width:36px;height:20px;background:var(--cream-2);border:1.5px solid var(--text);
+  border-radius:11px;position:relative;flex-shrink:0;transition:background .2s;
 }
 .knob::after{
   content:'';position:absolute;top:1px;left:1px;
-  width:18px;height:18px;background:var(--white);border-radius:50%;transition:transform .2s;
+  width:14px;height:14px;background:var(--white);border-radius:50%;transition:transform .2s;
+  border:1px solid var(--text);
 }
-.prev-tog.on .knob{background:var(--checkin)}
-.prev-tog.on .knob::after{transform:translateX(18px)}
-.prev-tog-body{flex:1;font-size:.72rem;color:var(--white);font-weight:800;line-height:1.3}
-.prev-tog-body small{display:block;color:rgba(255,255,255,.7);font-size:.6rem;margin-top:2px;font-weight:600}
-.prev-send{
-  padding:.9rem;background:var(--checkin);color:var(--white);
-  border:2px solid var(--white);border-radius:16px;
-  font-size:.95rem;font-weight:900;text-align:center;
-  box-shadow:0 4px 0 rgba(0,0,0,.5);transition:transform .1s;
+.ci-tog-pill.on .knob{background:var(--checkin)}
+.ci-tog-pill.on .knob::after{transform:translateX(16px)}
+.ci-tog-body{flex:1;font-size:.68rem;color:var(--checkin-2);font-weight:800;line-height:1.25}
+.ci-tog-body small{display:block;color:var(--text2);font-size:.58rem;margin-top:1px;font-weight:700}
+
+/* Send CTA — verbatim .scan-btn construction (css/styles.css:483-489):
+   2px border, 4px 4px offset shadow, same padding/radius. Only the fill
+   is swapped from --primary to --checkin so it reads as ITS OWN action
+   while still being unmistakably "a Nhóp Nhép button". Sits on the same
+   gradient-fade Home uses instead of a flat opaque bar, so the photo
+   stays visible underneath. */
+.ci-send-wrap{position:absolute;left:0;right:0;bottom:0;z-index:13;padding:.7rem .7rem calc(env(safe-area-inset-bottom,0px) + .7rem)}
+.ci-send-wrap::before{
+  content:'';position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(to bottom,transparent,rgba(0,0,0,.85) 55%);
 }
-.prev-send:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.5)}
+.ci-send-btn{
+  width:100%;padding:1.05rem;border-radius:16px;
+  background:var(--checkin);color:var(--white);
+  font-size:1.05rem;font-weight:900;letter-spacing:.3px;
+  border:2px solid var(--text);box-shadow:4px 4px 0 var(--text);
+  display:flex;align-items:center;justify-content:center;gap:.4rem;
+}
+.ci-send-btn:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--text)}
 
 /* Sent */
 .sent-photo{
@@ -1095,44 +1031,29 @@ input,textarea{font:inherit;color:inherit}
         </div>
       </div>
 
-      <!-- ═══ CHECK-IN — camera-first (Locket-style) ═══ -->
+      <!-- ═══ CHECK-IN — full-bleed camera, Home's floating sticker chrome ═══ -->
       <div class="screen" id="s-checkin">
-        <div class="ci-tab">
-          <div class="ci-tab-hd">
-            <button class="quan-auto-pill" onclick="openQuanPicker()">
-              <svg class="icon" width="16" height="16"><use href="#ic-action-pin-static"></use></svg>
-              <b id="ci-quan-name">Bún riêu Ngô Sĩ Liên</b>
-              <span class="dist" id="ci-quan-dist">15m</span>
-              <span class="chev">▾</span>
-            </button>
-          </div>
-          <div class="ci-cam-frame">
-            <div class="ci-cam-view">
-              <div class="ci-cam-food" id="ci-cam-food">🍜</div>
-              <div class="ci-cam-hint">Đây có phải quán bạn đang ăn?</div>
-              <div class="ci-cam-stars" id="ci-cam-stars" data-rating="0">
-                <span class="star" data-value="1"><svg class="icon star-ico" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
-                <span class="star" data-value="2"><svg class="icon star-ico" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
-                <span class="star" data-value="3"><svg class="icon star-ico" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
-                <span class="star" data-value="4"><svg class="icon star-ico" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
-                <span class="star" data-value="5"><svg class="icon star-ico" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
-              </div>
-            </div>
-          </div>
-          <div class="ci-controls">
-            <button class="ci-side" onclick="viewDiaryFromCi()">
-              <span class="ci-side-ico"><svg class="icon" width="20" height="20"><use href="#ic-proto-diary"></use></svg></span>
-              <span class="ci-side-lbl">Diary</span>
-            </button>
-            <button class="ci-shutter" id="ci-shutter" onclick="tapShutterInline()">
-              <span class="ci-shutter-inner"></span>
-            </button>
-            <button class="ci-side" onclick="toast('Đổi camera trước/sau')">
-              <span class="ci-side-ico"><svg class="icon" width="20" height="20"><use href="#ic-action-undo-reset"></use></svg></span>
-              <span class="ci-side-lbl">Đổi</span>
-            </button>
-          </div>
+        <div class="ci-cam-full">
+          <div class="ci-cam-food" id="ci-cam-food">🍜</div>
         </div>
+        <button class="ci-brand-pill" onclick="openQuanPicker()">
+          <svg class="icon" width="14" height="14"><use href="#ic-action-pin-static"></use></svg>
+          <b id="ci-quan-name">Bún riêu Ngô Sĩ Liên</b>
+          <span class="dist" id="ci-quan-dist">15m</span>
+          <span class="chev">▾</span>
+        </button>
+        <div class="ci-cluster">
+          <button class="ci-cluster-btn" onclick="viewDiaryFromCi()" title="Diary"><svg class="icon" width="18" height="18"><use href="#ic-proto-diary"></use></svg></button>
+          <button class="ci-cluster-btn" onclick="toast('Đổi camera trước/sau')" title="Đổi camera"><svg class="icon" width="18" height="18"><use href="#ic-action-undo-reset"></use></svg></button>
+        </div>
+        <div class="ci-star-pill" id="ci-cam-stars" data-rating="0">
+          <span class="star" data-value="1"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
+          <span class="star" data-value="2"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
+          <span class="star" data-value="3"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
+          <span class="star" data-value="4"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
+          <span class="star" data-value="5"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
+        </div>
+        <button class="ci-shutter-fab" id="ci-shutter" onclick="tapShutterInline()" aria-label="Chụp check-in"></button>
       </div>
 
       <!-- ═══ Quán picker overlay ═══ -->
@@ -1146,59 +1067,29 @@ input,textarea{font:inherit;color:inherit}
         </div>
       </div>
 
-      <!-- ═══ CAMERA ═══ -->
-      <div class="screen dark" id="s-camera">
-        <div class="cam">
-          <div class="cam-top">
-            <div class="cam-place"><svg class="icon" width="1em" height="1em"><use href="#ic-action-pin-static"></use></svg> <span id="cam-quan-name">Bún riêu NSL</span></div>
-            <button class="cam-btn-round" onclick="cancelCheckin()"><svg class="icon" width="16" height="16"><use href="#ic-action-close"></use></svg></button>
-          </div>
-          <div class="cam-view">
-            <div class="cam-food" id="cam-food">🍜</div>
-            <div class="cam-hint">Chấm sao rồi tap nút trắng để chụp</div>
-          </div>
-          <div class="cam-controls">
-            <div class="cam-stars" id="cam-stars" data-rating="0">
-              <span class="star" data-value="1"><svg class="icon star-ico" width="26" height="26"><use href="#ic-rating-star-outline"></use></svg></span>
-              <span class="star" data-value="2"><svg class="icon star-ico" width="26" height="26"><use href="#ic-rating-star-outline"></use></svg></span>
-              <span class="star" data-value="3"><svg class="icon star-ico" width="26" height="26"><use href="#ic-rating-star-outline"></use></svg></span>
-              <span class="star" data-value="4"><svg class="icon star-ico" width="26" height="26"><use href="#ic-rating-star-outline"></use></svg></span>
-              <span class="star" data-value="5"><svg class="icon star-ico" width="26" height="26"><use href="#ic-rating-star-outline"></use></svg></span>
-            </div>
-            <div class="cam-controls-row">
-              <button class="cam-flip" onclick="toast('Đổi camera trước/sau')"><svg class="icon" width="20" height="20"><use href="#ic-action-undo-reset"></use></svg></button>
-              <button class="cam-shutter" id="cam-shutter" onclick="tapShutter()"></button>
-              <button class="cam-side" onclick="cancelCheckin()">Huỷ</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═══ PREVIEW ═══ -->
+      <!-- ═══ PREVIEW — full-bleed photo, floating sticker controls ═══ -->
       <div class="screen dark" id="s-preview">
-        <div class="prev">
+        <div class="prev-shell">
           <div class="prev-photo" id="prev-photo">🍜</div>
-          <div class="prev-top">
-            <button class="cam-btn-round" onclick="retake()"><svg class="icon" width="14" height="14"><use href="#ic-action-undo-reset"></use></svg> Chụp lại</button>
-            <button class="cam-btn-round" onclick="cancelCheckin()"><svg class="icon" width="16" height="16"><use href="#ic-action-close"></use></svg></button>
+          <button class="ci-back-pill" onclick="retake()" title="Chụp lại"><svg class="icon" width="14" height="14"><use href="#ic-action-undo-reset"></use></svg></button>
+          <button class="ci-close-pill" onclick="cancelCheckin()" title="Huỷ"><svg class="icon" width="14" height="14"><use href="#ic-action-close"></use></svg></button>
+          <div class="ci-star-pill" id="prev-stars" data-rating="4">
+            <span class="star" data-value="1"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
+            <span class="star" data-value="2"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
+            <span class="star" data-value="3"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
+            <span class="star" data-value="4"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
+            <span class="star" data-value="5"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></span>
           </div>
-          <div class="prev-sheet">
-            <div class="prev-stars" id="prev-stars" data-rating="4">
-              <span class="star" data-value="1"><svg class="icon star-ico" width="24" height="24"><use href="#ic-rating-star-outline"></use></svg></span>
-              <span class="star" data-value="2"><svg class="icon star-ico" width="24" height="24"><use href="#ic-rating-star-outline"></use></svg></span>
-              <span class="star" data-value="3"><svg class="icon star-ico" width="24" height="24"><use href="#ic-rating-star-outline"></use></svg></span>
-              <span class="star" data-value="4"><svg class="icon star-ico" width="24" height="24"><use href="#ic-rating-star-outline"></use></svg></span>
-              <span class="star" data-value="5"><svg class="icon star-ico" width="24" height="24"><use href="#ic-rating-star-outline"></use></svg></span>
+          <textarea class="ci-cap-pill" id="prev-cap" rows="1" placeholder="Ghi chú ngắn (tuỳ chọn)..."></textarea>
+          <div class="ci-tog-pill on" id="prev-tog" onclick="toggleShare()">
+            <div class="knob"></div>
+            <div class="ci-tog-body">
+              <span id="tog-label">Chia sẻ với bạn bè</span>
+              <small id="tog-sub">Rating tính vào ✓ verified</small>
             </div>
-            <textarea class="prev-cap" id="prev-cap" rows="1" placeholder="Ghi chú ngắn (tuỳ chọn)..."></textarea>
-            <div class="prev-tog on" id="prev-tog" onclick="toggleShare()">
-              <div class="knob"></div>
-              <div class="prev-tog-body">
-                <span id="tog-label">Chia sẻ với bạn bè</span>
-                <small id="tog-sub">Rating tính vào ✓ verified</small>
-              </div>
-            </div>
-            <button class="prev-send" onclick="tapSend()"><svg class="icon" width="18" height="18"><use href="#ic-action-pin-static"></use></svg> Gửi check-in</button>
+          </div>
+          <div class="ci-send-wrap">
+            <button class="ci-send-btn" onclick="tapSend()"><svg class="icon" width="18" height="18"><use href="#ic-action-pin-static"></use></svg> Gửi check-in</button>
           </div>
         </div>
       </div>
@@ -1395,7 +1286,7 @@ const state = {
   feed:[...INITIAL_FEED],
 };
 
-const NO_TABS = new Set(['camera','preview','sent']);
+const NO_TABS = new Set(['preview','sent']);
 let currentScreen = 'home';
 
 function showScreen(name){
@@ -1422,8 +1313,9 @@ function refreshCheckinTab(){
   setStars('ci-cam-stars', 0);
 }
 
-/* Legacy path — auto-suggest sheet + Community detail button call this.
-   Skip the intermediate camera screen and open Check-in tab directly. */
+/* Called from the post-nav auto-suggest sheet and from Community's
+   detail-modal Check-in button — both just want to land on the tab with
+   the right quán pre-selected. */
 function startCheckin(quanId){
   const q = QUANS.find(x=>x.id===quanId); if (!q) return;
   state.currentQuan = q;
@@ -1432,19 +1324,8 @@ function startCheckin(quanId){
 
 function cancelCheckin(){ showTab('checkin'); }
 
-/* Legacy camera-screen shutter (still used from post-nav path if we ever
-   route back through the full-screen camera) */
-function tapShutter(){
-  const sh = document.getElementById('cam-shutter');
-  sh.classList.add('busy');
-  const flash = document.getElementById('flash');
-  flash.classList.add('on');
-  setTimeout(()=>flash.classList.remove('on'), 150);
-  setTimeout(()=>{ sh.classList.remove('busy'); goPreview(); }, 300);
-}
-
-/* Inline shutter (new default) — user is on Check-in tab, tap the round pink
-   shutter, we flash + go to Preview which handles rating/caption/send. */
+/* Tap the pink shutter FAB on the Check-in tab — flash, then hand off to
+   Preview (which reads the rating already set on #ci-cam-stars). */
 function tapShutterInline(){
   const sh = document.getElementById('ci-shutter');
   sh.classList.add('busy');
@@ -1453,9 +1334,6 @@ function tapShutterInline(){
   setTimeout(()=>flash.classList.remove('on'), 150);
   setTimeout(()=>{
     sh.classList.remove('busy');
-    // Carry over any rating pre-selected on the inline stars
-    const inlineR = +document.getElementById('ci-cam-stars').dataset.rating || 0;
-    setStars('cam-stars', inlineR);
     goPreview();
   }, 300);
 }
@@ -1497,7 +1375,7 @@ function selectQuanFromPicker(id){
 
 function goPreview(){
   const q = state.currentQuan; if (!q) return;
-  const camR = +document.getElementById('cam-stars').dataset.rating || 0;
+  const camR = +document.getElementById('ci-cam-stars').dataset.rating || 0;
   const r = camR || 4;
   setStars('prev-stars', r);
   const photo = document.getElementById('prev-photo');
@@ -1510,7 +1388,7 @@ function goPreview(){
   setTimeout(()=>document.getElementById('prev-cap').focus(), 300);
 }
 
-function retake(){ showScreen('camera'); }
+function retake(){ showScreen('checkin'); }
 
 function toggleShare(){
   document.getElementById('prev-tog').classList.toggle('on');
@@ -1748,7 +1626,7 @@ function resetDemo(){
   toast('Đã reset demo');
 }
 
-bindStars('cam-stars'); bindStars('prev-stars'); bindStars('ci-cam-stars');
+bindStars('prev-stars'); bindStars('ci-cam-stars');
 document.querySelectorAll('.stars-static').forEach(el => el.innerHTML = starsRow(5));
 renderFeed(); renderDiary(); updateProfileStats(); refreshCheckinTab();
 </script>
