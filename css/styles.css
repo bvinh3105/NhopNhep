@@ -2815,7 +2815,7 @@ body.map-full .tabbar{transform:translateY(105%)}
 .ci-cal-month{font-family:var(--font-display);font-size:1.05rem;font-weight:900;color:var(--text);letter-spacing:-.2px}
 .ci-cal-nav{
   width:32px;height:32px;border-radius:50%;
-  border:1.5px solid var(--cream-3,#D8C9A8);background:var(--cream-2,#EDE0C8);
+  border:1.5px solid var(--cream-3,#EEE0A6);background:var(--cream-2,#F5EBC1);
   font-size:17px;font-weight:700;color:var(--text2);
   cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;
 }
@@ -2835,9 +2835,9 @@ body.map-full .tabbar{transform:translateY(105%)}
 }
 .ci-cal-cell:active{transform:scale(.93)}
 .ci-cal-today{border-color:var(--accent,#E8843C)!important;box-shadow:2px 2px 0 var(--text),0 0 0 2.5px var(--accent,#E8843C)!important}
-.ci-cal-noimg{background:var(--cream-2,#EDE0C8)!important;display:flex;align-items:center;justify-content:center;font-size:.9rem}
+.ci-cal-noimg{background:var(--cream-2,#F5EBC1)!important;display:flex;align-items:center;justify-content:center;font-size:.9rem}
 .ci-cal-empty{aspect-ratio:1;display:flex;align-items:center;justify-content:center}
-.ci-cal-dot{width:5px;height:5px;border-radius:50%;background:var(--cream-3,#D8C9A8)}
+.ci-cal-dot{width:5px;height:5px;border-radius:50%;background:var(--cream-3,#EEE0A6)}
 .ci-cal-badge{
   position:absolute;bottom:2px;right:2px;
   background:var(--primary,#B92626);color:#fff;font-size:7px;font-weight:800;
@@ -2847,11 +2847,48 @@ body.map-full .tabbar{transform:translateY(105%)}
 }
 .ci-stat-bar{
   display:flex;justify-content:center;gap:32px;
-  background:var(--cream-2,#EDE0C8);
-  border-top:1.5px solid var(--cream-3,#D8C9A8);
+  background:var(--cream-2,#F5EBC1);
+  border-top:1.5px solid var(--cream-3,#EEE0A6);
   padding:13px 0 15px;
 }
 .ci-stat{display:flex;align-items:baseline;gap:5px;font-weight:800;color:var(--text)}
 .ci-stat-ico{font-size:15px;line-height:1;align-self:center}
 .ci-stat span:nth-child(2){font-size:1.15rem;letter-spacing:-.5px}
 .ci-stat-unit{font-size:.75rem;color:var(--text2);font-weight:600}
+
+/* ── CHECK-IN DISCOVER (Cộng đồng → Check-in subtab, below friends bubbles) ── */
+.ci-disc-divider{height:8px;background:var(--cream-2,#F5EBC1);margin:6px -1.1rem 0}
+.ci-disc-section{padding-top:2px}
+.ci-disc-hd{padding:12px 0 0}
+.ci-disc-title{font-size:.98rem;font-weight:800;color:var(--text);display:flex;align-items:center;gap:6px}
+.ci-disc-sub{font-size:.72rem;color:var(--text3);font-weight:600;margin-top:2px}
+.ci-disc-chips{display:flex;gap:7px;padding:10px 0 12px;overflow-x:auto}
+.ci-disc-chip{
+  flex-shrink:0;display:flex;align-items:center;gap:5px;
+  padding:.45rem .8rem;border-radius:20px;
+  background:var(--paper);border:1.5px solid var(--cream-3,#EEE0A6);
+  font-size:.75rem;font-weight:700;color:var(--text2);font-family:inherit;
+  cursor:pointer;white-space:nowrap;
+}
+.ci-disc-chip.on{background:var(--primary);border-color:var(--text);color:var(--white);box-shadow:2px 2px 0 var(--text)}
+.ci-disc-empty{text-align:center;padding:1.2rem 1rem;color:var(--text2);font-size:.82rem}
+.ci-disc-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding-bottom:6px}
+.ci-disc-card{
+  position:relative;border-radius:16px;overflow:hidden;
+  border:2px solid var(--text);box-shadow:3px 3px 0 var(--text);
+  aspect-ratio:3/4.3;display:flex;align-items:flex-end;cursor:pointer;
+  transition:transform .1s;
+}
+.ci-disc-card:active{transform:scale(.96)}
+.ci-disc-card-bg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:2.4rem;background:var(--paper)}
+.ci-disc-card-scrim{position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(42,24,16,.78) 100%)}
+.ci-disc-card-badge{
+  position:absolute;top:7px;left:7px;z-index:2;
+  display:flex;align-items:center;gap:3px;
+  background:rgba(254,249,229,.94);border:1.5px solid var(--text);
+  border-radius:10px;padding:3px 7px;font-size:.6rem;font-weight:800;color:var(--text);
+}
+.ci-disc-card-badge.hot{background:var(--accent);color:var(--white);border-color:var(--text)}
+.ci-disc-card-body{position:relative;z-index:2;padding:8px;width:100%;color:var(--white)}
+.ci-disc-card-name{font-size:.75rem;font-weight:800;line-height:1.25;margin-bottom:3px;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.ci-disc-card-meta{font-size:.6rem;font-weight:700;opacity:.92;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

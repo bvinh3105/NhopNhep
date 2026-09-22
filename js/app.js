@@ -60,6 +60,7 @@ function boot() {
   CheckinPostViewCtrl.init();
   CheckinViewerCtrl.init();
   CheckinCalendarCtrl.init();
+  CheckinDiscoverCtrl.init();
   wireScrollMasks();
 
   // Deep-link handler: ?q=<pb_id> auto-opens the community detail

@@ -3349,6 +3349,7 @@ const CommunityCtrl = {
         document.getElementById('communityRoutesPane').classList.toggle('hidden', which !== 'routes');
         if (which === 'checkins' && typeof CheckinFeedCtrl !== 'undefined') {
           CheckinFeedCtrl.refresh({ force: true });
+          if (typeof CheckinDiscoverCtrl !== 'undefined') CheckinDiscoverCtrl.refresh();
         }
       });
     });
@@ -5678,6 +5679,9 @@ const CheckinCtrl = {
     if (isShared && typeof CheckinFeedCtrl !== 'undefined') {
       CheckinFeedCtrl.refresh({ force: true });
     }
+    if (isShared && typeof CheckinDiscoverCtrl !== 'undefined') {
+      CheckinDiscoverCtrl.refresh();
+    }
     // Always refresh calendar (even private check-ins appear in own calendar).
     if (typeof CheckinCalendarCtrl !== 'undefined') CheckinCalendarCtrl._fetchMonth();
 
@@ -5833,6 +5837,162 @@ const CheckinFeedCtrl = {
       el.addEventListener('click', () => {
         const gi = +el.dataset.groupIdx;
         if (this._groups[gi]) CheckinViewerCtrl.open(this._groups, gi);
+      });
+    });
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   CHECK-IN DISCOVER  (v1.0 — 2026-09-22)
+   Snapchat-Discover-style 2-col grid below the friends bubbles in the
+   Cộng đồng → Check-in subtab. Surfaces public check-ins (is_shared=
+   true), not just followed users. Deliberately 4 separate honest sorts
+   instead of one blended "recommendation score" — each chip maps to
+   data that actually exists:
+     📍 near — haversine(State.userLat/Lng, restaurant_lat/lng)
+     🔥 hot  — count of check-ins clustering at the same spot
+     ✨ you  — matches the food emoji the viewer checks into most often
+     🕐 new  — server's own -created sort, no client re-sort needed
+   No "interaction/likes" sort — likes aren't persisted server-side yet
+   (see CheckinPostViewCtrl header), so a chip for it would be fake.
+═══════════════════════════════════════════════ */
+const CheckinDiscoverCtrl = {
+  MAX: 40,
+  HOT_MIN: 5,        // spot needs ≥5 check-ins to earn the 🔥 badge
+  FRESH_MS: 6 * 3600 * 1000,
+  _items: [],
+  _popularity: null,  // Map<spotKey, count>
+  _myTopEmoji: null,  // null = not loaded yet, '' = loaded but no data
+  _sort: 'near',
+  _loading: false,
+
+  init() {
+    document.querySelectorAll('#ciDiscChips .ci-disc-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('#ciDiscChips .ci-disc-chip').forEach(c => c.classList.remove('on'));
+        chip.classList.add('on');
+        this._sort = chip.dataset.sort;
+        this._render();
+      });
+    });
+  },
+
+  async refresh() {
+    if (this._loading) return;
+    this._loading = true;
+    try {
+      const r = await Community.listSharedCheckins({ perPage: this.MAX });
+      if (r.ok) {
+        this._items = (r.data && r.data.items) || [];
+        this._buildPopularity();
+      }
+      if (Community.isLoggedIn() && this._myTopEmoji === null) {
+        await this._loadMyTopEmoji();
+      }
+      this._render();
+    } finally {
+      this._loading = false;
+    }
+  },
+
+  _buildPopularity() {
+    this._popularity = new Map();
+    this._items.forEach(it => {
+      const key = this._spotKey(it);
+      this._popularity.set(key, (this._popularity.get(key) || 0) + 1);
+    });
+  },
+
+  // Groups check-ins at "the same place": prefer the community-quán
+  // relation id when present (exact), else round lat/lng to ~100m
+  // (3 decimals) so nearby GPS jitter still counts as one spot, else
+  // fall back to the typed name for vỉa hè spots with no coordinates.
+  _spotKey(it) {
+    if (it.restaurant) return `id:${it.restaurant}`;
+    const lat = it.restaurant_lat != null ? (+it.restaurant_lat).toFixed(3) : '';
+    const lng = it.restaurant_lng != null ? (+it.restaurant_lng).toFixed(3) : '';
+    if (lat && lng) return `geo:${lat},${lng}`;
+    return `name:${(it.restaurant_name || '').trim().toLowerCase()}`;
+  },
+
+  async _loadMyTopEmoji() {
+    const r = await Community.getMyCheckins({ perPage: 50 });
+    this._myTopEmoji = '';
+    if (!r.ok) return;
+    const items = (r.data && r.data.items) || [];
+    const counts = new Map();
+    items.forEach(it => { if (it.restaurant_emoji) counts.set(it.restaurant_emoji, (counts.get(it.restaurant_emoji) || 0) + 1); });
+    let top = '', max = 0;
+    counts.forEach((c, e) => { if (c > max) { max = c; top = e; } });
+    this._myTopEmoji = top;
+  },
+
+  _distanceOf(it) {
+    if (State.userLat == null || State.userLng == null) return Infinity;
+    if (it.restaurant_lat == null || it.restaurant_lng == null) return Infinity;
+    return haversine(State.userLat, State.userLng, +it.restaurant_lat, +it.restaurant_lng);
+  },
+
+  _sortedItems() {
+    const items = [...this._items];
+    if (this._sort === 'near') {
+      items.sort((a, b) => this._distanceOf(a) - this._distanceOf(b));
+    } else if (this._sort === 'hot') {
+      items.sort((a, b) => (this._popularity.get(this._spotKey(b)) || 0) - (this._popularity.get(this._spotKey(a)) || 0));
+    } else if (this._sort === 'you' && this._myTopEmoji) {
+      items.sort((a, b) => (b.restaurant_emoji === this._myTopEmoji ? 1 : 0) - (a.restaurant_emoji === this._myTopEmoji ? 1 : 0));
+    }
+    // 'new' (and 'you' with no history yet): keep the query's own -created order.
+    return items;
+  },
+
+  _render() {
+    const grid = document.getElementById('ciDiscGrid');
+    const empty = document.getElementById('ciDiscEmpty');
+    if (!grid) return;
+    if (!this._items.length) {
+      grid.innerHTML = '';
+      empty?.classList.remove('hidden');
+      return;
+    }
+    empty?.classList.add('hidden');
+
+    const items = this._sortedItems();
+    grid.innerHTML = items.map((it, i) => {
+      const dist = this._distanceOf(it);
+      const distLabel = dist === Infinity ? '' : (dist < 1000 ? `${Math.round(dist)}m` : `${(dist / 1000).toFixed(1)}km`);
+      const pop = this._popularity?.get(this._spotKey(it)) || 0;
+      const photoUrl = it.photo ? Community.checkinPhotoUrl(it, '300x400') : '';
+      const author = (it.expand && it.expand.user) || {};
+      const authorName = author.name || I18N.t('common.anonymous');
+      const isFresh = (Date.now() - new Date(it.created).getTime()) < this.FRESH_MS;
+
+      let badge = '';
+      if (pop >= this.HOT_MIN) badge = `<div class="ci-disc-card-badge hot">🔥 ${pop} check-in</div>`;
+      else if (isFresh) badge = `<div class="ci-disc-card-badge">🆕 Mới</div>`;
+      else if (distLabel) badge = `<div class="ci-disc-card-badge">📍 ${distLabel}</div>`;
+
+      const bg = photoUrl
+        ? ` style="background-image:url('${escapeHtml(photoUrl)}');background-size:cover;background-position:center"`
+        : '';
+      const emoji = photoUrl ? '' : escapeHtml(it.restaurant_emoji || '🍜');
+      const meta = [escapeHtml(authorName), distLabel].filter(Boolean).join(' · ');
+
+      return `<div class="ci-disc-card" data-idx="${i}">
+        <div class="ci-disc-card-bg"${bg}>${emoji}</div>
+        <div class="ci-disc-card-scrim"></div>
+        ${badge}
+        <div class="ci-disc-card-body">
+          <div class="ci-disc-card-name">${escapeHtml(it.restaurant_name || I18N.t('checkin.anonSpot'))}</div>
+          <div class="ci-disc-card-meta">${meta}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    grid.querySelectorAll('.ci-disc-card[data-idx]').forEach(el => {
+      el.addEventListener('click', () => {
+        const it = items[+el.dataset.idx];
+        if (it && typeof CheckinPostViewCtrl !== 'undefined') CheckinPostViewCtrl.open(it);
       });
     });
   },

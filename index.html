@@ -698,6 +698,28 @@
           <div class="ci-bubbles-empty-msg" data-i18n="checkinFeed.emptyMsg">Chưa có check-in nào hôm nay — chụp đầu tiên đi!</div>
         </div>
         <div class="ci-bubbles" id="checkinBubbles"></div>
+
+        <!-- Discover grid — public check-ins (is_shared=true) ranked by
+             one of 4 honest, real-data sorts (no blended black-box
+             score): distance, popularity-at-that-spot, user's own most-
+             checked-in food emoji, or recency. -->
+        <div class="ci-disc-divider"></div>
+        <div class="ci-disc-section" id="ciDiscoverSection">
+          <div class="ci-disc-hd">
+            <div class="ci-disc-title">🧭 <span data-i18n="checkinDiscover.title">Khám phá</span></div>
+            <div class="ci-disc-sub" data-i18n="checkinDiscover.sub">Gợi ý quanh bạn — quán hot, mới check-in</div>
+          </div>
+          <div class="ci-disc-chips" id="ciDiscChips">
+            <button class="ci-disc-chip on" data-sort="near" type="button">📍 <span data-i18n="checkinDiscover.near">Gần nhất</span></button>
+            <button class="ci-disc-chip" data-sort="hot" type="button">🔥 <span data-i18n="checkinDiscover.hot">Phổ biến</span></button>
+            <button class="ci-disc-chip" data-sort="you" type="button">✨ <span data-i18n="checkinDiscover.you">Cho bạn</span></button>
+            <button class="ci-disc-chip" data-sort="new" type="button">🕐 <span data-i18n="checkinDiscover.new">Mới nhất</span></button>
+          </div>
+          <div class="ci-disc-empty hidden" id="ciDiscEmpty">
+            <div class="ci-disc-empty-msg" data-i18n="checkinDiscover.empty">Chưa có check-in công khai nào gần bạn.</div>
+          </div>
+          <div class="ci-disc-grid" id="ciDiscGrid"></div>
+        </div>
       </div>
 
       <div class="profile-section hidden" id="communityRoutesPane">
