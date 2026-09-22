@@ -5843,7 +5843,7 @@ const CheckinFeedCtrl = {
 };
 
 /* ═══════════════════════════════════════════════
-   CHECK-IN DISCOVER  (v1.0 — 2026-09-22)
+   CHECK-IN DISCOVER  (v1.1 — 2026-09-22)
    Snapchat-Discover-style 2-col grid below the friends bubbles in the
    Cộng đồng → Check-in subtab. Surfaces public check-ins (is_shared=
    true), not just followed users. Deliberately 4 separate honest sorts
@@ -5852,17 +5852,23 @@ const CheckinFeedCtrl = {
      📍 near — haversine(State.userLat/Lng, restaurant_lat/lng)
      🔥 hot  — count of check-ins clustering at the same spot
      ✨ you  — matches the food emoji the viewer checks into most often
-     🕐 new  — server's own -created sort, no client re-sort needed
+     🕐 new  — most recent check-in per user
    No "interaction/likes" sort — likes aren't persisted server-side yet
    (see CheckinPostViewCtrl header), so a chip for it would be fake.
+
+   v1.1: one card per USER, not per check-in (same person's 5 posts
+   used to spread across 5 grid cells — grouped like the bubbles row,
+   with a count badge; tap opens the same fullscreen CheckinViewerCtrl
+   the bubbles use, seeded with just that one group).
 ═══════════════════════════════════════════════ */
 const CheckinDiscoverCtrl = {
   MAX: 40,
   HOT_MIN: 5,        // spot needs ≥5 check-ins to earn the 🔥 badge
   FRESH_MS: 6 * 3600 * 1000,
   _items: [],
-  _popularity: null,  // Map<spotKey, count>
-  _myTopEmoji: null,  // null = not loaded yet, '' = loaded but no data
+  _groups: [],         // [{ user, items[] (newest-first), newestAt }]
+  _popularity: null,   // Map<spotKey, count> — built from flat _items, spot-level not user-level
+  _myTopEmoji: null,   // null = not loaded yet, '' = loaded but no data
   _sort: 'near',
   _loading: false,
 
@@ -5885,6 +5891,7 @@ const CheckinDiscoverCtrl = {
       if (r.ok) {
         this._items = (r.data && r.data.items) || [];
         this._buildPopularity();
+        this._buildGroups();
       }
       if (Community.isLoggedIn() && this._myTopEmoji === null) {
         await this._loadMyTopEmoji();
@@ -5901,6 +5908,24 @@ const CheckinDiscoverCtrl = {
       const key = this._spotKey(it);
       this._popularity.set(key, (this._popularity.get(key) || 0) + 1);
     });
+  },
+
+  // One card per poster — mirrors CheckinFeedCtrl's bubble grouping so
+  // the same person's posts (any spot, any time) collapse into a
+  // single Discover tile instead of flooding the grid.
+  _buildGroups() {
+    const byUser = new Map();
+    this._items.forEach(it => {
+      const u = (it.expand && it.expand.user) || null;
+      const key = (u && u.id) || it.user || 'anon';
+      if (!byUser.has(key)) byUser.set(key, { user: u, items: [], newestAt: 0 });
+      const g = byUser.get(key);
+      g.items.push(it);
+      const t = new Date(it.created).getTime();
+      if (t > g.newestAt) g.newestAt = t;
+    });
+    byUser.forEach(g => g.items.sort((a, b) => new Date(b.created) - new Date(a.created)));
+    this._groups = [...byUser.values()].sort((a, b) => b.newestAt - a.newestAt);
   },
 
   // Groups check-ins at "the same place": prefer the community-quán
@@ -5933,66 +5958,76 @@ const CheckinDiscoverCtrl = {
     return haversine(State.userLat, State.userLng, +it.restaurant_lat, +it.restaurant_lng);
   },
 
-  _sortedItems() {
-    const items = [...this._items];
+  // Group-level aggregates — sort/badge by the person's BEST-matching
+  // post for the active criteria, not just their newest one.
+  _groupBestDist(g) { return Math.min(...g.items.map(it => this._distanceOf(it))); },
+  _groupBestPop(g) { return Math.max(...g.items.map(it => this._popularity?.get(this._spotKey(it)) || 0)); },
+  _groupMatchesYou(g) { return this._myTopEmoji && g.items.some(it => it.restaurant_emoji === this._myTopEmoji); },
+
+  _sortedGroups() {
+    const groups = [...this._groups];
     if (this._sort === 'near') {
-      items.sort((a, b) => this._distanceOf(a) - this._distanceOf(b));
+      groups.sort((a, b) => this._groupBestDist(a) - this._groupBestDist(b));
     } else if (this._sort === 'hot') {
-      items.sort((a, b) => (this._popularity.get(this._spotKey(b)) || 0) - (this._popularity.get(this._spotKey(a)) || 0));
+      groups.sort((a, b) => this._groupBestPop(b) - this._groupBestPop(a));
     } else if (this._sort === 'you' && this._myTopEmoji) {
-      items.sort((a, b) => (b.restaurant_emoji === this._myTopEmoji ? 1 : 0) - (a.restaurant_emoji === this._myTopEmoji ? 1 : 0));
+      groups.sort((a, b) => (this._groupMatchesYou(b) ? 1 : 0) - (this._groupMatchesYou(a) ? 1 : 0));
+    } else {
+      groups.sort((a, b) => b.newestAt - a.newestAt); // 'new' (and 'you' with no history yet)
     }
-    // 'new' (and 'you' with no history yet): keep the query's own -created order.
-    return items;
+    return groups;
   },
 
   _render() {
     const grid = document.getElementById('ciDiscGrid');
     const empty = document.getElementById('ciDiscEmpty');
     if (!grid) return;
-    if (!this._items.length) {
+    if (!this._groups.length) {
       grid.innerHTML = '';
       empty?.classList.remove('hidden');
       return;
     }
     empty?.classList.add('hidden');
 
-    const items = this._sortedItems();
-    grid.innerHTML = items.map((it, i) => {
-      const dist = this._distanceOf(it);
-      const distLabel = dist === Infinity ? '' : (dist < 1000 ? `${Math.round(dist)}m` : `${(dist / 1000).toFixed(1)}km`);
-      const pop = this._popularity?.get(this._spotKey(it)) || 0;
-      const photoUrl = it.photo ? Community.checkinPhotoUrl(it, '300x400') : '';
-      const author = (it.expand && it.expand.user) || {};
-      const authorName = author.name || I18N.t('common.anonymous');
-      const isFresh = (Date.now() - new Date(it.created).getTime()) < this.FRESH_MS;
+    const groups = this._sortedGroups();
+    grid.innerHTML = groups.map((g, gi) => {
+      const rep = g.items[0]; // most recent post = the tile's face
+      const bestDist = this._groupBestDist(g);
+      const distLabel = bestDist === Infinity ? '' : (bestDist < 1000 ? `${Math.round(bestDist)}m` : `${(bestDist / 1000).toFixed(1)}km`);
+      const bestPop = this._groupBestPop(g);
+      const photoUrl = rep.photo ? Community.checkinPhotoUrl(rep, '300x400') : '';
+      const authorName = (g.user && g.user.name) || I18N.t('common.anonymous');
+      const isFresh = (Date.now() - g.newestAt) < this.FRESH_MS;
 
       let badge = '';
-      if (pop >= this.HOT_MIN) badge = `<div class="ci-disc-card-badge hot">🔥 ${pop} check-in</div>`;
+      if (bestPop >= this.HOT_MIN) badge = `<div class="ci-disc-card-badge hot">🔥 ${bestPop} check-in</div>`;
       else if (isFresh) badge = `<div class="ci-disc-card-badge">🆕 Mới</div>`;
       else if (distLabel) badge = `<div class="ci-disc-card-badge">📍 ${distLabel}</div>`;
+
+      const countBadge = g.items.length > 1 ? `<div class="ci-disc-card-count">${g.items.length}</div>` : '';
 
       const bg = photoUrl
         ? ` style="background-image:url('${escapeHtml(photoUrl)}');background-size:cover;background-position:center"`
         : '';
-      const emoji = photoUrl ? '' : escapeHtml(it.restaurant_emoji || '🍜');
+      const emoji = photoUrl ? '' : escapeHtml(rep.restaurant_emoji || '🍜');
       const meta = [escapeHtml(authorName), distLabel].filter(Boolean).join(' · ');
 
-      return `<div class="ci-disc-card" data-idx="${i}">
+      return `<div class="ci-disc-card" data-group-idx="${gi}">
         <div class="ci-disc-card-bg"${bg}>${emoji}</div>
         <div class="ci-disc-card-scrim"></div>
         ${badge}
+        ${countBadge}
         <div class="ci-disc-card-body">
-          <div class="ci-disc-card-name">${escapeHtml(it.restaurant_name || I18N.t('checkin.anonSpot'))}</div>
+          <div class="ci-disc-card-name">${escapeHtml(rep.restaurant_name || I18N.t('checkin.anonSpot'))}</div>
           <div class="ci-disc-card-meta">${meta}</div>
         </div>
       </div>`;
     }).join('');
 
-    grid.querySelectorAll('.ci-disc-card[data-idx]').forEach(el => {
+    grid.querySelectorAll('.ci-disc-card[data-group-idx]').forEach(el => {
       el.addEventListener('click', () => {
-        const it = items[+el.dataset.idx];
-        if (it && typeof CheckinPostViewCtrl !== 'undefined') CheckinPostViewCtrl.open(it);
+        const g = groups[+el.dataset.groupIdx];
+        if (g && typeof CheckinViewerCtrl !== 'undefined') CheckinViewerCtrl.open([g], 0);
       });
     });
   },

@@ -2889,6 +2889,13 @@ body.map-full .tabbar{transform:translateY(105%)}
   border-radius:10px;padding:3px 7px;font-size:.6rem;font-weight:800;color:var(--text);
 }
 .ci-disc-card-badge.hot{background:var(--accent);color:var(--white);border-color:var(--text)}
+.ci-disc-card-count{
+  position:absolute;top:7px;right:7px;z-index:2;
+  background:var(--primary);color:var(--white);font-size:.62rem;font-weight:800;
+  min-width:18px;height:18px;border-radius:9px;padding:0 4px;
+  display:flex;align-items:center;justify-content:center;
+  border:1.5px solid var(--text);
+}
 .ci-disc-card-body{position:relative;z-index:2;padding:8px;width:100%;color:var(--white)}
 .ci-disc-card-name{font-size:.75rem;font-weight:800;line-height:1.25;margin-bottom:3px;text-shadow:0 1px 2px rgba(0,0,0,.3)}
 .ci-disc-card-meta{font-size:.6rem;font-weight:700;opacity:.92;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
