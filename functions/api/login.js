@@ -22,7 +22,7 @@
 // $pagesFunctionsWithPbUrl in both scripts or it will drift to a
 // dead tunnel on the next rotation.
 
-const PB_URL = 'https://imagination-dee-procedures-tables.trycloudflare.com';
+const PB_URL = 'https://api.trycloudflare.com';
 
 function jsonError(status, message) {
   return new Response(JSON.stringify({ message }), {
