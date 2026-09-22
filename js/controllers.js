@@ -3349,7 +3349,6 @@ const CommunityCtrl = {
         document.getElementById('communityRoutesPane').classList.toggle('hidden', which !== 'routes');
         if (which === 'checkins' && typeof CheckinFeedCtrl !== 'undefined') {
           CheckinFeedCtrl.refresh({ force: true });
-          if (typeof CheckinCalendarCtrl !== 'undefined') CheckinCalendarCtrl.show();
         }
       });
     });
@@ -5688,47 +5687,8 @@ const CheckinCtrl = {
   },
 
   async _openDiary() {
-    const overlay = document.getElementById('checkinDiaryOverlay');
-    const list = document.getElementById('checkinDiaryList');
-    const count = document.getElementById('checkinDiaryCount');
-    overlay.classList.add('show');
-    list.innerHTML = `<div class="empty" style="text-align:center;padding:1rem;color:var(--text2);font-size:.85rem">${I18N.t('common.loading')}</div>`;
-    if (!Community.isLoggedIn()) {
-      list.innerHTML = `<div class="empty" style="text-align:center;padding:1rem;color:var(--text2);font-size:.85rem">${I18N.t('err.needLogin')}</div>`;
-      count.textContent = '';
-      return;
-    }
-    const r = await Community.getMyCheckins({ perPage: 50 });
-    if (!r.ok) {
-      list.innerHTML = `<div class="empty" style="text-align:center;padding:1rem;color:var(--text2);font-size:.85rem">${r.error || I18N.t('err.serverGeneric')}</div>`;
-      count.textContent = '';
-      return;
-    }
-    const items = (r.data && r.data.items) || [];
-    count.textContent = I18N.t('checkin.diaryCount', { n: items.length });
-    if (!items.length) {
-      list.innerHTML = `<div class="empty" style="text-align:center;padding:1rem;color:var(--text2);font-size:.85rem">${I18N.t('checkin.diaryEmpty')}</div>`;
-      return;
-    }
-    list.innerHTML = items.map(it => {
-      const photo = it.photo ? Community.checkinPhotoUrl(it, '200x200') : '';
-      const stars = this._starsRow(it.rating || 0);
-      const d = new Date(it.created);
-      const dateLabel = `${d.getDate()}/${d.getMonth() + 1}`;
-      const noteHtml = it.note ? ` · ${escapeHtml(it.note)}` : '';
-      const share = it.is_shared
-        ? `<span class="checkin-diary-tag pub"><svg class="icon" width="12" height="12"><use href="#ic-privacy-friends"></use></svg> Share</span>`
-        : `<span class="checkin-diary-tag priv"><svg class="icon" width="12" height="12"><use href="#ic-privacy-lock"></use></svg> Riêng</span>`;
-      return `
-        <div class="checkin-diary-row" data-id="${it.id}">
-          <div class="checkin-diary-thumb">${photo ? `<img src="${photo}" alt="">` : `<span>🍜</span>`}</div>
-          <div class="checkin-diary-body">
-            <div class="checkin-diary-name">${escapeHtml(it.restaurant_name)}</div>
-            <div class="checkin-diary-meta">${stars} <span class="checkin-diary-date">· ${dateLabel}</span>${noteHtml}</div>
-          </div>
-          ${share}
-        </div>`;
-    }).join('');
+    document.getElementById('checkinDiaryOverlay').classList.add('show');
+    if (typeof CheckinCalendarCtrl !== 'undefined') CheckinCalendarCtrl.show();
   },
 
   _closeDiary() { document.getElementById('checkinDiaryOverlay').classList.remove('show'); },
@@ -5905,10 +5865,6 @@ const CheckinCalendarCtrl = {
   },
 
   async show() {
-    const section = document.getElementById('ciCalSection');
-    if (!section) return;
-    if (!Community.isLoggedIn()) { section.classList.add('hidden'); return; }
-    section.classList.remove('hidden');
     await this._fetchMonth();
   },
 
