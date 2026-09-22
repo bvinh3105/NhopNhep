@@ -3349,6 +3349,7 @@ const CommunityCtrl = {
         document.getElementById('communityRoutesPane').classList.toggle('hidden', which !== 'routes');
         if (which === 'checkins' && typeof CheckinFeedCtrl !== 'undefined') {
           CheckinFeedCtrl.refresh({ force: true });
+          if (typeof CheckinCalendarCtrl !== 'undefined') CheckinCalendarCtrl.show();
         }
       });
     });
@@ -5678,6 +5679,8 @@ const CheckinCtrl = {
     if (isShared && typeof CheckinFeedCtrl !== 'undefined') {
       CheckinFeedCtrl.refresh({ force: true });
     }
+    // Always refresh calendar (even private check-ins appear in own calendar).
+    if (typeof CheckinCalendarCtrl !== 'undefined') CheckinCalendarCtrl._fetchMonth();
 
     // Reset for the next check-in
     this._retake();
@@ -5872,6 +5875,158 @@ const CheckinFeedCtrl = {
         if (this._groups[gi]) CheckinViewerCtrl.open(this._groups, gi);
       });
     });
+  },
+};
+
+/* ═══════════════════════════════════════════════
+   CHECK-IN CALENDAR  (v1.0 — 2026-09-22)
+   Locket-style monthly grid inside the Cộng đồng → Check-in subtab.
+   Shows the logged-in user's own check-ins grouped by calendar day:
+   days with posts → photo thumbnail (or emoji fallback), days without
+   → a small dot. Tap a day → opens CheckinViewerCtrl with that day's
+   posts. Bottom stat bar: total check-ins + consecutive-day streak.
+
+   Data source: Community._fetch with a month-range filter on the
+   `checkins` collection (user + created window). Max 200 records/month
+   — realistic ceiling for daily check-ins over 31 days.
+═══════════════════════════════════════════════ */
+const CheckinCalendarCtrl = {
+  _year: 0,
+  _month: 0,
+  _items: [],
+  _byDay: null, // Map<dayNum, record[]>
+
+  init() {
+    const now = new Date();
+    this._year  = now.getFullYear();
+    this._month = now.getMonth() + 1;
+    document.getElementById('ciCalPrev')?.addEventListener('click', () => this._shiftMonth(-1));
+    document.getElementById('ciCalNext')?.addEventListener('click', () => this._shiftMonth(1));
+  },
+
+  async show() {
+    const section = document.getElementById('ciCalSection');
+    if (!section) return;
+    if (!Community.isLoggedIn()) { section.classList.add('hidden'); return; }
+    section.classList.remove('hidden');
+    await this._fetchMonth();
+  },
+
+  async _fetchMonth() {
+    if (!Community.isLoggedIn()) return;
+    const pad    = n => String(n).padStart(2, '0');
+    const lastD  = new Date(this._year, this._month, 0).getDate();
+    const start  = `${this._year}-${pad(this._month)}-01 00:00:00`;
+    const end    = `${this._year}-${pad(this._month)}-${lastD} 23:59:59`;
+    const uid    = Community.currentUser?.id;
+    if (!uid) return;
+    const filter = encodeURIComponent(`user="${uid}" && created >= "${start}" && created <= "${end}"`);
+    const r = await Community._fetch(
+      `/api/collections/checkins/records?filter=${filter}&sort=created&perPage=200`
+    );
+    if (r.ok) this._items = r.data?.items || [];
+    this._buildByDay();
+    this._render();
+  },
+
+  _buildByDay() {
+    this._byDay = new Map();
+    this._items.forEach(rec => {
+      const d = new Date(rec.created).getDate();
+      if (!this._byDay.has(d)) this._byDay.set(d, []);
+      this._byDay.get(d).push(rec);
+    });
+  },
+
+  _calcStreak() {
+    if (!this._byDay) return 0;
+    const now = new Date();
+    if (this._year !== now.getFullYear() || this._month !== now.getMonth() + 1) return 0;
+    let streak = 0;
+    for (let d = now.getDate(); d >= 1; d--) {
+      if (this._byDay.has(d)) streak++;
+      else break;
+    }
+    return streak;
+  },
+
+  _render() {
+    const grid     = document.getElementById('ciCalGrid');
+    const monthLbl = document.getElementById('ciCalMonthLbl');
+    const nextBtn  = document.getElementById('ciCalNext');
+    if (!grid) return;
+
+    const VI_MONTHS = ['tháng 1','tháng 2','tháng 3','tháng 4','tháng 5','tháng 6',
+                       'tháng 7','tháng 8','tháng 9','tháng 10','tháng 11','tháng 12'];
+    if (monthLbl) monthLbl.textContent = `${VI_MONTHS[this._month - 1]} ${this._year}`;
+
+    const now = new Date();
+    const isCurr = this._year === now.getFullYear() && this._month === now.getMonth() + 1;
+    if (nextBtn) nextBtn.disabled = isCurr;
+
+    const daysInMonth = new Date(this._year, this._month, 0).getDate();
+    const firstDow    = new Date(this._year, this._month - 1, 1).getDay(); // 0=Sun
+    const todayDate   = now.getDate();
+
+    let html = '';
+    for (let i = 0; i < firstDow; i++) html += '<div></div>';
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const isFuture = isCurr && d > todayDate;
+      const isToday  = isCurr && d === todayDate;
+      const items    = this._byDay?.get(d);
+
+      if (isFuture) {
+        html += '<div></div>';
+      } else if (items?.length) {
+        const rec      = items[items.length - 1]; // most recent of the day
+        const photoUrl = Community.checkinPhotoUrl(rec, '100x100');
+        const todayCls = isToday ? ' ci-cal-today' : '';
+        const badge    = items.length > 1 ? `<div class="ci-cal-badge">${items.length}</div>` : '';
+        if (photoUrl) {
+          html += `<div class="ci-cal-cell${todayCls}" data-day="${d}" style="background-image:url('${escapeHtml(photoUrl)}')">${badge}</div>`;
+        } else {
+          const emoji = escapeHtml(rec.restaurant_emoji || '🍜');
+          html += `<div class="ci-cal-cell ci-cal-noimg${todayCls}" data-day="${d}">${emoji}${badge}</div>`;
+        }
+      } else {
+        html += '<div class="ci-cal-empty"><div class="ci-cal-dot"></div></div>';
+      }
+    }
+    grid.innerHTML = html;
+
+    // Tap any filled day → open viewer with that day's posts
+    grid.querySelectorAll('.ci-cal-cell[data-day]').forEach(el => {
+      el.addEventListener('click', () => {
+        const d     = +el.dataset.day;
+        const items = this._byDay?.get(d);
+        if (!items?.length) return;
+        const group = {
+          user:     Community.currentUser,
+          items,
+          newestAt: new Date(items[items.length - 1].created).getTime(),
+          hasFresh: false,
+        };
+        CheckinViewerCtrl.open([group], 0);
+      });
+    });
+
+    const totalEl  = document.getElementById('ciStatTotal');
+    const streakEl = document.getElementById('ciStatStreak');
+    if (totalEl)  totalEl.textContent  = this._items.length;
+    if (streakEl) streakEl.textContent = this._calcStreak() + 'd';
+  },
+
+  _shiftMonth(delta) {
+    let m = this._month + delta;
+    let y = this._year;
+    if (m > 12) { m = 1; y++; }
+    if (m < 1)  { m = 12; y--; }
+    const now = new Date();
+    if (y > now.getFullYear() || (y === now.getFullYear() && m > now.getMonth() + 1)) return;
+    this._month = m;
+    this._year  = y;
+    this._fetchMonth();
   },
 };
 

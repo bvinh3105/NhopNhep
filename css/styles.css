@@ -2808,3 +2808,50 @@ body.map-full .tabbar{transform:translateY(105%)}
 .ci-post-like.on .icon{color:var(--white,#FFFDF5)}
 .ci-post-save.on{background:var(--accent,#E8843C);color:var(--white,#FFFDF5)}
 .ci-post-save.on .icon{color:var(--white,#FFFDF5)}
+
+/* ── CHECK-IN CALENDAR (Locket-style monthly grid) ──────────────────── */
+.ci-cal-section{margin:14px -1.1rem 0}
+.ci-cal-hd{display:flex;align-items:center;justify-content:space-between;padding:0 1.1rem 10px}
+.ci-cal-month{font-family:var(--font-display);font-size:1.05rem;font-weight:900;color:var(--text);letter-spacing:-.2px}
+.ci-cal-nav{
+  width:32px;height:32px;border-radius:50%;
+  border:1.5px solid var(--cream-3,#D8C9A8);background:var(--cream-2,#EDE0C8);
+  font-size:17px;font-weight:700;color:var(--text2);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;
+}
+.ci-cal-nav:active{transform:translate(1px,1px)}
+.ci-cal-nav:disabled{opacity:.35;cursor:default;pointer-events:none}
+.ci-cal-dow{
+  display:grid;grid-template-columns:repeat(7,1fr);
+  padding:0 1.1rem;gap:3px;margin-bottom:4px;
+}
+.ci-cal-dow span{text-align:center;font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase}
+.ci-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;padding:0 1.1rem 14px}
+.ci-cal-cell{
+  aspect-ratio:1;border-radius:10px;
+  border:1.5px solid var(--text);box-shadow:2px 2px 0 rgba(26,16,6,.28);
+  background-size:cover;background-position:center;
+  cursor:pointer;position:relative;transition:transform .1s;
+}
+.ci-cal-cell:active{transform:scale(.93)}
+.ci-cal-today{border-color:var(--accent,#E8843C)!important;box-shadow:2px 2px 0 var(--text),0 0 0 2.5px var(--accent,#E8843C)!important}
+.ci-cal-noimg{background:var(--cream-2,#EDE0C8)!important;display:flex;align-items:center;justify-content:center;font-size:.9rem}
+.ci-cal-empty{aspect-ratio:1;display:flex;align-items:center;justify-content:center}
+.ci-cal-dot{width:5px;height:5px;border-radius:50%;background:var(--cream-3,#D8C9A8)}
+.ci-cal-badge{
+  position:absolute;bottom:2px;right:2px;
+  background:var(--primary,#B92626);color:#fff;font-size:7px;font-weight:800;
+  min-width:13px;height:13px;border-radius:7px;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid #fff;padding:0 2px;
+}
+.ci-stat-bar{
+  display:flex;justify-content:center;gap:32px;
+  background:var(--cream-2,#EDE0C8);
+  border-top:1.5px solid var(--cream-3,#D8C9A8);
+  padding:13px 0 15px;
+}
+.ci-stat{display:flex;align-items:baseline;gap:5px;font-weight:800;color:var(--text)}
+.ci-stat-ico{font-size:15px;line-height:1;align-self:center}
+.ci-stat span:nth-child(2){font-size:1.15rem;letter-spacing:-.5px}
+.ci-stat-unit{font-size:.75rem;color:var(--text2);font-weight:600}

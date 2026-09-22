@@ -698,6 +698,25 @@
           <div class="ci-bubbles-empty-msg" data-i18n="checkinFeed.emptyMsg">Chưa có check-in nào hôm nay — chụp đầu tiên đi!</div>
         </div>
         <div class="ci-bubbles" id="checkinBubbles"></div>
+
+        <!-- Personal monthly calendar — Locket-style grid, visible only
+             when logged in. Days with check-ins show photo thumbnail;
+             days without show a dot. Stat bar: total + streak. -->
+        <div class="ci-cal-section hidden" id="ciCalSection">
+          <div class="ci-cal-hd">
+            <button class="ci-cal-nav" id="ciCalPrev" type="button" aria-label="Tháng trước">‹</button>
+            <span class="ci-cal-month" id="ciCalMonthLbl"></span>
+            <button class="ci-cal-nav" id="ciCalNext" type="button" aria-label="Tháng sau">›</button>
+          </div>
+          <div class="ci-cal-dow">
+            <span>CN</span><span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span>
+          </div>
+          <div class="ci-cal-grid" id="ciCalGrid"></div>
+          <div class="ci-stat-bar">
+            <div class="ci-stat"><span class="ci-stat-ico">🍜</span><span id="ciStatTotal">0</span><span class="ci-stat-unit"> check-in</span></div>
+            <div class="ci-stat"><span class="ci-stat-ico">🔥</span><span id="ciStatStreak">0d</span><span class="ci-stat-unit"> chuỗi</span></div>
+          </div>
+        </div>
       </div>
 
       <div class="profile-section hidden" id="communityRoutesPane">
