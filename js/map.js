@@ -18,12 +18,16 @@ const TabNav = {
     scrollEl.__scrollHideWired = true;
     const tabbar = document.querySelector('.tabbar');
     if (!tabbar) return;
-    let last = 0;
+    let last = 0, _raf = null;
     scrollEl.addEventListener('scroll', () => {
-      const st = scrollEl.scrollTop;
-      if (st > last && st > 30) tabbar.classList.add('scroll-hidden');
-      else if (st < last) tabbar.classList.remove('scroll-hidden');
-      last = st <= 0 ? 0 : st;
+      if (_raf) cancelAnimationFrame(_raf);
+      _raf = requestAnimationFrame(() => {
+        _raf = null;
+        const st = scrollEl.scrollTop;
+        if (st > last && st > 30) tabbar.classList.add('scroll-hidden');
+        else if (st < last) tabbar.classList.remove('scroll-hidden');
+        last = st <= 0 ? 0 : st;
+      });
     }, { passive: true });
   },
 

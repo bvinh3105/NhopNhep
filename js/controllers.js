@@ -3359,12 +3359,16 @@ const CommunityCtrl = {
     const commScroll = document.querySelector('#communityScreen .profile-scroll');
     TabNav.wireScrollHide(commScroll);
     const commSearchGroup = document.getElementById('communitySearchGroup');
-    let commLastScrollTop = 0;
+    let commLastScrollTop = 0, _commScrollRaf = null;
     commScroll.addEventListener('scroll', () => {
-      const st = commScroll.scrollTop;
-      if (st > commLastScrollTop && st > 30) commSearchGroup.classList.add('scroll-collapsed');
-      else if (st < commLastScrollTop) commSearchGroup.classList.remove('scroll-collapsed');
-      commLastScrollTop = st <= 0 ? 0 : st;
+      if (_commScrollRaf) cancelAnimationFrame(_commScrollRaf);
+      _commScrollRaf = requestAnimationFrame(() => {
+        _commScrollRaf = null;
+        const st = commScroll.scrollTop;
+        if (st > commLastScrollTop && st > 30) commSearchGroup.classList.add('scroll-collapsed');
+        else if (st < commLastScrollTop) commSearchGroup.classList.remove('scroll-collapsed');
+        commLastScrollTop = st <= 0 ? 0 : st;
+      });
     }, { passive: true });
 
     // Observer màu chữ header được (re)tạo trong render() thay vì ở đây —
@@ -5268,6 +5272,9 @@ const CheckinCtrl = {
     document.getElementById('checkinShareTog').addEventListener('click', () => {
       document.getElementById('checkinShareTog').classList.toggle('on');
     });
+    document.getElementById('checkinLocTog').addEventListener('click', () => {
+      document.getElementById('checkinLocTog').classList.toggle('on');
+    });
     document.getElementById('checkinSendBtn').addEventListener('click', () => this._submit());
 
     // Quán picker overlay
@@ -5612,6 +5619,7 @@ const CheckinCtrl = {
     const rating = +document.getElementById('checkinPreviewStars').dataset.rating || 0;
     const note = document.getElementById('checkinCaption').value.trim();
     const isShared = document.getElementById('checkinShareTog').classList.contains('on');
+    const shareLocation = document.getElementById('checkinLocTog').classList.contains('on');
     const typedAddr = (document.getElementById('checkinAddress')?.value || '').trim();
     const q = this._selected;
 
@@ -5619,22 +5627,24 @@ const CheckinCtrl = {
     //  1. Typed address wins (user's override / ad-hoc spot)
     //  2. Picked quán next
     //  3. Anonymous fallback ("Chỗ này") with GPS coords
+    // Coords are suppressed entirely when shareLocation=false so nobody
+    // can use the "Đi tới" feature to navigate directly to the poster.
     let restaurantId = '', restaurantName, restaurantLat, restaurantLng, source;
     if (typedAddr) {
       restaurantName = typedAddr;
-      restaurantLat = State.userLat ?? null;
-      restaurantLng = State.userLng ?? null;
+      restaurantLat = shareLocation ? (State.userLat ?? null) : null;
+      restaurantLng = shareLocation ? (State.userLng ?? null) : null;
       source = 'freeform';
     } else if (q) {
       restaurantId = q.source === 'community' && q.id ? q.id : '';
       restaurantName = q.name;
-      restaurantLat = q.lat ?? null;
-      restaurantLng = q.lng ?? null;
+      restaurantLat = shareLocation ? (q.lat ?? null) : null;
+      restaurantLng = shareLocation ? (q.lng ?? null) : null;
       source = q.source;
     } else {
       restaurantName = I18N.t('checkin.anonSpot');
-      restaurantLat = State.userLat ?? null;
-      restaurantLng = State.userLng ?? null;
+      restaurantLat = shareLocation ? (State.userLat ?? null) : null;
+      restaurantLng = shareLocation ? (State.userLng ?? null) : null;
       source = 'anon';
     }
 
@@ -6250,13 +6260,11 @@ const CheckinPostViewCtrl = {
       ? '<use href="#ic-heart-filled"></use>' : '<use href="#ic-heart-outline"></use>';
     document.getElementById('ciPostSaveBtn').classList.toggle('on', this._saved.has(record.id));
 
-    // "Đi tới" chip — only meaningful when we have coords OR a real name
-    // to search on. Hides on the "Chỗ này" anonymous fallback since a
-    // Google Maps search for that literal string returns nothing useful.
-    const anonName = I18N.t('checkin.anonSpot');
+    // "Đi tới" chip — requires coords; hidden when the poster chose to hide
+    // their GPS location (restaurant_lat/lng == null). Name-only is not
+    // enough — showCheckinItinerary() already bails if coords are missing.
     const hasCoords = record.restaurant_lat != null && record.restaurant_lng != null;
-    const hasRealName = record.restaurant_name && record.restaurant_name !== anonName;
-    document.getElementById('ciPostDirectBtn').classList.toggle('hidden', !hasCoords && !hasRealName);
+    document.getElementById('ciPostDirectBtn').classList.toggle('hidden', !hasCoords);
 
     document.getElementById('checkinPostOverlay').classList.add('show');
   },
@@ -6484,10 +6492,8 @@ const CheckinViewerCtrl = {
 
     // Footer — location + "Đi tới" chip (hide on anon fallback) + actions.
     document.getElementById('ciViewerLoc').textContent = rec.restaurant_name || '—';
-    const anonName = I18N.t('checkin.anonSpot');
     const hasCoords = rec.restaurant_lat != null && rec.restaurant_lng != null;
-    const hasRealName = rec.restaurant_name && rec.restaurant_name !== anonName;
-    document.getElementById('ciViewerDirectBtn').classList.toggle('hidden', !hasCoords && !hasRealName);
+    document.getElementById('ciViewerDirectBtn').classList.toggle('hidden', !hasCoords);
 
     // Like / save state — reuse the same localStorage sets the modal uses.
     const liked = CheckinPostViewCtrl._liked;
