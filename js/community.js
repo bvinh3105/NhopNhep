@@ -833,6 +833,31 @@ const Community = {
     return this._fetch(`/api/collections/checkins/records/${id}`, { method: 'DELETE' });
   },
 
+  // Toggle a check-in's visibility after posting — "Ẩn khỏi bạn bè" /
+  // "Hiện lại" in the post viewer's "•••" menu (owner only; server rule
+  // enforces ownership). checkins.updateRule only allows the owner to
+  // PATCH their own record — see 1790000001_checkins_allow_owner_update.js.
+  async setCheckinShared(id, isShared) {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    return this._fetch(`/api/collections/checkins/records/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_shared: isShared ? true : false }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+
+  // File a report on someone else's check-in — "Báo cáo" in the viewer's
+  // "•••" menu. Write-only from here; only a superuser can review the
+  // queue (checkin_reports.listRule/viewRule: null).
+  async reportCheckin(checkinId, reason) {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    const fd = new FormData();
+    fd.append('checkin', checkinId);
+    fd.append('reporter', this.currentUser.id);
+    fd.append('reason', reason || 'other');
+    return this._fetch('/api/collections/checkin_reports/records', { method: 'POST', body: fd });
+  },
+
   // Full URL to a check-in's photo file (thumb'd if size is passed).
   // Same pattern the community feed uses for quán photos.
   checkinPhotoUrl(record, size = '') {

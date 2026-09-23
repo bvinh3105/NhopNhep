@@ -2595,61 +2595,20 @@ body.map-full .tabbar{transform:translateY(105%)}
 /* ─── Fullscreen viewer ──────────────────────────────────────────── */
 /* Uses .modal-overlay.show for open/close (same as diary/picker); the
    inner frame is what fills the viewport. Tab bar gets hidden via
-   .tabbar.checkin-hidden while viewer is up (see CheckinViewerCtrl). */
+   .tabbar.checkin-hidden while viewer is up (see CheckinViewerCtrl).
+   Redesigned 2026-09-23: caption + "•••" options menu (owner: Xóa/Ẩn
+   khỏi bạn bè/Thống kê; viewer: Báo cáo/Ẩn bài này) + labeled action
+   pills replacing the old icon-only circles + inline "Đi tới" chip
+   (now one of the action pills instead). Absorbed the old standalone
+   CheckinPostViewCtrl modal — that entry point was dead code (nothing
+   called .open() any more; Discover/bubbles/calendar all route through
+   this viewer), so it was deleted instead of kept in sync by hand. */
 #checkinViewer.ci-viewer-ov{background:rgba(0,0,0,.95);z-index:300}
 #checkinViewer .ci-viewer-frame{
   position:relative;width:100vw;height:100vh;max-width:520px;
   display:flex;flex-direction:column;
   color:var(--white,#FFFDF5);
   background:transparent;
-}
-
-/* Progress bar segments at the top — 1 segment per post in the group,
-   current segment animates fill over 5s via CSS animation. */
-.ci-viewer-progress{
-  position:absolute;top:calc(env(safe-area-inset-top, 0px) + 10px);
-  left:12px;right:12px;z-index:20;
-  display:flex;gap:4px;
-}
-.ci-viewer-progress-seg{
-  flex:1;height:3px;border-radius:2px;
-  background:rgba(255,255,255,.35);overflow:hidden;
-}
-.ci-viewer-progress-seg-fill{
-  height:100%;width:0;background:var(--white,#FFFDF5);
-  transform-origin:left;
-}
-.ci-viewer-progress-seg.done .ci-viewer-progress-seg-fill{width:100%}
-.ci-viewer-progress-seg.active .ci-viewer-progress-seg-fill{
-  animation:ciViewerFill 5000ms linear forwards;
-}
-@keyframes ciViewerFill{from{width:0}to{width:100%}}
-
-/* Header — avatar + name + time on the left, close on the right */
-.ci-viewer-hd{
-  position:absolute;top:calc(env(safe-area-inset-top, 0px) + 22px);
-  left:12px;right:12px;z-index:15;
-  display:flex;align-items:center;gap:10px;padding:.5rem .6rem;
-}
-.ci-viewer-avatar{
-  width:38px;height:38px;border-radius:50%;
-  background:var(--accent,#E8843C);border:2px solid var(--white,#FFFDF5);
-  display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex-shrink:0;
-  color:var(--text);
-}
-.ci-viewer-avatar .icon{width:1.15rem;height:1.15rem;color:var(--text)}
-.ci-viewer-hd-txt{flex:1;min-width:0;line-height:1.15}
-.ci-viewer-username{
-  font-size:.95rem;font-weight:900;text-transform:uppercase;letter-spacing:-.01em;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-.ci-viewer-time{font-size:.68rem;font-weight:700;opacity:.85}
-.ci-viewer-close{
-  width:36px;height:36px;border-radius:50%;
-  background:rgba(0,0,0,.5);color:var(--white,#FFFDF5);
-  border:1.5px solid rgba(255,255,255,.35);
-  display:flex;align-items:center;justify-content:center;
-  padding:0;cursor:pointer;flex-shrink:0;
 }
 
 /* Photo cover — fills whole viewport behind everything */
@@ -2668,9 +2627,9 @@ body.map-full .tabbar{transform:translateY(105%)}
   background:linear-gradient(135deg,#F9A870,#B92626);
 }
 
-/* Tap zones — invisible, cover left/right thirds of the photo. On
-   desktop they still work as clickable areas. Keep in front of photo
-   but behind header/foot so those UI stays interactive. */
+/* Tap zones — invisible, cover left/right thirds of the photo. Also the
+   swipe-detection target (see CheckinViewerCtrl). Keep in front of
+   photo but behind header/foot/progress so those stay interactive. */
 .ci-viewer-tap{
   position:absolute;top:0;bottom:0;z-index:10;
   background:transparent;border:0;padding:0;cursor:pointer;
@@ -2678,44 +2637,127 @@ body.map-full .tabbar{transform:translateY(105%)}
 .ci-viewer-tap-prev{left:0;width:30%}
 .ci-viewer-tap-next{right:0;width:70%}
 
-/* Bottom bar — location + directions + actions */
-.ci-viewer-foot{
-  position:absolute;left:0;right:0;bottom:0;z-index:15;
-  padding:14px 14px calc(env(safe-area-inset-bottom, 0px) + 14px);
-  background:linear-gradient(to top,rgba(0,0,0,.72) 0%,rgba(0,0,0,0) 100%);
-  display:flex;flex-direction:column;gap:12px;
+/* Progress bar segments at the top — 1 segment per post in the group,
+   current segment animates fill over 5s via CSS animation. */
+.ci-viewer-progress{
+  position:absolute;top:calc(env(safe-area-inset-top, 0px) + 10px);
+  left:14px;right:14px;z-index:16;
+  display:flex;gap:4px;
 }
-.ci-viewer-loc{
-  display:flex;align-items:center;gap:6px;
-  font-size:.85rem;font-weight:800;color:var(--white,#FFFDF5);
+.ci-viewer-progress-seg{
+  flex:1;height:3px;border-radius:2px;
+  background:rgba(255,255,255,.35);overflow:hidden;
 }
-.ci-viewer-loc .icon{color:var(--white,#FFFDF5);width:.9em;height:.9em;flex-shrink:0}
-.ci-viewer-loc > span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.ci-viewer-direct{
-  flex-shrink:0;padding:.28rem .65rem;
-  background:var(--primary,#B92626);color:var(--white,#FFFDF5);
-  border:1.5px solid var(--white,#FFFDF5);border-radius:999px;
-  display:inline-flex;align-items:center;gap:4px;
-  font-size:.7rem;font-weight:900;font-family:inherit;cursor:pointer;
-  box-shadow:0 2px 6px rgba(0,0,0,.35);
+.ci-viewer-progress-seg-fill{
+  height:100%;width:0;background:var(--white,#FFFDF5);
+  transform-origin:left;
 }
-.ci-viewer-direct.hidden{display:none}
-.ci-viewer-direct .icon{width:.85em;height:.85em;color:var(--white,#FFFDF5)}
-.ci-viewer-direct:active{transform:translateY(1px)}
+.ci-viewer-progress-seg.done .ci-viewer-progress-seg-fill{width:100%}
+.ci-viewer-progress-seg.active .ci-viewer-progress-seg-fill{
+  animation:ciViewerFill 5000ms linear forwards;
+}
+@keyframes ciViewerFill{from{width:0}to{width:100%}}
 
-.ci-viewer-actions{
+/* Header — avatar + name + time on the left, "•••" + close on the right */
+.ci-viewer-hd{
+  position:absolute;top:calc(env(safe-area-inset-top, 0px) + 26px);
+  left:14px;right:14px;z-index:15;
   display:flex;align-items:center;gap:10px;
 }
-.ci-viewer-act{
-  width:42px;height:42px;border-radius:50%;
+.ci-viewer-avatar{
+  width:40px;height:40px;border-radius:50%;
+  background:var(--accent,#E8843C);border:2px solid var(--white,#FFFDF5);
+  display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;
+  color:var(--text);
+}
+.ci-viewer-avatar .icon{width:1.15rem;height:1.15rem;color:var(--text)}
+.ci-viewer-hd-txt{flex:1;min-width:0;line-height:1.2}
+.ci-viewer-uname-row{display:flex;align-items:center;gap:5px}
+.ci-viewer-username{
+  font-size:.98rem;font-weight:900;text-transform:uppercase;letter-spacing:-.01em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  text-shadow:0 1px 4px rgba(0,0,0,.45);
+}
+.ci-viewer-lock{flex-shrink:0;width:14px;height:14px;opacity:.85}
+.ci-viewer-time{font-size:.7rem;font-weight:700;opacity:.9;text-shadow:0 1px 3px rgba(0,0,0,.4)}
+
+.ci-viewer-hd-actions{display:flex;gap:8px;flex-shrink:0}
+.ci-viewer-opt-btn,.ci-viewer-close{
+  width:36px;height:36px;border-radius:50%;
   background:rgba(0,0,0,.5);color:var(--white,#FFFDF5);
   border:1.5px solid rgba(255,255,255,.35);
-  display:inline-flex;align-items:center;justify-content:center;
-  padding:0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  padding:0;cursor:pointer;flex-shrink:0;
 }
-.ci-viewer-act .icon{width:1.15rem;height:1.15rem}
+.ci-viewer-opt-btn:active,.ci-viewer-close:active{transform:scale(.92)}
+.kebab-dots{display:flex;gap:3px}
+.kebab-dots span{width:3.5px;height:3.5px;border-radius:50%;background:var(--white,#FFFDF5)}
+
+/* Bottom bar — caption + location + action pills, over a gradient scrim */
+.ci-viewer-foot{
+  position:absolute;left:0;right:0;bottom:0;z-index:15;
+  padding:18px 14px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  background:linear-gradient(to top,rgba(0,0,0,.78) 0%,rgba(0,0,0,.4) 55%,transparent 100%);
+  display:flex;flex-direction:column;gap:10px;
+}
+.ci-viewer-caption{
+  font-size:.85rem;font-weight:700;line-height:1.4;color:var(--white,#FFFDF5);
+  text-shadow:0 1px 3px rgba(0,0,0,.4);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.ci-viewer-caption.hidden{display:none}
+.ci-viewer-loc{
+  display:flex;align-items:center;gap:6px;
+  font-size:.8rem;font-weight:800;color:var(--white,#FFFDF5);
+}
+.ci-viewer-loc .icon{color:var(--accent,#E8843C);width:.9em;height:.9em;flex-shrink:0}
+.ci-viewer-loc > span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+
+/* Action pills — owner gets Lưu/Chia sẻ/Đi tới; viewer gets an extra
+   Thích at the front. Rendered dynamically per _renderPost() so the
+   set always matches record.user === currentUser.id. */
+.ci-viewer-actions{display:flex;align-items:center;gap:10px}
+.ci-viewer-act{
+  flex:1;height:44px;border-radius:14px;min-width:0;
+  background:rgba(0,0,0,.5);color:var(--white,#FFFDF5);
+  border:1.5px solid rgba(255,255,255,.35);
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  font-size:.74rem;font-weight:900;font-family:inherit;cursor:pointer;
+  transition:transform .1s;
+}
+.ci-viewer-act .icon{width:1.1rem;height:1.1rem;flex-shrink:0}
+.ci-viewer-act span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ci-viewer-act:active{transform:scale(.95)}
 .ci-viewer-act.on{background:var(--primary,#B92626);border-color:var(--white,#FFFDF5)}
-.ci-viewer-share{margin-left:auto}
+.ci-viewer-act.direct{background:var(--primary,#B92626);border-color:var(--white,#FFFDF5)}
+
+/* Options popover — mirrors the app's existing anchored .cat-dd-panel
+   pattern (light card, scale+opacity transition), just re-themed to sit
+   over a dark photo instead of the map. */
+.ci-opt-overlay{
+  position:absolute;inset:0;z-index:20;background:transparent;
+  opacity:0;pointer-events:none;transition:opacity .15s;
+}
+.ci-opt-overlay.show{opacity:1;pointer-events:auto}
+.ci-opt-panel{
+  position:absolute;top:calc(env(safe-area-inset-top, 0px) + 72px);right:14px;z-index:21;
+  width:210px;background:var(--white,#FFFDF5);border-radius:var(--radius-lg);
+  border:2px solid var(--text);box-shadow:0 10px 26px rgba(0,0,0,.4);
+  padding:6px;transform-origin:top right;
+  transform:scale(.85);opacity:0;pointer-events:none;
+  transition:transform .2s cubic-bezier(.34,1.56,.64,1),opacity .15s;
+}
+.ci-opt-panel.show{transform:scale(1);opacity:1;pointer-events:auto}
+.ci-opt-item{
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:.6rem .65rem;border-radius:12px;font-size:.82rem;font-weight:800;color:var(--text);
+  font-family:inherit;cursor:pointer;transition:background .12s,color .12s;
+}
+.ci-opt-item:active{background:var(--cream-2)}
+.ci-opt-item .icon{width:1.05rem;height:1.05rem;flex-shrink:0}
+.ci-opt-item.danger{color:var(--primary)}
+.ci-opt-item.danger.confirming{background:var(--primary);color:var(--white,#FFFDF5)}
+.ci-opt-sep{height:1px;background:var(--line);margin:4px 4px}
 
 /* Temporary marker for "Đi tới" landing on the Home map */
 .leaflet-marker-icon .ci-direct-pin{
@@ -2724,102 +2766,6 @@ body.map-full .tabbar{transform:translateY(105%)}
   animation:ciDirectPinDrop .3s ease-out;
 }
 @keyframes ciDirectPinDrop{from{transform:translateY(-14px);opacity:0}to{transform:translateY(0);opacity:1}}
-
-/* ─── Post-view modal ────────────────────────────────────────────── */
-/* Reuses .modal-overlay .show pattern (see index.html:792) — no new
-   open/close mechanism, just a different sheet shape inside. */
-#checkinPostOverlay .ci-post-frame{
-  width:min(340px,88vw);aspect-ratio:3/5.2;
-  background:var(--white,#FFFDF5);
-  border:2.5px solid var(--text);border-radius:26px;
-  box-shadow:5px 5px 0 var(--text);
-  display:flex;flex-direction:column;
-  padding:14px 14px 16px;gap:12px;position:relative;
-  /* Center in overlay */
-  margin:auto;
-}
-
-/* Header row */
-.ci-post-hd{display:flex;align-items:flex-start;gap:12px}
-.ci-post-avatar{
-  width:44px;height:44px;border-radius:50%;
-  background:var(--accent,#E8843C);
-  border:2.5px solid var(--text);box-shadow:2px 2px 0 var(--text);
-  display:flex;align-items:center;justify-content:center;
-  font-size:1.4rem;flex-shrink:0;overflow:hidden;
-}
-.ci-post-avatar .icon{width:1.4rem;height:1.4rem;color:var(--text)}
-.ci-post-hd-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;padding-top:1px}
-.ci-post-username{
-  font-size:1.15rem;font-weight:900;color:var(--text);
-  text-transform:uppercase;letter-spacing:-.01em;line-height:1;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-}
-.ci-post-meta{display:flex;flex-direction:column;gap:3px;font-size:.72rem;font-weight:800;color:var(--text2);line-height:1.3}
-.ci-post-meta-line{display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.ci-post-meta-line .icon{color:var(--primary,#B92626);width:.85em;height:.85em;flex-shrink:0}
-.ci-post-meta-line > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
-
-/* "Đi tới" chip — inline on the 📍 line, opens Google Maps at the
-   check-in's lat/lng (deep-links to native app on mobile). Hidden when
-   the record has no coords AND no name to search on. Added 2026-09-22. */
-.ci-post-direct{
-  flex-shrink:0;margin-left:auto;
-  padding:.2rem .55rem;background:var(--primary,#B92626);color:var(--white,#FFFDF5);
-  border:1.5px solid var(--text);border-radius:999px;
-  box-shadow:1.5px 1.5px 0 var(--text);
-  display:inline-flex;align-items:center;gap:3px;
-  font-size:.68rem;font-weight:900;
-  cursor:pointer;font-family:inherit;line-height:1;
-}
-.ci-post-direct .icon{color:var(--white,#FFFDF5);width:.85em;height:.85em}
-.ci-post-direct > span{overflow:visible;text-overflow:clip;white-space:nowrap;flex:none;min-width:0}
-.ci-post-direct.hidden{display:none}
-.ci-post-direct:active{transform:translate(1px,1px);box-shadow:.5px .5px 0 var(--text)}
-.ci-post-close{
-  width:34px;height:34px;border-radius:50%;background:var(--paper);color:var(--text);
-  border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
-  display:flex;align-items:center;justify-content:center;font-weight:900;
-  padding:0;cursor:pointer;flex-shrink:0;
-}
-
-/* Photo — 3:4 fills width of the padded frame */
-.ci-post-photo-wrap{
-  width:100%;aspect-ratio:3/4;
-  border-radius:18px;overflow:hidden;
-  border:2px solid var(--text);
-  background:linear-gradient(135deg,var(--cream-3),var(--accent));
-  position:relative;flex-shrink:0;
-}
-.ci-post-photo{
-  position:absolute;inset:0;
-  background-size:cover;background-position:center;
-}
-.ci-post-photo.empty{
-  display:flex;align-items:center;justify-content:center;font-size:5.5rem;
-  filter:drop-shadow(0 4px 12px rgba(0,0,0,.35));
-}
-
-/* Actions row */
-.ci-post-actions{
-  display:flex;align-items:center;gap:10px;margin-top:auto;padding-top:4px;
-}
-.ci-post-act{
-  height:36px;padding:0 .8rem;border-radius:12px;
-  background:var(--paper);color:var(--text);
-  border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
-  display:inline-flex;align-items:center;justify-content:center;gap:5px;
-  font-size:.82rem;font-weight:900;font-family:inherit;cursor:pointer;
-  transition:transform .1s;
-}
-.ci-post-act:active{transform:translate(2px,2px);box-shadow:0 0 0 var(--text)}
-.ci-post-act .icon{width:1.05em;height:1.05em}
-.ci-post-icon-only{padding:0;width:36px;flex-shrink:0}
-.ci-post-share{margin-left:auto}
-.ci-post-like.on{background:var(--primary,#B92626);color:var(--white,#FFFDF5);border-color:var(--text)}
-.ci-post-like.on .icon{color:var(--white,#FFFDF5)}
-.ci-post-save.on{background:var(--accent,#E8843C);color:var(--white,#FFFDF5)}
-.ci-post-save.on .icon{color:var(--white,#FFFDF5)}
 
 /* ── CHECK-IN CALENDAR (Locket-style monthly grid) ──────────────────── */
 .ci-cal-section{margin:14px -1.1rem 0}

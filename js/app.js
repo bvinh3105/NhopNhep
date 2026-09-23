@@ -57,7 +57,6 @@ function boot() {
   SessionVoteModal.init();
   CheckinCtrl.init();
   CheckinFeedCtrl.init();
-  CheckinPostViewCtrl.init();
   CheckinViewerCtrl.init();
   CheckinCalendarCtrl.init();
   CheckinDiscoverCtrl.init();

@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2674">
+<link rel="stylesheet" href="css/styles.css?v=2675">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -343,6 +343,12 @@
 <symbol id="ic-status-warning" viewBox="0 0 24 24"><path d="M12,3 L22,20 H2 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M12,9 L12,14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
   <path d="M11.4,17 a0.6,0.6 0 1,0 1.2,0 a0.6,0.6 0 1,0 -1.2,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-stats" viewBox="0 0 24 24"><path d="M4,20 V13 M12,20 V6 M20,20 V10" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M3,20 H21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-eye-off" viewBox="0 0 24 24"><path d="M3,3 L21,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M10.6,5.2 C11,5.1 11.5,5 12,5 C18,5 22,12 22,12 C22,12 20.8,14 18.9,15.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M6.5,6.9 C4.2,8.5 2,12 2,12 C2,12 6,19 12,19 C13.5,19 14.9,18.6 16.1,17.9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+  <path d="M9.5,9.9 a3,3 0 0 0 4.2,4.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
 </svg>
 
 
@@ -859,94 +865,76 @@
      bar segments up top, tap left/right to navigate within the user's
      stream. Close returns to bubbles. See CheckinViewerCtrl. -->
 <div class="modal-overlay ci-viewer-ov" id="checkinViewer">
-  <div class="ci-viewer-frame">
-    <div class="ci-viewer-progress" id="ciViewerProgress"></div>
-    <div class="ci-viewer-hd">
-      <div class="ci-viewer-avatar" id="ciViewerAvatar"></div>
-      <div class="ci-viewer-hd-txt">
-        <div class="ci-viewer-username" id="ciViewerUsername">—</div>
-        <div class="ci-viewer-time" id="ciViewerTime">—</div>
-      </div>
-      <button class="ci-viewer-close" id="ciViewerClose" type="button" aria-label="Đóng">
-        <svg class="icon" width="16" height="16"><use href="#ic-action-close"></use></svg>
-      </button>
-    </div>
+  <div class="ci-viewer-frame" id="ciViewerFrame">
     <div class="ci-viewer-photo-wrap">
       <div class="ci-viewer-photo" id="ciViewerPhoto"></div>
     </div>
+
+    <!-- Tap zones — tap (or swipe) left 30% for previous, right 70% for
+         next. z-index sits above the photo but below header/foot so
+         real buttons there still win hit-testing at their own pixels. -->
     <button class="ci-viewer-tap ci-viewer-tap-prev" id="ciViewerPrevZone" type="button" aria-label="Trước"></button>
     <button class="ci-viewer-tap ci-viewer-tap-next" id="ciViewerNextZone" type="button" aria-label="Sau"></button>
+
+    <div class="ci-viewer-progress" id="ciViewerProgress"></div>
+
+    <div class="ci-viewer-hd">
+      <div class="ci-viewer-avatar" id="ciViewerAvatar"></div>
+      <div class="ci-viewer-hd-txt">
+        <div class="ci-viewer-uname-row">
+          <div class="ci-viewer-username" id="ciViewerUsername">—</div>
+          <svg class="icon ci-viewer-lock hidden" id="ciViewerLock"><use href="#ic-privacy-lock"></use></svg>
+        </div>
+        <div class="ci-viewer-time" id="ciViewerTime">—</div>
+      </div>
+      <div class="ci-viewer-hd-actions">
+        <button class="ci-viewer-opt-btn" id="ciViewerOptBtn" type="button" aria-label="Tuỳ chọn">
+          <span class="kebab-dots"><span></span><span></span><span></span></span>
+        </button>
+        <button class="ci-viewer-close" id="ciViewerClose" type="button" aria-label="Đóng">
+          <svg class="icon" width="16" height="16"><use href="#ic-action-close"></use></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Options popover — sibling of .ci-viewer-hd (NOT nested inside
+         it), so inset:0 anchors to the fullscreen frame and tap-outside-
+         to-close catches taps anywhere — .ci-viewer-hd is itself
+         position:absolute, which would otherwise become its containing
+         block instead. Mirrors the app's existing anchored .cat-dd-panel
+         popover pattern (light card, even over the dark photo). -->
+    <div class="ci-opt-overlay" id="ciOptOverlay">
+      <div class="ci-opt-panel" id="ciOptPanel">
+        <div class="ci-opt-own" id="ciOptOwn">
+          <button class="ci-opt-item danger" id="ciOptDelete" type="button">
+            <svg class="icon"><use href="#ic-action-delete"></use></svg><span data-i18n="checkin.optDelete">Xóa check-in</span>
+          </button>
+          <button class="ci-opt-item" id="ciOptHideOwn" type="button">
+            <svg class="icon"><use href="#ic-privacy-lock"></use></svg><span id="ciOptHideOwnLbl" data-i18n="checkin.optHideOwn">Ẩn khỏi bạn bè</span>
+          </button>
+          <div class="ci-opt-sep"></div>
+          <button class="ci-opt-item" id="ciOptStats" type="button">
+            <svg class="icon"><use href="#ic-action-stats"></use></svg><span data-i18n="checkin.optStats">Thống kê</span>
+          </button>
+        </div>
+        <div class="ci-opt-viewer hidden" id="ciOptViewer">
+          <button class="ci-opt-item danger" id="ciOptReport" type="button">
+            <svg class="icon"><use href="#ic-status-warning"></use></svg><span data-i18n="checkin.optReport">Báo cáo</span>
+          </button>
+          <button class="ci-opt-item" id="ciOptHideViewer" type="button">
+            <svg class="icon"><use href="#ic-action-eye-off"></use></svg><span data-i18n="checkin.optHideViewer">Ẩn bài này</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="ci-viewer-foot">
+      <div class="ci-viewer-caption hidden" id="ciViewerCaption"></div>
       <div class="ci-viewer-loc">
         <svg class="icon"><use href="#ic-action-pin-static"></use></svg>
         <span id="ciViewerLoc">—</span>
-        <button class="ci-viewer-direct hidden" id="ciViewerDirectBtn" type="button" title="Chỉ đường">
-          <svg class="icon"><use href="#ic-map-external"></use></svg>
-          <span data-i18n="checkinFeed.directions">Đi tới</span>
-        </button>
       </div>
-      <div class="ci-viewer-actions">
-        <button class="ci-viewer-act ci-viewer-like" id="ciViewerLikeBtn" type="button" aria-label="Yêu thích">
-          <svg class="icon" id="ciViewerLikeIco"><use href="#ic-heart-outline"></use></svg>
-        </button>
-        <button class="ci-viewer-act ci-viewer-save" id="ciViewerSaveBtn" type="button" aria-label="Lưu">
-          <svg class="icon" id="ciViewerSaveIco"><use href="#ic-action-bookmark"></use></svg>
-        </button>
-        <button class="ci-viewer-act ci-viewer-share" id="ciViewerShareBtn" type="button" aria-label="Chia sẻ">
-          <svg class="icon"><use href="#ic-action-copy-link"></use></svg>
-        </button>
-        <button class="ci-viewer-act ci-viewer-delete hidden" id="ciViewerDeleteBtn" type="button" aria-label="Xóa check-in này">
-          <svg class="icon"><use href="#ic-action-delete"></use></svg>
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Post view — legacy modal kept for direct deep-link entry (?checkin=id).
-     3:5.2 frame, 3:4 photo, header + 3 actions. See CheckinPostViewCtrl. -->
-<div class="modal-overlay" id="checkinPostOverlay">
-  <div class="ci-post-frame">
-    <div class="ci-post-hd">
-      <div class="ci-post-avatar" id="ciPostAvatar"></div>
-      <div class="ci-post-hd-txt">
-        <div class="ci-post-username" id="ciPostUsername">—</div>
-        <div class="ci-post-meta">
-          <div class="ci-post-meta-line">
-            <svg class="icon"><use href="#ic-action-pin-static"></use></svg>
-            <span id="ciPostLoc">—</span>
-            <button class="ci-post-direct hidden" id="ciPostDirectBtn" type="button" title="Chỉ đường">
-              <svg class="icon"><use href="#ic-map-external"></use></svg>
-              <span data-i18n="checkinFeed.directions">Đi tới</span>
-            </button>
-          </div>
-          <div class="ci-post-meta-line">
-            <svg class="icon"><use href="#ic-route-time-window"></use></svg>
-            <span id="ciPostTime">—</span>
-          </div>
-        </div>
-      </div>
-      <button class="ci-post-close" id="checkinPostClose" type="button" aria-label="Đóng">
-        <svg class="icon" width="14" height="14"><use href="#ic-action-close"></use></svg>
-      </button>
-    </div>
-    <div class="ci-post-photo-wrap">
-      <div class="ci-post-photo" id="ciPostPhoto"></div>
-    </div>
-    <div class="ci-post-actions">
-      <button class="ci-post-act ci-post-like" id="ciPostLikeBtn" type="button">
-        <svg class="icon" id="ciPostLikeIco"><use href="#ic-heart-outline"></use></svg>
-        <span data-i18n="checkinFeed.like">Yêu thích</span>
-      </button>
-      <button class="ci-post-act ci-post-save ci-post-icon-only" id="ciPostSaveBtn" type="button" aria-label="Lưu">
-        <svg class="icon" id="ciPostSaveIco"><use href="#ic-action-bookmark"></use></svg>
-      </button>
-      <button class="ci-post-act ci-post-share ci-post-icon-only" id="ciPostShareBtn" type="button" aria-label="Chia sẻ">
-        <svg class="icon"><use href="#ic-action-copy-link"></use></svg>
-      </button>
-      <button class="ci-post-act ci-post-delete ci-post-icon-only hidden" id="ciPostDeleteBtn" type="button" aria-label="Xóa check-in này">
-        <svg class="icon"><use href="#ic-action-delete"></use></svg>
-      </button>
+      <div class="ci-viewer-actions" id="ciViewerActions"><!-- filled by JS: owner / viewer set --></div>
     </div>
   </div>
 </div>
@@ -1389,13 +1377,13 @@
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
 <script src="js/security.js?v=2672"></script>
-<script src="js/i18n.js?v=2674"></script>
+<script src="js/i18n.js?v=2675"></script>
 <script src="js/utils.js?v=2672"></script>
 <script src="js/state.js?v=2672"></script>
 <script src="js/poi.js?v=2672"></script>
 <script src="js/geocoder.js?v=2672"></script>
 <script src="js/gemini.js?v=2672"></script>
-<script src="js/community.js?v=2672"></script>
+<script src="js/community.js?v=2675"></script>
 <script src="js/push.js?v=2672"></script>
 <script src="js/analytics.js?v=2672"></script>
 <script src="js/map.js?v=2672"></script>
@@ -1413,8 +1401,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2674"></script>
-<script src="js/app.js?v=2672"></script>
+<script src="js/controllers.js?v=2675"></script>
+<script src="js/app.js?v=2675"></script>
 
 </body>
 </html>

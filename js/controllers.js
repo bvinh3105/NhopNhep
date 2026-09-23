@@ -5778,6 +5778,7 @@ const CheckinFeedCtrl = {
       const all = (r.data && r.data.items) || [];
       this._items = all
         .filter(x => new Date(x.created).getTime() > cutoff)
+        .filter(x => !CheckinViewerCtrl.isHidden(x.id))
         .sort((a, b) => new Date(b.created) - new Date(a.created));
       // Group by user. Users with no expand fall into a shared 'anon'
       // bucket so they still render (rare — happens when the users.
@@ -5864,7 +5865,7 @@ const CheckinFeedCtrl = {
      ✨ you  — matches the food emoji the viewer checks into most often
      🕐 new  — most recent check-in per user
    No "interaction/likes" sort — likes aren't persisted server-side yet
-   (see CheckinPostViewCtrl header), so a chip for it would be fake.
+   (see CheckinViewerCtrl header), so a chip for it would be fake.
 
    v1.1: one card per USER, not per check-in (same person's 5 posts
    used to spread across 5 grid cells — grouped like the bubbles row,
@@ -5899,7 +5900,7 @@ const CheckinDiscoverCtrl = {
     try {
       const r = await Community.listSharedCheckins({ perPage: this.MAX });
       if (r.ok) {
-        this._items = (r.data && r.data.items) || [];
+        this._items = ((r.data && r.data.items) || []).filter(x => !CheckinViewerCtrl.isHidden(x.id));
         this._buildPopularity();
         this._buildGroups();
       }
@@ -6192,186 +6193,6 @@ const CheckinCalendarCtrl = {
 };
 
 /* ═══════════════════════════════════════════════
-   CHECK-IN POST VIEW MODAL  (v1.1)
-   Single-post modal opened when the user taps a card in the strip
-   above. Approved layout: 3:5.2 frame · 3:4 photo · header (avatar +
-   uppercase username + 📍 location + 🕐 time) + 3 actions (♥ · 🔖 · 🔗).
-
-   v1 note: check-ins have NO like/save backend yet. Buttons persist
-   state client-side (localStorage keys ci_liked / ci_saved) so the
-   toggle is visible for the user reviewing this UI layer. Wire the
-   real endpoints in a follow-up PR — the DOM/CSS stays identical.
-═══════════════════════════════════════════════ */
-const CheckinPostViewCtrl = {
-  LIKES_KEY: 'nhopnhep_ci_liked',
-  SAVES_KEY: 'nhopnhep_ci_saved',
-  _current: null,
-  _liked: null, _saved: null,
-
-  init() {
-    this._liked = this._loadSet(this.LIKES_KEY);
-    this._saved = this._loadSet(this.SAVES_KEY);
-
-    const ov = document.getElementById('checkinPostOverlay');
-    if (!ov) return;
-    // Backdrop / close button — mirrors the diary overlay wiring at
-    // controllers.js:5270-5272 exactly, so behaviour is consistent.
-    ov.addEventListener('click', (e) => { if (e.target === ov) this.close(); });
-    document.getElementById('checkinPostClose').addEventListener('click', () => this.close());
-
-    document.getElementById('ciPostLikeBtn').addEventListener('click', () => this._toggleLike());
-    document.getElementById('ciPostSaveBtn').addEventListener('click', () => this._toggleSave());
-    document.getElementById('ciPostShareBtn').addEventListener('click', () => this._share());
-    document.getElementById('ciPostDirectBtn').addEventListener('click', () => this._directions());
-    document.getElementById('ciPostDeleteBtn').addEventListener('click', () => this._delete());
-  },
-
-  open(record) {
-    if (!record) return;
-    this._current = record;
-    const author = record.expand && record.expand.user;
-    const authorName = (author && author.name) || I18N.t('common.anonymous');
-
-    document.getElementById('ciPostUsername').textContent = authorName;
-    document.getElementById('ciPostLoc').textContent = record.restaurant_name || '—';
-    document.getElementById('ciPostTime').textContent = timeAgo(record.created);
-
-    // Avatar — reuse the app's avatarIcon() via authorAvatar() so it
-    // matches whatever icon the user picked in ProfileCtrl.
-    const av = document.getElementById('ciPostAvatar');
-    av.innerHTML = author && typeof authorAvatar === 'function' ? authorAvatar(author) : (record.restaurant_emoji || '🦊');
-
-    // Photo — falls back to emoji when the check-in was posted without
-    // one (allowed by the backend schema, see checkins migration).
-    const photoEl = document.getElementById('ciPostPhoto');
-    const photoUrl = record.photo ? Community.checkinPhotoUrl(record, '640x800') : '';
-    if (photoUrl) {
-      photoEl.className = 'ci-post-photo';
-      photoEl.style.backgroundImage = "url('" + photoUrl.replace(/'/g, "\\'") + "')";
-      photoEl.textContent = '';
-    } else {
-      photoEl.className = 'ci-post-photo empty';
-      photoEl.style.backgroundImage = '';
-      photoEl.textContent = record.restaurant_emoji || '🍜';
-    }
-
-    // Sync like/save state from localStorage
-    document.getElementById('ciPostLikeBtn').classList.toggle('on', this._liked.has(record.id));
-    document.getElementById('ciPostLikeIco').innerHTML = this._liked.has(record.id)
-      ? '<use href="#ic-heart-filled"></use>' : '<use href="#ic-heart-outline"></use>';
-    document.getElementById('ciPostSaveBtn').classList.toggle('on', this._saved.has(record.id));
-
-    // "Đi tới" chip — requires coords; hidden when the poster chose to hide
-    // their GPS location (restaurant_lat/lng == null). Name-only is not
-    // enough — showCheckinItinerary() already bails if coords are missing.
-    const hasCoords = record.restaurant_lat != null && record.restaurant_lng != null;
-    document.getElementById('ciPostDirectBtn').classList.toggle('hidden', !hasCoords);
-
-    // Delete button — own check-ins only.
-    const isOwn = Community.currentUser && record.user === Community.currentUser.id;
-    const delBtn = document.getElementById('ciPostDeleteBtn');
-    delBtn.classList.toggle('hidden', !isOwn);
-    delBtn.dataset.confirm = '';
-    delBtn.style.color = '';
-
-    document.getElementById('checkinPostOverlay').classList.add('show');
-  },
-
-  close() {
-    document.getElementById('checkinPostOverlay').classList.remove('show');
-    this._current = null;
-  },
-
-  _toggleLike() {
-    if (!this._current) return;
-    const id = this._current.id;
-    const on = !this._liked.has(id);
-    if (on) this._liked.add(id); else this._liked.delete(id);
-    this._saveSet(this.LIKES_KEY, this._liked);
-    document.getElementById('ciPostLikeBtn').classList.toggle('on', on);
-    document.getElementById('ciPostLikeIco').innerHTML = on
-      ? '<use href="#ic-heart-filled"></use>' : '<use href="#ic-heart-outline"></use>';
-  },
-
-  _toggleSave() {
-    if (!this._current) return;
-    const id = this._current.id;
-    const on = !this._saved.has(id);
-    if (on) this._saved.add(id); else this._saved.delete(id);
-    this._saveSet(this.SAVES_KEY, this._saved);
-    document.getElementById('ciPostSaveBtn').classList.toggle('on', on);
-    showToast(I18N.t(on ? 'toast.postSaved' : 'toast.postUnsaved'));
-  },
-
-  _directions() {
-    const r = this._current;
-    if (!r) return;
-    this.close();
-    showCheckinItinerary(r);
-  },
-
-  async _share() {
-    if (!this._current) return;
-    // Deep-link handler for ?checkin=<id> is not wired yet — plain link
-    // still opens the app; CheckinFeedCtrl re-fetches on tab open so the
-    // recipient sees the post appear in the strip.
-    const url = location.origin + '/?checkin=' + encodeURIComponent(this._current.id);
-    try {
-      await navigator.clipboard.writeText(url);
-      showToast(I18N.t('toast.linkCopied'));
-    } catch (e) {
-      const ta = document.createElement('textarea');
-      ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
-      document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); showToast(I18N.t('toast.linkCopied')); }
-      catch (_) { showToast(I18N.t('toast.linkCopyFail')); }
-      document.body.removeChild(ta);
-    }
-  },
-
-  _delTimer: null,
-  _delete() {
-    const btn = document.getElementById('ciPostDeleteBtn');
-    if (btn.dataset.confirm !== '1') {
-      btn.dataset.confirm = '1';
-      btn.style.color = 'var(--primary)';
-      showToast(I18N.t('checkin.deleteConfirm'));
-      clearTimeout(this._delTimer);
-      this._delTimer = setTimeout(() => {
-        btn.dataset.confirm = '';
-        btn.style.color = '';
-      }, 3000);
-      return;
-    }
-    clearTimeout(this._delTimer);
-    this._doDelete();
-  },
-
-  async _doDelete() {
-    const rec = this._current;
-    if (!rec) return;
-    const r = await Community.deleteCheckin(rec.id);
-    if (!r.ok) { showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
-    showToast(I18N.t('checkin.deleted'));
-    this.close();
-    if (typeof CheckinCalendarCtrl !== 'undefined') CheckinCalendarCtrl._fetchMonth();
-    if (typeof CheckinFeedCtrl !== 'undefined') CheckinFeedCtrl.refresh({ force: true });
-    if (typeof CheckinDiscoverCtrl !== 'undefined') CheckinDiscoverCtrl.refresh();
-  },
-
-  _loadSet(key) {
-    try {
-      const raw = localStorage.getItem(key);
-      return new Set(raw ? JSON.parse(raw) : []);
-    } catch (_) { return new Set(); }
-  },
-  _saveSet(key, set) {
-    try { localStorage.setItem(key, JSON.stringify([...set])); } catch (_) {}
-  },
-};
-
-
-/* ═══════════════════════════════════════════════
    "Đi tới" — open the itinerary planner with the check-in as sole stop
    Instead of opening an external map, feed the check-in's coords into
    PlanCtrl.buildItinerary() and show the plan screen. User gets the
@@ -6420,48 +6241,97 @@ function showCheckinItinerary(rec) {
 
 
 /* ═══════════════════════════════════════════════
-   CHECK-IN VIEWER  (v1.2 — 2026-09-22)
-   Fullscreen Stories-style viewer for the Cộng đồng → Check-in subtab.
-   Opens with a group of one user's posts (from CheckinFeedCtrl._groups),
-   auto-advances 5s/post, progress bar segments up top, tap-left/right
-   to navigate. On finish (or tap next past the last post), closes back
-   to the bubbles grid.
+   CHECK-IN VIEWER  (v2 — 2026-09-23)
+   Fullscreen Stories-style viewer for the Cộng đồng → Check-in subtab —
+   also the ONLY check-in detail view now (absorbed the old standalone
+   CheckinPostViewCtrl card modal, which had become dead code: nothing
+   called .open() on it any more once Discover/bubbles/calendar all
+   switched to routing through this viewer instead).
+
+   Opens with a group of one user's posts (from CheckinFeedCtrl._groups
+   or similar), auto-advances 5s/post, progress bar segments up top,
+   tap-left/right OR swipe to navigate. On finish (or tap next past the
+   last post), closes back to the bubbles grid.
+
+   New in v2: caption text, a "•••" options menu (owner: Xóa / Ẩn khỏi
+   bạn bè / Thống kê — viewer: Báo cáo / Ẩn bài này), and the action row
+   is now rendered dynamically per isOwn — owner gets Lưu/Chia sẻ/Đi tới,
+   viewer gets Thích/Lưu/Chia sẻ/Đi tới ("Đi tới" moved out of the
+   location line into this row).
 
    State model:
      _groups[] : all groups (users) in the current view — same array
                  CheckinFeedCtrl rendered
      _gi       : current group index
      _pi       : current post index within that group
-     _timer    : setTimeout handle for auto-advance
+     _timer    : setTimeout handle for auto-advance (paused while the
+                 options popover is open)
      _seen     : Set of check-in IDs already viewed (localStorage-backed;
                  drives the bubble ring "seen" gray-vs-gradient state)
+     _liked/_saved : localStorage-backed like/save sets — check-ins have
+                 no server-side like/save backend yet (see _stats() for
+                 why "Thống kê" doesn't show real engagement numbers)
+     _hidden   : localStorage-backed set of check-in IDs the viewer chose
+                 to hide from their own feed ("Ẩn bài này") — filtered
+                 out by CheckinFeedCtrl/CheckinDiscoverCtrl via isHidden()
 
-   No swipe gestures in v1 — tap the left third to go back, tap
-   anywhere else to go forward. That's IG Stories' default too, and
-   works cleanly without a gesture handler.
+   Tap zones double as the swipe target — pointerdown/pointerup on the
+   frame, delegated so header/footer buttons (higher z-index, real hit
+   targets) never trigger navigation: only a pointerdown that actually
+   lands on a .ci-viewer-tap zone starts tracking.
 ═══════════════════════════════════════════════ */
 const CheckinViewerCtrl = {
   DURATION_MS: 5000,
   SEEN_KEY: 'nhopnhep_ci_seen',
+  LIKES_KEY: 'nhopnhep_ci_liked',
+  SAVES_KEY: 'nhopnhep_ci_saved',
+  HIDDEN_KEY: 'nhopnhep_ci_hidden',
   _groups: null, _gi: 0, _pi: 0,
-  _timer: null,
-  _seen: null,
+  _timer: null, _delTimer: null,
+  _seen: null, _liked: null, _saved: null, _hidden: null,
+  _dragStartX: null, _dragStartY: null, _dragZone: null,
 
   init() {
     this._seen = this._loadSeen();
+    this._liked = this._loadSet(this.LIKES_KEY);
+    this._saved = this._loadSet(this.SAVES_KEY);
+    this._hidden = this._loadSet(this.HIDDEN_KEY);
     const ov = document.getElementById('checkinViewer');
     if (!ov) return;
     // Backdrop tap → close (only when the tap lands on the backdrop
     // itself, not the frame). Escape hatch for accidental opens.
     ov.addEventListener('click', (e) => { if (e.target === ov) this.close(); });
     document.getElementById('ciViewerClose').addEventListener('click', () => this.close());
-    document.getElementById('ciViewerNextZone').addEventListener('click', () => this._next());
-    document.getElementById('ciViewerPrevZone').addEventListener('click', () => this._prev());
-    document.getElementById('ciViewerDirectBtn').addEventListener('click', () => this._directions());
-    document.getElementById('ciViewerLikeBtn').addEventListener('click', () => this._toggleLike());
-    document.getElementById('ciViewerSaveBtn').addEventListener('click', () => this._toggleSave());
-    document.getElementById('ciViewerShareBtn').addEventListener('click', () => this._share());
-    document.getElementById('ciViewerDeleteBtn').addEventListener('click', () => this._delete());
+
+    // Tap zones + swipe — see header comment.
+    const frameEl = document.getElementById('ciViewerFrame');
+    frameEl.addEventListener('pointerdown', (e) => {
+      const zoneEl = e.target.closest('.ci-viewer-tap');
+      if (!zoneEl) { this._dragStartX = null; return; }
+      this._dragStartX = e.clientX; this._dragStartY = e.clientY;
+      this._dragZone = zoneEl.id === 'ciViewerPrevZone' ? 'prev' : 'next';
+    });
+    frameEl.addEventListener('pointerup', (e) => {
+      if (this._dragStartX == null) return;
+      const dx = e.clientX - this._dragStartX, dy = e.clientY - this._dragStartY;
+      this._dragStartX = null;
+      const isSwipe = Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.3;
+      if (isSwipe) { if (dx < 0) this._next(); else this._prev(); }
+      else { if (this._dragZone === 'prev') this._prev(); else this._next(); }
+    });
+
+    document.getElementById('ciViewerOptBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      this._openOptMenu();
+    });
+    document.getElementById('ciOptOverlay').addEventListener('click', (e) => {
+      if (e.target.id === 'ciOptOverlay') this._closeOptMenu(true);
+    });
+    document.getElementById('ciOptDelete').addEventListener('click', () => this._delete());
+    document.getElementById('ciOptHideOwn').addEventListener('click', () => this._toggleHideOwn());
+    document.getElementById('ciOptStats').addEventListener('click', () => this._stats());
+    document.getElementById('ciOptReport').addEventListener('click', () => this._report());
+    document.getElementById('ciOptHideViewer').addEventListener('click', () => this._hideForViewer());
   },
 
   open(groups, gi = 0) {
@@ -6469,6 +6339,7 @@ const CheckinViewerCtrl = {
     this._groups = groups;
     this._gi = gi;
     this._pi = 0;
+    this._closeOptMenu(true);
     document.getElementById('checkinViewer').classList.add('show');
     // Hide the floating tab bar while the viewer takes the whole screen.
     document.querySelector('.tabbar')?.classList.add('checkin-hidden');
@@ -6479,6 +6350,7 @@ const CheckinViewerCtrl = {
     document.getElementById('checkinViewer').classList.remove('show');
     document.querySelector('.tabbar')?.classList.remove('checkin-hidden');
     clearTimeout(this._timer); this._timer = null;
+    this._closeOptMenu(true);
     this._groups = null;
     // Re-render bubbles so newly-seen groups turn gray.
     if (typeof CheckinFeedCtrl !== 'undefined') CheckinFeedCtrl._render();
@@ -6514,6 +6386,7 @@ const CheckinViewerCtrl = {
     document.getElementById('ciViewerUsername').textContent =
       (author && author.name) || I18N.t('common.anonymous');
     document.getElementById('ciViewerTime').textContent = timeAgo(rec.created);
+    document.getElementById('ciViewerLock').classList.toggle('hidden', !!rec.is_shared);
 
     // Photo — fill background of .ci-viewer-photo; falls back to emoji
     // background when the record has no photo (still valid per schema).
@@ -6529,26 +6402,21 @@ const CheckinViewerCtrl = {
       photoEl.textContent = rec.restaurant_emoji || '🍜';
     }
 
-    // Footer — location + "Đi tới" chip (hide on anon fallback) + actions.
+    // Footer — caption (hidden if the check-in has no note) + location.
+    const capEl = document.getElementById('ciViewerCaption');
+    capEl.textContent = rec.note || '';
+    capEl.classList.toggle('hidden', !rec.note);
     document.getElementById('ciViewerLoc').textContent = rec.restaurant_name || '—';
-    const hasCoords = rec.restaurant_lat != null && rec.restaurant_lng != null;
-    document.getElementById('ciViewerDirectBtn').classList.toggle('hidden', !hasCoords);
 
-    // Like / save state — reuse the same localStorage sets the modal uses.
-    const liked = CheckinPostViewCtrl._liked;
-    const saved = CheckinPostViewCtrl._saved;
-    const likeBtn = document.getElementById('ciViewerLikeBtn');
-    likeBtn.classList.toggle('on', liked && liked.has(rec.id));
-    document.getElementById('ciViewerLikeIco').innerHTML = liked && liked.has(rec.id)
-      ? '<use href="#ic-heart-filled"></use>' : '<use href="#ic-heart-outline"></use>';
-    document.getElementById('ciViewerSaveBtn').classList.toggle('on', saved && saved.has(rec.id));
-
-    // Delete button — only for own check-ins.
+    // Options menu — owner (Xóa/Ẩn khỏi bạn bè/Thống kê) vs viewer
+    // (Báo cáo/Ẩn bài này).
     const isOwn = Community.currentUser && rec.user === Community.currentUser.id;
-    const delBtn = document.getElementById('ciViewerDeleteBtn');
-    delBtn.classList.toggle('hidden', !isOwn);
-    delBtn.dataset.confirm = '';
-    delBtn.style.color = '';
+    document.getElementById('ciOptOwn').classList.toggle('hidden', !isOwn);
+    document.getElementById('ciOptViewer').classList.toggle('hidden', isOwn);
+    document.getElementById('ciOptHideOwnLbl').textContent =
+      I18N.t(rec.is_shared ? 'checkin.optHideOwn' : 'checkin.optShowOwn');
+
+    this._renderActions();
 
     // Mark this record as seen (drives the bubble ring gray state on
     // re-render). Doesn't affect this render — only the next bubbles pass.
@@ -6556,9 +6424,51 @@ const CheckinViewerCtrl = {
     this._saveSeen();
 
     // Kick auto-advance
+    this._restartAutoTimer();
+  },
+
+  // Owner: Lưu / Chia sẻ / Đi tới. Viewer: Thích / Lưu / Chia sẻ / Đi tới.
+  // Rebuilt from scratch every render (record changes, isOwn can differ
+  // between posts if the group ever mixed authors — it doesn't today,
+  // but this is no more code than a partial update).
+  _renderActions() {
+    const rec = this._current();
+    if (!rec) return;
+    const isOwn = Community.currentUser && rec.user === Community.currentUser.id;
+    const wrap = document.getElementById('ciViewerActions');
+    const liked = this._liked.has(rec.id), saved = this._saved.has(rec.id);
+    const hasCoords = rec.restaurant_lat != null && rec.restaurant_lng != null;
+
+    const likeBtn = isOwn ? '' : `
+      <button class="ci-viewer-act like ${liked ? 'on' : ''}" id="ciViewerLikeBtn" type="button">
+        <svg class="icon"><use href="#${liked ? 'ic-heart-filled' : 'ic-heart-outline'}"></use></svg>
+        <span data-i18n="checkinFeed.like">${I18N.t('checkinFeed.like')}</span>
+      </button>`;
+    wrap.innerHTML = `
+      ${likeBtn}
+      <button class="ci-viewer-act save ${saved ? 'on' : ''}" id="ciViewerSaveBtn" type="button">
+        <svg class="icon"><use href="#ic-action-bookmark"></use></svg>
+        <span data-i18n="checkin.save">${I18N.t('checkin.save')}</span>
+      </button>
+      <button class="ci-viewer-act" id="ciViewerShareBtn" type="button">
+        <svg class="icon"><use href="#ic-action-copy-link"></use></svg>
+        <span data-i18n="checkinFeed.share">${I18N.t('checkinFeed.share')}</span>
+      </button>
+      <button class="ci-viewer-act direct ${hasCoords ? '' : 'hidden'}" id="ciViewerDirectBtn" type="button">
+        <svg class="icon"><use href="#ic-map-external"></use></svg>
+        <span data-i18n="checkinFeed.directions">${I18N.t('checkinFeed.directions')}</span>
+      </button>`;
+    if (!isOwn) document.getElementById('ciViewerLikeBtn').addEventListener('click', () => this._toggleLike());
+    document.getElementById('ciViewerSaveBtn').addEventListener('click', () => this._toggleSave());
+    document.getElementById('ciViewerShareBtn').addEventListener('click', () => this._share());
+    document.getElementById('ciViewerDirectBtn').addEventListener('click', () => this._directions());
+  },
+
+  _restartAutoTimer() {
     clearTimeout(this._timer);
     this._timer = setTimeout(() => this._next(), this.DURATION_MS);
   },
+  _pauseAutoTimer() { clearTimeout(this._timer); },
 
   _next() {
     if (!this._groups) return;
@@ -6605,23 +6515,20 @@ const CheckinViewerCtrl = {
   _toggleLike() {
     const rec = this._current();
     if (!rec) return;
-    // Delegate to the modal's like set so state stays consistent
-    // between the two entry points (modal + viewer).
-    const on = !CheckinPostViewCtrl._liked.has(rec.id);
-    if (on) CheckinPostViewCtrl._liked.add(rec.id); else CheckinPostViewCtrl._liked.delete(rec.id);
-    CheckinPostViewCtrl._saveSet(CheckinPostViewCtrl.LIKES_KEY, CheckinPostViewCtrl._liked);
-    document.getElementById('ciViewerLikeBtn').classList.toggle('on', on);
-    document.getElementById('ciViewerLikeIco').innerHTML = on
-      ? '<use href="#ic-heart-filled"></use>' : '<use href="#ic-heart-outline"></use>';
+    const on = !this._liked.has(rec.id);
+    if (on) this._liked.add(rec.id); else this._liked.delete(rec.id);
+    this._saveSet(this.LIKES_KEY, this._liked);
+    this._renderActions();
+    showToast(I18N.t(on ? 'toast.postLiked' : 'toast.postUnliked'));
   },
 
   _toggleSave() {
     const rec = this._current();
     if (!rec) return;
-    const on = !CheckinPostViewCtrl._saved.has(rec.id);
-    if (on) CheckinPostViewCtrl._saved.add(rec.id); else CheckinPostViewCtrl._saved.delete(rec.id);
-    CheckinPostViewCtrl._saveSet(CheckinPostViewCtrl.SAVES_KEY, CheckinPostViewCtrl._saved);
-    document.getElementById('ciViewerSaveBtn').classList.toggle('on', on);
+    const on = !this._saved.has(rec.id);
+    if (on) this._saved.add(rec.id); else this._saved.delete(rec.id);
+    this._saveSet(this.SAVES_KEY, this._saved);
+    this._renderActions();
     showToast(I18N.t(on ? 'toast.postSaved' : 'toast.postUnsaved'));
   },
 
@@ -6642,18 +6549,36 @@ const CheckinViewerCtrl = {
     }
   },
 
+  _openOptMenu() {
+    document.getElementById('ciOptOverlay').classList.add('show');
+    document.getElementById('ciOptPanel').classList.add('show');
+    this._pauseAutoTimer();
+  },
+  _closeOptMenu(resetConfirm) {
+    document.getElementById('ciOptOverlay').classList.remove('show');
+    document.getElementById('ciOptPanel').classList.remove('show');
+    if (document.getElementById('checkinViewer').classList.contains('show')) this._restartAutoTimer();
+    if (!resetConfirm) return;
+    clearTimeout(this._delTimer);
+    const btn = document.getElementById('ciOptDelete');
+    btn.dataset.confirm = '';
+    btn.classList.remove('confirming');
+    btn.querySelector('span').textContent = I18N.t('checkin.optDelete');
+  },
+
   // Tap once → highlight + toast "Nhấn lại để xóa". Tap again within 3s → delete.
-  _delTimer: null,
   _delete() {
-    const btn = document.getElementById('ciViewerDeleteBtn');
+    const btn = document.getElementById('ciOptDelete');
     if (btn.dataset.confirm !== '1') {
       btn.dataset.confirm = '1';
-      btn.style.color = 'var(--primary)';
+      btn.classList.add('confirming');
+      btn.querySelector('span').textContent = I18N.t('checkin.deleteConfirmShort');
       showToast(I18N.t('checkin.deleteConfirm'));
       clearTimeout(this._delTimer);
       this._delTimer = setTimeout(() => {
         btn.dataset.confirm = '';
-        btn.style.color = '';
+        btn.classList.remove('confirming');
+        btn.querySelector('span').textContent = I18N.t('checkin.optDelete');
       }, 3000);
       return;
     }
@@ -6666,21 +6591,81 @@ const CheckinViewerCtrl = {
     if (!rec) return;
     const r = await Community.deleteCheckin(rec.id);
     if (!r.ok) { showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
+    this._closeOptMenu(true);
     showToast(I18N.t('checkin.deleted'));
-    // Remove from local group items so the viewer can advance cleanly.
+    this._removeCurrentLocally();
+  },
+
+  // Owner-only: toggle is_shared after posting. Requires
+  // checkins.updateRule to allow the owner (see 1790000001 migration) —
+  // the original "no editing" rule stays for everyone else.
+  async _toggleHideOwn() {
+    const rec = this._current();
+    if (!rec) return;
+    const nextShared = !rec.is_shared;
+    const r = await Community.setCheckinShared(rec.id, nextShared);
+    if (!r.ok) { showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
+    rec.is_shared = nextShared;
+    document.getElementById('ciViewerLock').classList.toggle('hidden', !!rec.is_shared);
+    document.getElementById('ciOptHideOwnLbl').textContent =
+      I18N.t(rec.is_shared ? 'checkin.optHideOwn' : 'checkin.optShowOwn');
+    this._closeOptMenu(true);
+    showToast(I18N.t(rec.is_shared ? 'checkin.sharedAgain' : 'checkin.hiddenPrivate'));
+    if (typeof CheckinFeedCtrl !== 'undefined') CheckinFeedCtrl.refresh({ force: true });
+    if (typeof CheckinDiscoverCtrl !== 'undefined') CheckinDiscoverCtrl.refresh();
+  },
+
+  // No view/like/interaction tracking exists server-side yet (likes here
+  // are a local-only Set, not aggregated — see header comment), so this
+  // is an honest "coming soon" rather than fabricated numbers.
+  _stats() {
+    this._closeOptMenu(true);
+    showToast(I18N.t('checkin.statsComingSoon'));
+  },
+
+  async _report() {
+    const rec = this._current();
+    if (!rec) return;
+    this._closeOptMenu(true);
+    const r = await Community.reportCheckin(rec.id, 'other');
+    showToast(r.ok ? I18N.t('checkin.reported') : `⚠️ ${r.error || I18N.t('err.serverGeneric')}`);
+  },
+
+  // Viewer-only: hide this one check-in from MY OWN feed/discover — pure
+  // client-side (localStorage), doesn't touch the poster's record at all.
+  _hideForViewer() {
+    const rec = this._current();
+    if (!rec) return;
+    this._hidden.add(rec.id);
+    this._saveSet(this.HIDDEN_KEY, this._hidden);
+    this._closeOptMenu(true);
+    showToast(I18N.t('checkin.hiddenFromFeed'));
+    this._removeCurrentLocally();
+  },
+
+  // Shared by _doDelete() and _hideForViewer(): drop the current item
+  // from its group and either advance within the group or close + let
+  // the feed/discover screens refresh themselves without it.
+  _removeCurrentLocally() {
     const g = this._groups && this._groups[this._gi];
     if (g) g.items.splice(this._pi, 1);
-    // Refresh calendar if open (diary source), feed if community source.
     if (typeof CheckinCalendarCtrl !== 'undefined') CheckinCalendarCtrl._fetchMonth();
     if (typeof CheckinFeedCtrl !== 'undefined') CheckinFeedCtrl.refresh({ force: true });
     if (typeof CheckinDiscoverCtrl !== 'undefined') CheckinDiscoverCtrl.refresh();
-    // Advance: if there are still items in this group, stay; otherwise close.
     if (g && g.items.length > 0) {
       if (this._pi >= g.items.length) this._pi = g.items.length - 1;
       this._renderPost();
     } else {
       this.close();
     }
+  },
+
+  // Public helper other check-in list controllers filter through before
+  // building their groups — see CheckinFeedCtrl.refresh()/
+  // CheckinDiscoverCtrl.refresh().
+  isHidden(id) {
+    if (!this._hidden) this._hidden = this._loadSet(this.HIDDEN_KEY);
+    return this._hidden.has(id);
   },
 
   _loadSeen() {
@@ -6699,5 +6684,15 @@ const CheckinViewerCtrl = {
       const trimmed = arr.length > 500 ? arr.slice(arr.length - 500) : arr;
       localStorage.setItem(this.SEEN_KEY, JSON.stringify(trimmed));
     } catch (_) {}
+  },
+
+  _loadSet(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      return new Set(raw ? JSON.parse(raw) : []);
+    } catch (_) { return new Set(); }
+  },
+  _saveSet(key, set) {
+    try { localStorage.setItem(key, JSON.stringify([...set])); } catch (_) {}
   },
 };
