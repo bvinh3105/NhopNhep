@@ -15,7 +15,7 @@
 // tunnel rotates. See PROJECT_HANDOFF section 4 for the watchdog that
 // normally handles this (patches all three files — Bat-TOAN-BO*.ps1).
 
-const PB_URL = 'https://operation-consultation-floating-cigarette.trycloudflare.com';
+const PB_URL = 'https://establish-connector-achieve-budgets.trycloudflare.com';
 const TURNSTILE_ACTION = 'register';
 // The exact hostnames the Turnstile widget was registered for (Cloudflare
 // dashboard/widget-create) — not sensitive, unlike TURNSTILE_SECRET, so
