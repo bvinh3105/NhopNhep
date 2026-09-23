@@ -705,7 +705,11 @@ const Community = {
   // nhà chậm upload, dễ timeout. Giờ kiểm tra blob.type thật thay vì chỉ
   // xem có blob hay không, sai type thì rơi thẳng xuống JPEG (Safari mã
   // hoá JPEG qua canvas đúng chuẩn từ rất lâu rồi, không có vấn đề này).
-  compressImage(file, maxWidth = 1600, quality = 0.82) {
+  // maxBytes defaults to the shared restaurant-photo budget (see
+  // MAX_PHOTO_BYTES comment — tuned for up to 4 photos over a slow home
+  // upload). Check-ins are a single photo per post, so createCheckin()
+  // passes a higher maxWidth/quality/maxBytes here instead of the default.
+  compressImage(file, maxWidth = 1600, quality = 0.82, maxBytes = this.MAX_PHOTO_BYTES) {
     return new Promise((resolve, reject) => {
       const fail = () => reject(new Error(`${I18N.t('err.imageUnreadable')}: ${file.name || 'ảnh'}`));
       let url;
@@ -723,10 +727,10 @@ const Community = {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           canvas.toBlob((webp) => {
             if (webp && webp.type === 'image/webp') {
-              return this._shrinkIfHuge(canvas, webp, 'webp', resolve);
+              return this._shrinkIfHuge(canvas, webp, 'webp', resolve, maxBytes);
             }
             canvas.toBlob((jpeg) => {
-              if (jpeg) return this._shrinkIfHuge(canvas, jpeg, 'jpg', resolve);
+              if (jpeg) return this._shrinkIfHuge(canvas, jpeg, 'jpg', resolve, maxBytes);
               fail(); // JPEG luôn được hỗ trợ — chỉ hỏng khi hết bộ nhớ
             }, 'image/jpeg', quality);
           }, 'image/webp', quality);
@@ -737,8 +741,8 @@ const Community = {
     });
   },
 
-  _shrinkIfHuge(canvas, blob, ext, resolve) {
-    if (blob.size <= this.MAX_PHOTO_BYTES) return resolve({ blob, ext });
+  _shrinkIfHuge(canvas, blob, ext, resolve, maxBytes = this.MAX_PHOTO_BYTES) {
+    if (blob.size <= maxBytes) return resolve({ blob, ext });
     const mime = ext === 'webp' ? 'image/webp' : 'image/jpeg';
     canvas.toBlob((smaller) => {
       const ok = smaller && smaller.type === mime && smaller.size < blob.size;
@@ -777,15 +781,19 @@ const Community = {
 
     if (photoBlob && photoBlob.size) {
       // Photo from camera is already a WebP-ish blob from CheckinCtrl's
-      // canvas.toBlob() — but a raw 4032×3024 frame captures around 3-4MB,
-      // often over the server cap. Reuse compressImage's shrink pass:
-      // wrap the Blob in a File so compressImage's Image() decode path
-      // works, then upload whatever it returns.
+      // canvas.toBlob() — but a raw high-res frame (CheckinCtrl now asks
+      // getUserMedia for as much sensor resolution as the device has)
+      // captures several MB, often over the server cap. Reuse
+      // compressImage's shrink pass: wrap the Blob in a File so its
+      // Image() decode path works, then upload whatever it returns.
+      // Wider/higher-quality/bigger-budget than the restaurant-photo
+      // defaults — a check-in is ONE photo per post, not up to 4, so
+      // the same total-upload-time budget allows more per photo.
       let filename = `checkin-${Date.now()}.webp`;
       let uploadBlob = photoBlob;
       try {
         const f = new File([photoBlob], filename, { type: photoBlob.type || 'image/webp' });
-        const result = await this.compressImage(f);
+        const result = await this.compressImage(f, 1920, 0.86, 1.4 * 1024 * 1024);
         if (result && result.blob && result.blob.size) {
           uploadBlob = result.blob;
           filename = `checkin-${Date.now()}.${result.ext}`;

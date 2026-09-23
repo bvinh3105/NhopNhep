@@ -5244,6 +5244,19 @@ const CheckinCtrl = {
   _captured: null,         // { blob: Blob, dataUrl: string } — the pending photo
   _pickerCandidates: [],
 
+  // "Món ăn nào cũng lên hình đẹp" — a small, universal food-flattering
+  // grade tuned for GOOD lighting (this doesn't try to rescue underlit
+  // shots — a low-light photo pushed this hard just gets noisier).
+  // +contrast makes crust/char/glossy-sauce texture pop; +saturate
+  // brings out food color without tipping into cartoonish; a touch of
+  // brightness + sepia reads as "warm/appetizing" across soups, grilled
+  // meat, desserts and drinks alike without skewing any one hue too far
+  // (a strong single-hue push looks great on one dish and wrong on the
+  // next). Applied to the live <video> preview AND baked into the
+  // captured canvas (ctx.filter, same string) so what's framed is what
+  // gets saved — see _startStream() and _tapShutter().
+  PHOTO_FILTER: 'contrast(1.08) saturate(1.16) brightness(1.02) sepia(.06)',
+
   init() {
     document.getElementById('checkinQuanPill').addEventListener('click', () => this._openPicker());
     document.getElementById('checkinDiaryBtn').addEventListener('click', () => this._openDiary());
@@ -5363,10 +5376,24 @@ const CheckinCtrl = {
     this._stopStream();
     try {
       this._stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: this._facing } },
+        video: {
+          facingMode: { ideal: this._facing },
+          // `ideal` never fails the request even when unmet (unlike
+          // `min`/`exact`) — the browser just picks its closest actual
+          // max. Asking for far more than any phone sensor delivers is
+          // the standard way to say "give me your best", without an
+          // enumerateDevices()/getCapabilities() round-trip first.
+          width: { ideal: 3840 }, height: { ideal: 3840 },
+          advanced: [
+            { focusMode: 'continuous' },
+            { whiteBalanceMode: 'continuous' },
+            { exposureMode: 'continuous' },
+          ],
+        },
         audio: false,
       });
       video.srcObject = this._stream;
+      video.style.filter = this.PHOTO_FILTER;
       video.classList.remove('hidden');
       noperm.classList.add('hidden');
       this._toggleChrome(true);
@@ -5570,6 +5597,11 @@ const CheckinCtrl = {
     const canvas = document.createElement('canvas');
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext('2d');
+    // Bake in the same grade the live preview showed (ctx.filter takes
+    // the same syntax as CSS filter) — WYSIWYG, and unsupported browsers
+    // just silently skip it (assigning an unsupported value is a no-op,
+    // not an error) rather than failing the capture.
+    try { ctx.filter = this.PHOTO_FILTER; } catch (_) {}
     ctx.drawImage(video, 0, 0, w, h);
 
     // WebP first (smaller); fall back to JPEG on Safari <14 or when the
