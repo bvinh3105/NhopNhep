@@ -31,7 +31,7 @@
 //
 // Tunnel URL — same watchdog-patched constant as every other Function.
 
-const PB_URL = 'https://api.trycloudflare.com';
+const PB_URL = 'https://plate-yacht-modification-authorities.trycloudflare.com';
 const VAPID_PUBLIC_KEY = 'BPSe1NDXoXEtvYH86qYexkNLS9gii_oBUNqDCzRO9ENmKZ2BsAXHsU1c3cDTXgzu-BqFKIPK0UHTgF76VpKXTLY';
 const VAPID_SUBJECT = 'mailto:bachvinhtran@gmail.com'; // required by RFC 8292 — contact for push-service abuse reports
 
