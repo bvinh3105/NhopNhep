@@ -15,7 +15,7 @@
 // Tunnel URL — patched by the same watchdog (Bat-TOAN-BO*.ps1) that
 // updates log.js and register.js. Keep the constant name identical.
 
-const PB_URL     = 'https://situated-peterson-ment-edited.trycloudflare.com';
+const PB_URL     = 'https://hand-software-dimension-cult.trycloudflare.com';
 const COLLECTION = 'error_logs';
 const MAX_BODY   = 2 * 1024; // 2 KB — a crash report is < 400 bytes
 
