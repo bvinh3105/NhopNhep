@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2672">
+<link rel="stylesheet" href="css/styles.css?v=2674">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -895,6 +895,9 @@
         <button class="ci-viewer-act ci-viewer-share" id="ciViewerShareBtn" type="button" aria-label="Chia sẻ">
           <svg class="icon"><use href="#ic-action-copy-link"></use></svg>
         </button>
+        <button class="ci-viewer-act ci-viewer-delete hidden" id="ciViewerDeleteBtn" type="button" aria-label="Xóa check-in này">
+          <svg class="icon"><use href="#ic-action-delete"></use></svg>
+        </button>
       </div>
     </div>
   </div>
@@ -940,6 +943,9 @@
       </button>
       <button class="ci-post-act ci-post-share ci-post-icon-only" id="ciPostShareBtn" type="button" aria-label="Chia sẻ">
         <svg class="icon"><use href="#ic-action-copy-link"></use></svg>
+      </button>
+      <button class="ci-post-act ci-post-delete ci-post-icon-only hidden" id="ciPostDeleteBtn" type="button" aria-label="Xóa check-in này">
+        <svg class="icon"><use href="#ic-action-delete"></use></svg>
       </button>
     </div>
   </div>
@@ -1383,7 +1389,7 @@
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
 <script src="js/security.js?v=2672"></script>
-<script src="js/i18n.js?v=2673"></script>
+<script src="js/i18n.js?v=2674"></script>
 <script src="js/utils.js?v=2672"></script>
 <script src="js/state.js?v=2672"></script>
 <script src="js/poi.js?v=2672"></script>
@@ -1407,7 +1413,7 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2673"></script>
+<script src="js/controllers.js?v=2674"></script>
 <script src="js/app.js?v=2672"></script>
 
 </body>

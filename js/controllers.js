@@ -6223,6 +6223,7 @@ const CheckinPostViewCtrl = {
     document.getElementById('ciPostSaveBtn').addEventListener('click', () => this._toggleSave());
     document.getElementById('ciPostShareBtn').addEventListener('click', () => this._share());
     document.getElementById('ciPostDirectBtn').addEventListener('click', () => this._directions());
+    document.getElementById('ciPostDeleteBtn').addEventListener('click', () => this._delete());
   },
 
   open(record) {
@@ -6265,6 +6266,13 @@ const CheckinPostViewCtrl = {
     // enough — showCheckinItinerary() already bails if coords are missing.
     const hasCoords = record.restaurant_lat != null && record.restaurant_lng != null;
     document.getElementById('ciPostDirectBtn').classList.toggle('hidden', !hasCoords);
+
+    // Delete button — own check-ins only.
+    const isOwn = Community.currentUser && record.user === Community.currentUser.id;
+    const delBtn = document.getElementById('ciPostDeleteBtn');
+    delBtn.classList.toggle('hidden', !isOwn);
+    delBtn.dataset.confirm = '';
+    delBtn.style.color = '';
 
     document.getElementById('checkinPostOverlay').classList.add('show');
   },
@@ -6319,6 +6327,36 @@ const CheckinPostViewCtrl = {
       catch (_) { showToast(I18N.t('toast.linkCopyFail')); }
       document.body.removeChild(ta);
     }
+  },
+
+  _delTimer: null,
+  _delete() {
+    const btn = document.getElementById('ciPostDeleteBtn');
+    if (btn.dataset.confirm !== '1') {
+      btn.dataset.confirm = '1';
+      btn.style.color = 'var(--primary)';
+      showToast(I18N.t('checkin.deleteConfirm'));
+      clearTimeout(this._delTimer);
+      this._delTimer = setTimeout(() => {
+        btn.dataset.confirm = '';
+        btn.style.color = '';
+      }, 3000);
+      return;
+    }
+    clearTimeout(this._delTimer);
+    this._doDelete();
+  },
+
+  async _doDelete() {
+    const rec = this._current;
+    if (!rec) return;
+    const r = await Community.deleteCheckin(rec.id);
+    if (!r.ok) { showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
+    showToast(I18N.t('checkin.deleted'));
+    this.close();
+    if (typeof CheckinCalendarCtrl !== 'undefined') CheckinCalendarCtrl._fetchMonth();
+    if (typeof CheckinFeedCtrl !== 'undefined') CheckinFeedCtrl.refresh({ force: true });
+    if (typeof CheckinDiscoverCtrl !== 'undefined') CheckinDiscoverCtrl.refresh();
   },
 
   _loadSet(key) {
@@ -6423,6 +6461,7 @@ const CheckinViewerCtrl = {
     document.getElementById('ciViewerLikeBtn').addEventListener('click', () => this._toggleLike());
     document.getElementById('ciViewerSaveBtn').addEventListener('click', () => this._toggleSave());
     document.getElementById('ciViewerShareBtn').addEventListener('click', () => this._share());
+    document.getElementById('ciViewerDeleteBtn').addEventListener('click', () => this._delete());
   },
 
   open(groups, gi = 0) {
@@ -6503,6 +6542,13 @@ const CheckinViewerCtrl = {
     document.getElementById('ciViewerLikeIco').innerHTML = liked && liked.has(rec.id)
       ? '<use href="#ic-heart-filled"></use>' : '<use href="#ic-heart-outline"></use>';
     document.getElementById('ciViewerSaveBtn').classList.toggle('on', saved && saved.has(rec.id));
+
+    // Delete button — only for own check-ins.
+    const isOwn = Community.currentUser && rec.user === Community.currentUser.id;
+    const delBtn = document.getElementById('ciViewerDeleteBtn');
+    delBtn.classList.toggle('hidden', !isOwn);
+    delBtn.dataset.confirm = '';
+    delBtn.style.color = '';
 
     // Mark this record as seen (drives the bubble ring gray state on
     // re-render). Doesn't affect this render — only the next bubbles pass.
@@ -6593,6 +6639,47 @@ const CheckinViewerCtrl = {
       try { document.execCommand('copy'); showToast(I18N.t('toast.linkCopied')); }
       catch (_) { showToast(I18N.t('toast.linkCopyFail')); }
       document.body.removeChild(ta);
+    }
+  },
+
+  // Tap once → highlight + toast "Nhấn lại để xóa". Tap again within 3s → delete.
+  _delTimer: null,
+  _delete() {
+    const btn = document.getElementById('ciViewerDeleteBtn');
+    if (btn.dataset.confirm !== '1') {
+      btn.dataset.confirm = '1';
+      btn.style.color = 'var(--primary)';
+      showToast(I18N.t('checkin.deleteConfirm'));
+      clearTimeout(this._delTimer);
+      this._delTimer = setTimeout(() => {
+        btn.dataset.confirm = '';
+        btn.style.color = '';
+      }, 3000);
+      return;
+    }
+    clearTimeout(this._delTimer);
+    this._doDelete();
+  },
+
+  async _doDelete() {
+    const rec = this._current();
+    if (!rec) return;
+    const r = await Community.deleteCheckin(rec.id);
+    if (!r.ok) { showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
+    showToast(I18N.t('checkin.deleted'));
+    // Remove from local group items so the viewer can advance cleanly.
+    const g = this._groups && this._groups[this._gi];
+    if (g) g.items.splice(this._pi, 1);
+    // Refresh calendar if open (diary source), feed if community source.
+    if (typeof CheckinCalendarCtrl !== 'undefined') CheckinCalendarCtrl._fetchMonth();
+    if (typeof CheckinFeedCtrl !== 'undefined') CheckinFeedCtrl.refresh({ force: true });
+    if (typeof CheckinDiscoverCtrl !== 'undefined') CheckinDiscoverCtrl.refresh();
+    // Advance: if there are still items in this group, stay; otherwise close.
+    if (g && g.items.length > 0) {
+      if (this._pi >= g.items.length) this._pi = g.items.length - 1;
+      this._renderPost();
+    } else {
+      this.close();
     }
   },
 

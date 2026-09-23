@@ -2596,7 +2596,7 @@ body.map-full .tabbar{transform:translateY(105%)}
 /* Uses .modal-overlay.show for open/close (same as diary/picker); the
    inner frame is what fills the viewport. Tab bar gets hidden via
    .tabbar.checkin-hidden while viewer is up (see CheckinViewerCtrl). */
-#checkinViewer.ci-viewer-ov{background:rgba(0,0,0,.95)}
+#checkinViewer.ci-viewer-ov{background:rgba(0,0,0,.95);z-index:300}
 #checkinViewer .ci-viewer-frame{
   position:relative;width:100vw;height:100vh;max-width:520px;
   display:flex;flex-direction:column;
