@@ -22,7 +22,7 @@
 // $pagesFunctionsWithPbUrl in both scripts or it will drift to a
 // dead tunnel on the next rotation.
 
-const PB_URL = 'https://restricted-early-treat-consultants.trycloudflare.com';
+const PB_URL = 'https://ambassador-annotation-messages-flyer.trycloudflare.com';
 
 function jsonError(status, message) {
   return new Response(JSON.stringify({ message }), {
