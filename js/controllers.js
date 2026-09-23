@@ -5256,9 +5256,12 @@ const CheckinCtrl = {
   // captured canvas (ctx.filter, same string) so what's framed is what
   // gets saved — see _startStream() and _tapShutter().
   PHOTO_FILTER: 'contrast(1.08) saturate(1.16) brightness(1.02) sepia(.06)',
+  _locked: false, // AE/AF lock state for the current stream — see _toggleLock()
 
   init() {
     document.getElementById('checkinQuanPill').addEventListener('click', () => this._openPicker());
+    document.getElementById('checkinLockBtn').addEventListener('click', () => this._toggleLock());
+    document.getElementById('checkinExposureSlider').addEventListener('input', (e) => this._setExposure(+e.target.value));
     document.getElementById('checkinDiaryBtn').addEventListener('click', () => this._openDiary());
     document.getElementById('checkinFlipBtn').addEventListener('click', () => this._flipCamera());
     document.getElementById('checkinShutterBtn').addEventListener('click', () => this._tapShutter());
@@ -5397,6 +5400,7 @@ const CheckinCtrl = {
       video.classList.remove('hidden');
       noperm.classList.add('hidden');
       this._toggleChrome(true);
+      this._setupManualControls();
     } catch (e) {
       // getUserMedia rejects with different error names — map each to a
       // message that tells the user what to do. Falling back to a single
@@ -5436,6 +5440,77 @@ const CheckinCtrl = {
   async _flipCamera() {
     this._facing = this._facing === 'environment' ? 'user' : 'environment';
     await this._startStream();
+  },
+
+  // Feature-detects what THIS stream's track can actually do and shows
+  // only the controls that will really work — mainly a Chrome/Android
+  // thing (getCapabilities()/applyConstraints() manual focus/exposure
+  // aren't implemented in iOS Safari at all), so this hides both
+  // controls entirely rather than showing dead buttons on most iPhones.
+  // Runs fresh on every _startStream() (flip camera = a new track).
+  _setupManualControls() {
+    this._locked = false;
+    const lockBtn = document.getElementById('checkinLockBtn');
+    const expWrap = document.getElementById('checkinExposureWrap');
+    const expSlider = document.getElementById('checkinExposureSlider');
+    lockBtn.classList.remove('on');
+    lockBtn.classList.add('hidden');
+    expWrap.classList.add('hidden');
+
+    const track = this._stream && this._stream.getVideoTracks()[0];
+    const caps = track && track.getCapabilities ? track.getCapabilities() : null;
+    if (!caps) return;
+
+    // Lock button — only useful if the track can actually switch to a
+    // manual (frozen) mode for at least one of focus/exposure.
+    const canLock = (caps.focusMode && caps.focusMode.includes('manual'))
+      || (caps.exposureMode && caps.exposureMode.includes('manual'));
+    lockBtn.classList.toggle('hidden', !canLock);
+
+    // Exposure slider — only if the track reports a real compensation
+    // range (min < max); a degenerate 0..0 range would just be a dead
+    // slider stuck in place.
+    const ec = caps.exposureCompensation;
+    if (ec && typeof ec.min === 'number' && typeof ec.max === 'number' && ec.max > ec.min) {
+      expSlider.min = ec.min;
+      expSlider.max = ec.max;
+      expSlider.step = ec.step || 1;
+      const settings = track.getSettings ? track.getSettings() : {};
+      expSlider.value = settings.exposureCompensation ?? 0;
+      expWrap.classList.remove('hidden');
+    }
+  },
+
+  async _toggleLock() {
+    const track = this._stream && this._stream.getVideoTracks()[0];
+    if (!track) return;
+    const caps = track.getCapabilities ? track.getCapabilities() : null;
+    if (!caps) return;
+    this._locked = !this._locked;
+    const mode = this._locked ? 'manual' : 'continuous';
+    // Switching to 'manual' WITHOUT specifying a new focusDistance/
+    // exposureTime freezes whatever value continuous mode had already
+    // settled on — this is the standard "AE/AF lock" trick, not a
+    // separate value the user has to pick first.
+    const advanced = [];
+    if (caps.focusMode && caps.focusMode.includes(mode)) advanced.push({ focusMode: mode });
+    if (caps.exposureMode && caps.exposureMode.includes(mode)) advanced.push({ exposureMode: mode });
+    if (caps.whiteBalanceMode && caps.whiteBalanceMode.includes(mode)) advanced.push({ whiteBalanceMode: mode });
+    try {
+      await track.applyConstraints({ advanced });
+      document.getElementById('checkinLockBtn').classList.toggle('on', this._locked);
+      showToast(I18N.t(this._locked ? 'checkin.locked' : 'checkin.unlocked'));
+    } catch (_) {
+      this._locked = !this._locked; // revert — the device refused the mode switch
+      showToast(`⚠️ ${I18N.t('err.serverGeneric')}`);
+    }
+  },
+
+  async _setExposure(value) {
+    const track = this._stream && this._stream.getVideoTracks()[0];
+    if (!track) return;
+    try { await track.applyConstraints({ advanced: [{ exposureCompensation: value }] }); }
+    catch (_) { /* device rejected mid-drag — harmless, slider just won't stick */ }
   },
 
   _refreshQuan() {
