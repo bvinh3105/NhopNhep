@@ -2256,16 +2256,25 @@ body.map-full .tabbar{transform:translateY(105%)}
      .checkin-quan-pill/dist  — cosmetic tweaks on top of .brand-float
      .checkin-star-pill       — new: rating row (no existing analog)
      .checkin-preview*        — sheet shown after the shutter fires
-     .checkin-share-tog       — new: pink toggle
+     .checkin-share-tog       — new: cream/orange toggle
      .checkin-picker-*        — quán switcher list rows
      .checkin-diary-*         — my check-in history rows
 
    The shutter itself has a class combo `.rp-fab.checkin-shutter` —
-   .rp-fab does 100% of the sizing/border/shadow/position math, the
-   .checkin-shutter modifier only swaps the fill from --primary red
-   to --checkin pink so it reads as its own action. Also swaps the
+   .rp-fab does 100% of the sizing/border/color/shadow/position math;
+   the .checkin-shutter modifier only resizes/repositions it (same red
+   fill as every other .rp-fab, e.g. Home's dice button) and swaps the
    inline dice icon (there isn't one — we don't render a child) for
-   a nested "shutter ring" via ::after.
+   a nested white "shutter ring" via ::after.
+
+   Every one-off "this is check-in, not the rest of the app" accent
+   (a #D64B7A pink, undeclared as a real --checkin token — it only
+   ever worked by accident because that hex happens to equal the
+   --cat-snack category color) has been retired in favor of the app's
+   actual tokens: --primary for actions/selected-state, --accent for a
+   secondary highlight (same role it already has for star ratings and
+   the share toggle above). Flagged by Vinh (2026-09-24): the pink
+   read as a foreign UI, not "same app, different tab".
 ═══════════════════════════════════════════════ */
 
 /* Full-bleed video takes the whole tab surface, just like #mainMapWrap
@@ -2373,9 +2382,11 @@ body.map-full .tabbar{transform:translateY(105%)}
 .checkin-quan-pill .icon{width:1em;height:1em;color:var(--primary)}
 .checkin-quan-pill .chevron{color:var(--text3);font-size:.7rem;margin-left:.1rem}
 #checkinQuanName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* Plain muted text, not a colored badge — matches how distance is shown
+   everywhere else in the app (.r-dist / .tl-travel-dist), not a one-off
+   pill invented just for this pill. */
 .checkin-quan-dist{
-  color:var(--white);background:var(--checkin,#D64B7A);
-  padding:.15rem .45rem;border-radius:8px;font-size:.62rem;font-weight:900;
+  color:var(--text3);font-weight:700;font-size:.68rem;
   margin-left:.1rem;
 }
 .checkin-quan-dist:empty{display:none}
@@ -2460,7 +2471,7 @@ body.map-full .tabbar{transform:translateY(105%)}
      per Vinh (2026-09-24): bigger capture target. */
   bottom:calc(env(safe-area-inset-bottom, 0px) + 120px);
   width:80px;height:80px;
-  background:var(--checkin,#D64B7A);
+  background:var(--primary);
   color:var(--cream);
 }
 .rp-fab.checkin-shutter::after{
@@ -2675,10 +2686,12 @@ body.map-full .tabbar{transform:translateY(105%)}
 .checkin-picker-body{flex:1;min-width:0}
 .checkin-picker-name{font-weight:900;font-size:.85rem;color:var(--text);line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .checkin-picker-meta{color:var(--text2);font-size:.65rem;font-weight:700;display:flex;gap:.5rem;margin-top:2px}
+/* "Đang chọn" — same selected-state language as .dish-chip.active
+   elsewhere (primary-tint fill, primary border/text). */
 .checkin-picker-tag{
-  font-size:.6rem;font-weight:900;color:var(--checkin-2,#A83359);flex-shrink:0;
-  padding:.2rem .45rem;background:var(--checkin-tint,#FBE3EC);
-  border:1.5px solid var(--checkin,#D64B7A);border-radius:6px;
+  font-size:.6rem;font-weight:900;color:var(--primary-2);flex-shrink:0;
+  padding:.2rem .45rem;background:var(--primary-tint);
+  border:1.5px solid var(--primary);border-radius:6px;
 }
 
 /* ── Diary sheet (opens from ↖ cluster) ───────────────────────────────── */
@@ -2710,7 +2723,10 @@ body.map-full .tabbar{transform:translateY(105%)}
   display:inline-flex;align-items:center;gap:.15rem;
 }
 .checkin-diary-tag.priv{background:var(--paper);color:var(--text2)}
-.checkin-diary-tag.pub{background:var(--checkin-tint,#FBE3EC);color:var(--checkin-2,#A83359);border-color:var(--checkin,#D64B7A)}
+/* Public — same soft accent-orange tint as .checkin-share-tog.on, so
+   "shared with everyone" reads as one consistent accent everywhere it
+   shows up, not a different color per screen. */
+.checkin-diary-tag.pub{background:#FFEED9;color:var(--accent-2);border-color:var(--accent)}
 
 /* ═══════════════════════════════════════════════════════════════════
    CHECK-IN SUBTAB — STORIES BUBBLES + FULLSCREEN VIEWER  (2026-09-22)
@@ -2746,7 +2762,7 @@ body.map-full .tabbar{transform:translateY(105%)}
 }
 .ci-bubble-ring{
   position:relative;width:72px;height:72px;border-radius:50%;
-  padding:3px;background:conic-gradient(from 210deg,var(--primary,#B92626),var(--accent,#E8843C),var(--checkin,#D64B7A),var(--primary,#B92626));
+  padding:3px;background:conic-gradient(from 210deg,var(--primary,#B92626),var(--accent,#E8843C),var(--primary-3,#5F0F0F),var(--primary,#B92626));
   transition:transform .12s;
 }
 .ci-bubble:active .ci-bubble-ring{transform:scale(.94)}
