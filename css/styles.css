@@ -2330,19 +2330,32 @@ body.map-full .tabbar{transform:translateY(105%)}
    edge (the reticle boundary), so there's nothing left to seam.
    z-index:1 — above the raw <video> (z:0) but below the reticle
    border/corner (z:2) and every real UI control (pill/buttons/sheet
-   are all z:14+), so it never intercepts a tap. */
+   are all z:14+), so it never intercepts a tap.
+
+   mask-position % is NOT "distance from the edge" — like
+   background-position, it's resolved as (container - layer) * pct, i.e.
+   against the LEFTOVER space once the sized layer is placed, not the
+   full container (2026-09-24 real-device bug: naively reusing the
+   border's 4.4%/11.4% here put the hole almost flush with the top-left
+   corner instead of matching the border box, so the visible blur/sharp
+   line drifted off the actual reticle). Converting the border's
+   top/left/right/bottom insets into that formula for a 91.2%×57% layer:
+     x: leftover = 100-91.2=8.8%  → pct = 4.4/8.8   = 50%
+     y: leftover = 100-57  =43%   → pct = 11.4/43   ≈ 26.512%
+   (x comes out to a clean 50% only because the reticle is horizontally
+   symmetric — 4.4% inset on both left and right). */
 .checkin-blur-frame{
   position:absolute;inset:0;z-index:1;pointer-events:none;
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   background:rgba(20,12,6,.15); /* slight dark tint reinforces the "outside the frame" read */
   -webkit-mask-image:linear-gradient(#000,#000),linear-gradient(#000,#000);
   -webkit-mask-size:100% 100%,91.2% 57%;
-  -webkit-mask-position:0 0,4.4% 11.4%;
+  -webkit-mask-position:0 0,50% 26.512%;
   -webkit-mask-repeat:no-repeat,no-repeat;
   -webkit-mask-composite:xor;
   mask-image:linear-gradient(#000,#000),linear-gradient(#000,#000);
   mask-size:100% 100%,91.2% 57%;
-  mask-position:0 0,4.4% 11.4%;
+  mask-position:0 0,50% 26.512%;
   mask-repeat:no-repeat,no-repeat;
   mask-composite:exclude;
 }
