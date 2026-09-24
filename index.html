@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2699">
+<link rel="stylesheet" href="css/styles.css?v=2700">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -762,21 +762,18 @@
   <!-- Camera live preview — CheckinCtrl fills this with a MediaStream. -->
   <video id="checkinVideo" class="checkin-video" autoplay playsinline muted></video>
 
-  <!-- Blur frame around the reticle — 4 strips (top/bottom/left/right)
-       exactly bounding the same area #checkinScreen::before draws its
-       border on, each with backdrop-filter:blur() so the LIVE video
-       behind them blurs in real time while the center (inside the
-       reticle) stays perfectly sharp. 4 real elements because CSS only
-       gives 2 pseudo-elements per selector and a single clip-path/mask
-       "frame with a hole" is far fussier to keep in sync with the
-       reticle's own top/left/right/bottom percentages than 4 plain
-       boxes using those same values. Hidden together with the reticle
-       on the same fallback states (see the shared .checkin-blur-strip
-       rule + #checkinScreen:has(...) selectors in styles.css). -->
-  <div class="checkin-blur-strip checkin-blur-top"></div>
-  <div class="checkin-blur-strip checkin-blur-bottom"></div>
-  <div class="checkin-blur-strip checkin-blur-left"></div>
-  <div class="checkin-blur-strip checkin-blur-right"></div>
+  <!-- Blur frame around the reticle — ONE element, backdrop-filter:blur()
+       over the whole tab, with a CSS mask punching out the reticle's own
+       top/left/right/bottom area so the LIVE video shows through sharp
+       there and blurred everywhere else. Real-device testing (2026-09-24)
+       showed the earlier 4-separate-strips version left visible seams
+       where the strips met at each corner — each strip is its own
+       compositing/blur region, so the corners never quite lined up.
+       A single masked element has exactly one edge (the reticle
+       boundary itself), so there's nothing left to seam. Hidden together
+       with the reticle on the same fallback states (see
+       #checkinScreen:has(...) selectors in styles.css). -->
+  <div class="checkin-blur-frame"></div>
 
   <!-- Focus reticle animation (pure CSS via .checkin-video::before below in styles.css). -->
 

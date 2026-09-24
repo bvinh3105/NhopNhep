@@ -2292,40 +2292,60 @@ body.map-full .tabbar{transform:translateY(105%)}
    per Vinh (2026-09-24) — was 10%/10% (already symmetric by
    construction) but the frame itself needed to be bigger; 4.4%/4.4%
    keeps the same symmetric-by-construction property at the new size. */
+/* Border made visibly readable on ANY backdrop (2026-09-24 — the old
+   rgba(255,255,255,.14) line all but disappeared against a light/grey
+   real-world background, real-device bug report). Bright white line +
+   a dark ring just outside it + a soft dark glow: the dark parts read
+   against a light scene, the white part reads against a dark scene, so
+   at least one half is always visible regardless of what's framed. */
 #checkinScreen::before{
   content:'';position:absolute;top:11.4%;left:4.4%;right:4.4%;bottom:31.6%;
-  border:1.5px solid rgba(255,255,255,.14);border-radius:14px;
+  border:1.5px solid rgba(255,255,255,.85);border-radius:14px;
+  box-shadow:0 0 0 1px rgba(0,0,0,.45),0 0 8px rgba(0,0,0,.3);
   pointer-events:none;z-index:2;
   animation:checkin-focus 1.8s ease-in-out infinite alternate;
 }
 #checkinScreen::after{
   content:'';position:absolute;top:calc(11.4% - 8px);left:calc(4.4% - 8px);
   width:18px;height:18px;pointer-events:none;z-index:2;
-  border-top:2.5px solid rgba(255,255,255,.7);border-left:2.5px solid rgba(255,255,255,.7);
+  border-top:2.5px solid rgba(255,255,255,.9);border-left:2.5px solid rgba(255,255,255,.9);
   border-top-left-radius:5px;
+  filter:drop-shadow(0 0 2px rgba(0,0,0,.5));
 }
 @keyframes checkin-focus{
   from{opacity:.5;transform:scale(1)}
   to  {opacity:1;transform:scale(1.02)}
 }
 
-/* Blur frame — 4 strips using the SAME top/left/right/bottom
-   percentages as the reticle above, each blurring whatever live video
-   is behind it via backdrop-filter so the shot outside the frame reads
-   as out-of-focus and the reticle's interior stays perfectly sharp
-   (nothing sits on top of the center, so nothing there is blurred).
+/* Blur frame — ONE element, backdrop-filter over the full tab, masked
+   down to just the ring AROUND the reticle (mask-composite:exclude of
+   a full-rect layer and an inner-rect layer at the reticle's own
+   top/left/right/bottom — the overlap, i.e. the reticle's interior,
+   comes out fully transparent so the raw sharp video shows there,
+   same numbers #checkinScreen::before uses for its border).
+   Replaced an earlier 4-separate-strips version (2026-09-24) that left
+   visible seams at each corner — each strip was its own independent
+   compositing/blur region, so the corners where two strips touched
+   never quite lined up on a real device. One element has exactly one
+   edge (the reticle boundary), so there's nothing left to seam.
    z-index:1 — above the raw <video> (z:0) but below the reticle
    border/corner (z:2) and every real UI control (pill/buttons/sheet
    are all z:14+), so it never intercepts a tap. */
-.checkin-blur-strip{
-  position:absolute;z-index:1;pointer-events:none;
+.checkin-blur-frame{
+  position:absolute;inset:0;z-index:1;pointer-events:none;
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   background:rgba(20,12,6,.15); /* slight dark tint reinforces the "outside the frame" read */
+  -webkit-mask-image:linear-gradient(#000,#000),linear-gradient(#000,#000);
+  -webkit-mask-size:100% 100%,91.2% 57%;
+  -webkit-mask-position:0 0,4.4% 11.4%;
+  -webkit-mask-repeat:no-repeat,no-repeat;
+  -webkit-mask-composite:xor;
+  mask-image:linear-gradient(#000,#000),linear-gradient(#000,#000);
+  mask-size:100% 100%,91.2% 57%;
+  mask-position:0 0,4.4% 11.4%;
+  mask-repeat:no-repeat,no-repeat;
+  mask-composite:exclude;
 }
-.checkin-blur-top{top:0;left:0;right:0;height:11.4%}
-.checkin-blur-bottom{bottom:0;left:0;right:0;height:31.6%}
-.checkin-blur-left{top:11.4%;bottom:31.6%;left:0;width:4.4%}
-.checkin-blur-right{top:11.4%;bottom:31.6%;right:0;width:4.4%}
 
 /* When the preview sheet or one of the fallback overlays is showing,
    don't leave the reticle/blur frame drawn on top of them. */
@@ -2335,9 +2355,9 @@ body.map-full .tabbar{transform:translateY(105%)}
 #checkinScreen:has(#checkinSignInWrap:not(.hidden))::after,
 #checkinScreen:has(#checkinNoPerm:not(.hidden))::before,
 #checkinScreen:has(#checkinNoPerm:not(.hidden))::after,
-#checkinScreen:has(#checkinPreview:not(.hidden)) .checkin-blur-strip,
-#checkinScreen:has(#checkinSignInWrap:not(.hidden)) .checkin-blur-strip,
-#checkinScreen:has(#checkinNoPerm:not(.hidden)) .checkin-blur-strip{display:none}
+#checkinScreen:has(#checkinPreview:not(.hidden)) .checkin-blur-frame,
+#checkinScreen:has(#checkinSignInWrap:not(.hidden)) .checkin-blur-frame,
+#checkinScreen:has(#checkinNoPerm:not(.hidden)) .checkin-blur-frame{display:none}
 
 /* Signed-out / no-permission fallbacks — reuse the .coming-soon-wrap
    look already used elsewhere. They live above the (empty) video. */
