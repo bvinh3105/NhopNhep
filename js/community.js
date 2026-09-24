@@ -19,7 +19,7 @@ const Community = {
   // override for whenever this goes stale before a redeploy catches up.
   DEFAULT_URL: (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
     ? 'http://127.0.0.1:8090'
-    : 'https://api.trycloudflare.com',
+    : 'https://connections-updates-profit-competitive.trycloudflare.com',
   get BASE_URL() {
     return (localStorage.getItem('community_api_url') || this.DEFAULT_URL).replace(/\/$/, '');
   },
