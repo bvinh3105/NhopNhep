@@ -2299,14 +2299,36 @@ body.map-full .tabbar{transform:translateY(105%)}
   from{opacity:.5;transform:scale(1)}
   to  {opacity:1;transform:scale(1.02)}
 }
+
+/* Blur frame — 4 strips using the SAME top/left/right/bottom
+   percentages as the reticle above, each blurring whatever live video
+   is behind it via backdrop-filter so the shot outside the frame reads
+   as out-of-focus and the reticle's interior stays perfectly sharp
+   (nothing sits on top of the center, so nothing there is blurred).
+   z-index:1 — above the raw <video> (z:0) but below the reticle
+   border/corner (z:2) and every real UI control (pill/buttons/sheet
+   are all z:14+), so it never intercepts a tap. */
+.checkin-blur-strip{
+  position:absolute;z-index:1;pointer-events:none;
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  background:rgba(20,12,6,.15); /* slight dark tint reinforces the "outside the frame" read */
+}
+.checkin-blur-top{top:0;left:0;right:0;height:11.4%}
+.checkin-blur-bottom{bottom:0;left:0;right:0;height:31.6%}
+.checkin-blur-left{top:11.4%;bottom:31.6%;left:0;width:4.4%}
+.checkin-blur-right{top:11.4%;bottom:31.6%;right:0;width:4.4%}
+
 /* When the preview sheet or one of the fallback overlays is showing,
-   don't leave the reticle drawn on top of them. */
+   don't leave the reticle/blur frame drawn on top of them. */
 #checkinScreen:has(#checkinPreview:not(.hidden))::before,
 #checkinScreen:has(#checkinPreview:not(.hidden))::after,
 #checkinScreen:has(#checkinSignInWrap:not(.hidden))::before,
 #checkinScreen:has(#checkinSignInWrap:not(.hidden))::after,
 #checkinScreen:has(#checkinNoPerm:not(.hidden))::before,
-#checkinScreen:has(#checkinNoPerm:not(.hidden))::after{display:none}
+#checkinScreen:has(#checkinNoPerm:not(.hidden))::after,
+#checkinScreen:has(#checkinPreview:not(.hidden)) .checkin-blur-strip,
+#checkinScreen:has(#checkinSignInWrap:not(.hidden)) .checkin-blur-strip,
+#checkinScreen:has(#checkinNoPerm:not(.hidden)) .checkin-blur-strip{display:none}
 
 /* Signed-out / no-permission fallbacks — reuse the .coming-soon-wrap
    look already used elsewhere. They live above the (empty) video. */
@@ -2502,8 +2524,10 @@ body.map-full .tabbar{transform:translateY(105%)}
 
 /* Cream sheet — rounded top corners, sits under the photo. flex:1 lets
    the sheet fill the remaining vertical space cleanly on any device.
-   overflow:visible so the star pill's negative margin can straddle the
-   top border (the "handle" effect). Content easily fits on all phones. */
+   overflow:visible so .checkin-sub-tabs' negative margin can straddle
+   the top border (the "handle" effect — the star pill used to do this
+   itself before the Locket-style swipeable-subs redesign moved it into
+   its own sub-panel). */
 .checkin-preview-sheet{
   flex:1;margin:24px 0 0;
   background:var(--cream,#FBF3D9);
@@ -2514,12 +2538,49 @@ body.map-full .tabbar{transform:translateY(105%)}
   overflow:visible;
 }
 
-/* Star pill inside the sheet — reset .checkin-star-pill's absolute
-   positioning (which the live-view pill uses), lift slightly so it
-   straddles the sheet's top border like a "handle" element. */
+/* Locket-style swipeable subs (2026-09-24) — Đánh giá / Địa điểm /
+   Nội dung as 3 native-scroll-snap panels instead of one long stacked
+   form. Tabs straddle the sheet's top border as the "handle" element
+   (same -46px trick the star pill used to do solo), and double as a
+   position indicator that syncs FROM scroll position (IntersectionObserver
+   in CheckinCtrl._wireSubTabs) as well as a tap-to-jump control INTO it
+   (scrollIntoView). Chose native scroll-snap over a hand-rolled
+   pointer-driven carousel for the same reason the exposure-slider redo
+   kept the native <input type=range>: touch drag, momentum, and
+   keyboard/trackpad scrolling all come for free instead of being
+   reimplemented and risking drift from how touch scrolling actually
+   feels on the device. */
+.checkin-sub-tabs{
+  display:flex;gap:6px;justify-content:center;
+  position:relative;margin:-46px 0 6px;z-index:2;
+}
+.checkin-sub-tab{
+  padding:.5rem .85rem;background:var(--white);color:var(--text2);
+  border:2px solid var(--text);border-radius:999px;box-shadow:2px 2px 0 var(--text);
+  font-size:.72rem;font-weight:900;font-family:var(--font-body);
+  transition:background .15s,color .15s,transform .1s;
+}
+.checkin-sub-tab.active{background:var(--primary,#B92626);color:var(--white);border-color:var(--primary-2,#8C1919)}
+.checkin-sub-tab:active{transform:translate(1px,1px)}
+
+.checkin-sub-scroll{
+  display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;
+  height:100px; /* fixed — switching subs never resizes/jumps the sheet */
+  margin:0 -18px; /* bleed past the sheet's own side padding so each panel gets the FULL width to snap-scroll across */
+}
+.checkin-sub-scroll::-webkit-scrollbar{display:none}
+.checkin-sub-panel{
+  flex:0 0 100%;scroll-snap-align:center;
+  display:flex;align-items:center;justify-content:center;
+  padding:0 18px; /* restores the sheet's own side padding for this panel's content */
+}
+
+/* Star pill inside its sub-panel — reset .checkin-star-pill's absolute
+   positioning (which the live-view pill uses); no longer needs its own
+   negative-margin "handle" straddle, .checkin-sub-tabs does that now. */
 .checkin-preview-stars{
   position:relative;left:auto;right:auto;bottom:auto;transform:none;
-  align-self:center;margin:-46px 0 6px;z-index:2;
   background:var(--white);
 }
 
@@ -2536,7 +2597,7 @@ body.map-full .tabbar{transform:translateY(105%)}
   font-family:var(--font-body);
 }
 .checkin-preview-cap{
-  color:var(--text2);font-style:italic;font-weight:600;font-size:.82rem;resize:none;
+  color:var(--text2);font-style:italic;font-weight:600;font-size:.82rem;resize:none;height:100%;
 }
 .checkin-preview-addr::placeholder{color:var(--text3);font-weight:700}
 .checkin-preview-cap::placeholder{color:var(--text3);font-style:italic}
@@ -2576,6 +2637,30 @@ body.map-full .tabbar{transform:translateY(105%)}
 .scan-btn.checkin-send-btn:active{background:var(--primary-2,#8C1919)}
 
 /* ── Quán picker sheet (opens on tap of top pill) ─────────────────────── */
+/* Manual address entry — same visual language as .checkin-preview-addr
+   (white input, brutalist border+shadow), stacked with a "Dùng địa chỉ
+   này" confirm button since there's no separate "submit" affordance
+   like a form would have inside this list-sheet. */
+.checkin-picker-manual{display:flex;flex-direction:column;gap:.5rem;margin-top:.6rem}
+.checkin-picker-manual input{
+  width:100%;padding:.7rem 1rem;
+  background:var(--white);border:2px solid var(--text);border-radius:16px;
+  box-shadow:2px 2px 0 var(--text);
+  font-size:.85rem;font-weight:800;color:var(--text);font-family:var(--font-body);
+  outline:none;
+}
+.checkin-picker-manual input::placeholder{color:var(--text3);font-weight:700}
+.checkin-picker-manual input:focus{border-color:var(--primary,#B92626)}
+.checkin-picker-manual button{
+  height:42px;border-radius:14px;background:var(--primary,#B92626);color:var(--white);
+  border:2px solid var(--primary-2,#8C1919);box-shadow:2px 2px 0 var(--text);
+  font-weight:900;font-size:.85rem;font-family:var(--font-body);
+}
+.checkin-picker-manual button:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.checkin-picker-or{
+  text-align:center;font-size:.68rem;font-weight:800;color:var(--text3);
+  text-transform:uppercase;letter-spacing:.05em;margin:.9rem 0 .2rem;
+}
 .checkin-picker-list{
   max-height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:.5rem;
   padding:.3rem .3rem .6rem;margin:.4rem 0;

@@ -5297,6 +5297,8 @@ const CheckinCtrl = {
       });
     });
 
+    this._wireSubTabs();
+
     // Preview sheet controls
     document.getElementById('checkinRetakeBtn').addEventListener('click', () => this._retake());
     document.getElementById('checkinPreviewClose').addEventListener('click', () => this._retake());
@@ -5312,6 +5314,10 @@ const CheckinCtrl = {
     const pickerOv = document.getElementById('checkinQuanPickerOverlay');
     pickerOv.addEventListener('click', (e) => { if (e.target === pickerOv) this._closePicker(); });
     document.getElementById('checkinPickerClose').addEventListener('click', () => this._closePicker());
+    document.getElementById('checkinPickerAddrUse').addEventListener('click', () => this._useManualAddress());
+    document.getElementById('checkinPickerAddrInput').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); this._useManualAddress(); }
+    });
 
     // Diary overlay
     const diaryOv = document.getElementById('checkinDiaryOverlay');
@@ -5687,6 +5693,11 @@ const CheckinCtrl = {
   },
 
   _openPicker() {
+    // Prefill with whatever freeform address is already selected (so
+    // reopening the picker to tweak it doesn't lose what was typed);
+    // leave blank for a community/OSM/Gemini pick, or nothing selected.
+    document.getElementById('checkinPickerAddrInput').value =
+      (this._selected && this._selected.source === 'freeform') ? this._selected.name : '';
     const list = document.getElementById('checkinPickerList');
     const lat = State.userLat, lng = State.userLng;
     // Rebuild the candidate pool same as _findClosest but keep the whole list.
@@ -5753,6 +5764,23 @@ const CheckinCtrl = {
     this._closePicker();
   },
 
+  // Typed BEFORE shooting instead of only in the post-capture address
+  // field — same freeform shape _submit() already builds when the user
+  // types there (source:'freeform', GPS-only coords, no relation id),
+  // just settable earlier so the quán pill already reflects it going
+  // into the shot.
+  _useManualAddress() {
+    const input = document.getElementById('checkinPickerAddrInput');
+    const name = input.value.trim();
+    if (!name) { showToast(I18N.t('checkin.err.emptyAddr')); return; }
+    this._selected = {
+      id: '', name, source: 'freeform',
+      lat: State.userLat ?? null, lng: State.userLng ?? null,
+    };
+    this._refreshQuan();
+    this._closePicker();
+  },
+
   _setStars(container, n) {
     container.dataset.rating = n;
     container.querySelectorAll('.checkin-star').forEach(btn => {
@@ -5761,6 +5789,54 @@ const CheckinCtrl = {
       const on = v <= n;
       btn.classList.toggle('on', on);
       if (use) use.setAttribute('href', on ? '#ic-rating-star-filled' : '#ic-rating-star-outline');
+    });
+  },
+
+  // Locket-style swipeable subs in the preview sheet (Đánh giá/Địa điểm/
+  // Nội dung) — tabs stay synced to native scroll-snap position both
+  // ways: tapping a tab scrolls to it, scrolling past 50% of a panel
+  // activates its tab. Wired once at boot (the sheet's DOM is static,
+  // only #checkinPreview's own .hidden class toggles), not re-wired per
+  // photo — _resetSubTabs() below just jumps back to sub 0 each capture.
+  _wireSubTabs() {
+    const scroll = document.getElementById('checkinSubScroll');
+    const tabs = [...document.querySelectorAll('#checkinSubTabs .checkin-sub-tab')];
+    const panels = [...document.querySelectorAll('#checkinSubScroll .checkin-sub-panel')];
+    if (!scroll || !tabs.length) return;
+
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const panel = panels[+tab.dataset.sub];
+        if (panel) panel.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      });
+    });
+
+    // threshold:[0.6] — fires once a panel is clearly the one in view,
+    // not at the halfway point of a still-settling snap scroll (which
+    // flickered the active tab between neighbours mid-swipe).
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const idx = entry.target.dataset.sub;
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.sub === idx));
+      });
+    }, { root: scroll, threshold: [0.6] });
+    panels.forEach(p => observer.observe(p));
+  },
+
+  // Back to "Đánh giá" every time a NEW photo is captured — otherwise a
+  // retake would reopen wherever the user last swiped to on a previous
+  // shot. Plain scrollLeft assignment (not scrollTo({behavior:'smooth'}))
+  // since this runs while the sheet is still hidden/animating in — an
+  // animated scroll starting mid-transition would look like a stutter,
+  // not a deliberate move ('instant' isn't a standard ScrollBehavior
+  // value even though some browsers accept it; a direct property write
+  // has no such ambiguity).
+  _resetSubTabs() {
+    const scroll = document.getElementById('checkinSubScroll');
+    if (scroll) scroll.scrollLeft = 0;
+    document.querySelectorAll('#checkinSubTabs .checkin-sub-tab').forEach((t, i) => {
+      t.classList.toggle('active', i === 0);
     });
   },
 
@@ -5811,6 +5887,7 @@ const CheckinCtrl = {
     const addrEl = document.getElementById('checkinAddress');
     if (addrEl) addrEl.value = (this._selected && this._selected.name) || '';
     document.getElementById('checkinShareTog').classList.add('on');
+    this._resetSubTabs();
     document.getElementById('checkinPreview').classList.remove('hidden');
     // Slide the floating tab bar off so the Send/toggle/caption strip
     // at bottom:0 isn't covered. Restored in _retake and _submit.
