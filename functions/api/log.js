@@ -15,7 +15,7 @@
 // updated together whenever the tunnel rotates. See PROJECT_HANDOFF
 // section 4 for the watchdog that normally handles this.
 
-const PB_URL = 'https://hand-software-dimension-cult.trycloudflare.com';
+const PB_URL = 'https://hang-peas-artist-spa.trycloudflare.com';
 const COLLECTION = 'analytics_events';
 const MAX_BODY = 8 * 1024; // 8 KB — a single event is ~500 bytes tops
 
