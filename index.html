@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2701">
+<link rel="stylesheet" href="css/styles.css?v=2702">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -759,24 +759,6 @@
     <button class="cat-chip active" id="checkinGoSignIn" data-i18n="checkin.goSignIn" type="button" style="margin-top:.8rem">Đăng nhập ngay</button>
   </div>
 
-  <!-- Camera live preview — CheckinCtrl fills this with a MediaStream. -->
-  <video id="checkinVideo" class="checkin-video" autoplay playsinline muted></video>
-
-  <!-- Blur frame around the reticle — ONE element, backdrop-filter:blur()
-       over the whole tab, with a CSS mask punching out the reticle's own
-       top/left/right/bottom area so the LIVE video shows through sharp
-       there and blurred everywhere else. Real-device testing (2026-09-24)
-       showed the earlier 4-separate-strips version left visible seams
-       where the strips met at each corner — each strip is its own
-       compositing/blur region, so the corners never quite lined up.
-       A single masked element has exactly one edge (the reticle
-       boundary itself), so there's nothing left to seam. Hidden together
-       with the reticle on the same fallback states (see
-       #checkinScreen:has(...) selectors in styles.css). -->
-  <div class="checkin-blur-frame"></div>
-
-  <!-- Focus reticle animation (pure CSS via .checkin-video::before below in styles.css). -->
-
   <!-- No-permission fallback shown when getUserMedia is denied/unavailable. -->
   <div class="checkin-noperm hidden" id="checkinNoPerm">
     <div class="coming-soon-ico"><svg class="icon" width="40" height="40"><use href="#ic-nav-checkin"></use></svg></div>
@@ -785,7 +767,7 @@
     <button class="cat-chip active" id="checkinRetryCam" data-i18n="checkin.retryCam" type="button" style="margin-top:.8rem">Thử lại</button>
   </div>
 
-  <!-- Quán pill — top-left, reuses .brand-float construction. Tap opens picker. -->
+  <!-- Quán pill — floats near the top, reuses .brand-float construction. Tap opens picker. -->
   <button class="brand-float checkin-quan-pill" id="checkinQuanPill" type="button">
     <svg class="icon" width="16" height="16"><use href="#ic-action-pin-static"></use></svg>
     <span id="checkinQuanName">—</span>
@@ -793,35 +775,50 @@
     <span class="chevron">▾</span>
   </button>
 
-  <!-- Diary + flip — standalone floating circles flanking the shutter in
-       one row (gallery/shutter/flip, same layout Instagram/Snapchat use),
-       split out of the old 3-in-1 cluster pill per Vinh (2026-09-24):
-       "tách cho tôi các icon button riêng ra... dễ tách nút và thao tác
-       hơn". Position math lives in .checkin-diary-btn/.checkin-flip-btn. -->
-  <button class="checkin-float-btn checkin-diary-btn" id="checkinDiaryBtn" type="button" data-i18n="checkin.diaryTitle" data-i18n-attr="title" title="Diary"><svg class="icon"><use href="#ic-proto-diary"></use></svg></button>
-  <button class="checkin-float-btn checkin-flip-btn" id="checkinFlipBtn" type="button" data-i18n="checkin.flipTitle" data-i18n-attr="title" title="Đổi camera trước/sau"><svg class="icon"><use href="#ic-action-undo-reset"></use></svg></button>
+  <!-- ═══ Live camera — Locket-style inset frame (2026-09-24 layout
+       rebuild, see the CSS header comment above .checkin-frame-zone for
+       why this replaced the old full-bleed+reticle+blur system).
+       #checkinScreen is a flex column (base .screen rule); the two
+       spacer divs + frame-zone + ctrl-row are its real flex children,
+       so the control row always ends up directly under the frame no
+       matter how tall the (width-driven, aspect-ratio:3/4) frame
+       renders on a given device. ═══ -->
+  <div class="checkin-spacer-top"></div>
 
-  <!-- Lock + exposure form their own right-docked vertical pair, away
-       from the diary/shutter/flip row. Lock only shown when the
-       device's camera actually supports manual focus/exposure mode
-       (CheckinCtrl feature-detects via track.getCapabilities() after
-       the stream starts). -->
-  <button class="checkin-float-btn checkin-lock-btn hidden" id="checkinLockBtn" type="button" data-i18n="checkin.lockTitle" data-i18n-attr="title" title="Khóa nét & sáng"><svg class="icon"><use href="#ic-privacy-lock"></use></svg></button>
+  <div class="checkin-frame-zone">
+    <div class="checkin-frame">
+      <video id="checkinVideo" class="checkin-video" autoplay playsinline muted></video>
 
-  <!-- Exposure/brightness fine-tune — vertical slider, right edge above
-       the lock button. Only shown when
-       track.getCapabilities().exposureCompensation exists (mainly
-       Chrome/Android — iOS Safari has no web API for this, so the
-       control simply never appears there instead of sitting broken).
-       checkinExposureReadout is a floating "+1.5"/"Tự động" label that
-       tracks the thumb during drag (see CheckinCtrl._onExposureInput). -->
-  <div class="checkin-exposure hidden" id="checkinExposureWrap">
-    <svg class="icon" width="18" height="18"><use href="#ic-action-sun"></use></svg>
-    <input type="range" id="checkinExposureSlider" class="checkin-exposure-slider" min="0" max="0" step="1" value="0">
-    <div class="checkin-exposure-readout" id="checkinExposureReadout"></div>
+      <!-- Lock + exposure dock to the frame's own top-right corner now
+           (frame-relative, not screen-relative — see their CSS).
+           Lock only shown when the device's camera actually supports
+           manual focus/exposure mode (CheckinCtrl feature-detects via
+           track.getCapabilities() after the stream starts). -->
+      <div class="checkin-exposure hidden" id="checkinExposureWrap">
+        <svg class="icon" width="18" height="18"><use href="#ic-action-sun"></use></svg>
+        <input type="range" id="checkinExposureSlider" class="checkin-exposure-slider" min="0" max="0" step="1" value="0">
+        <div class="checkin-exposure-readout" id="checkinExposureReadout"></div>
+      </div>
+      <button class="checkin-float-btn checkin-lock-btn hidden" id="checkinLockBtn" type="button" data-i18n="checkin.lockTitle" data-i18n-attr="title" title="Khóa nét & sáng"><svg class="icon"><use href="#ic-privacy-lock"></use></svg></button>
+    </div>
   </div>
 
-  <!-- Star rating pill — floats above the shutter. 0 = no rating (still valid). -->
+  <!-- Diary/shutter/flip — same gallery/shutter/flip row Instagram/
+       Snapchat use, now real flex children of one row (was 3
+       individually screen-bottom-anchored floats) so they stay put
+       directly under the frame regardless of its rendered height. -->
+  <div class="checkin-ctrl-row">
+    <button class="checkin-float-btn checkin-diary-btn" id="checkinDiaryBtn" type="button" data-i18n="checkin.diaryTitle" data-i18n-attr="title" title="Diary"><svg class="icon"><use href="#ic-proto-diary"></use></svg></button>
+    <button class="rp-fab checkin-shutter" id="checkinShutterBtn" type="button" aria-label="Chụp check-in"></button>
+    <button class="checkin-float-btn checkin-flip-btn" id="checkinFlipBtn" type="button" data-i18n="checkin.flipTitle" data-i18n-attr="title" title="Đổi camera trước/sau"><svg class="icon"><use href="#ic-action-undo-reset"></use></svg></button>
+  </div>
+
+  <div class="checkin-spacer-bottom"></div>
+
+  <!-- Star rating pill — floats above the shutter. 0 = no rating (still
+       valid). Permanently display:none (see styles.css) — rating only
+       shows in the post-capture preview sheet now; kept in the DOM so
+       _tapShutter()'s dataset.rating read still works. -->
   <div class="checkin-star-pill" id="checkinStars" data-rating="0">
     <button class="checkin-star" type="button" data-value="1"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
     <button class="checkin-star" type="button" data-value="2"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
@@ -829,9 +826,6 @@
     <button class="checkin-star" type="button" data-value="4"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
     <button class="checkin-star" type="button" data-value="5"><svg class="icon" width="22" height="22"><use href="#ic-rating-star-outline"></use></svg></button>
   </div>
-
-  <!-- Shutter — reuses .rp-fab construction (54px, 2px border, 3px offset shadow), recolored to --checkin. -->
-  <button class="rp-fab checkin-shutter" id="checkinShutterBtn" type="button" aria-label="Chụp check-in"></button>
 
   <!-- Flash overlay for the capture moment. -->
   <div class="checkin-flash" id="checkinFlash"></div>

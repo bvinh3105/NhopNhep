@@ -247,7 +247,10 @@ input,textarea,select{font-family:var(--font-body)}
    keyboard stepping and screen-reader value announcements keep working
    for free and there's no second state machine to keep in sync. */
 .checkin-exposure{
-  position:absolute;top:calc(var(--safe-top) + 238px);right:15px;z-index:14;
+  /* Docks to .checkin-frame's own top-right corner now (2026-09-24
+     layout rebuild) — frame-relative, not screen-relative, since the
+     frame's size is width-driven and no longer full-bleed. */
+  position:absolute;top:14px;right:14px;z-index:14;
   display:flex;flex-direction:column;align-items:center;gap:8px;
   background:var(--white);border-radius:24px;padding:12px 8px;
   box-shadow:0 6px 18px rgba(42,24,16,.2);
@@ -2245,14 +2248,17 @@ body.map-full .tabbar{transform:translateY(105%)}
 /* ═══════════════════════════════════════════════
    CHECK-IN TAB — camera-first ("chụp NGAY", real-time capture)
    ───────────────────────────────────────────────
-   Layout is IDENTICAL in feel to Home: a full-bleed rectangle (the map
-   there, the live <video> here) with .brand-float top-left, .map-btn-
-   cluster top-right, and .rp-fab as the primary action. Reusing those
-   three constructions verbatim (no new pill/button shapes) so this tab
-   reads as "same app, different content", not a foreign camera UI.
+   Live-camera layout rebuilt 2026-09-24 to a Locket-style inset frame
+   Vinh signed off on via an interactive demo, replacing the original
+   full-bleed-video + reticle + backdrop-blur version: an inset, rounded
+   3:4 .checkin-frame with real dark margin around it (var(--text), same
+   token the no-permission fallback already used), .brand-float pill
+   floating near the top, and diary/shutter/flip as one flex row directly
+   under the frame. See the longer comment above .checkin-spacer-top
+   further down for the structural reasoning.
 
    New styles below are ONLY:
-     .checkin-video           — the full-bleed <video> element
+     .checkin-frame, .checkin-spacer-*, .checkin-ctrl-row — the live-camera layout
      .checkin-quan-pill/dist  — cosmetic tweaks on top of .brand-float
      .checkin-star-pill       — new: rating row (no existing analog)
      .checkin-preview*        — sheet shown after the shutter fires
@@ -2277,100 +2283,45 @@ body.map-full .tabbar{transform:translateY(105%)}
    read as a foreign UI, not "same app, different tab".
 ═══════════════════════════════════════════════ */
 
-/* Full-bleed video takes the whole tab surface, just like #mainMapWrap
-   does for Home. Cover-fit so portrait phones don't get letterboxed. */
-.checkin-video{
-  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+/* ── Live camera layout (2026-09-24 rebuild) ──────────────────────────
+   Retired the earlier full-bleed-video + reticle + backdrop-blur system
+   for a Locket-style layout Vinh signed off on via an interactive demo:
+   an inset, rounded 3:4 frame with real margin around it, instead of a
+   full-bleed video with a focus box drawn on top. There's no "outside
+   the frame" video left to blur — the margin is just solid background —
+   so the whole reticle/mask apparatus (and its real-device mask-position
+   bug from earlier the same day) is gone, not just patched.
+
+   #checkinScreen is `.screen`'s own flex column (display:flex;
+   flex-direction:column is the BASE .screen rule) — .checkin-spacer-top/
+   -bottom, .checkin-frame-zone and .checkin-ctrl-row are real flex
+   children so the control row always sits directly under the frame
+   regardless of the frame's rendered height (width-driven via
+   aspect-ratio, so it varies by device) — anchoring the row from a
+   fixed screen-bottom offset instead, like the old layout did, would
+   overlap the frame on some widths and leave a gap on others. Floating
+   chrome that doesn't need to affect that flow (the quán pill, the
+   hidden rating pill, capture flash, the preview sheet, sign-in/no-perm
+   fallbacks) stays exactly as it was: position:absolute against
+   #checkinScreen, unaffected by the flex children around it. */
+#checkinScreen{background:var(--text)}
+
+.checkin-spacer-top{flex:4;min-height:0}
+.checkin-spacer-bottom{flex:6;min-height:0}
+
+.checkin-frame-zone{flex:0 0 auto;padding:0 18px;min-height:0}
+.checkin-frame{
+  position:relative;width:100%;aspect-ratio:3/4;
+  border-radius:32px;overflow:hidden;
   background:var(--cam-bg,#0e0806);
-  z-index:0;
 }
+.checkin-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .checkin-video.hidden{display:none}
 
-/* Focus reticle over the video — same corner-bracket detail the preview
-   prototype used, drawn purely with CSS on the video wrapper. Ignores
-   pointer so it doesn't intercept a shutter tap. Enlarged + recentered
-   per Vinh (2026-09-24) — was 10%/10% (already symmetric by
-   construction) but the frame itself needed to be bigger; 4.4%/4.4%
-   keeps the same symmetric-by-construction property at the new size. */
-/* Border made visibly readable on ANY backdrop (2026-09-24 — the old
-   rgba(255,255,255,.14) line all but disappeared against a light/grey
-   real-world background, real-device bug report). Bright white line +
-   a dark ring just outside it + a soft dark glow: the dark parts read
-   against a light scene, the white part reads against a dark scene, so
-   at least one half is always visible regardless of what's framed. */
-#checkinScreen::before{
-  content:'';position:absolute;top:11.4%;left:4.4%;right:4.4%;bottom:31.6%;
-  border:1.5px solid rgba(255,255,255,.85);border-radius:14px;
-  box-shadow:0 0 0 1px rgba(0,0,0,.45),0 0 8px rgba(0,0,0,.3);
-  pointer-events:none;z-index:2;
-  animation:checkin-focus 1.8s ease-in-out infinite alternate;
+.checkin-ctrl-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 34px calc(var(--safe-bottom) + 90px);flex-shrink:0;
 }
-#checkinScreen::after{
-  content:'';position:absolute;top:calc(11.4% - 8px);left:calc(4.4% - 8px);
-  width:18px;height:18px;pointer-events:none;z-index:2;
-  border-top:2.5px solid rgba(255,255,255,.9);border-left:2.5px solid rgba(255,255,255,.9);
-  border-top-left-radius:5px;
-  filter:drop-shadow(0 0 2px rgba(0,0,0,.5));
-}
-@keyframes checkin-focus{
-  from{opacity:.5;transform:scale(1)}
-  to  {opacity:1;transform:scale(1.02)}
-}
-
-/* Blur frame — ONE element, backdrop-filter over the full tab, masked
-   down to just the ring AROUND the reticle (mask-composite:exclude of
-   a full-rect layer and an inner-rect layer at the reticle's own
-   top/left/right/bottom — the overlap, i.e. the reticle's interior,
-   comes out fully transparent so the raw sharp video shows there,
-   same numbers #checkinScreen::before uses for its border).
-   Replaced an earlier 4-separate-strips version (2026-09-24) that left
-   visible seams at each corner — each strip was its own independent
-   compositing/blur region, so the corners where two strips touched
-   never quite lined up on a real device. One element has exactly one
-   edge (the reticle boundary), so there's nothing left to seam.
-   z-index:1 — above the raw <video> (z:0) but below the reticle
-   border/corner (z:2) and every real UI control (pill/buttons/sheet
-   are all z:14+), so it never intercepts a tap.
-
-   mask-position % is NOT "distance from the edge" — like
-   background-position, it's resolved as (container - layer) * pct, i.e.
-   against the LEFTOVER space once the sized layer is placed, not the
-   full container (2026-09-24 real-device bug: naively reusing the
-   border's 4.4%/11.4% here put the hole almost flush with the top-left
-   corner instead of matching the border box, so the visible blur/sharp
-   line drifted off the actual reticle). Converting the border's
-   top/left/right/bottom insets into that formula for a 91.2%×57% layer:
-     x: leftover = 100-91.2=8.8%  → pct = 4.4/8.8   = 50%
-     y: leftover = 100-57  =43%   → pct = 11.4/43   ≈ 26.512%
-   (x comes out to a clean 50% only because the reticle is horizontally
-   symmetric — 4.4% inset on both left and right). */
-.checkin-blur-frame{
-  position:absolute;inset:0;z-index:1;pointer-events:none;
-  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  background:rgba(20,12,6,.15); /* slight dark tint reinforces the "outside the frame" read */
-  -webkit-mask-image:linear-gradient(#000,#000),linear-gradient(#000,#000);
-  -webkit-mask-size:100% 100%,91.2% 57%;
-  -webkit-mask-position:0 0,50% 26.512%;
-  -webkit-mask-repeat:no-repeat,no-repeat;
-  -webkit-mask-composite:xor;
-  mask-image:linear-gradient(#000,#000),linear-gradient(#000,#000);
-  mask-size:100% 100%,91.2% 57%;
-  mask-position:0 0,50% 26.512%;
-  mask-repeat:no-repeat,no-repeat;
-  mask-composite:exclude;
-}
-
-/* When the preview sheet or one of the fallback overlays is showing,
-   don't leave the reticle/blur frame drawn on top of them. */
-#checkinScreen:has(#checkinPreview:not(.hidden))::before,
-#checkinScreen:has(#checkinPreview:not(.hidden))::after,
-#checkinScreen:has(#checkinSignInWrap:not(.hidden))::before,
-#checkinScreen:has(#checkinSignInWrap:not(.hidden))::after,
-#checkinScreen:has(#checkinNoPerm:not(.hidden))::before,
-#checkinScreen:has(#checkinNoPerm:not(.hidden))::after,
-#checkinScreen:has(#checkinPreview:not(.hidden)) .checkin-blur-frame,
-#checkinScreen:has(#checkinSignInWrap:not(.hidden)) .checkin-blur-frame,
-#checkinScreen:has(#checkinNoPerm:not(.hidden)) .checkin-blur-frame{display:none}
 
 /* Signed-out / no-permission fallbacks — reuse the .coming-soon-wrap
    look already used elsewhere. They live above the (empty) video. */
@@ -2424,42 +2375,34 @@ body.map-full .tabbar{transform:translateY(105%)}
 }
 .checkin-quan-dist:empty{display:none}
 
-/* Standalone floating icon buttons — replaces the old 3-in-1
-   .checkin-cluster pill. Same circular-white-chip visual language the
-   app already uses for lone floating buttons (e.g. GPS float on Home),
-   just independently positioned instead of grouped in one shared pill. */
+/* Standalone floating icon buttons. Same circular-white-chip visual
+   language the app already uses for lone floating buttons (e.g. GPS
+   float on Home). Diary/flip are now real flex children of
+   .checkin-ctrl-row (2026-09-24 layout rebuild) instead of individually
+   absolute-positioned — anchoring each to a fixed screen-bottom offset
+   couldn't reliably clear the new width-driven frame height across
+   device sizes, and flex placement makes that a non-issue. Lock stays
+   absolute since it docks to a specific corner of .checkin-frame. */
 .checkin-float-btn{
-  position:absolute;z-index:14;border-radius:50%;background:var(--white);
+  z-index:14;border-radius:50%;background:var(--white);
   box-shadow:0 6px 18px rgba(42,24,16,.2);
   display:flex;align-items:center;justify-content:center;color:var(--text2);
   transition:transform .1s;
 }
 .checkin-float-btn:active{transform:scale(.92)}
 
-/* Diary + flip flank the (enlarged, 80px) shutter in one row — the same
-   gallery/shutter/flip layout Instagram/Snapchat use for their camera
-   tab. 40px outer margins, 61px gaps to the shutter on both sides — the
-   two numbers plus the shutter's own 80px width sum to exactly 390px,
-   so this is centered as a SET without needing left:50% math of its
-   own. Bottom-anchored to share the shutter's vertical center: the
-   shutter sits at bottom:(safe-bottom+120px) with height 80 → center is
-   120+40=160px above the safe-bottom line; matching that center for a
-   54px-tall button needs bottom:(safe-bottom + 160-27) = +133px. */
-.checkin-diary-btn{
-  left:40px;bottom:calc(var(--safe-bottom) + 133px);width:54px;height:54px;
-}
-.checkin-flip-btn{
-  right:40px;bottom:calc(var(--safe-bottom) + 133px);width:54px;height:54px;
-}
+.checkin-diary-btn,.checkin-flip-btn{width:54px;height:54px}
 .checkin-diary-btn .icon,.checkin-flip-btn .icon{width:24px;height:24px}
 
-/* Lock sits directly above the exposure slider, both right-docked at
-   right:15px (see .checkin-exposure below — they deliberately share
-   that exact edge). A separate visual group from the diary/shutter/
-   flip row, so it keeps its own smaller 38px size, no reason to match
-   the row's 54px buttons. */
-.checkin-lock-btn{
-  top:calc(var(--safe-top) + 422px);right:15px;width:38px;height:38px;
+/* Docks below .checkin-exposure, same right edge, both relative to
+   .checkin-frame now instead of the whole screen (2026-09-24 layout
+   rebuild) — the frame's size is width-driven (aspect-ratio:3/4), so a
+   screen-relative fixed px offset couldn't reliably land in the same
+   spot on every device the way a frame-relative one does. Stack math:
+   exposure top:14px + its own ~170px height (12+18+8+120+12 padding/
+   icon/gap/slider) + 8px gap ≈ 192px for lock's top. */
+.checkin-float-btn.checkin-lock-btn{
+  position:absolute;top:192px;right:14px;width:38px;height:38px;
 }
 
 /* Star rating pill — floats between the frame edge and the shutter.
@@ -2488,21 +2431,25 @@ body.map-full .tabbar{transform:translateY(105%)}
 .checkin-star.on{color:var(--accent-2)}
 .checkin-star .icon{width:1.3rem;height:1.3rem}
 
-/* Shutter — .rp-fab does the size/border/shadow/position. The extra
-   .checkin-shutter class only recolors it and positions it centered
-   above the tab bar (instead of the .rp-fab default bottom:100px right:16px
-   which suits Home's dice FAB). */
+/* Shutter — .rp-fab does the size/border/shadow math; .checkin-shutter
+   only recolors it and, since 2026-09-24, takes it OUT of .rp-fab's
+   fixed/floating positioning entirely so it can sit as a normal flex
+   child of .checkin-ctrl-row (centered between diary/flip by
+   justify-content:space-between there, same as Instagram/Snapchat's
+   gallery/shutter/flip row) — the row itself is now what stays clear of
+   the tab bar (see .checkin-ctrl-row's bottom padding), not the shutter
+   individually. position:relative, NOT static — static would still take
+   it out of flow correctly, but it ALSO stops the button being a
+   containing block for its own ::after "shutter ring" pseudo-element
+   below, which then anchored to some big ancestor instead and rendered
+   as a screen-filling blob (caught live while testing this rebuild).
+   right:auto;bottom:auto resets .rp-fab's own right:16px;bottom:100px —
+   under position:relative (unlike the fixed/static it replaced) those
+   inherited offsets don't just get ignored, they shift the button away
+   from its normal flex position by that exact amount (caught live: the
+   shutter rendered 100px above the row it was actually laid out in). */
 .rp-fab.checkin-shutter{
-  right:auto;left:50%;transform:translateX(-50%);
-  /* Cleared above the floating tab bar on all phones — see .checkin-star-pill
-     comment above for the env() reasoning. bottom-anchored (not top), so
-     enlarging width/height below only grows the button UPWARD — the tab-bar
-     clearance stays exactly this same 120px regardless of size, and
-     left:50%+transform:translateX(-50%) stays perfectly centered
-     regardless of width too. Star pill above at bottom:190 has ~16px gap
-     to a default 54px shutter, tighter now that it's enlarged — intentional
-     per Vinh (2026-09-24): bigger capture target. */
-  bottom:calc(env(safe-area-inset-bottom, 0px) + 120px);
+  position:relative;right:auto;bottom:auto;
   width:80px;height:80px;
   background:var(--primary);
   color:var(--cream);
@@ -2511,9 +2458,9 @@ body.map-full .tabbar{transform:translateY(105%)}
   content:'';position:absolute;inset:6px;background:var(--white);
   border-radius:50%;border:2px solid var(--text);
 }
-.rp-fab.checkin-shutter:active{transform:translate(calc(-50% + 1px),1px);box-shadow:2px 2px 0 var(--text)}
+.rp-fab.checkin-shutter:active{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--text)}
 .rp-fab.checkin-shutter.busy{animation:checkin-shutter-pulse .35s ease}
-@keyframes checkin-shutter-pulse{0%,100%{transform:translateX(-50%) scale(1)}50%{transform:translateX(-50%) scale(.88)}}
+@keyframes checkin-shutter-pulse{0%,100%{transform:scale(1)}50%{transform:scale(.88)}}
 
 /* Capture flash */
 .checkin-flash{position:absolute;inset:0;background:var(--white);opacity:0;pointer-events:none;transition:opacity .15s;z-index:50}
