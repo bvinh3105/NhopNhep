@@ -235,12 +235,19 @@ input,textarea,select{font-family:var(--font-body)}
 .cluster-btn-gps.pulse{transform:scale(1.2)}
 .cluster-btn.on{background:var(--primary);color:var(--white)}
 
-/* Exposure/brightness fine-tune — vertical slider docked on the left
-   edge, mirrors the quán pill's top offset roughly but centered
-   vertically so it doesn't collide with the pill or the shutter area. */
+/* Exposure/brightness fine-tune — vertical slider, right edge, docked
+   directly above .checkin-lock-btn (2026-09-24: moved from the left
+   edge to pair with lock as one right-side stack). Track widened
+   26px→30px for a bigger drag target per the same UX pass — see
+   CheckinCtrl._onExposureInput()/_queueExposure() for the interaction
+   changes (snap-to-zero, double-tap reset, live EV readout, and an
+   in-flight-gated coalescing queue instead of firing applyConstraints
+   on every raw drag tick). Intentionally still a real, native
+   <input type=range> — NOT a custom pointer-driven surface — so
+   keyboard stepping and screen-reader value announcements keep working
+   for free and there's no second state machine to keep in sync. */
 .checkin-exposure{
-  position:absolute;top:50%;left:.6rem;z-index:14;
-  transform:translateY(-50%);
+  position:absolute;top:calc(var(--safe-top) + 238px);right:15px;z-index:14;
   display:flex;flex-direction:column;align-items:center;gap:8px;
   background:var(--white);border-radius:24px;padding:12px 8px;
   box-shadow:0 6px 18px rgba(42,24,16,.2);
@@ -248,9 +255,30 @@ input,textarea,select{font-family:var(--font-body)}
 }
 .checkin-exposure-slider{
   writing-mode:vertical-lr;direction:rtl;
-  width:26px;height:120px;accent-color:var(--primary);
+  width:30px;height:120px;accent-color:var(--primary);
   cursor:pointer;
 }
+/* Snap-to-zero confirmation pulse — re-triggerable via classList.remove
+   then .add (see CheckinCtrl._pulseExposureThumb) since removing and
+   re-adding the same class in the same tick doesn't reliably restart a
+   CSS animation on its own. */
+.checkin-exposure-slider.pulse{animation:checkinExposurePulse .18s ease}
+@keyframes checkinExposurePulse{50%{transform:scale(1.15)}}
+
+/* Floating "+1.5" / "Tự động" readout — sits to the LEFT of the wrap
+   (the wrap itself is right-docked, so there's no room to the right)
+   and tracks the thumb's vertical position, set inline via JS. Only
+   visible while actively dragging + briefly after (see the 600ms
+   fade in _showExposureReadout). */
+.checkin-exposure-readout{
+  position:absolute;right:calc(100% + 8px);top:50%;
+  transform:translateY(-50%);
+  background:var(--text);color:var(--cream);
+  font-size:.68rem;font-weight:800;line-height:1;
+  padding:.3rem .55rem;border-radius:8px;white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.checkin-exposure-readout.show{opacity:1}
 
 #mainMapWrap{
   position:absolute;inset:0;z-index:0;margin:0;border-radius:0;
@@ -2251,15 +2279,18 @@ body.map-full .tabbar{transform:translateY(105%)}
 
 /* Focus reticle over the video — same corner-bracket detail the preview
    prototype used, drawn purely with CSS on the video wrapper. Ignores
-   pointer so it doesn't intercept a shutter tap. */
+   pointer so it doesn't intercept a shutter tap. Enlarged + recentered
+   per Vinh (2026-09-24) — was 10%/10% (already symmetric by
+   construction) but the frame itself needed to be bigger; 4.4%/4.4%
+   keeps the same symmetric-by-construction property at the new size. */
 #checkinScreen::before{
-  content:'';position:absolute;top:12%;left:10%;right:10%;bottom:26%;
+  content:'';position:absolute;top:11.4%;left:4.4%;right:4.4%;bottom:31.6%;
   border:1.5px solid rgba(255,255,255,.14);border-radius:14px;
   pointer-events:none;z-index:2;
   animation:checkin-focus 1.8s ease-in-out infinite alternate;
 }
 #checkinScreen::after{
-  content:'';position:absolute;top:calc(12% - 8px);left:calc(10% - 8px);
+  content:'';position:absolute;top:calc(11.4% - 8px);left:calc(4.4% - 8px);
   width:18px;height:18px;pointer-events:none;z-index:2;
   border-top:2.5px solid rgba(255,255,255,.7);border-left:2.5px solid rgba(255,255,255,.7);
   border-top-left-radius:5px;
@@ -2293,12 +2324,15 @@ body.map-full .tabbar{transform:translateY(105%)}
 .checkin-signin.hidden,.checkin-noperm.hidden{display:none}
 
 /* Cosmetic overrides on top of the .brand-float pill for the check-in
-   context — same base construction, wider max-width so quán names
-   don't clip on narrow phones, and a chevron in text3 to hint "tap to
-   change". Everything else (bg, radius, shadow) inherits from
-   .brand-float unchanged. */
+   context — same base construction (bg/radius/shadow inherited
+   unchanged), but its own top/left instead of .brand-float's
+   .6rem/.7rem edge-hugging default: pulled in from the corner per
+   Vinh (2026-09-24) so it reads as placed, not stuck to the edge.
+   max-width shrunk to match the new 83px side margins so long quán
+   names can't overflow past a symmetric-looking right gap. */
 .checkin-quan-pill{
-  max-width:calc(100vw - 6rem);z-index:14;
+  top:calc(var(--safe-top) + 24px);left:83px;
+  max-width:calc(100vw - 166px);z-index:14;
 }
 .checkin-quan-pill .icon{width:1em;height:1em;color:var(--primary)}
 .checkin-quan-pill .chevron{color:var(--text3);font-size:.7rem;margin-left:.1rem}
@@ -2309,7 +2343,43 @@ body.map-full .tabbar{transform:translateY(105%)}
 }
 .checkin-quan-dist:empty{display:none}
 
-.checkin-cluster{z-index:14}
+/* Standalone floating icon buttons — replaces the old 3-in-1
+   .checkin-cluster pill. Same circular-white-chip visual language the
+   app already uses for lone floating buttons (e.g. GPS float on Home),
+   just independently positioned instead of grouped in one shared pill. */
+.checkin-float-btn{
+  position:absolute;z-index:14;border-radius:50%;background:var(--white);
+  box-shadow:0 6px 18px rgba(42,24,16,.2);
+  display:flex;align-items:center;justify-content:center;color:var(--text2);
+  transition:transform .1s;
+}
+.checkin-float-btn:active{transform:scale(.92)}
+
+/* Diary + flip flank the (enlarged, 80px) shutter in one row — the same
+   gallery/shutter/flip layout Instagram/Snapchat use for their camera
+   tab. 40px outer margins, 61px gaps to the shutter on both sides — the
+   two numbers plus the shutter's own 80px width sum to exactly 390px,
+   so this is centered as a SET without needing left:50% math of its
+   own. Bottom-anchored to share the shutter's vertical center: the
+   shutter sits at bottom:(safe-bottom+120px) with height 80 → center is
+   120+40=160px above the safe-bottom line; matching that center for a
+   54px-tall button needs bottom:(safe-bottom + 160-27) = +133px. */
+.checkin-diary-btn{
+  left:40px;bottom:calc(var(--safe-bottom) + 133px);width:54px;height:54px;
+}
+.checkin-flip-btn{
+  right:40px;bottom:calc(var(--safe-bottom) + 133px);width:54px;height:54px;
+}
+.checkin-diary-btn .icon,.checkin-flip-btn .icon{width:24px;height:24px}
+
+/* Lock sits directly above the exposure slider, both right-docked at
+   right:15px (see .checkin-exposure below — they deliberately share
+   that exact edge). A separate visual group from the diary/shutter/
+   flip row, so it keeps its own smaller 38px size, no reason to match
+   the row's 54px buttons. */
+.checkin-lock-btn{
+  top:calc(var(--safe-top) + 422px);right:15px;width:38px;height:38px;
+}
 
 /* Star rating pill — floats between the frame edge and the shutter.
    Uses the same sticker construction (2px border + offset shadow) as
@@ -2344,11 +2414,15 @@ body.map-full .tabbar{transform:translateY(105%)}
 .rp-fab.checkin-shutter{
   right:auto;left:50%;transform:translateX(-50%);
   /* Cleared above the floating tab bar on all phones — see .checkin-star-pill
-     comment above for the env() reasoning. Shutter is 54px tall, so with
-     bottom:120px + safe-inset the TOP of the shutter is well clear of the
-     tab bar's ~72px effective height. Star pill above at bottom:190 has
-     ~16px gap, tight but intentional. */
+     comment above for the env() reasoning. bottom-anchored (not top), so
+     enlarging width/height below only grows the button UPWARD — the tab-bar
+     clearance stays exactly this same 120px regardless of size, and
+     left:50%+transform:translateX(-50%) stays perfectly centered
+     regardless of width too. Star pill above at bottom:190 has ~16px gap
+     to a default 54px shutter, tighter now that it's enlarged — intentional
+     per Vinh (2026-09-24): bigger capture target. */
   bottom:calc(env(safe-area-inset-bottom, 0px) + 120px);
+  width:80px;height:80px;
   background:var(--checkin,#D64B7A);
   color:var(--cream);
 }

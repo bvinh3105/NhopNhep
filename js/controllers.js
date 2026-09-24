@@ -5258,10 +5258,25 @@ const CheckinCtrl = {
   PHOTO_FILTER: 'contrast(1.08) saturate(1.16) brightness(1.02) sepia(.06)',
   _locked: false, // AE/AF lock state for the current stream — see _toggleLock()
 
+  // Exposure-slider interaction state — see _queueExposure()/_drainExposure()
+  // (in-flight-gated coalescing queue) and _checkExposureDoubleTap().
+  _exposureLastSent: null, _exposurePending: null, _exposureApplying: false,
+  _exposureFadeTimer: null, _lastExposureTap: null,
+
   init() {
     document.getElementById('checkinQuanPill').addEventListener('click', () => this._openPicker());
     document.getElementById('checkinLockBtn').addEventListener('click', () => this._toggleLock());
-    document.getElementById('checkinExposureSlider').addEventListener('input', (e) => this._setExposure(+e.target.value));
+    document.getElementById('checkinExposureSlider').addEventListener('input', (e) => this._onExposureInput(+e.target.value));
+    // Double-tap anywhere on the wrap (sun icon, padding, or the slider
+    // itself — pointerdown bubbles up regardless) resets to 0. Doesn't
+    // block the native slider's own drag handling; it only reacts to a
+    // second rapid tap, see _checkExposureDoubleTap().
+    document.getElementById('checkinExposureWrap').addEventListener('pointerdown', (e) => {
+      if (!this._checkExposureDoubleTap(e)) return;
+      const slider = document.getElementById('checkinExposureSlider');
+      slider.value = 0;
+      this._onExposureInput(0);
+    });
     document.getElementById('checkinDiaryBtn').addEventListener('click', () => this._openDiary());
     document.getElementById('checkinFlipBtn').addEventListener('click', () => this._flipCamera());
     document.getElementById('checkinShutterBtn').addEventListener('click', () => this._tapShutter());
@@ -5341,19 +5356,20 @@ const CheckinCtrl = {
     document.querySelector('.tabbar')?.classList.remove('checkin-hidden');
   },
 
-  // Show/hide the floating controls (pill, cluster, stars, shutter) —
+  // Show/hide the floating controls (pill, buttons, stars, shutter) —
   // hidden when the sign-in overlay or the no-perm fallback is up.
-  // checkinExposureWrap is included even though it defaults to hidden
-  // via its own capability check (_setupManualControls) — it lives
-  // outside .checkin-cluster, so without this it could stay stuck
-  // visible over the no-perm fallback if the stream fails on a re-entry
-  // AFTER a previous visit had already shown it.
+  // checkinExposureWrap/checkinLockBtn are included even though they
+  // default to hidden via their own capability check
+  // (_setupManualControls) — without this they could stay stuck visible
+  // over the no-perm fallback if the stream fails on a re-entry AFTER a
+  // previous visit had already shown them. Safe to combine with that
+  // class-based hiding: .hidden{display:none!important} always wins
+  // over this inline style either way.
   _toggleChrome(show) {
-    ['checkinQuanPill','checkinStars','checkinShutterBtn','checkinExposureWrap'].forEach(id => {
+    ['checkinQuanPill','checkinStars','checkinShutterBtn','checkinDiaryBtn','checkinFlipBtn','checkinLockBtn','checkinExposureWrap'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = show ? '' : 'none';
     });
-    document.querySelector('#checkinScreen .checkin-cluster').style.display = show ? '' : 'none';
   },
 
   async _startStream() {
@@ -5482,6 +5498,11 @@ const CheckinCtrl = {
       expSlider.step = ec.step || 1;
       const settings = track.getSettings ? track.getSettings() : {};
       expSlider.value = settings.exposureCompensation ?? 0;
+      // Fresh track → fresh coalescing queue (see _queueExposure/_drainExposure).
+      this._exposureLastSent = null;
+      this._exposurePending = null;
+      this._exposureApplying = false;
+      this._lastExposureTap = null;
       expWrap.classList.remove('hidden');
     }
   },
@@ -5511,11 +5532,95 @@ const CheckinCtrl = {
     }
   },
 
-  async _setExposure(value) {
+  // Fires on every native 'input' tick. Kept the real <input type=range>
+  // as the sole interactive element (no custom pointer-driven surface) —
+  // arrow-key stepping and screen-reader value announcements keep
+  // working for free, and there's no second state machine to drift out
+  // of sync with it. Everything below just decorates that one control.
+  _onExposureInput(rawValue) {
+    const slider = document.getElementById('checkinExposureSlider');
+    const min = +slider.min, max = +slider.max;
+    let value = rawValue;
+    // Magnetic snap-to-zero — a precision-assist for a drag already in
+    // progress near center, so returning to "auto" doesn't mean hunting
+    // for one exact pixel. Separate from (and complementary to) the
+    // double-tap reset below, which is a zero-motion shortcut instead.
+    if (min < 0 && max > 0 && Math.abs(value) < 0.3) {
+      value = 0;
+      slider.value = 0;
+      this._pulseExposureThumb();
+    }
+    this._showExposureReadout(value, min, max);
+    this._queueExposure(value);
+  },
+
+  _showExposureReadout(value, min, max) {
+    const label = document.getElementById('checkinExposureReadout');
+    label.textContent = value === 0
+      ? I18N.t('checkin.exposureAuto')
+      : (value > 0 ? `+${value.toFixed(1)}` : value.toFixed(1));
+    // direction:rtl + writing-mode:vertical-lr puts min at the bottom
+    // and max at the top (see .checkin-exposure-slider) — mirror that
+    // here so the readout tracks the thumb instead of running backwards.
+    const pct = (value - min) / (max - min);
+    label.style.top = `${(1 - pct) * 100}%`;
+    label.classList.add('show');
+    // One shared timeout — cleared and restarted on every interaction —
+    // so two overlapping fades from a fast double-drag can't race.
+    clearTimeout(this._exposureFadeTimer);
+    this._exposureFadeTimer = setTimeout(() => label.classList.remove('show'), 600);
+  },
+
+  _pulseExposureThumb() {
+    const slider = document.getElementById('checkinExposureSlider');
+    slider.classList.remove('pulse');
+    void slider.offsetWidth; // reflow — restarts the animation on rapid re-triggers
+    slider.classList.add('pulse');
+  },
+
+  // Double-tap anywhere on the slider resets to 0 ("Tự động") — a
+  // zero-motion shortcut distinct from the drag-based snap-to-zero
+  // above, which only helps once a drag is already near center.
+  _checkExposureDoubleTap(e) {
+    const now = Date.now();
+    const last = this._lastExposureTap;
+    this._lastExposureTap = { time: now, x: e.clientX, y: e.clientY };
+    if (!last) return false;
+    const closeInTime = now - last.time < 300;
+    const closeInSpace = Math.hypot(e.clientX - last.x, e.clientY - last.y) < 24;
+    return closeInTime && closeInSpace;
+  },
+
+  // In-flight-gated trailing coalescing: guarantees at most ONE
+  // applyConstraints() call in flight at a time and always eventually
+  // sends the latest value — self-adapts to whatever the device's real
+  // camera HAL latency is instead of guessing a fixed throttle
+  // interval. A fixed-interval throttle (e.g. once per animation
+  // frame) is the wrong primitive here: AE convergence/settling is
+  // often 50-150ms+ (worse in low light, which is exactly when this
+  // control gets used), so a 16ms-cadence throttle would still queue
+  // calls up behind hardware that hasn't caught up — that's the actual
+  // cause of the "device rejected mid-drag" symptom below, not just
+  // raw call volume. Rounded-value dedup separately skips scheduling a
+  // no-op call during tiny finger jitter.
+  _queueExposure(value) {
+    const rounded = Math.round(value * 10) / 10;
+    if (rounded === this._exposureLastSent) return;
+    this._exposurePending = rounded;
+    if (this._exposureApplying) return; // in-flight call picks up the latest on settle
+    this._drainExposure();
+  },
+
+  async _drainExposure() {
     const track = this._stream && this._stream.getVideoTracks()[0];
     if (!track) return;
+    this._exposureApplying = true;
+    const value = this._exposurePending;
+    this._exposureLastSent = value;
     try { await track.applyConstraints({ advanced: [{ exposureCompensation: value }] }); }
-    catch (_) { /* device rejected mid-drag — harmless, slider just won't stick */ }
+    catch (_) { /* superseded or rejected mid-drag — harmless, next value below still lands */ }
+    this._exposureApplying = false;
+    if (this._exposurePending !== value) this._drainExposure();
   },
 
   _refreshQuan() {
