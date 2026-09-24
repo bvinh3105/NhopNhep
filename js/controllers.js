@@ -5343,8 +5343,13 @@ const CheckinCtrl = {
 
   // Show/hide the floating controls (pill, cluster, stars, shutter) —
   // hidden when the sign-in overlay or the no-perm fallback is up.
+  // checkinExposureWrap is included even though it defaults to hidden
+  // via its own capability check (_setupManualControls) — it lives
+  // outside .checkin-cluster, so without this it could stay stuck
+  // visible over the no-perm fallback if the stream fails on a re-entry
+  // AFTER a previous visit had already shown it.
   _toggleChrome(show) {
-    ['checkinQuanPill','checkinStars','checkinShutterBtn'].forEach(id => {
+    ['checkinQuanPill','checkinStars','checkinShutterBtn','checkinExposureWrap'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = show ? '' : 'none';
     });
@@ -5502,7 +5507,7 @@ const CheckinCtrl = {
       showToast(I18N.t(this._locked ? 'checkin.locked' : 'checkin.unlocked'));
     } catch (_) {
       this._locked = !this._locked; // revert — the device refused the mode switch
-      showToast(`⚠️ ${I18N.t('err.serverGeneric')}`);
+      showToast(`⚠️ ${I18N.t('checkin.lockFailed')}`);
     }
   },
 
@@ -6190,8 +6195,13 @@ const CheckinCalendarCtrl = {
     const uid    = Community.currentUser?.id;
     if (!uid) return;
     const filter = encodeURIComponent(`user="${uid}" && created >= "${start}" && created <= "${end}"`);
+    // expand=user — without it CheckinViewerCtrl._renderPost() has no
+    // rec.expand.user to read a name/avatar from and falls back to
+    // "Anonymous", which is wrong here specifically: every record this
+    // fetch returns already belongs to the viewer (own diary), so it
+    // should show their own name, not a stranger placeholder.
     const r = await Community._fetch(
-      `/api/collections/checkins/records?filter=${filter}&sort=created&perPage=200`
+      `/api/collections/checkins/records?filter=${filter}&sort=created&perPage=200&expand=user`
     );
     if (r.ok) this._items = r.data?.items || [];
     this._buildByDay();
@@ -6693,11 +6703,23 @@ const CheckinViewerCtrl = {
     this._doDelete();
   },
 
+  // PocketBase's own JSON error messages are English system text ("The
+  // requested resource wasn't found.") — never surface that raw in a
+  // Vietnamese UI. 404 specifically means the record's already gone
+  // (deleted from another session, or a stale local reference), which
+  // gets its own friendlier line; everything else falls back generic.
+  _friendlyError(r) {
+    return r.status === 404 ? I18N.t('checkin.notFoundServer') : I18N.t('err.serverGeneric');
+  },
+
   async _doDelete() {
     const rec = this._current();
     if (!rec) return;
     const r = await Community.deleteCheckin(rec.id);
-    if (!r.ok) { showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
+    // A 404 here means the record is already gone server-side — the end
+    // state the user wants (record gone) already holds, so treat it as
+    // success instead of surfacing an error for something that isn't one.
+    if (!r.ok && r.status !== 404) { showToast(`⚠️ ${this._friendlyError(r)}`); return; }
     this._closeOptMenu(true);
     showToast(I18N.t('checkin.deleted'));
     this._removeCurrentLocally();
@@ -6711,7 +6733,11 @@ const CheckinViewerCtrl = {
     if (!rec) return;
     const nextShared = !rec.is_shared;
     const r = await Community.setCheckinShared(rec.id, nextShared);
-    if (!r.ok) { showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
+    if (!r.ok) {
+      showToast(`⚠️ ${this._friendlyError(r)}`);
+      if (r.status === 404) this._removeCurrentLocally(); // stale reference — drop it
+      return;
+    }
     rec.is_shared = nextShared;
     document.getElementById('ciViewerLock').classList.toggle('hidden', !!rec.is_shared);
     document.getElementById('ciOptHideOwnLbl').textContent =
@@ -6735,7 +6761,7 @@ const CheckinViewerCtrl = {
     if (!rec) return;
     this._closeOptMenu(true);
     const r = await Community.reportCheckin(rec.id, 'other');
-    showToast(r.ok ? I18N.t('checkin.reported') : `⚠️ ${r.error || I18N.t('err.serverGeneric')}`);
+    showToast(r.ok ? I18N.t('checkin.reported') : `⚠️ ${this._friendlyError(r)}`);
   },
 
   // Viewer-only: hide this one check-in from MY OWN feed/discover — pure
