@@ -6512,6 +6512,19 @@ function showCheckinItinerary(rec) {
     showToast(I18N.t('trips.needGps'));
     return;
   }
+  // A check-in's coords are just State.userLat/Lng at the moment it was
+  // taken (see CheckinCtrl._submit) — if GPS or the IP-geo fallback gave
+  // a bad fix at that moment, the check-in can end up tagged continents
+  // away from where it actually happened. Building a route from "here"
+  // to a stale bad fix produces a nonsense multi-day "motorbike" trip
+  // (real bug seen: 11,643km / 466h46p). This app is same-day local
+  // food itineraries — no real stop is ever this far, so treat it as
+  // bad data rather than pretending to route it.
+  const MAX_CHECKIN_DIST_M = 200000; // 200km — generous for any real intra-day trip
+  if (haversine(State.userLat, State.userLng, +rec.restaurant_lat, +rec.restaurant_lng) > MAX_CHECKIN_DIST_M) {
+    showToast(I18N.t('checkinFeed.tooFar'));
+    return;
+  }
   // Adapter — match the shape trip.stops uses in replayTrip so the
   // downstream renderers (timeline, map, save-trip) treat this the
   // same as any other planned stop. `cat` MUST be a valid CATEGORIES
