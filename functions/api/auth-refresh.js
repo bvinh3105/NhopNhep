@@ -11,7 +11,7 @@
 // functions/api/. Must be listed in $pagesFunctionsWithPbUrl in both
 // Bat-TOAN-BO*.ps1 scripts.
 
-const PB_URL = 'https://hang-peas-artist-spa.trycloudflare.com';
+const PB_URL = 'https://indexed-victory-plenty-muscle.trycloudflare.com';
 
 function jsonError(status, message) {
   return new Response(JSON.stringify({ message }), {
