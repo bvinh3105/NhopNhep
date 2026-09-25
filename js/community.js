@@ -902,10 +902,13 @@ const Community = {
     return this._fetch(`/api/collections/checkins/records?filter=${filter}&sort=-created&perPage=${perPage}&expand=user`);
   },
 
-  // Global feed of shared check-ins (mixed into the community list, or
-  // rendered as its own strip — caller decides). Returned newest first.
-  async listSharedCheckins({ page = 1, perPage = 30 } = {}) {
-    const filter = encodeURIComponent(`is_shared=true`);
+  // Community feed of shared check-ins, newest first. Posts live in the
+  // Cộng đồng tab for 24h only (bubbles AND Khám phá); after that they
+  // stay in the owner's diary (getMyCheckins) and still count toward a
+  // quán's verified rating (getCheckinsForRestaurant) — neither is capped.
+  async listSharedCheckins({ page = 1, perPage = 30, withinHours = 24 } = {}) {
+    const since = new Date(Date.now() - withinHours * 3600 * 1000).toISOString().replace('T', ' ');
+    const filter = encodeURIComponent(`is_shared=true && created >= "${since}"`);
     return this._fetch(`/api/collections/checkins/records?filter=${filter}&sort=-created&page=${page}&perPage=${perPage}&expand=user`);
   },
 

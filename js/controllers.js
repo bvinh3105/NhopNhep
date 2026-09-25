@@ -6276,7 +6276,9 @@ const CheckinCtrl = {
   // photo — _resetSubTabs() below just jumps back to sub 0 each capture.
   _wireSubTabs() {
     const scroll = document.getElementById('checkinSubScroll');
-    const tabs = [...document.querySelectorAll('#checkinSubTabs .checkin-sub-tab')];
+    // Position markers: the (hidden) tab chips and the visible dots under
+    // the cards — both jump on tap and both follow the swipe.
+    const tabs = [...document.querySelectorAll('#checkinSubTabs .checkin-sub-tab, #checkinSubDots .checkin-sub-dot')];
     const panels = [...document.querySelectorAll('#checkinSubScroll .checkin-sub-panel')];
     if (!scroll || !tabs.length) return;
 
@@ -6311,8 +6313,8 @@ const CheckinCtrl = {
   _resetSubTabs() {
     const scroll = document.getElementById('checkinSubScroll');
     if (scroll) scroll.scrollLeft = 0;
-    document.querySelectorAll('#checkinSubTabs .checkin-sub-tab').forEach((t, i) => {
-      t.classList.toggle('active', i === 0);
+    document.querySelectorAll('#checkinSubTabs .checkin-sub-tab, #checkinSubDots .checkin-sub-dot').forEach(t => {
+      t.classList.toggle('active', t.dataset.sub === '0');
     });
   },
 
