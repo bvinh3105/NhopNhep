@@ -235,30 +235,48 @@ input,textarea,select{font-family:var(--font-body)}
 .cluster-btn-gps.pulse{transform:scale(1.2)}
 .cluster-btn.on{background:var(--primary);color:var(--white)}
 
-/* Exposure/brightness fine-tune — vertical slider, right edge, docked
-   directly above .checkin-lock-btn (2026-09-24: moved from the left
-   edge to pair with lock as one right-side stack). Track widened
-   26px→30px for a bigger drag target per the same UX pass — see
-   CheckinCtrl._onExposureInput()/_queueExposure() for the interaction
-   changes (snap-to-zero, double-tap reset, live EV readout, and an
-   in-flight-gated coalescing queue instead of firing applyConstraints
-   on every raw drag tick). Intentionally still a real, native
-   <input type=range> — NOT a custom pointer-driven surface — so
-   keyboard stepping and screen-reader value announcements keep working
-   for free and there's no second state machine to keep in sync. */
+/* Manual controls — horizontal dial (2026-09-25 redesign, replaces the
+   earlier vertical slider + a separately-floating lock circle, per
+   Vinh's reference screenshot of a native camera's brightness dial).
+   Sits in its own row directly below .checkin-frame-zone (a real flex
+   child of #checkinScreen, not an overlay on the video anymore — see
+   .checkin-frame-zone's own comment for why the live-camera layout is
+   flex-based). .checkin-exposure and .checkin-lock-btn are independent
+   siblings inside this row rather than one nested inside the other:
+   CheckinCtrl._setupManualControls() feature-detects each one
+   separately (a device can support manual exposure without manual
+   focus/exposure LOCK, or vice versa), so each keeps its own .hidden
+   toggle; only the row itself needs to hide when NEITHER is supported. */
+.checkin-manual-row{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 18px 0;flex-shrink:0;
+}
+.checkin-manual-row.hidden{display:none}
 .checkin-exposure{
-  /* Docks to .checkin-frame's own top-right corner now (2026-09-24
-     layout rebuild) — frame-relative, not screen-relative, since the
-     frame's size is width-driven and no longer full-bleed. */
-  position:absolute;top:14px;right:14px;z-index:14;
-  display:flex;flex-direction:column;align-items:center;gap:8px;
-  background:var(--white);border-radius:24px;padding:12px 8px;
+  position:relative; /* containing block for .checkin-exposure-readout below */
+  flex:1;min-width:0;display:flex;align-items:center;gap:6px;
+  background:var(--white);border-radius:20px;padding:6px 8px;
   box-shadow:0 6px 18px rgba(42,24,16,.2);
   color:var(--text2);
 }
+.checkin-exposure.hidden{display:none}
+/* Reset + lock share one small circular-icon-button look — same
+   visual family as .checkin-float-btn's diary/flip circles, just
+   smaller since they're nested in a slim bar instead of floating
+   solo. Intentionally still a real, native <input type=range> for the
+   slider itself — NOT a custom pointer-driven surface — so keyboard
+   stepping and screen-reader value announcements keep working for
+   free and there's no second state machine to keep in sync. */
+.checkin-exposure-btn{
+  flex-shrink:0;width:30px;height:30px;border-radius:50%;border:none;
+  background:var(--paper);color:var(--text2);
+  display:flex;align-items:center;justify-content:center;
+}
+.checkin-exposure-btn.checkin-lock-btn{width:38px;height:38px;background:var(--white);box-shadow:0 6px 18px rgba(42,24,16,.2)}
+.checkin-exposure-btn.checkin-lock-btn.on{background:var(--primary);color:var(--white)}
 .checkin-exposure-slider{
-  writing-mode:vertical-lr;direction:rtl;
-  width:30px;height:120px;accent-color:var(--primary);
+  flex:1;min-width:0;-webkit-appearance:none;appearance:none;
+  height:30px;accent-color:var(--primary);
   cursor:pointer;
 }
 /* Snap-to-zero confirmation pulse — re-triggerable via classList.remove
@@ -268,14 +286,14 @@ input,textarea,select{font-family:var(--font-body)}
 .checkin-exposure-slider.pulse{animation:checkinExposurePulse .18s ease}
 @keyframes checkinExposurePulse{50%{transform:scale(1.15)}}
 
-/* Floating "+1.5" / "Tự động" readout — sits to the LEFT of the wrap
-   (the wrap itself is right-docked, so there's no room to the right)
-   and tracks the thumb's vertical position, set inline via JS. Only
-   visible while actively dragging + briefly after (see the 600ms
-   fade in _showExposureReadout). */
+/* Floating "+1.5" / "Tự động" readout — sits ABOVE the slider now
+   (was to its left, when the slider was vertical) and tracks the
+   thumb's horizontal position, set inline via JS as a left:<px>
+   relative to .checkin-exposure. Only visible while actively dragging
+   + briefly after (see the 600ms fade in _showExposureReadout). */
 .checkin-exposure-readout{
-  position:absolute;right:calc(100% + 8px);top:50%;
-  transform:translateY(-50%);
+  position:absolute;bottom:calc(100% + 8px);left:0;
+  transform:translateX(-50%);
   background:var(--text);color:var(--cream);
   font-size:.68rem;font-weight:800;line-height:1;
   padding:.3rem .55rem;border-radius:8px;white-space:nowrap;
@@ -2541,8 +2559,15 @@ body.map-full .tabbar{transform:translateY(105%)}
    keyboard/trackpad scrolling all come for free instead of being
    reimplemented and risking drift from how touch scrolling actually
    feels on the device. */
+/* Hidden per Vinh (2026-09-25): "ẩn những box ghi đánh giá (ở trên)
+   chỉ giữ lại những box ở dưới" — the preview sheet now opens straight
+   to the share/GPS toggles + send button, no rating/address/note step.
+   Kept in the DOM (not deleted) — _tapShutter() still seeds
+   #checkinPreviewStars with a default rating and #checkinAddress/
+   #checkinCaption stay valid empty inputs _submit() reads unchanged;
+   only their visibility changed, not the data flow. */
 .checkin-sub-tabs{
-  display:flex;gap:6px;justify-content:center;
+  display:none;gap:6px;justify-content:center;
   position:relative;margin:-46px 0 6px;z-index:2;
 }
 .checkin-sub-tab{
@@ -2555,7 +2580,7 @@ body.map-full .tabbar{transform:translateY(105%)}
 .checkin-sub-tab:active{transform:translate(1px,1px)}
 
 .checkin-sub-scroll{
-  display:flex;overflow-x:auto;scroll-snap-type:x mandatory;
+  display:none;overflow-x:auto;scroll-snap-type:x mandatory;
   -webkit-overflow-scrolling:touch;scrollbar-width:none;
   height:100px; /* fixed — switching subs never resizes/jumps the sheet */
   margin:0 -18px; /* bleed past the sheet's own side padding so each panel gets the FULL width to snap-scroll across */

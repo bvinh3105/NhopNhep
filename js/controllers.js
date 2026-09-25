@@ -5267,8 +5267,15 @@ const CheckinCtrl = {
     document.getElementById('checkinQuanPill').addEventListener('click', () => this._openPicker());
     document.getElementById('checkinLockBtn').addEventListener('click', () => this._toggleLock());
     document.getElementById('checkinExposureSlider').addEventListener('input', (e) => this._onExposureInput(+e.target.value));
-    // Double-tap anywhere on the wrap (sun icon, padding, or the slider
-    // itself — pointerdown bubbles up regardless) resets to 0. Doesn't
+    // Explicit reset button (2026-09-25 dial redesign, docked to the
+    // slider's left) — same reset _onExposureInput(0) the double-tap
+    // below already did, just discoverable without knowing the gesture.
+    document.getElementById('checkinExposureReset').addEventListener('click', () => {
+      document.getElementById('checkinExposureSlider').value = 0;
+      this._onExposureInput(0);
+    });
+    // Double-tap anywhere on the wrap (padding or the slider itself —
+    // pointerdown bubbles up regardless) also resets to 0. Doesn't
     // block the native slider's own drag handling; it only reacts to a
     // second rapid tap, see _checkExposureDoubleTap().
     document.getElementById('checkinExposureWrap').addEventListener('pointerdown', (e) => {
@@ -5372,7 +5379,7 @@ const CheckinCtrl = {
   // class-based hiding: .hidden{display:none!important} always wins
   // over this inline style either way.
   _toggleChrome(show) {
-    ['checkinQuanPill','checkinStars','checkinShutterBtn','checkinDiaryBtn','checkinFlipBtn','checkinLockBtn','checkinExposureWrap'].forEach(id => {
+    ['checkinQuanPill','checkinStars','checkinShutterBtn','checkinDiaryBtn','checkinFlipBtn','checkinManualRow'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = show ? '' : 'none';
     });
@@ -5477,16 +5484,22 @@ const CheckinCtrl = {
   // Runs fresh on every _startStream() (flip camera = a new track).
   _setupManualControls() {
     this._locked = false;
+    const row = document.getElementById('checkinManualRow');
     const lockBtn = document.getElementById('checkinLockBtn');
     const expWrap = document.getElementById('checkinExposureWrap');
     const expSlider = document.getElementById('checkinExposureSlider');
     lockBtn.classList.remove('on');
     lockBtn.classList.add('hidden');
     expWrap.classList.add('hidden');
+    // .checkin-manual-row wraps both as independent siblings (see its
+    // CSS comment) — synced at the end from whichever of the two ends
+    // up visible, so the row itself only shows when at least one does.
+    const syncRow = () => row.classList.toggle('hidden',
+      lockBtn.classList.contains('hidden') && expWrap.classList.contains('hidden'));
 
     const track = this._stream && this._stream.getVideoTracks()[0];
     const caps = track && track.getCapabilities ? track.getCapabilities() : null;
-    if (!caps) return;
+    if (!caps) { syncRow(); return; }
 
     // Lock button — only useful if the track can actually switch to a
     // manual (frozen) mode for at least one of focus/exposure.
@@ -5511,6 +5524,7 @@ const CheckinCtrl = {
       this._lastExposureTap = null;
       expWrap.classList.remove('hidden');
     }
+    syncRow();
   },
 
   async _toggleLock() {
@@ -5562,14 +5576,17 @@ const CheckinCtrl = {
 
   _showExposureReadout(value, min, max) {
     const label = document.getElementById('checkinExposureReadout');
+    const slider = document.getElementById('checkinExposureSlider');
     label.textContent = value === 0
       ? I18N.t('checkin.exposureAuto')
       : (value > 0 ? `+${value.toFixed(1)}` : value.toFixed(1));
-    // direction:rtl + writing-mode:vertical-lr puts min at the bottom
-    // and max at the top (see .checkin-exposure-slider) — mirror that
-    // here so the readout tracks the thumb instead of running backwards.
+    // Slider is a plain horizontal LTR range now (2026-09-25 dial
+    // redesign) — track the thumb's x position in px relative to
+    // .checkin-exposure (the readout's containing block), not just
+    // centered over the slider, since the slider shares its row with
+    // the reset button and isn't flush with the row's own left edge.
     const pct = (value - min) / (max - min);
-    label.style.top = `${(1 - pct) * 100}%`;
+    label.style.left = `${slider.offsetLeft + pct * slider.offsetWidth}px`;
     label.classList.add('show');
     // One shared timeout — cleared and restarted on every interaction —
     // so two overlapping fades from a fast double-drag can't race.
