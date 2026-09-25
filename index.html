@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2713">
+<link rel="stylesheet" href="css/styles.css?v=2715">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -1044,30 +1044,62 @@
   </div>
 </div>
 
-<!-- Diary modal — Locket-style monthly calendar of my check-ins. -->
-<div class="modal-overlay" id="checkinDiaryOverlay">
-  <div class="modal-sheet list-sheet">
-    <div class="modal-handle"></div>
-    <div class="modal-title" data-i18n="checkin.diaryTitle2">📔 Nhật ký ăn</div>
-    <div class="ci-cal-section" id="ciCalSection" style="margin-top:0">
-      <div class="ci-cal-hd">
-        <button class="ci-cal-nav" id="ciCalPrev" type="button" aria-label="Tháng trước">‹</button>
-        <span class="ci-cal-month" id="ciCalMonthLbl"></span>
-        <button class="ci-cal-nav" id="ciCalNext" type="button" aria-label="Tháng sau">›</button>
+<!-- Nhật ký ăn — "Sổ Dán Món". Each meal is a photo sticker stuck on a
+     monthly page; tapping one peels it off into the Bữa detail. Built and
+     wired by NhatKyCtrl (controllers.js). Not a .modal-overlay on purpose:
+     CommunityDetailModal ("Xem quán") closes any open .modal-overlay, and
+     the diary has to stay underneath it. -->
+<div class="nk" id="nkRoot" hidden>
+  <div class="nk-backdrop" id="nkBackdrop"></div>
+  <div class="nk-sheet" id="nkSheet" role="dialog" aria-modal="true" aria-labelledby="nkTitle">
+    <div class="nk-grab" id="nkGrab" aria-hidden="true"><span class="nk-handle"></span></div>
+    <header class="nk-head" id="nkHead">
+      <div class="nk-titles">
+        <p class="nk-eyebrow" data-i18n="nk.eyebrow">Nhật ký ăn</p>
+        <h2 id="nkTitle" data-i18n="nk.title">Sổ tay <em>ăn uống</em></h2>
       </div>
-      <div class="ci-cal-dow">
-        <span>CN</span><span>T2</span><span>T3</span><span>T4</span><span>T5</span><span>T6</span><span>T7</span>
+      <div class="nk-actions">
+        <button class="nk-circle nk-stk" id="nkSearchBtn" type="button" data-i18n="nk.searchAria" data-i18n-attr="aria-label" aria-label="Tìm lại bữa ăn"><svg class="icon" aria-hidden="true"><use href="#ic-action-search"></use></svg></button>
+        <button class="nk-circle nk-stk" id="nkCloseBtn" type="button" data-i18n="nk.closeAria" data-i18n-attr="aria-label" aria-label="Đóng sổ"><svg class="icon" aria-hidden="true"><use href="#ic-action-close"></use></svg></button>
       </div>
-      <div class="ci-cal-grid" id="ciCalGrid"></div>
-      <div class="ci-stat-bar">
-        <div class="ci-stat"><span class="ci-stat-ico">🍜</span><span id="ciStatTotal">0</span><span class="ci-stat-unit"> check-in</span></div>
-        <div class="ci-stat"><span class="ci-stat-ico">🔥</span><span id="ciStatStreak">0d</span><span class="ci-stat-unit"> chuỗi</span></div>
+      <div class="nk-search" role="search">
+        <input id="nkQuery" type="search" autocomplete="off" data-i18n="nk.searchPh" data-i18n-attr="placeholder" placeholder="Tìm quán, món, ghi chú…">
+        <button id="nkSearchCancel" type="button" data-i18n="nk.cancel">Huỷ</button>
       </div>
+    </header>
+    <div class="nk-notice" id="nkNotice" hidden></div>
+    <div id="nkBrowse">
+      <button class="nk-memory nk-stk" id="nkMemory" type="button" hidden></button>
+      <nav class="nk-months" id="nkMonths" data-i18n="nk.monthsAria" data-i18n-attr="aria-label" aria-label="Chọn tháng"></nav>
+      <div class="nk-page-wrap" id="nkPageWrap"></div>
+      <button class="nk-tray-btn" id="nkTrayBtn" type="button" hidden></button>
     </div>
-    <div class="form-actions" style="justify-content:center;margin-top:.5rem">
-      <button class="btn-cancel" id="checkinDiaryClose" data-i18n="common.close">Đóng</button>
-    </div>
+    <div class="nk-results" id="nkResults" hidden></div>
   </div>
+
+  <div class="nk-detail" id="nkDetail" aria-hidden="true">
+    <div class="nk-scrim"></div>
+    <div class="nk-d-top">
+      <div class="nk-d-top-row">
+        <div class="nk-d-date nk-float" id="nkDate"></div>
+        <button class="nk-d-more nk-float" id="nkMore" type="button" data-i18n="nk.moreAria" data-i18n-attr="aria-label" aria-label="Thêm">•••</button>
+      </div>
+      <div class="nk-d-meals" id="nkMeals"></div>
+    </div>
+    <div class="nk-d-body" id="nkBody">
+      <div class="nk-d-stage" id="nkStage"><div class="nk-d-card" id="nkCard"></div></div>
+      <div class="nk-ticket nk-stk" id="nkTicket"></div>
+    </div>
+    <div class="nk-d-bar">
+      <button class="nk-circle nk-stk" id="nkDetailClose" type="button" data-i18n="common.close" data-i18n-attr="aria-label" aria-label="Đóng"><svg class="icon" aria-hidden="true"><use href="#ic-action-close"></use></svg></button>
+      <div class="nk-ruler nk-stk" id="nkRuler" role="slider" tabindex="0" data-i18n="nk.rulerAria" data-i18n-attr="aria-label" aria-label="Tua theo ngày"></div>
+    </div>
+    <div class="nk-bubble nk-float" id="nkBubble"><i></i><b></b></div>
+    <div class="nk-coach nk-float" id="nkCoach" data-i18n="nk.coach">Vuốt ngang để lật bữa · kéo thước để tua</div>
+  </div>
+
+  <div class="nk-mam" id="nkMam" aria-hidden="true"></div>
+  <div class="nk-flash nk-float" id="nkFlash" role="status" aria-live="polite"></div>
 </div>
 
 <!-- ═══════════════════════════════════════════════
@@ -1524,7 +1556,7 @@
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
 <script src="js/security.js?v=2672"></script>
-<script src="js/i18n.js?v=2713"></script>
+<script src="js/i18n.js?v=2715"></script>
 <script src="js/utils.js?v=2710"></script>
 <script src="js/state.js?v=2672"></script>
 <script src="js/poi.js?v=2672"></script>
@@ -1548,8 +1580,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2712"></script>
-<script src="js/app.js?v=2710"></script>
+<script src="js/controllers.js?v=2715"></script>
+<script src="js/app.js?v=2715"></script>
 
 </body>
 </html>
