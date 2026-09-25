@@ -3100,6 +3100,7 @@ body.map-full .tabbar{transform:translateY(105%)}
 .nk-chip:active{transform:scale(.97)}
 .nk-chip.on{background:var(--primary);color:var(--cream);border-color:var(--primary-2)}
 .nk-chip.empty{color:var(--text3)}
+.nk-chip.on.empty{color:var(--cream)}
 .nk-float{background:var(--white);border:none;box-shadow:0 4px 14px rgba(42,24,16,.18)}
 .nk-hit{position:relative}
 .nk-hit::after{content:'';position:absolute;inset:-6px}
@@ -3151,10 +3152,10 @@ body.map-full .tabbar{transform:translateY(105%)}
 .nk-stamp span{font-size:8.5px;font-weight:900;letter-spacing:.5px;margin-top:2px;text-align:center;max-width:60px}
 .nk-stamp.pending{border-style:dashed}
 .nk-stamp.pending span{font-size:7.5px;max-width:58px}
-.nk-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;height:20px;align-items:center;margin-top:4px}
+.nk-dow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;height:20px;align-items:center;margin-top:4px}
 .nk-dow span{text-align:center;font-size:11px;font-weight:800;color:var(--text3)}
 .nk-dow span:last-child{color:var(--primary)}
-.nk-grid{display:grid;grid-template-columns:repeat(7,1fr);column-gap:5px;row-gap:8px;margin-top:4px}
+.nk-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));column-gap:5px;row-gap:8px;margin-top:4px}
 .nk-cell{position:relative;aspect-ratio:3/4;border-radius:8px;display:block;width:100%;padding:0;transition:opacity .16s}
 .nk-cell.dim{opacity:.25}
 /* the page the sticker was stuck on — only visible once it's peeled */
@@ -3174,7 +3175,7 @@ body.map-full .tabbar{transform:translateY(105%)}
 .nk-cell.today-filled{outline:2px solid var(--primary);outline-offset:2px}
 .nk-cell.num{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--text3)}
 .nk-cell.future{color:var(--cream-3);cursor:default}
-.nk-cell.today{border:2px dashed var(--primary);background:var(--primary-tint);color:var(--primary);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.nk-cell.today{min-width:0;overflow:hidden;border:2px dashed var(--primary);background:var(--primary-tint);color:var(--primary);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
 .nk-cell.today .icon{width:18px;height:18px}
 .nk-cell.today small{font-size:9px;font-weight:800;white-space:nowrap;letter-spacing:-.2px}
 .nk-cell.today.pulse{animation:nkTodayPulse .5s ease-in-out 2}
@@ -3224,8 +3225,9 @@ body.map-full .tabbar{transform:translateY(105%)}
 .nk-d-meals .nk-static{font-size:13px;font-weight:800;color:var(--text2)}
 .nk-d-body{position:absolute;left:0;right:0;top:calc(var(--safe-top) + 112px);bottom:calc(var(--safe-bottom) + 80px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;padding-bottom:12px}
 .nk-d-body::-webkit-scrollbar{display:none}
-.nk-d-stage{height:384px;display:flex;justify-content:center;align-items:flex-start;padding-top:4px;touch-action:none;position:relative}
+.nk-d-stage{min-height:384px;display:flex;justify-content:center;align-items:flex-start;padding-top:4px;touch-action:none;position:relative}
 .nk-d-card{position:relative;width:256px}
+.nk-detail:not(.open) .nk-d-card{visibility:hidden}
 .nk-d-card .nk-behind{position:absolute;inset:0;background:var(--white);border:2px solid var(--text);border-radius:14px;transform:translate(6px,4px) rotate(3deg)}
 .nk-d-frame{position:relative;background:var(--white);border:2px solid var(--text);border-radius:14px;padding:8px 8px 0;transform:rotate(var(--tilt,-1.5deg));transition:opacity .14s}
 .nk-d-photo{position:relative;width:236px;height:315px;border-radius:8px;overflow:hidden;background-color:var(--cream-2);display:flex;align-items:center;justify-content:center;color:var(--text2)}
@@ -3269,6 +3271,13 @@ body.map-full .tabbar{transform:translateY(105%)}
 @media (max-width:380px){
   .nk-t-btns .nk-go{flex:1.15}
   .nk-t-btns button{gap:4px;padding:0 4px}
+  .nk-cell.today small{font-size:8px;letter-spacing:-.3px}
+}
+@media (max-width:340px){
+  .nk-t-btns button,.nk-t-btns .nk-go{flex:1 1 auto}
+  .nk-stars .icon{width:13px;height:13px}
+  .nk-priv{padding:0 8px}
+  .nk-cell.today small{display:none}
 }
 .nk-d-bar{position:absolute;left:12px;right:12px;bottom:calc(var(--safe-bottom) + 12px);display:flex;gap:8px;align-items:center;opacity:0;transform:translateY(80px);transition:opacity .26s,transform .26s var(--ease-out)}
 .nk-detail.open .nk-d-bar{opacity:1;transform:none;transition-delay:.22s}

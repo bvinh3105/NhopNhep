@@ -1925,6 +1925,11 @@ const PlanCtrl = {
         // Added 2026-09-22 alongside CheckinViewerCtrl integration.
         document.getElementById('communityScreen').classList.remove('hidden');
         CommunityCtrl.render();
+      } else if (this._returnTo === 'checkin') {
+        // "Đi tới" from the diary → back to the camera tab with the sổ open.
+        // switchTo works here: State.currentTab is still 'home' from the trip.
+        TabNav.switchTo('checkin');
+        if (typeof NhatKyCtrl !== 'undefined') NhatKyCtrl.open();
       } else {
         document.getElementById('resultsScreen').classList.remove('hidden');
       }
@@ -2442,6 +2447,7 @@ const ProfileCtrl = {
     // đã đăng, kết bạn, và thông tin tài khoản.
     document.getElementById('communityLogout').addEventListener('click', () => {
       Community.logout();
+      if (typeof NhatKyCtrl !== 'undefined') NhatKyCtrl.forget();
       showToast(I18N.t('toast.loggedOut'));
       this.render();
     });
@@ -6400,7 +6406,13 @@ const CheckinCtrl = {
     // Coords are suppressed entirely when shareLocation=false so nobody
     // can use the "Đi tới" feature to navigate directly to the poster.
     let restaurantId = '', restaurantName, restaurantLat, restaurantLng, source;
-    if (typedAddr) {
+    // The address field is prefilled with the picked quán's name (see
+    // _tapShutter), so an UNEDITED prefill is the pick itself — only a
+    // changed or typed-from-scratch address is a freeform spot. Treating the
+    // prefill as freeform dropped the restaurant relation (and its verified
+    // rating) on every community pick, "Ghé lại" included.
+    const editedAddr = typedAddr && !(q && typedAddr === String(q.name || '').trim());
+    if (editedAddr) {
       restaurantName = typedAddr;
       restaurantLat = shareLocation ? (State.userLat ?? null) : null;
       restaurantLng = shareLocation ? (State.userLng ?? null) : null;
@@ -6851,7 +6863,7 @@ const NhatKyCtrl = {
   _entries: [], _dayMap: new Map(), _badPhotos: new Set(),
   _uid: '', _loaded: false, _stale: true, _loading: null, _offline: false, _failed: false,
   _month: '', _filter: null, _searching: false, _cur: null, _openSource: null,
-  _busy: false, _idle: [], _pendingDrop: null, _pulsed: false, _hideT: null, _flashT: null,
+  _busy: false, _idle: [], _pendingDrop: null, _mut: 0, _tgen: 0, _retry: false, _loadingUid: '', _mamMonth: '', _quanBusy: false, _pulsed: false, _hideT: null, _flashT: null,
   _swipe: {}, _drag: {}, _rs: {}, _sd: null,
 
   init() {
@@ -6867,16 +6879,18 @@ const NhatKyCtrl = {
     $('nkMonths').addEventListener('click', (e) => { const b = e.target.closest('[data-m]'); if (b) this._goMonth(b.dataset.m); });
     $('nkPageWrap').addEventListener('click', (e) => this._onPageClick(e));
     $('nkMemory').addEventListener('click', () => {
+      if (!this._isOpen()) return;
       const m = $('nkMemory');
       this._openDetail(this._find(m.dataset.id), m.querySelector('.nk-thumb'), 'memory');
     });
     $('nkTrayBtn').addEventListener('click', () => {
+      if (!this._isOpen()) return;
       if ($('nkTrayBtn').classList.contains('locked')) showToast(I18N.t('nk.trayLockedToast'));
       else this._openMam(this._month);
     });
     $('nkResults').addEventListener('click', (ev) => {
       const r = ev.target.closest('.nk-r-row');
-      if (r) this._openDetail(this._find(r.dataset.id), r.querySelector('.nk-thumb'), 'search');
+      if (r && this._isOpen()) this._openDetail(this._find(r.dataset.id), r.querySelector('.nk-thumb'), 'search');
     });
     this._wireSheetDrag();
     this._wirePageSwipe();
@@ -6890,13 +6904,13 @@ const NhatKyCtrl = {
       if (t) this._deal(t.i, t.at > this._cur.at ? 1 : -1);
     });
     $('nkTicket').addEventListener('click', (ev) => {
-      if (!this._cur) return;
+      if (!this._cur || this._busy) return;
       if (ev.target.closest('#nkPriv')) return this._privacyPop();
       if (ev.target.closest('#nkGo')) return this._go();
       if (ev.target.closest('#nkAgain')) return this._again();
       if (ev.target.closest('#nkQuan')) return this._viewQuan();
     });
-    $('nkMore').addEventListener('click', () => this._moreMenu());
+    $('nkMore').addEventListener('click', () => { if (!this._busy) this._moreMenu(); });
     this._wireStageDrag();
     this._wireRuler();
 
@@ -6914,7 +6928,7 @@ const NhatKyCtrl = {
       if (!ev.target.closest('.nk-pop,.nk-menu,#nkPriv,#nkMore')) this._closePops();
     }, true);
     document.addEventListener('keydown', (ev) => {
-      if (root.hidden) return;
+      if (root.hidden || document.querySelector('.modal-overlay.show')) return;
       if (ev.key === 'Escape') {
         if (this._cur) this._closeDetail();
         else if (this._mamOpen()) this._closeMam();
@@ -6932,9 +6946,13 @@ const NhatKyCtrl = {
     try { if (history.state && history.state.nk) history.replaceState(null, ''); } catch (_) {}
     document.addEventListener('i18n:changed', () => { if (this._isOpen()) this._rerender(); });
     document.addEventListener('community:session-expired', () => {
+      const layers = (this._cur ? 1 : 0) + (this._mamOpen() ? 1 : 0);
       this._uid = ''; this._entries = []; this._dayMap = new Map();
       this._loaded = false; this._stale = true; this._offline = false; this._failed = false;
-      if (!document.getElementById('nkRoot').hidden) { this._resetDetail(); this._resetMam(); this._render(); }
+      if (!document.getElementById('nkRoot').hidden) {
+        this._closePops(); this._resetDetail(); this._resetMam(); this._render();
+        for (let i = 0; i < layers; i++) this._back();
+      }
     });
   },
 
@@ -6986,7 +7004,7 @@ const NhatKyCtrl = {
   // created. The next open refetches (that response carries expand, so the
   // quán category fills in) and plays the drop + stamp moment for it.
   noteNewCheckin(rec) {
-    this._stale = true;
+    this._stale = true; this._mut++;
     if (!rec || !rec.id) return;
     this._pendingDrop = { id: rec.id, at: Date.now() };
     if (this._uid && rec.user === this._uid && !this._find(rec.id)) {
@@ -6997,28 +7015,35 @@ const NhatKyCtrl = {
 
   // Something outside the diary (the check-in viewer) deleted or re-shared
   // one of my check-ins — refetch on next open.
-  invalidate() { this._stale = true; },
+  invalidate() { this._stale = true; this._mut++; },
+
+  // Explicit logout: private meals, notes and GPS spots must not stay on a
+  // shared or borrowed phone. (Session expiry keeps the cache — the same
+  // person signs back in.)
+  forget() {
+    this.close({ instant: true });
+    try { Object.keys(localStorage).filter(k => k.startsWith(this.CACHE_KEY)).forEach(k => localStorage.removeItem(k)); } catch (_) {}
+    this._uid = ''; this._entries = []; this._dayMap = new Map(); this._badPhotos = new Set();
+    this._loaded = false; this._stale = true; this._offline = false; this._failed = false; this._pendingDrop = null;
+  },
 
   // ── data ────────────────────────────────────────────────
   async _refresh() {
-    if (this._loading) return this._loading;
-    const uid = this._uid;
+    if (this._loading && this._loadingUid === this._uid) return this._loading;
+    const uid = this._uid, m0 = this._mut;
     this._failed = false;
-    this._loading = this._load(uid).then(async (res) => {
+    this._loadingUid = uid;
+    const p = this._loading = this._fetchFresh(uid).then((res) => {
       if (uid !== this._uid) return; // logged out / switched account mid-flight
-      if (res.ok && !res.items.length && this._entries.length) {
-        // PocketBase answers an expired token as a guest — an empty list,
-        // not a 401. Before wiping a sổ that had meals, check the session:
-        // refreshToken() fires community:session-expired on a dead token
-        // (handled in init), otherwise retry once with the fresh one.
-        const t = await Community.refreshToken();
-        if (uid !== this._uid) return;
-        if (t.ok) res = await this._load(uid);
-        else res = { ok: false };
-        if (uid !== this._uid) return;
+      if (res.ok && this._mut !== m0) {
+        // A delete, privacy change or new check-in happened while this GET
+        // was in flight — its answer predates that, so fetch again.
+        this._stale = true; this._retry = true;
+        return;
       }
       if (res.ok) {
         this._loaded = true; this._stale = false; this._offline = false;
+        this._badPhotos = new Set(); // back online / new tunnel: retry every photo
         this._setRecords(res.items);
         this._writeCache();
       } else if (this._entries.length) {
@@ -7027,10 +7052,36 @@ const NhatKyCtrl = {
         this._failed = true;
       }
     });
-    if (this._isOpen() || !document.getElementById('nkRoot').hidden) this._renderNotice();
-    try { await this._loading; } finally { this._loading = null; }
+    if (!document.getElementById('nkRoot').hidden) this._renderNotice();
+    try { await p; } finally { if (this._loading === p) { this._loading = null; this._loadingUid = ''; } }
+    if (this._retry && uid === this._uid) { this._retry = false; return this._refresh(); }
     this._whenIdle(() => { if (!document.getElementById('nkRoot').hidden) this._rerender(); });
   },
+
+  // PocketBase serves an expired or revoked token as a GUEST instead of a
+  // 401: the list comes back holding only the user's SHARED meals (or
+  // nothing), and owner-only writes answer 404. Trusting that would wipe
+  // every private meal from the sổ and its offline copy, so check the
+  // token's expiry first and double-check the session on an empty list.
+  // refreshToken() fires community:session-expired on a dead token.
+  async _fetchFresh(uid) {
+    if (this._tokenExpired() && !(await this._sessionOk())) return { ok: false };
+    if (uid !== this._uid) return { ok: false };
+    let res = await this._load(uid);
+    if (res.ok && !res.items.length && uid === this._uid) {
+      if (!(await this._sessionOk())) return { ok: false };
+      res = await this._load(uid);
+    }
+    return res;
+  },
+  _tokenExpired() {
+    try {
+      const b64 = String(Community.token).split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const exp = JSON.parse(atob(b64)).exp;
+      return !!exp && exp * 1000 <= Date.now() + 30000;
+    } catch (_) { return false; }
+  },
+  async _sessionOk() { return !!(await Community.refreshToken()).ok; },
 
   async _load(uid) {
     const filter = encodeURIComponent(`user="${uid}"`);
@@ -7078,9 +7129,12 @@ const NhatKyCtrl = {
     // PocketBase number fields come back 0 when never set — 0,0 is "no location".
     const lat = +rec.restaurant_lat || 0, lng = +rec.restaurant_lng || 0;
     const name = (rec.restaurant_name || '').trim() || (rq && rq.name) || I18N.t('checkin.anonSpot');
+    // Anonymous "Chỗ này" snaps are different places, not one quán: key
+    // them by rounded GPS spot, or by the record itself without one.
+    const anon = !rec.restaurant && this._isAnonName(name);
+    const qk = rec.restaurant || (anon ? ((lat || lng) ? `g:${lat.toFixed(3)},${lng.toFixed(3)}` : 'id:' + rec.id) : 'n:' + this._norm(name));
     return {
-      id: rec.id, rec, at, day, meal, name,
-      qk: rec.restaurant || 'n:' + this._norm(name),
+      id: rec.id, rec, at, day, meal, name, qk,
       cat: rq ? (COMMUNITY_PB_TO_CAT[rq.category] || null) : null,
       rel: !!(rq && rq.id),
       priceKey: (rq && rq.price_range) || '',
@@ -7110,13 +7164,19 @@ const NhatKyCtrl = {
   },
 
   _find(id) { return this._entries.find(x => x.id === id) || null; },
+  _isAnonName(name) {
+    const n = this._norm(name).trim();
+    return !n || ['vi', 'en'].some(l => I18N.dict[l] && this._norm(I18N.dict[l]['checkin.anonSpot']).trim() === n);
+  },
 
   // ── small helpers ───────────────────────────────────────
   _ic(n, cls = 'icon') { return `<svg class="${cls}" aria-hidden="true"><use href="#ic-${n}"></use></svg>`; },
   _pad(n) { return String(n).padStart(2, '0'); },
   _dkey(d) { return `${d.getFullYear()}-${this._pad(d.getMonth() + 1)}-${this._pad(d.getDate())}`; },
   _mkey(d) { return `${d.getFullYear()}-${this._pad(d.getMonth() + 1)}`; },
-  _today() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; },
+  // The diary's day starts at 04:00, like the khuya rule in _toEntry — at
+  // 00:40 "today" is still the evening before.
+  _today() { const d = new Date(); if (d.getHours() < 4) d.setDate(d.getDate() - 1); d.setHours(0, 0, 0, 0); return d; },
   _mondayOf(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; },
   _mealOf(at) {
     const m = at.getHours() * 60 + at.getMinutes();
@@ -7202,6 +7262,15 @@ const NhatKyCtrl = {
   _hDone() { clearTimeout(this._hWait); this._hBusy = false; this._hRun(); },
   _onPop() {
     if (this._hBusy) { this._hDone(); return; } // our own traversal landed
+    // Back while "Xem quán" (CommunityDetailModal) sits on top of the sổ:
+    // close the modal, and put back the entry of the layer underneath.
+    const modal = this._isOpen() && document.querySelector('.modal-overlay.show');
+    if (modal) {
+      if (modal.id === 'communityDetailModal') CommunityDetailModal.close();
+      else modal.classList.remove('show');
+      this._push(this._cur ? 'detail' : this._mamOpen() ? 'mam' : 'sheet');
+      return;
+    }
     // Back pressed mid-peel: the layer can't close yet, so put its history
     // entry back rather than leave it open with no entry to close it.
     if (this._busy) { this._push(this._cur ? 'detail' : 'sheet'); return; }
@@ -7246,7 +7315,9 @@ const NhatKyCtrl = {
 
   _renderMemory() {
     const el = document.getElementById('nkMemory');
-    const target = this._today(); target.setMonth(target.getMonth() - 1);
+    // Same day last month, clamped (31/10 → 30/9, never 1/10).
+    const t = this._today();
+    const target = new Date(t.getFullYear(), t.getMonth() - 1, Math.min(t.getDate(), new Date(t.getFullYear(), t.getMonth(), 0).getDate()));
     let best = null, bestD = 4;
     this._entries.forEach(e => {
       const d = Math.abs((e.day - target) / 864e5);
@@ -7272,6 +7343,7 @@ const NhatKyCtrl = {
     return out;
   },
   _monthEntries(mk) { return this._entries.filter(e => this._mkey(e.day) === mk); },
+  _otherYear(mk) { return mk.slice(0, 4) !== String(this._today().getFullYear()); },
 
   _renderMonths() {
     const nav = document.getElementById('nkMonths');
@@ -7280,7 +7352,8 @@ const NhatKyCtrl = {
     nav.innerHTML = this._monthsList().map(mk => {
       const m = +mk.split('-')[1];
       const empty = !this._monthEntries(mk).length;
-      return `<button class="nk-chip${mk === this._month ? ' on' : ''}${empty ? ' empty' : ''}" type="button" data-m="${mk}" aria-pressed="${mk === this._month}">${this._monthShort(m)}</button>`;
+      const label = this._monthShort(m) + (this._otherYear(mk) ? '/' + mk.slice(2, 4) : '');
+      return `<button class="nk-chip${mk === this._month ? ' on' : ''}${empty ? ' empty' : ''}" type="button" data-m="${mk}" aria-pressed="${mk === this._month}">${label}</button>`;
     }).join('');
     const on = nav.querySelector('.on');
     if (on) nav.scrollLeft = on.offsetLeft - nav.clientWidth / 2 + on.offsetWidth / 2;
@@ -7310,6 +7383,10 @@ const NhatKyCtrl = {
     return best;
   },
 
+  _stampHtml(st) {
+    return `<button class="nk-stamp${st.pending ? ' pending' : ''}" id="nkStamp" type="button" aria-label="${escapeHtml(I18N.t('nk.streakAria', { n: st.n }))}"><b>${st.n}</b><span>${I18N.t(st.pending ? 'nk.streakPending' : 'nk.streakWeeks')}</span></button>`;
+  },
+
   _pageHtml(mk) {
     const [y, m] = mk.split('-').map(Number);
     const list = this._monthEntries(mk);
@@ -7322,9 +7399,7 @@ const NhatKyCtrl = {
     // the count from before it — _maybeDrop() animates both into place.
     const dropId = this._dropId();
     const st = this._weekStreak(dropId);
-    const stamp = isCur && st.n
-      ? `<button class="nk-stamp${st.pending ? ' pending' : ''}" id="nkStamp" type="button" aria-label="${escapeHtml(I18N.t('nk.streakAria', { n: st.n }))}"><b>${st.n}</b><span>${I18N.t(st.pending ? 'nk.streakPending' : 'nk.streakWeeks')}</span></button>`
-      : '';
+    const stamp = isCur && st.n ? this._stampHtml(st) : '';
     let cells = '';
     for (let i = 0; i < first; i++) cells += '<div></div>';
     for (let d = 1; d <= days; d++) {
@@ -7354,7 +7429,7 @@ const NhatKyCtrl = {
     const emptyMonth = this._uid && !list.length && this._entries.length;
     return `<article class="nk-page nk-stk" id="nkPage" data-m="${mk}">
       ${stamp}
-      <div class="nk-p-head"><h3>${this._monthLong(m)}</h3><div class="nk-meta">${list.length ? I18N.t('nk.meta', { n: list.length, q: quan }) : ''}</div></div>
+      <div class="nk-p-head"><h3>${this._monthLong(m)}${this._otherYear(mk) ? ` · ${y}` : ''}</h3><div class="nk-meta">${list.length ? I18N.t('nk.meta', { n: list.length, q: quan }) : ''}</div></div>
       ${emptyMonth ? `<p class="nk-empty-month">${I18N.t('nk.emptyMonth', { m, month: this._monthLong(m) })}</p>` : ''}
       <div class="nk-dow">${I18N.t('nk.dow').split(',').map(s => `<span>${s}</span>`).join('')}</div>
       <div class="nk-grid">${cells}</div>
@@ -7402,7 +7477,7 @@ const NhatKyCtrl = {
   },
 
   _onPageClick(e) {
-    if (this._swipe.justDragged) return;
+    if (this._swipe.justDragged || !this._isOpen()) return;
     const cell = e.target.closest('.nk-cell.photo');
     if (cell) { this._openDetail(this._find(cell.dataset.id), cell.querySelector('.nk-ph'), 'cell'); return; }
     // Today's empty cell and "Chụp món đầu tiên" — the camera is already
@@ -7639,7 +7714,7 @@ const NhatKyCtrl = {
   // "Bóc sticker": the photo lifts off its cell (the category strip stays
   // on the page) and flies up into the opened frame.
   async _openDetail(e, sourceEl, source) {
-    if (this._busy || !e || !sourceEl) return;
+    if (this._busy || !e || !sourceEl || !this._isOpen()) return;
     this._setBusy(true);
     this._closePops();
     this._openSource = source;
@@ -7655,16 +7730,26 @@ const NhatKyCtrl = {
     if (cell) cell.classList.add('peeled'); else sourceEl.style.visibility = 'hidden';
     const round = source === 'plate';
     const tilt = this._tiltOf(e);
-    const clone = await this._flyClone(this._thumb(e), from, to, {
-      dur: 470,
-      kf: (fr, a, b) => [
-        fr(a, { transform: 'rotate(0deg) scale(1)', borderRadius: round ? '50%' : '6px', easing: 'ease-out' }),
-        fr(a, { offset: .19, transform: 'rotate(0deg) scale(1.06)', borderRadius: round ? '50%' : '6px', easing: 'cubic-bezier(.34,1.56,.64,1)' }),
-        fr(b, { transform: `rotate(${tilt}deg) scale(1)`, borderRadius: '8px' }),
-      ],
-    });
-    frame.style.opacity = '';
-    this._done(clone.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: 'forwards' }), 140).then(() => clone.remove());
+    const gen = this._tgen;
+    if (this._reduced()) {
+      // Reduced motion: no flight — the frame's own opacity transition is the crossfade.
+      frame.style.opacity = '';
+    } else {
+      const clone = await this._flyClone(this._thumb(e), from, to, {
+        dur: 470,
+        kf: (fr, a, b) => [
+          fr(a, { transform: 'rotate(0deg) scale(1)', borderRadius: round ? '50%' : '6px', easing: 'ease-out' }),
+          fr(a, { offset: .19, transform: 'rotate(0deg) scale(1.06)', borderRadius: round ? '50%' : '6px', easing: 'cubic-bezier(.34,1.56,.64,1)' }),
+          fr(b, { transform: `rotate(${tilt}deg) scale(1)`, borderRadius: '8px' }),
+        ],
+      });
+      if (!cell) sourceEl.style.visibility = '';
+      // Torn down mid-flight (Ghé lại / Đi tới / tab switch): don't bring
+      // the detail back or push an entry nothing will ever pop.
+      if (gen !== this._tgen) { clone.remove(); return; }
+      frame.style.opacity = '';
+      this._done(clone.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: 'forwards' }), 140).then(() => clone.remove());
+    }
     if (!cell) sourceEl.style.visibility = '';
     this._push('detail');
     this._setBusy(false);
@@ -7687,7 +7772,9 @@ const NhatKyCtrl = {
     this._closePops();
     const e = this._cur;
     let target = this._sourceFor(e);
-    if (!target) {
+    // Over an open Mâm with no plate for this meal: nothing visible to fly
+    // back to (the grid is hidden under the Mâm).
+    if (!target && !this._mamOpen()) {
       if (this._searching) this._stopSearch();
       if (this._mkey(e.day) !== this._month) { this._month = this._mkey(e.day); this._renderMonths(); this._renderPage(0); this._renderTray(); }
       this._markPeeled(e);
@@ -7701,7 +7788,7 @@ const NhatKyCtrl = {
     det.classList.remove('open'); det.setAttribute('aria-hidden', 'true');
     document.getElementById('nkSheet').classList.remove('behind');
     document.getElementById('nkCoach').classList.remove('show');
-    if (target) {
+    if (target && !this._reduced()) {
       const to = this._rectIn(target);
       const round = target.classList.contains('nk-plate');
       const clone = await this._flyClone(this._thumb(e), from, to, {
@@ -7728,6 +7815,7 @@ const NhatKyCtrl = {
   _resetDetail() {
     const det = document.getElementById('nkDetail');
     if (!det) return;
+    this._tgen++; // any peel / deal / delete still awaiting must not revive the detail
     det.classList.remove('open'); det.setAttribute('aria-hidden', 'true');
     document.getElementById('nkSheet').classList.remove('behind');
     document.getElementById('nkCoach').classList.remove('show');
@@ -7759,9 +7847,11 @@ const NhatKyCtrl = {
     if (!next) { this._rubber(dir); this._flash(I18N.t(dir > 0 ? 'nk.newest' : 'nk.oldest')); return; }
     this._setBusy(true);
     const card = document.getElementById('nkCard');
+    const gen = this._tgen;
     if (!this._reduced()) {
       await this._done(card.animate([{ transform: card.style.transform || 'none' }, { transform: `translateX(${dir * 420}px) rotate(${dir * 14}deg)` }], { duration: 240, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' }), 240);
     }
+    if (gen !== this._tgen) return; // closed mid-deal
     card.getAnimations().forEach(a => a.cancel()); card.style.transform = '';
     this._renderDetail(next);
     card.animate(this._reduced() ? [{ opacity: 0 }, { opacity: 1 }] : [{ transform: 'scale(.94)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: this._reduced() ? 150 : 220, easing: 'cubic-bezier(.34,1.56,.64,1)' });
@@ -7769,9 +7859,13 @@ const NhatKyCtrl = {
     this._setBusy(false);
   },
   _step(dir) { if (this._cur) this._deal(this._cur.i + dir, dir); },
+  // Start from wherever a drag left the card, and don't leave it there.
   _rubber(dir) {
+    const card = document.getElementById('nkCard');
+    const from = card.style.transform || 'none';
+    card.style.transform = '';
     if (this._reduced()) return;
-    document.getElementById('nkCard').animate([{ transform: 'none' }, { transform: `translateX(${-dir * 24}px)` }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+    card.animate([{ transform: from }, { transform: `translateX(${-dir * 24}px)` }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.34,1.56,.64,1)' });
   },
   // Keep the page's "peeled" backing on the meal being viewed, if its
   // month is the one on screen (otherwise close() switches month anyway).
@@ -7786,7 +7880,7 @@ const NhatKyCtrl = {
     const scrim = () => document.querySelector('#nkDetail .nk-scrim');
     stage.addEventListener('pointerdown', (e) => {
       if (!this._cur || this._busy) return;
-      this._drag.s = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, lock: null };
+      this._drag.s = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, lock: null, tgt: e.target };
       try { stage.setPointerCapture(e.pointerId); } catch (_) {}
     });
     stage.addEventListener('pointermove', (e) => {
@@ -7814,7 +7908,7 @@ const NhatKyCtrl = {
         scrim().style.opacity = '';
         if (dy > 100 || dy / dt > .5) { card().style.transform = ''; this._closeDetail(); return; }
         springBack();
-      } else if (!s.lock && e.type === 'pointerup' && e.target.closest('#nkChin')) {
+      } else if (!s.lock && e.type === 'pointerup' && s.tgt && s.tgt.closest && s.tgt.closest('#nkChin')) {
         document.getElementById('nkChin').classList.toggle('open');
       }
     };
@@ -7901,13 +7995,18 @@ const NhatKyCtrl = {
   // Optimistic: the sticker flips raised ↔ flat right away and rolls back
   // if the PATCH fails.
   async _setShared(e, next) {
+    const id = e.id;
     const apply = (v) => {
-      e.shared = v; e.rec.is_shared = v;
-      if (this._cur && this._cur.id === e.id) this._renderDetail(e);
+      const live = this._find(id) || e; // a refresh may have swapped the objects
+      live.shared = v; live.rec.is_shared = v;
+      if (this._cur && this._cur.id === id) this._renderDetail(live);
       if (!this._searching) { this._renderPage(0); if (this._cur) this._markPeeledIfVisible(this._cur); }
     };
+    this._mut++;
     apply(next);
-    const r = await Community.setCheckinShared(e.id, next);
+    let r = await Community.setCheckinShared(id, next);
+    // An expired session is answered 404 (see _fetchFresh) — refresh it and retry once.
+    if (!r.ok && r.status === 404 && await this._sessionOk()) r = await Community.setCheckinShared(id, next);
     if (!r.ok) { apply(!next); showToast(I18N.t('nk.changeFail')); return; }
     showToast(I18N.t(next ? 'nk.shared' : 'nk.madePrivate'));
     this._writeCache();
@@ -7959,22 +8058,41 @@ const NhatKyCtrl = {
   async _deleteCur() {
     const gone = this._cur;
     if (!gone || this._busy) return;
+    const id = gone.id, gen = this._tgen;
     this._setBusy(true);
-    const r = await Community.deleteCheckin(gone.id);
-    // 404 = already gone server-side — the state the user asked for.
-    if (!r.ok && r.status !== 404) { this._setBusy(false); showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
+    this._mut++;
+    let r = await Community.deleteCheckin(id);
+    // 404 normally means "already gone" — the state the user asked for. But
+    // PocketBase also answers 404 to an expired session (owner rule fails as
+    // a guest), so confirm the session and retry once before believing it.
+    if (!r.ok && r.status === 404) {
+      if (!(await this._sessionOk())) { if (gen === this._tgen) this._setBusy(false); showToast(I18N.t('nk.changeFail')); return; }
+      r = await Community.deleteCheckin(id);
+    }
+    if (!r.ok && r.status !== 404) { if (gen === this._tgen) this._setBusy(false); showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
     const card = document.getElementById('nkCard');
-    await this._done(card.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(.6)', opacity: 0 }], { duration: this._reduced() ? 150 : 200, fill: 'forwards' }), 200);
-    const idx = gone.i;
-    this._entries = this._entries.filter(x => x !== gone);
+    if (gen === this._tgen) {
+      await this._done(card.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(.6)', opacity: 0 }], { duration: this._reduced() ? 150 : 200, fill: 'forwards' }), 200);
+    }
+    const live = this._find(id);
+    const idx = live ? live.i : gone.i;
+    this._entries = this._entries.filter(x => x.id !== id);
     this._sortEntries();
     this._writeCache();
-    card.getAnimations().forEach(a => a.cancel());
-    const next = this._entries[Math.min(idx, this._entries.length - 1)];
-    this._renderMemory(); this._renderMonths(); this._renderPage(0); this._renderTray();
     showToast(I18N.t('nk.deleted'));
     if (typeof CheckinFeedCtrl !== 'undefined') CheckinFeedCtrl.refresh({ force: true });
     if (typeof CheckinDiscoverCtrl !== 'undefined') CheckinDiscoverCtrl.refresh();
+    if (gen !== this._tgen) {
+      // The detail was torn down meanwhile (sổ closed, tab switched): only
+      // the data and the page need to reflect the delete.
+      if (!document.getElementById('nkRoot').hidden) this._render();
+      return;
+    }
+    const next = this._entries[Math.min(idx, this._entries.length - 1)];
+    this._renderMemory(); this._renderMonths(); this._renderPage(0); this._renderTray();
+    if (this._searching) this._runSearch();
+    if (this._mamOpen()) this._renderMam(this._mamMonth);
+    card.getAnimations().forEach(a => a.cancel());
     if (next) {
       this._renderDetail(next);
       this._markPeeledIfVisible(next);
@@ -7991,8 +8109,12 @@ const NhatKyCtrl = {
   _go() {
     const e = this._cur;
     if (!e.loc) { showToast(I18N.t('nk.noLoc')); return; }
+    // Same refusals as showCheckinItinerary, checked BEFORE closing the sổ
+    // so a refused route doesn't just throw the diary away.
+    if (State.userLat == null || State.userLng == null) { showToast(I18N.t('trips.needGps')); return; }
+    if (haversine(State.userLat, State.userLng, +e.rec.restaurant_lat, +e.rec.restaurant_lng) > 200000) { showToast(I18N.t('checkinFeed.tooFar')); return; }
     this.close({ instant: true });
-    showCheckinItinerary(e.rec);
+    showCheckinItinerary(e.rec, 'checkin');
   },
 
   // Ghé lại — back to the camera with this quán already picked.
@@ -8013,14 +8135,32 @@ const NhatKyCtrl = {
 
   async _viewQuan() {
     const e = this._cur;
-    if (!e.rel) return;
-    const r = await Community._fetch(`/api/collections/restaurants/records/${encodeURIComponent(e.rec.restaurant)}?expand=created_by`);
+    if (!e || !e.rel || this._quanBusy) return;
+    this._quanBusy = true;
+    let r;
+    try { r = await Community._fetch(`/api/collections/restaurants/records/${encodeURIComponent(e.rec.restaurant)}?expand=created_by`); }
+    finally { this._quanBusy = false; }
+    if (!this._isOpen() || !this._cur || this._cur.id !== e.id) return; // left meanwhile
     if (r.ok && r.data) CommunityDetailModal.open(r.data);
     else showToast(I18N.t('nk.quanFail'));
   },
 
   // ── Mâm tháng ───────────────────────────────────────────
   _openMam(mk) {
+    if (!this._isOpen() || this._mamOpen()) return;
+    this._renderMam(mk);
+    const box = document.getElementById('nkMam');
+    box.classList.add('open'); box.setAttribute('aria-hidden', 'false'); box.scrollTop = 0;
+    this._push('mam');
+    if (!this._reduced()) {
+      document.getElementById('nkPoster').animate([{ transform: 'scale(.92)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 280, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+      box.querySelectorAll('.nk-plate').forEach((p, i) => { p.style.animationDelay = `${i * 50}ms`; p.classList.add('pop-in'); });
+      box.querySelectorAll('.nk-m-stat').forEach((c, i) => c.animate([{ transform: 'translateY(12px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 240, delay: 200 + i * 60, fill: 'backwards', easing: 'cubic-bezier(.16,1,.3,1)' }));
+    }
+  },
+
+  _renderMam(mk) {
+    this._mamMonth = mk;
     const [y, m] = mk.split('-').map(Number);
     const list = this._monthEntries(mk), withPhoto = list.filter(e => this._hasPhoto(e));
     const center = withPhoto.slice().sort((a, b) => (b.rating - a.rating) || (b.at - a.at))[0];
@@ -8053,13 +8193,6 @@ const NhatKyCtrl = {
         <div class="nk-m-stat nk-stk"><small>${I18N.t('nk.statNew')}</small><b>${newQuan}</b></div>
       </div>
       <div class="nk-m-btns"><button class="nk-stk nk-share" id="nkMamShare" type="button">${I18N.t('nk.mamShare')}</button><button class="nk-stk" id="nkMamDone" type="button">${I18N.t('nk.mamDone')}</button></div>`;
-    box.classList.add('open'); box.setAttribute('aria-hidden', 'false'); box.scrollTop = 0;
-    this._push('mam');
-    if (!this._reduced()) {
-      document.getElementById('nkPoster').animate([{ transform: 'scale(.92)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 280, easing: 'cubic-bezier(.34,1.56,.64,1)' });
-      box.querySelectorAll('.nk-plate').forEach((p, i) => { p.style.animationDelay = `${i * 50}ms`; p.classList.add('pop-in'); });
-      box.querySelectorAll('.nk-m-stat').forEach((c, i) => c.animate([{ transform: 'translateY(12px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 240, delay: 200 + i * 60, fill: 'backwards', easing: 'cubic-bezier(.16,1,.3,1)' }));
-    }
     const summary = I18N.t('nk.mamSummary', { m, month: this._monthLong(m), name, n: list.length, q: quanN, fav: topQ ? I18N.t('nk.mamSummaryFav', { name: topQName }) : '' });
     document.getElementById('nkMamClose').onclick = document.getElementById('nkMamDone').onclick = () => this._closeMam();
     document.getElementById('nkMamShare').onclick = async () => {
@@ -8106,10 +8239,20 @@ const NhatKyCtrl = {
       cell.querySelector('.nk-strip').animate([{ transform: 'scaleX(0)', transformOrigin: 'left' }, { transform: 'scaleX(1)', transformOrigin: 'left' }], { duration: 140, delay: 140, fill: 'backwards' });
     }
     await new Promise(r => setTimeout(r, reduced ? 0 : 420));
-    const stamp = document.getElementById('nkStamp');
+    // Re-render the stamp from the full list: the page drew it without the
+    // new meal (so it may read "tuần này chưa ghi", or not exist at all for
+    // a first week). It counts up from the old number during the slam.
+    const st = this._weekStreak();
+    let stamp = document.getElementById('nkStamp');
+    const page = document.getElementById('nkPage');
+    if (st.n && page && this._month === this._mkey(this._today())) {
+      if (stamp) stamp.outerHTML = this._stampHtml(st);
+      else page.insertAdjacentHTML('afterbegin', this._stampHtml(st));
+      stamp = document.getElementById('nkStamp');
+    }
     if (stamp) {
       const b = stamp.querySelector('b');
-      if (before) b.textContent = before;
+      if (before && before !== st.n) b.textContent = before;
       if (!reduced) {
         stamp.animate([{ transform: 'rotate(-24deg) scale(1.6)', opacity: 0 }, { transform: 'rotate(-12deg) scale(1)', opacity: .92 }], { duration: 260, easing: 'cubic-bezier(.34,1.56,.64,1)' });
         const ink = document.createElement('span');
@@ -8122,7 +8265,7 @@ const NhatKyCtrl = {
         ], { duration: 300, fill: 'forwards' });
         this._done(ink.getAnimations()[0], 300).then(() => ink.remove());
       }
-      setTimeout(() => { b.textContent = this._weekStreak().n; }, reduced ? 0 : 160);
+      setTimeout(() => { b.textContent = st.n; }, reduced ? 0 : 160);
       this._buzz(15);
     }
     this._flash(e.visitNo >= 2 ? I18N.t('nk.visitNth', { n: e.visitNo }) : I18N.t('nk.newQuan'), 1600);
@@ -8146,7 +8289,7 @@ const NhatKyCtrl = {
    turn-by-turn tracking all work out of the box. Back button returns
    to Cộng đồng (see PlanCtrl.init back handler).
 ═══════════════════════════════════════════════ */
-function showCheckinItinerary(rec) {
+function showCheckinItinerary(rec, returnTo = 'community') {
   if (!rec) return;
   if (rec.restaurant_lat == null || rec.restaurant_lng == null) {
     showToast(I18N.t('checkinFeed.noCoords'));
@@ -8188,7 +8331,7 @@ function showCheckinItinerary(rec) {
     lat: +rec.restaurant_lat,
     lng: +rec.restaurant_lng,
   };
-  PlanCtrl._returnTo = 'community';
+  PlanCtrl._returnTo = returnTo;
   PlanCtrl.buildItinerary([stop]);
   // TabNav.switchTo('home') first so every other screen (including
   // #checkinScreen — which PlanCtrl.show() doesn't hide) is properly
