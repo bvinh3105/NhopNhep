@@ -1,0 +1,903 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#2A1810">
+<title>Thước Kéo Sáng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --cream:#FBF3D9;--cream-2:#F5EBC1;--cream-3:#EEE0A6;--white:#FFFDF5;--paper:#FEF9E5;
+  --primary:#B92626;--primary-2:#8C1919;--primary-tint:#F8DFD3;
+  --accent:#E8843C;--accent-2:#D66A22;
+  --text:#2A1810;--text2:#6B4A38;--text3:#9C7F6B;--line:rgba(42,24,16,.10);--line-2:rgba(42,24,16,.16);
+  --safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px);
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);--ease-out:cubic-bezier(.16,1,.3,1);
+  --font:'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  color-scheme:light;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{background:var(--cream-2)}
+body{font-family:var(--font);color:var(--text);font-size:15px;line-height:1.5;font-weight:500;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.icon{width:1em;height:1em;display:block;flex-shrink:0}
+
+.stage{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:28px;padding:28px 16px 56px}
+
+/* ── Phone mock: mirrors #checkinScreen in css/styles.css ── */
+.phone{flex-shrink:0;padding:10px;border-radius:56px;background:#140b07;box-shadow:0 30px 70px rgba(42,24,16,.32),inset 0 0 0 1.5px rgba(255,253,245,.08)}
+.screen{position:relative;width:390px;height:844px;border-radius:46px;overflow:hidden;background:var(--text);display:flex;flex-direction:column;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+
+.quan-pill{position:absolute;top:calc(var(--safe-top) + 24px);left:50%;transform:translateX(-50%);z-index:14;display:inline-flex;align-items:center;gap:.35rem;max-width:calc(100% - 166px);background:var(--white);border:none;border-radius:24px;padding:.6rem 1.05rem .6rem 1.15rem;box-shadow:0 6px 18px rgba(42,24,16,.2);font-weight:900;font-size:1.05rem;color:var(--primary);letter-spacing:-.3px;line-height:1}
+.quan-pill .icon{color:var(--primary)}
+.quan-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.quan-dist{color:var(--text3);font-weight:700;font-size:.68rem;margin-left:.1rem;letter-spacing:0}
+.quan-pill .chevron{color:var(--text3);font-size:.7rem;margin-left:.1rem}
+
+.spacer-top{flex:4;min-height:0}
+.spacer-bottom{flex:6;min-height:0}
+.frame-zone{flex:0 0 auto;padding:0 18px}
+.frame{position:relative;width:100%;aspect-ratio:3/4;border-radius:32px;overflow:hidden;background:#0e0806}
+.frame canvas,.frame video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;transition:filter .16s linear}
+.frame video.mirror{transform:scaleX(-1)}
+.flash{position:absolute;inset:0;background:var(--white);opacity:0;pointer-events:none;transition:opacity .15s;z-index:3}
+.flash.on{opacity:.9}
+
+.manual-row{display:flex;align-items:center;gap:8px;padding:8px 18px 0;flex-shrink:0}
+.exposure{position:relative;flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:var(--white);border-radius:20px;padding:6px 8px;box-shadow:0 6px 18px rgba(42,24,16,.2);color:var(--text2)}
+.exp-btn{flex-shrink:0;width:30px;height:30px;border-radius:50%;border:none;background:var(--paper);color:var(--text2);display:flex;align-items:center;justify-content:center;transition:transform .1s}
+.exp-btn .icon{width:16px;height:16px}
+.exp-btn:active{transform:scale(.92)}
+.lock-btn{width:38px;height:38px;background:var(--white);box-shadow:0 6px 18px rgba(42,24,16,.2)}
+.lock-btn .icon{width:18px;height:18px}
+.lock-btn.on{background:var(--primary);color:var(--white)}
+
+/* ── The new ruler ── */
+.dial{--inset:10px;position:relative;flex:1;min-width:0;height:30px;touch-action:none;cursor:ew-resize;border-radius:10px;outline:none}
+.dial:focus-visible{box-shadow:0 0 0 2px var(--primary)}
+.ticks{position:absolute;inset:0;pointer-events:none}
+.tick{position:absolute;top:50%;left:calc(var(--inset) + (100% - 2 * var(--inset)) * var(--p));width:2px;height:7px;margin-left:-1px;border-radius:1px;background:var(--text3);opacity:.5;transform:translateY(-50%) scaleY(var(--s,1));transition:transform .16s var(--ease-out),background-color .16s,opacity .16s}
+.tick.major{height:12px;background:var(--text2);opacity:.7}
+.tick.zero{height:16px;background:var(--text);opacity:.9}
+.tick.fill{background:var(--primary);opacity:.85}
+.thumb{position:absolute;top:50%;left:calc(var(--inset) + (100% - 2 * var(--inset)) * var(--p));width:4px;height:24px;margin-left:-2px;border-radius:2px;background:var(--primary);transform:translateY(-50%);box-shadow:0 0 0 3px rgba(185,38,38,.14);transition:left .12s var(--ease-spring),height .15s var(--ease-out);pointer-events:none}
+.dial.dragging .thumb{height:28px}
+.thumb::after{content:'';position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;box-shadow:0 0 0 2px var(--primary);opacity:0;transform:scale(.4)}
+.thumb.buzz::after{animation:buzzRing .26s ease-out}
+.thumb.buzz-zero::after{box-shadow:0 0 0 3px var(--primary);animation:buzzRing .38s ease-out}
+@keyframes buzzRing{0%{opacity:.6;transform:scale(.4)}100%{opacity:0;transform:scale(1.3)}}
+.thumb.bump-l{animation:bumpL .22s ease-out}
+.thumb.bump-r{animation:bumpR .22s ease-out}
+@keyframes bumpL{40%{transform:translate(-4px,-50%) scaleY(.86)}}
+@keyframes bumpR{40%{transform:translate(4px,-50%) scaleY(.86)}}
+
+/* Production's current slider, byte-for-byte, for the A/B */
+.old-slider{flex:1;min-width:0;-webkit-appearance:none;appearance:none;height:30px;accent-color:var(--primary);cursor:pointer}
+
+.readout{position:absolute;bottom:calc(100% + 8px);left:0;transform:translateX(-50%);z-index:2;background:var(--text);color:var(--cream);font-size:.72rem;font-weight:800;line-height:1;padding:.35rem .6rem;border-radius:8px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s;font-variant-numeric:tabular-nums}
+.readout.show{opacity:1}
+
+.ctrl-row{display:flex;align-items:center;justify-content:space-between;padding:16px 34px calc(var(--safe-bottom) + 90px);flex-shrink:0}
+.float-btn{width:54px;height:54px;border:none;border-radius:50%;background:var(--white);box-shadow:0 6px 18px rgba(42,24,16,.2);display:flex;align-items:center;justify-content:center;color:var(--text2);transition:transform .1s}
+.float-btn .icon{width:24px;height:24px}
+.float-btn:active{transform:scale(.92)}
+.shutter{position:relative;width:80px;height:80px;border-radius:50%;background:var(--primary);border:2px solid var(--text);box-shadow:3px 3px 0 var(--text);transition:box-shadow .12s,transform .12s}
+.shutter::after{content:'';position:absolute;inset:6px;background:var(--white);border-radius:50%;border:2px solid var(--text)}
+.shutter:active{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--text)}
+
+.tabbar{position:absolute;left:10px;right:10px;bottom:calc(var(--safe-bottom) + 10px);z-index:20;background:var(--white);border-radius:28px;display:flex;align-items:center;padding:10px 6px;box-shadow:0 12px 30px rgba(42,24,16,.24)}
+.tab-btn{flex:1;padding:5px 0;display:flex;flex-direction:column;align-items:center;gap:4px;color:var(--text3);background:none;border:none}
+.tab-btn .icon{width:22px;height:22px}
+.tab-btn.active{color:var(--primary)}
+.tab-btn.active .icon{transform:scale(1.1)}
+.tab-lbl{font-size:.68rem;font-weight:800;letter-spacing:.2px;line-height:1}
+
+.toast{position:absolute;left:50%;top:calc(var(--safe-top) + 84px);transform:translate(-50%,-8px);z-index:30;background:var(--white);color:var(--text);font-size:.78rem;font-weight:800;padding:.55rem .9rem;border-radius:14px;box-shadow:0 8px 22px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ── Tuning panel ── */
+.panel{width:100%;max-width:420px;display:flex;flex-direction:column;gap:14px}
+.panel-head{padding:4px 4px 2px}
+.eyebrow{font-size:.68rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--primary)}
+.panel-head h1{font-size:1.45rem;font-weight:900;letter-spacing:-.4px;line-height:1.15;margin-top:4px;text-wrap:balance}
+.lede{font-size:.88rem;color:var(--text2);margin-top:6px;max-width:60ch}
+.card{background:var(--white);border-radius:18px;padding:16px;box-shadow:0 1px 0 var(--line-2),0 8px 24px rgba(42,24,16,.07);display:flex;flex-direction:column;gap:10px}
+.card h2{font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)}
+.status{display:flex;align-items:flex-start;gap:10px;font-size:.86rem;font-weight:700;color:var(--text);line-height:1.4}
+.status .icon{width:22px;height:22px;color:var(--primary);margin-top:1px}
+.status.warn .icon{color:var(--accent-2)}
+.status .icon.wiggle{animation:wiggle .24s ease-out}
+@keyframes wiggle{25%{transform:translateX(-2px) rotate(-6deg)}75%{transform:translateX(2px) rotate(6deg)}}
+.kv{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:.82rem;color:var(--text2);padding-top:8px;border-top:1px dashed var(--line-2)}
+.kv b{color:var(--text);font-weight:900;font-variant-numeric:tabular-nums}
+.seg{display:flex;background:var(--cream);border-radius:999px;padding:4px;gap:4px}
+.seg button{flex:1;border:none;background:transparent;border-radius:999px;padding:9px 6px;font-size:.8rem;font-weight:800;color:var(--text2);white-space:nowrap}
+.seg button[aria-checked="true"]{background:var(--text);color:var(--cream)}
+.field{display:flex;flex-direction:column;gap:6px}
+.field-label{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:.84rem;font-weight:800;color:var(--text)}
+.field-label output{font-size:.78rem;font-weight:800;color:var(--primary);font-variant-numeric:tabular-nums}
+.field input[type=range]{width:100%;accent-color:var(--primary);height:28px}
+.hint{font-size:.76rem;color:var(--text3);line-height:1.45}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:none;border-radius:14px;padding:11px 14px;font-size:.84rem;font-weight:800}
+.btn-primary{background:var(--primary);color:var(--white)}
+.btn-ghost{background:var(--cream);color:var(--text)}
+.why{display:flex;flex-direction:column;gap:8px;padding-left:1.1rem}
+.why li{font-size:.82rem;color:var(--text2);line-height:1.45}
+.why b{color:var(--text)}
+.cfg-line{display:block;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.76rem;background:var(--paper);border:1px dashed var(--line-2);border-radius:10px;padding:10px 12px;color:var(--text);user-select:all;-webkit-user-select:all;word-break:break-word}
+.preview{display:flex;gap:14px;align-items:center}
+.preview canvas{width:132px;height:132px;border-radius:12px;background:var(--white);box-shadow:0 0 0 1px var(--line-2);flex-shrink:0}
+.preview a{font-size:.84rem;font-weight:800;color:var(--primary);word-break:break-all}
+
+@media (max-width:640px){
+  .stage{padding:0 0 48px;gap:0}
+  .phone{width:100%;padding:0;border-radius:0;box-shadow:none;background:none}
+  .screen{width:100%;height:100svh;min-height:620px;border-radius:0}
+  .panel{padding:22px 16px 0}
+}
+@media (prefers-reduced-motion:reduce){
+  .tick,.thumb,.frame canvas,.frame video{transition:none}
+  .thumb.buzz::after,.thumb.buzz-zero::after,.thumb.bump-l,.thumb.bump-r,.status .icon.wiggle{animation:none}
+}
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="phone">
+    <section class="screen" id="screen" aria-label="Màn chụp check-in (mô phỏng)">
+      <button class="quan-pill" id="quanPill" type="button">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9,3 H15 L14,8 L17,12 H7 L10,8 Z"/><path d="M12,12 L12,21"/></svg>
+        <span class="quan-name">Phở Thìn Lò Đúc</span>
+        <span class="quan-dist">120m</span>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+      <div class="spacer-top"></div>
+      <div class="frame-zone">
+        <div class="frame" id="frame">
+          <canvas id="scene" role="img" aria-label="Ảnh mẫu: tô phở nhìn từ trên xuống"></canvas>
+          <video id="cam" playsinline muted hidden></video>
+          <div class="flash" id="flash"></div>
+        </div>
+      </div>
+
+      <div class="manual-row">
+        <div class="exposure" id="exposure">
+          <button class="exp-btn" id="resetBtn" type="button" aria-label="Đặt lại độ sáng" title="Đặt lại độ sáng">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.74,4.48 A8,8 0 1 1 5.07,8.00"/><path d="M5,7 L4,12 L9,11"/></svg>
+          </button>
+          <div class="dial" id="dial" role="slider" tabindex="0" aria-label="Độ sáng" aria-valuemin="-2" aria-valuemax="2" aria-valuenow="0" aria-valuetext="Tự động">
+            <div class="ticks" id="ticks"></div>
+            <div class="thumb" id="thumb"></div>
+          </div>
+          <input type="range" class="old-slider" id="oldSlider" min="-2" max="2" step="0.1666667" value="0" aria-label="Độ sáng (thanh cũ)" hidden>
+          <div class="readout" id="readout">Tự động</div>
+        </div>
+        <button class="exp-btn lock-btn" id="lockBtn" type="button" aria-label="Khóa nét &amp; sáng" aria-pressed="false" title="Khóa nét &amp; sáng">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7,11 h10 a2,2 0 0 1 2,2 v6 a2,2 0 0 1 -2,2 h-10 a2,2 0 0 1 -2,-2 v-6 a2,2 0 0 1 2,-2 z"/><path d="M8,11 V7 a4,4 0 0 1 8,0 v4"/></svg>
+        </button>
+      </div>
+
+      <div class="ctrl-row">
+        <button class="float-btn" id="diaryBtn" type="button" aria-label="Nhật ký check-in">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6,4 h11 a1,1 0 0 1 1,1 v15 H7 a2,2 0 0 1 -2,-2 V5 a1,1 0 0 1 1,-1 z"/><path d="M5,17 a2,2 0 0 1 2,-2 H18"/><path d="M9,8 L15,8"/><path d="M9,11.5 L13,11.5"/></svg>
+        </button>
+        <button class="shutter" id="shutter" type="button" aria-label="Chụp check-in"></button>
+        <button class="float-btn" id="flipBtn" type="button" aria-label="Đổi camera trước/sau">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.74,4.48 A8,8 0 1 1 5.07,8.00"/><path d="M5,7 L4,12 L9,11"/></svg>
+        </button>
+      </div>
+      <div class="spacer-bottom"></div>
+
+      <nav class="tabbar" aria-label="Thanh điều hướng (mô phỏng)">
+        <button class="tab-btn" type="button">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4,12 a8,6 0 0 0 16,0"/><path d="M3,12 L21,12"/><path d="M9,5 L9,8"/><path d="M12,4 L12,7"/><path d="M15,5 L15,8"/></svg>
+          <span class="tab-lbl">Trang chủ</span>
+        </button>
+        <button class="tab-btn active" type="button" aria-current="page">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4,9 a2,2 0 0 1 2,-2 H8 L9.5,5 H14.5 L16,7 H18 a2,2 0 0 1 2,2 V17 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 Z"/><path d="M8.5,13 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0"/></svg>
+          <span class="tab-lbl">Check-in</span>
+        </button>
+        <button class="tab-btn" type="button">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6,9 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"/><path d="M3,20 a6,6 0 0 1 12,0"/><path d="M14.7,10 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0"/><path d="M13,20 a5,5 0 0 1 8.5,-0.6"/></svg>
+          <span class="tab-lbl">Cộng đồng</span>
+        </button>
+        <button class="tab-btn" type="button">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.8,8 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0"/><path d="M5,20 A7,7 0 0 1 19,20"/></svg>
+          <span class="tab-lbl">Cá nhân</span>
+        </button>
+      </nav>
+    </section>
+  </div>
+
+  <aside class="panel" aria-label="Tinh chỉnh cảm giác thước kéo sáng">
+    <header class="panel-head">
+      <p class="eyebrow">Check-in · Thước kéo sáng</p>
+      <h1>Mỗi nấc một lần rung</h1>
+      <p class="lede">Kéo thước ngay dưới khung ảnh. Qua mỗi vạch là sáng/tối thêm 1 nấc và rung nhẹ một cái; về mốc 0 (Tự động) rung đậm hơn; kéo quá hai đầu thanh sẽ rung 2 nhịp báo đã hết.</p>
+    </header>
+
+    <div class="card" id="previewCard" hidden>
+      <h2>Thử rung thật trên điện thoại</h2>
+      <div class="preview">
+        <canvas id="qr" width="264" height="264" aria-label="Mã QR mở bản thử trên điện thoại"></canvas>
+        <div>
+          <p class="hint">Khung xem này chặn rung. Quét mã bằng điện thoại Android (hoặc mở link) để cảm nhận rung thật — có cả nút mở camera thật.</p>
+          <p style="margin-top:8px"><a id="previewLink" href="#" target="_blank" rel="noopener"></a></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="status" id="hapticStatus">
+        <svg class="icon" id="hapticIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="4" width="8" height="16" rx="2"/><path d="M4.5 9v6M19.5 9v6M2 11v2M22 11v2"/></svg>
+        <span id="hapticText">Đang kiểm tra khả năng rung…</span>
+      </div>
+      <div class="kv"><span>Độ sáng đang chọn</span><b id="valNow">0 EV · Tự động</b></div>
+      <div class="kv"><span>Số lần rung</span><b id="hapticCount">0</b></div>
+      <div class="btn-row"><button class="btn btn-ghost" id="testBuzz" type="button">Thử rung một cái</button></div>
+    </div>
+
+    <div class="card">
+      <h2>So sánh</h2>
+      <div class="seg" id="modeSeg" role="radiogroup" aria-label="Kiểu thanh">
+        <button type="button" role="radio" data-v="dial">Thước mới</button>
+        <button type="button" role="radio" data-v="old">Thanh cũ</button>
+      </div>
+      <p class="hint">"Thanh cũ" là đúng thanh trượt đang chạy trong app: bước 1/6 EV, không có vạch, không rung — kéo thử để thấy vì sao khó dừng đúng chỗ.</p>
+    </div>
+
+    <div class="card">
+      <h2>Tinh chỉnh cảm giác</h2>
+      <div class="field">
+        <div class="field-label"><span>Mỗi nấc</span><output id="spacingOut">≈ 18px</output></div>
+        <div class="seg" id="stepSeg" role="radiogroup" aria-label="Độ lớn mỗi nấc">
+          <button type="button" role="radio" data-v="6">1/6 EV</button>
+          <button type="button" role="radio" data-v="3">1/3 EV</button>
+          <button type="button" role="radio" data-v="2">1/2 EV</button>
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label"><span>Phạm vi</span><output id="countOut">12 nấc</output></div>
+        <div class="seg" id="rangeSeg" role="radiogroup" aria-label="Phạm vi chỉnh">
+          <button type="button" role="radio" data-v="2">±2 EV</button>
+          <button type="button" role="radio" data-v="3">±3 EV</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label" for="hyst"><span>Độ dính nấc</span><output id="hystOut" for="hyst">Vừa</output></label>
+        <input type="range" id="hyst" min="0" max="0.45" step="0.05">
+        <p class="hint">Càng dính thì tay run nhẹ càng không làm nấc nhảy qua lại, đổi lại phải kéo dứt khoát hơn.</p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="tickMs"><span>Rung mỗi nấc</span><output id="tickOut" for="tickMs">10 ms</output></label>
+        <input type="range" id="tickMs" min="4" max="30" step="1">
+      </div>
+      <div class="field">
+        <label class="field-label" for="zeroMs"><span>Rung ở mốc 0</span><output id="zeroOut" for="zeroMs">24 ms</output></label>
+        <input type="range" id="zeroMs" min="10" max="50" step="1">
+      </div>
+      <div class="btn-row"><button class="btn btn-ghost" id="resetCfg" type="button">Về mặc định</button></div>
+    </div>
+
+    <div class="card">
+      <h2>Camera thật</h2>
+      <div class="btn-row"><button class="btn btn-primary" id="camBtn" type="button">Mở camera thật</button></div>
+      <p class="hint" id="camStatus">Đang dùng ảnh mẫu, độ sáng mô phỏng bằng bộ lọc. Mở camera thật để thước chỉnh đúng độ sáng của camera điện thoại.</p>
+    </div>
+
+    <div class="card">
+      <h2>Vì sao dễ chỉnh hơn</h2>
+      <ul class="why">
+        <li><b>Nấc to gấp đôi:</b> mỗi nấc 1/3 EV (bước chuẩn của máy ảnh) thay vì 1/6 EV, nên mỗi nấc rộng ~18px thay vì ~9px.</li>
+        <li><b>Chạm không nhảy:</b> chạm vào thước không đổi gì, chỉ khi kéo mới đổi — không lỡ tay nhảy vọt tới chỗ vừa chạm.</li>
+        <li><b>Có độ dính:</b> phải kéo quá nửa nấc thêm một chút mới sang nấc mới; mốc 0 dính hơn để dễ quay về Tự động.</li>
+        <li><b>Rung phân biệt:</b> nấc thường rung nhẹ, mốc 0 rung đậm, chạm đầu thanh rung 2 nhịp.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Thông số bạn chọn</h2>
+      <p class="hint">Khi thấy vừa tay, gửi lại dòng này để tôi đưa đúng thông số vào app:</p>
+      <code class="cfg-line" id="cfgLine"></code>
+      <div class="btn-row"><button class="btn btn-ghost" id="copyCfg" type="button">Sao chép</button></div>
+    </div>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+<script>
+(() => {
+  'use strict';
+  const PREVIEW_URL = 'https://thuoc-keo-sang.nhopnhep.pages.dev/demo/thuoc-keo-sang/';
+  const $ = (id) => document.getElementById(id);
+
+  const DEFAULTS = { mode: 'dial', stepDiv: 3, range: 2, hyst: 0.2, tickMs: 10, zeroMs: 24 };
+  const EDGE_MS = 34, ZERO_EXTRA = 0.25, INSET = 10, TICK_GAP_MS = 28;
+  let cfg = { ...DEFAULTS };
+  try { const saved = JSON.parse(localStorage.getItem('nn-dial-cfg') || 'null'); if (saved) cfg = { ...cfg, ...saved }; } catch (_) {}
+  const saveCfg = () => { try { localStorage.setItem('nn-dial-cfg', JSON.stringify(cfg)); } catch (_) {} };
+
+  const inFrame = (() => { try { return window.self !== window.top; } catch (_) { return true; } })();
+  const hasVibrate = typeof navigator.vibrate === 'function';
+  const isIOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const coarse = matchMedia('(pointer: coarse)').matches;
+
+  const dial = $('dial'), thumb = $('thumb'), readout = $('readout'), oldSlider = $('oldSlider');
+
+  // ── Notches ──
+  let device = null;         // real camera's exposureCompensation {min,max,step}, if any
+  let values = [], idx = 0, zeroIdx = 0, tickEls = [];
+
+  function buildNotches() {
+    const step = 1 / cfg.stepDiv;
+    const lo = device ? Math.max(device.min, -cfg.range) : -cfg.range;
+    const hi = device ? Math.min(device.max, cfg.range) : cfg.range;
+    const vals = [];
+    for (let k = Math.ceil(lo / step - 1e-9); k <= Math.floor(hi / step + 1e-9); k++) {
+      let v = k * step;
+      if (device && device.step) v = Math.round(v / device.step) * device.step;
+      v = Math.round(v * 1000) / 1000;
+      if (!vals.length || Math.abs(vals[vals.length - 1] - v) > 1e-6) vals.push(v);
+    }
+    values = vals.length ? vals : [0];
+    zeroIdx = Math.max(0, values.findIndex((v) => Math.abs(v) < 1e-6));
+    idx = zeroIdx;
+
+    const wrap = $('ticks');
+    wrap.textContent = '';
+    const n = values.length - 1;
+    tickEls = values.map((v, i) => {
+      const t = document.createElement('span');
+      const isZero = Math.abs(v) < 1e-6, isMajor = Math.abs(v - Math.round(v)) < 1e-6;
+      t.className = 'tick' + (isZero ? ' zero' : isMajor ? ' major' : '');
+      t.style.setProperty('--p', n ? i / n : 0.5);
+      wrap.appendChild(t);
+      return t;
+    });
+    dial.setAttribute('aria-valuemin', values[0]);
+    dial.setAttribute('aria-valuemax', values[n]);
+    render();
+    updateSpacing();
+    applyExposure(0);
+  }
+
+  const isZero = (v) => Math.abs(v) < 1e-6;
+  const fmt = (v) => isZero(v) ? 'Tự động' : (v > 0 ? '+' : '−') + Math.abs(v).toFixed(1);
+
+  function render() {
+    const n = values.length - 1;
+    const p = n ? idx / n : 0.5;
+    thumb.style.setProperty('--p', p);
+    tickEls.forEach((t, i) => {
+      const d = Math.abs(i - idx);
+      t.style.setProperty('--s', (1 + 0.6 * Math.max(0, 1 - d / 2.4)).toFixed(3));
+      const between = (idx > zeroIdx && i > zeroIdx && i <= idx) || (idx < zeroIdx && i < zeroIdx && i >= idx);
+      t.classList.toggle('fill', between);
+    });
+    const v = values[idx];
+    dial.setAttribute('aria-valuenow', v);
+    dial.setAttribute('aria-valuetext', isZero(v) ? 'Tự động' : `${fmt(v)} EV`);
+    readout.textContent = fmt(v);
+    readout.style.left = `${dialX(p)}px`;
+    $('valNow').textContent = isZero(v) ? '0 EV · Tự động' : `${fmt(v)} EV`;
+  }
+
+  function dialX(p) {
+    const x = dial.offsetLeft + INSET + (dial.clientWidth - 2 * INSET) * p;
+    const box = $('exposure').clientWidth;
+    return Math.max(26, Math.min(box - 26, x));
+  }
+
+  function updateSpacing() {
+    const n = values.length - 1;
+    if (dial.clientWidth && n) $('spacingOut').textContent = `≈ ${Math.round((dial.clientWidth - 2 * INSET) / n)}px mỗi nấc`;
+    $('countOut').textContent = `${n} nấc`;
+  }
+
+  function setIdx(n) {
+    n = Math.max(0, Math.min(values.length - 1, n));
+    if (n === idx) return false;
+    const prev = idx;
+    idx = n;
+    render();
+    const crossedZero = (prev - zeroIdx) * (n - zeroIdx) < 0;
+    haptic(n === zeroIdx || crossedZero ? 'zero' : 'tick');
+    applyExposure(values[idx]);
+    return true;
+  }
+
+  // ── Readout visibility ──
+  let readoutTimer = null;
+  function showReadout(hold) {
+    clearTimeout(readoutTimer);
+    readout.classList.add('show');
+    if (!hold) readoutTimer = setTimeout(() => readout.classList.remove('show'), 700);
+  }
+
+  // ── Drag: relative, with hysteresis ──
+  let drag = null, lastTap = null;
+  const threshold = (i) => 0.5 + cfg.hyst + (i === zeroIdx ? ZERO_EXTRA : 0);
+
+  dial.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    dial.focus({ preventScroll: true });
+    dial.setPointerCapture(e.pointerId);
+    const n = Math.max(1, values.length - 1);
+    drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, i0: idx, spacing: (dial.clientWidth - 2 * INSET) / n, moved: false, edge: 0 };
+    dial.classList.add('dragging');
+    render();
+    showReadout(true);
+  });
+
+  dial.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const last = values.length - 1;
+    const dx = e.clientX - drag.x0;
+    if (!drag.moved && Math.abs(dx) > 4) drag.moved = true;
+    const pos = drag.i0 + dx / drag.spacing;
+    let next = idx;
+    while (next < last && pos >= next + threshold(next)) next++;
+    while (next > 0 && pos <= next - threshold(next)) next--;
+    setIdx(next);
+    const over = pos > last + 0.6 && idx === last ? 1 : pos < -0.6 && idx === 0 ? -1 : 0;
+    if (over) {
+      if (drag.edge !== over) { drag.edge = over; haptic('edge'); bump(over); }
+      // Pin the finger to the wall so dragging back responds immediately
+      // instead of first having to "unwind" the overshoot.
+      drag.x0 = e.clientX - ((over === 1 ? last : 0) - drag.i0) * drag.spacing;
+    } else if ((drag.edge === 1 && pos < last - 0.3) || (drag.edge === -1 && pos > 0.3)) {
+      drag.edge = 0;
+    }
+  });
+
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const tapped = !drag.moved && e.type === 'pointerup';
+    drag = null;
+    dial.classList.remove('dragging');
+    showReadout(false);
+    if (!tapped) { lastTap = null; return; }
+    const now = performance.now();
+    if (lastTap && now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24) {
+      lastTap = null;
+      resetToZero();
+    } else {
+      lastTap = { t: now, x: e.clientX, y: e.clientY };
+    }
+  }
+  dial.addEventListener('pointerup', endDrag);
+  dial.addEventListener('pointercancel', endDrag);
+
+  dial.addEventListener('keydown', (e) => {
+    const big = cfg.stepDiv;
+    const delta = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1, PageUp: big, PageDown: -big }[e.key];
+    let n = null;
+    if (delta) n = idx + delta;
+    else if (e.key === 'Home') n = 0;
+    else if (e.key === 'End') n = values.length - 1;
+    else if (e.key === '0') n = zeroIdx;
+    if (n === null) return;
+    e.preventDefault();
+    if (!setIdx(n) && (n < 0 || n > values.length - 1)) { haptic('edge'); bump(n < 0 ? -1 : 1); }
+    showReadout(false);
+  });
+
+  let wheelAcc = 0;
+  dial.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    wheelAcc += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : -e.deltaY;
+    while (wheelAcc >= 40) { wheelAcc -= 40; if (!setIdx(idx + 1)) { haptic('edge'); bump(1); } }
+    while (wheelAcc <= -40) { wheelAcc += 40; if (!setIdx(idx - 1)) { haptic('edge'); bump(-1); } }
+    showReadout(false);
+  }, { passive: false });
+
+  function resetToZero() {
+    if (cfg.mode === 'old') {
+      oldSlider.value = 0;
+      onOldInput();
+      return;
+    }
+    if (!setIdx(zeroIdx)) haptic('zero');
+    showReadout(false);
+  }
+  $('resetBtn').addEventListener('click', resetToZero);
+
+  function bump(dir) {
+    thumb.classList.remove('bump-l', 'bump-r');
+    void thumb.offsetWidth;
+    thumb.classList.add(dir < 0 ? 'bump-l' : 'bump-r');
+  }
+
+  // ── Haptics ──
+  const H = { count: 0, last: 0, ok: false, blocked: false };
+  let iosTap = null;
+  if (!hasVibrate && isIOS) {
+    const label = document.createElement('label');
+    label.setAttribute('aria-hidden', 'true');
+    label.style.cssText = 'position:fixed;left:-200px;top:0;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none';
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.setAttribute('switch', '');
+    input.tabIndex = -1;
+    label.appendChild(input);
+    document.body.appendChild(label);
+    iosTap = () => label.click();
+  }
+
+  function haptic(kind) {
+    const now = performance.now();
+    pulse(kind);
+    if (kind === 'tick' && now - H.last < TICK_GAP_MS) return;
+    H.last = now;
+    H.count++;
+    if (hasVibrate) {
+      const pattern = kind === 'tick' ? cfg.tickMs : kind === 'zero' ? cfg.zeroMs : [EDGE_MS, 55, Math.round(EDGE_MS * 0.6)];
+      let ok = false;
+      try { ok = navigator.vibrate(pattern); } catch (_) {}
+      if (ok) H.ok = true; else H.blocked = true;
+    } else if (iosTap) {
+      iosTap();
+      if (kind === 'edge') setTimeout(iosTap, 70);
+    }
+    updateHapticStatus();
+  }
+
+  function pulse(kind) {
+    const cls = kind === 'zero' ? 'buzz-zero' : 'buzz';
+    thumb.classList.remove('buzz', 'buzz-zero');
+    void thumb.offsetWidth;
+    if (kind !== 'edge') thumb.classList.add(cls);
+    const icon = $('hapticIcon');
+    icon.classList.remove('wiggle');
+    void icon.offsetWidth;
+    icon.classList.add('wiggle');
+  }
+
+  function updateHapticStatus() {
+    let msg, warn = true;
+    if (!hasVibrate && isIOS) msg = 'iPhone chưa hỗ trợ rung cho web. Đang thử mẹo rung riêng của iOS 18 — có thể không cảm nhận được.';
+    else if (!hasVibrate) msg = 'Trình duyệt này không hỗ trợ rung. Vòng nháy trên thước là lúc điện thoại sẽ rung.';
+    else if (H.blocked && inFrame) msg = 'Khung xem này đang chặn rung. Mở bản thử trên điện thoại Android (mã QR phía trên) để cảm nhận rung thật.';
+    else if (H.blocked) msg = 'Trình duyệt chặn rung. Chạm vào trang một lần rồi kéo lại, hoặc kiểm tra điện thoại có đang tắt rung / tiết kiệm pin.';
+    else if (!coarse) msg = 'Máy tính không có mô-tơ rung. Vòng nháy trên thước là lúc điện thoại sẽ rung.';
+    else if (H.ok) { msg = 'Rung đang chạy — mỗi nấc một lần rung.'; warn = false; }
+    else if (inFrame) msg = 'Khung xem này thường chặn rung. Kéo thử; nếu không rung, mở bản thử qua mã QR.';
+    else { msg = 'Sẵn sàng — kéo thước để cảm nhận rung.'; warn = false; }
+    $('hapticText').textContent = msg;
+    $('hapticStatus').classList.toggle('warn', warn);
+    $('hapticCount').textContent = H.count;
+  }
+  $('testBuzz').addEventListener('click', () => haptic('zero'));
+
+  // ── Brightness: real camera exposureCompensation, else a filter ──
+  let stream = null, track = null, facing = 'environment';
+  let ecLast = null, ecPending = null, ecBusy = false;
+
+  function applyExposure(v) {
+    if (track && device) {
+      setFilter(null);
+      const r = Math.round(v * 1000) / 1000;
+      if (r === ecLast) return;
+      ecPending = r;
+      if (!ecBusy) drainEC();
+    } else {
+      setFilter(v);
+    }
+  }
+  async function drainEC() {
+    if (!track) return;
+    ecBusy = true;
+    const v = ecPending;
+    ecLast = v;
+    try { await track.applyConstraints({ advanced: [{ exposureCompensation: v }] }); } catch (_) {}
+    ecBusy = false;
+    if (ecPending !== v) drainEC();
+  }
+  function setFilter(v) {
+    const el = track ? $('cam') : $('scene');
+    el.style.filter = v == null || isZero(v) ? '' : `brightness(${Math.pow(2, v * 0.55).toFixed(3)}) contrast(${(1 - Math.abs(v) * 0.04).toFixed(3)})`;
+  }
+
+  async function startCamera() {
+    const status = $('camStatus');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { status.textContent = 'Trình duyệt này không mở được camera.'; return; }
+    stopCamera();
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1440 }, height: { ideal: 1920 } }, audio: false });
+      const v = $('cam');
+      v.srcObject = stream;
+      v.classList.toggle('mirror', facing === 'user');
+      v.hidden = false;
+      $('scene').hidden = true;
+      await v.play().catch(() => {});
+      track = stream.getVideoTracks()[0];
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+      const ec = caps.exposureCompensation;
+      if (ec && typeof ec.min === 'number' && ec.max > ec.min) {
+        device = { min: ec.min, max: ec.max, step: ec.step || 0 };
+        status.textContent = `Camera thật · máy báo độ sáng ${fmtEV(ec.min)} → ${fmtEV(ec.max)} EV, bước gốc ${(ec.step || 0).toFixed(2)} EV (thanh cũ đang kéo theo bước này).`;
+        oldSlider.min = ec.min; oldSlider.max = ec.max; oldSlider.step = ec.step || 0.1;
+      } else {
+        device = null;
+        status.textContent = 'Camera thật · máy này không cho web chỉnh độ sáng, thước đang mô phỏng bằng bộ lọc.';
+      }
+      ecLast = null; ecPending = null; ecBusy = false;
+      $('camBtn').textContent = 'Tắt camera thật';
+      buildNotches();
+      oldSlider.value = 0;
+    } catch (err) {
+      stopCamera();
+      status.textContent = err && err.name === 'NotAllowedError'
+        ? (inFrame ? 'Khung xem này chặn camera — mở bản thử qua mã QR để dùng camera thật.' : 'Chưa được cấp quyền camera. Cho phép camera trong trình duyệt rồi bấm lại.')
+        : `Không mở được camera: ${(err && err.message) || err}`;
+    }
+  }
+  function stopCamera() {
+    if (stream) stream.getTracks().forEach((t) => t.stop());
+    stream = null; track = null;
+    const v = $('cam');
+    v.srcObject = null; v.hidden = true; v.style.filter = '';
+    $('scene').hidden = false;
+    $('camBtn').textContent = 'Mở camera thật';
+    device = null;
+    oldSlider.min = -2; oldSlider.max = 2; oldSlider.step = 1 / 6; oldSlider.value = 0;
+    buildNotches();
+  }
+  const fmtEV = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1);
+  $('camBtn').addEventListener('click', () => {
+    if (stream) { stopCamera(); $('camStatus').textContent = 'Đã tắt camera, quay về ảnh mẫu.'; }
+    else startCamera();
+  });
+
+  // ── Old slider (production's current one) ──
+  function onOldInput() {
+    let v = +oldSlider.value;
+    if (Math.abs(v) < 0.3) { v = 0; oldSlider.value = 0; }
+    readout.textContent = v === 0 ? 'Tự động' : (v > 0 ? `+${v.toFixed(1)}` : v.toFixed(1));
+    const pct = (v - +oldSlider.min) / (+oldSlider.max - +oldSlider.min);
+    readout.style.left = `${oldSlider.offsetLeft + pct * oldSlider.offsetWidth}px`;
+    showReadout(false);
+    $('valNow').textContent = v === 0 ? '0 EV · Tự động' : `${fmt(v)} EV`;
+    applyExposure(v);
+  }
+  oldSlider.addEventListener('input', onOldInput);
+
+  // ── Other camera-screen controls ──
+  let toastTimer = null;
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+  }
+  let locked = false;
+  $('lockBtn').addEventListener('click', async () => {
+    locked = !locked;
+    if (track && track.getCapabilities) {
+      const caps = track.getCapabilities(), mode = locked ? 'manual' : 'continuous', adv = [];
+      if (caps.focusMode && caps.focusMode.includes(mode)) adv.push({ focusMode: mode });
+      if (caps.exposureMode && caps.exposureMode.includes(mode)) adv.push({ exposureMode: mode });
+      if (adv.length) { try { await track.applyConstraints({ advanced: adv }); } catch (_) {} }
+    }
+    $('lockBtn').classList.toggle('on', locked);
+    $('lockBtn').setAttribute('aria-pressed', String(locked));
+    toast(locked ? '🔒 Đã khóa nét & sáng — tự do đổi góc chụp' : '🔓 Đã mở khóa — camera tự lấy nét/sáng lại');
+  });
+  $('shutter').addEventListener('click', () => {
+    const f = $('flash');
+    f.classList.add('on');
+    setTimeout(() => f.classList.remove('on'), 120);
+  });
+  $('flipBtn').addEventListener('click', () => {
+    if (!stream) { toast('Mở camera thật ở bảng bên để đổi camera'); return; }
+    facing = facing === 'environment' ? 'user' : 'environment';
+    startCamera();
+  });
+  $('diaryBtn').addEventListener('click', () => toast('Nhật ký check-in — không có trong bản thử'));
+  $('quanPill').addEventListener('click', () => toast('Chọn quán — không có trong bản thử'));
+
+  // ── Tuning panel ──
+  function syncSeg(id, val) {
+    $(id).querySelectorAll('button[data-v]').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.v === String(val))));
+  }
+  function bindSeg(id, onPick) {
+    $(id).addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-v]');
+      if (b) onPick(b.dataset.v);
+    });
+  }
+  function setMode(m) {
+    cfg.mode = m;
+    saveCfg();
+    syncSeg('modeSeg', m);
+    dial.hidden = m !== 'dial';
+    oldSlider.hidden = m !== 'old';
+    readout.classList.remove('show');
+    if (m === 'dial') { idx = zeroIdx; render(); updateSpacing(); }
+    else { oldSlider.value = 0; $('valNow').textContent = '0 EV · Tự động'; }
+    applyExposure(0);
+    updateCfgLine();
+  }
+  bindSeg('modeSeg', setMode);
+  bindSeg('stepSeg', (v) => { cfg.stepDiv = +v; saveCfg(); syncSeg('stepSeg', v); buildNotches(); updateCfgLine(); if (cfg.mode !== 'dial') setMode('dial'); });
+  bindSeg('rangeSeg', (v) => { cfg.range = +v; saveCfg(); syncSeg('rangeSeg', v); buildNotches(); updateCfgLine(); if (cfg.mode !== 'dial') setMode('dial'); });
+
+  const hystName = (h) => h < 0.01 ? 'Không dính' : h <= 0.1 ? 'Nhẹ' : h <= 0.25 ? 'Vừa' : h <= 0.35 ? 'Chắc' : 'Rất chắc';
+  function bindRange(id, key, outId, fmtOut) {
+    const el = $(id);
+    el.value = cfg[key];
+    $(outId).textContent = fmtOut(+el.value);
+    el.addEventListener('input', () => {
+      cfg[key] = +el.value;
+      $(outId).textContent = fmtOut(cfg[key]);
+      saveCfg();
+      updateCfgLine();
+    });
+    el.addEventListener('change', () => { if (key === 'tickMs') haptic('tick'); if (key === 'zeroMs') haptic('zero'); });
+  }
+  bindRange('hyst', 'hyst', 'hystOut', (h) => `${hystName(h)} · ${h.toFixed(2)}`);
+  bindRange('tickMs', 'tickMs', 'tickOut', (v) => `${v} ms`);
+  bindRange('zeroMs', 'zeroMs', 'zeroOut', (v) => `${v} ms`);
+
+  $('resetCfg').addEventListener('click', () => {
+    cfg = { ...DEFAULTS };
+    saveCfg();
+    ['hyst', 'tickMs', 'zeroMs'].forEach((k) => { $(k).value = cfg[k]; $(k).dispatchEvent(new Event('input')); });
+    syncSeg('stepSeg', cfg.stepDiv);
+    syncSeg('rangeSeg', cfg.range);
+    buildNotches();
+    setMode('dial');
+  });
+
+  function updateCfgLine() {
+    $('cfgLine').textContent = `Thước kéo sáng: nấc 1/${cfg.stepDiv} EV · ±${cfg.range} EV · dính ${cfg.hyst.toFixed(2)} · rung nấc ${cfg.tickMs}ms · rung mốc 0 ${cfg.zeroMs}ms`;
+  }
+  $('copyCfg').addEventListener('click', async () => {
+    const btn = $('copyCfg');
+    try {
+      await navigator.clipboard.writeText($('cfgLine').textContent);
+      btn.textContent = 'Đã sao chép';
+    } catch (_) {
+      const r = document.createRange();
+      r.selectNodeContents($('cfgLine'));
+      const s = getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+      btn.textContent = 'Đã chọn — nhấn giữ để sao chép';
+    }
+    setTimeout(() => { btn.textContent = 'Sao chép'; }, 1800);
+  });
+
+  // ── Sample photo: a bowl of phở, drawn so no image files are needed ──
+  function drawScene() {
+    const c = $('scene'), f = $('frame');
+    const w = f.clientWidth, h = f.clientHeight;
+    if (!w || !h) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    c.width = Math.round(w * dpr);
+    c.height = Math.round(h * dpr);
+    const x = c.getContext('2d');
+    x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    let seed = 11;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const TAU = Math.PI * 2;
+
+    const wood = x.createLinearGradient(0, 0, w, h);
+    wood.addColorStop(0, '#7a4a2a'); wood.addColorStop(0.5, '#8d5a34'); wood.addColorStop(1, '#663b20');
+    x.fillStyle = wood; x.fillRect(0, 0, w, h);
+    x.globalAlpha = 0.16; x.strokeStyle = '#3d2212'; x.lineWidth = 1.2;
+    for (let i = 0; i < 28; i++) {
+      const y0 = (i / 28) * h + rnd() * 8;
+      x.beginPath(); x.moveTo(0, y0);
+      for (let xx = 0; xx <= w; xx += 20) x.lineTo(xx, y0 + Math.sin(xx / 55 + i) * 3);
+      x.stroke();
+    }
+    x.globalAlpha = 0.35; x.fillStyle = '#3a2011';
+    [0.34, 0.7].forEach((t) => x.fillRect(0, h * t, w, 2));
+    x.globalAlpha = 1;
+
+    const cx = w * 0.5, cy = h * 0.5, R = w * 0.38;
+    x.save(); x.shadowColor = 'rgba(20,8,2,.55)'; x.shadowBlur = 28; x.shadowOffsetY = 14;
+    x.fillStyle = '#efe6d4'; x.beginPath(); x.arc(cx, cy, R, 0, TAU); x.fill(); x.restore();
+    x.strokeStyle = '#2f5d86'; x.lineWidth = 2.2; x.beginPath(); x.arc(cx, cy, R * 0.93, 0, TAU); x.stroke();
+    x.lineWidth = 1; x.beginPath(); x.arc(cx, cy, R * 0.965, 0, TAU); x.stroke();
+
+    const broth = x.createRadialGradient(cx - R * 0.2, cy - R * 0.25, R * 0.1, cx, cy, R * 0.84);
+    broth.addColorStop(0, '#e6a64a'); broth.addColorStop(0.7, '#c8822c'); broth.addColorStop(1, '#9f5e1b');
+    x.fillStyle = broth; x.beginPath(); x.arc(cx, cy, R * 0.84, 0, TAU); x.fill();
+
+    x.save(); x.beginPath(); x.arc(cx, cy, R * 0.84, 0, TAU); x.clip();
+    x.strokeStyle = 'rgba(250,244,226,.9)'; x.lineWidth = 3; x.lineCap = 'round';
+    for (let i = 0; i < 36; i++) {
+      const a = rnd() * TAU, r0 = rnd() * R * 0.7, sx = cx + Math.cos(a) * r0, sy = cy + Math.sin(a) * r0;
+      x.beginPath(); x.moveTo(sx, sy);
+      x.bezierCurveTo(sx + (rnd() - 0.5) * R * 0.6, sy + (rnd() - 0.5) * R * 0.6, sx + (rnd() - 0.5) * R * 0.6, sy + (rnd() - 0.5) * R * 0.6, sx + (rnd() - 0.5) * R * 0.7, sy + (rnd() - 0.5) * R * 0.7);
+      x.stroke();
+    }
+    for (let i = 0; i < 5; i++) {
+      const a = -0.6 + i * 0.45, bx = cx + Math.cos(a) * R * 0.42, by = cy + Math.sin(a) * R * 0.42 - R * 0.08;
+      x.save(); x.translate(bx, by); x.rotate(a + 1.2);
+      x.fillStyle = i % 2 ? '#8e4f3f' : '#a2604d';
+      x.beginPath(); x.ellipse(0, 0, R * 0.2, R * 0.11, 0, 0, TAU); x.fill();
+      x.strokeStyle = 'rgba(240,200,180,.45)'; x.lineWidth = 1.5;
+      x.beginPath(); x.moveTo(-R * 0.14, 0); x.quadraticCurveTo(0, -R * 0.05, R * 0.14, 0); x.stroke();
+      x.restore();
+    }
+    x.strokeStyle = 'rgba(255,255,245,.85)'; x.lineWidth = 1.6;
+    for (let i = 0; i < 7; i++) { const a = rnd() * TAU, r0 = rnd() * R * 0.6; x.beginPath(); x.arc(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, 5 + rnd() * 5, 0, TAU); x.stroke(); }
+    for (let i = 0; i < 22; i++) {
+      const a = rnd() * TAU, r0 = R * (0.1 + rnd() * 0.62);
+      x.save(); x.translate(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); x.rotate(rnd() * Math.PI);
+      x.fillStyle = rnd() > 0.5 ? '#3f8f3a' : '#62ad4c';
+      x.beginPath(); x.ellipse(0, 0, 7 + rnd() * 5, 3.2, 0, 0, TAU); x.fill(); x.restore();
+    }
+    x.strokeStyle = '#8cc56a'; x.lineWidth = 2.2;
+    for (let i = 0; i < 14; i++) { const a = rnd() * TAU, r0 = rnd() * R * 0.66; x.beginPath(); x.arc(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, 2.6 + rnd() * 1.6, 0, TAU); x.stroke(); }
+    for (let i = 0; i < 6; i++) {
+      const a = rnd() * TAU, r0 = R * (0.2 + rnd() * 0.5), px = cx + Math.cos(a) * r0, py = cy + Math.sin(a) * r0;
+      x.fillStyle = '#c8321e'; x.beginPath(); x.arc(px, py, 4.2, 0, TAU); x.fill();
+      x.fillStyle = '#f3d27a'; x.beginPath(); x.arc(px, py, 1.3, 0, TAU); x.fill();
+    }
+    const sheen = x.createRadialGradient(cx - R * 0.35, cy - R * 0.4, 0, cx - R * 0.35, cy - R * 0.4, R * 0.5);
+    sheen.addColorStop(0, 'rgba(255,240,200,.35)'); sheen.addColorStop(1, 'rgba(255,240,200,0)');
+    x.fillStyle = sheen; x.fillRect(cx - R, cy - R, R * 2, R * 2);
+    x.restore();
+
+    x.save(); x.translate(w * 0.84, h * 0.13); x.rotate(-0.5);
+    x.fillStyle = '#7fb43a'; x.beginPath(); x.arc(0, 0, w * 0.1, Math.PI, 0); x.closePath(); x.fill();
+    x.fillStyle = '#d6ec9a'; x.beginPath(); x.arc(0, 0, w * 0.085, Math.PI, 0); x.closePath(); x.fill();
+    x.strokeStyle = 'rgba(127,180,58,.7)'; x.lineWidth = 1.3;
+    for (let k = 1; k < 5; k++) { const an = Math.PI + (k * Math.PI) / 5; x.beginPath(); x.moveTo(0, 0); x.lineTo(Math.cos(an) * w * 0.085, Math.sin(an) * w * 0.085); x.stroke(); }
+    x.restore();
+
+    x.save(); x.translate(w * 0.06, h * 0.95); x.rotate(-0.2);
+    [[0, '#caa46c'], [12, '#bf9760']].forEach(([off, col]) => { x.fillStyle = col; x.fillRect(0, off - 3, w * 0.6, 6); });
+    x.restore();
+
+    const dx = w * 0.84, dy = h * 0.88, dr = w * 0.1;
+    x.save(); x.shadowColor = 'rgba(20,8,2,.5)'; x.shadowBlur = 14; x.shadowOffsetY = 6;
+    x.fillStyle = '#efe6d4'; x.beginPath(); x.arc(dx, dy, dr, 0, TAU); x.fill(); x.restore();
+    x.fillStyle = '#4a1d12'; x.beginPath(); x.arc(dx, dy, dr * 0.76, 0, TAU); x.fill();
+    x.strokeStyle = '#c73a22'; x.lineWidth = 3; x.beginPath(); x.arc(dx + 2, dy - 1, dr * 0.4, 0.3, 4.2); x.stroke();
+  }
+
+  // ── Preview card (only where vibration is blocked: inside the artifact viewer) ──
+  if (inFrame) {
+    $('previewCard').hidden = false;
+    const link = $('previewLink');
+    link.href = PREVIEW_URL;
+    link.textContent = PREVIEW_URL.replace(/^https:\/\//, '').replace(/\/$/, '');
+    if (typeof QRious === 'function') {
+      try { new QRious({ element: $('qr'), value: PREVIEW_URL, size: 264, level: 'M', foreground: '#2A1810', background: '#FFFDF5', padding: 14 }); } catch (_) { $('qr').hidden = true; }
+    } else {
+      $('qr').hidden = true;
+    }
+  }
+
+  // ── Init ──
+  $('hyst').value = cfg.hyst;
+  syncSeg('stepSeg', cfg.stepDiv);
+  syncSeg('rangeSeg', cfg.range);
+  buildNotches();
+  setMode(cfg.mode === 'old' ? 'old' : 'dial');
+  drawScene();
+  updateHapticStatus();
+  updateCfgLine();
+  if ('ResizeObserver' in window) new ResizeObserver(() => { drawScene(); updateSpacing(); render(); }).observe($('frame'));
+  window.addEventListener('pagehide', () => { if (stream) stream.getTracks().forEach((t) => t.stop()); });
+})();
+</script>
+</body>
+</html>
