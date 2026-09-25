@@ -5791,7 +5791,7 @@ const CheckinCtrl = {
   PHOTO_FILTER: 'contrast(1.08) saturate(1.16) brightness(1.02) sepia(.06)',
   _locked: false, // AE/AF lock state for the current stream — see _toggleLock()
   AUTO_PICK_M: 150,  // _findClosest(): farthest quán auto-selected as "you're here"
-  CAPTURE_MAX: 1920, // longest side of the captured photo (the upload budget, see createCheckin)
+  CAPTURE_MAX: 1920, // width cap of the captured photo — the same cap createCheckin's compressImage(…, 1920) applied
   // Zoom — native track zoom when the camera exposes it (Android Chrome),
   // otherwise a digital crop (CSS scale on the preview, cropped on capture).
   _zoom: 1, _zoomNative: null, _zoomMax: 3, _zoomPending: null, _zoomApplying: false, _pinch: null,
@@ -6056,7 +6056,9 @@ const CheckinCtrl = {
     const track = this._stream && this._stream.getVideoTracks()[0];
     const caps = track && track.getCapabilities ? track.getCapabilities() : null;
     const z = caps && caps.zoom;
-    this._zoomNative = z && typeof z.min === 'number' && typeof z.max === 'number' && z.max > z.min ? z : null;
+    // Ratio-based zoom only (phone cameras: min ≤ 1). Desktop PTZ webcams
+    // report raw driver units (e.g. 100–500) — those use the digital path.
+    this._zoomNative = z && typeof z.min === 'number' && typeof z.max === 'number' && z.max > z.min && z.min > 0 && z.min <= 1 ? z : null;
     this._zoomMax = this._zoomNative ? Math.min(this._zoomNative.max, 10) : 3;
     this._zoomPending = null; this._zoomApplying = false;
     const settings = track && track.getSettings ? track.getSettings() : {};
@@ -6256,11 +6258,13 @@ const CheckinCtrl = {
         });
       }
     });
-    // Only auto-pick a quán the user is plausibly AT: with no GPS fix, or
-    // nothing within AUTO_PICK_M, leave it to the picker. An unedited pick
+    // Only auto-pick a quán the user is plausibly AT: a live GPS fix
+    // (State._locKind 'gps' — not the Hà Nội sample point, IP geo, a cached
+    // or a typed Home location) with a quán within AUTO_PICK_M; otherwise
+    // leave it to the picker. An unedited pick
     // now keeps its restaurant relation (and feeds that quán's verified
     // rating), so a far-off "closest" guess must not slip in unnoticed.
-    if (!pool.length || lat == null || lng == null) return null;
+    if (!pool.length || lat == null || lng == null || State._locKind !== 'gps') return null;
     // Cheap flat-earth distance — accurate enough at neighborhood scale.
     const withDist = pool.map(p => {
       const dLat = (p.lat - lat) * 111320;
@@ -6449,7 +6453,7 @@ const CheckinCtrl = {
     if (w / h > A) vw = h * A; else vh = w / A;
     const dz = this._zoomNative ? 1 : this._zoom;
     const sw = vw / dz, sh = vh / dz, sx = (w - sw) / 2, sy = (h - sh) / 2;
-    const k = Math.min(1, this.CAPTURE_MAX / Math.max(sw, sh));
+    const k = Math.min(1, this.CAPTURE_MAX / sw);
     const canvas = document.createElement('canvas');
     canvas.width = Math.round(sw * k); canvas.height = Math.round(sh * k);
     const ctx = canvas.getContext('2d');
@@ -7400,16 +7404,16 @@ const NhatKyCtrl = {
   _hDone() { clearTimeout(this._hWait); this._hBusy = false; this._hRun(); },
   _onPop() {
     if (this._hBusy) { this._hDone(); return; } // our own traversal landed
-    if (this._lbOpen()) { this._closeLb({ fromPop: true }); return; }
     // Back while "Xem quán" (CommunityDetailModal) sits on top of the sổ:
     // close the modal, and put back the entry of the layer underneath.
     const modal = this._isOpen() && document.querySelector('.modal-overlay.show');
     if (modal) {
       if (modal.id === 'communityDetailModal') CommunityDetailModal.close();
       else modal.classList.remove('show');
-      this._push(this._cur ? 'detail' : this._mamOpen() ? 'mam' : 'sheet');
+      this._push(this._lbOpen() ? 'lb' : this._cur ? 'detail' : this._mamOpen() ? 'mam' : 'sheet');
       return;
     }
+    if (this._lbOpen()) { this._closeLb({ fromPop: true }); return; }
     // Back pressed mid-peel: the layer can't close yet, so put its history
     // entry back rather than leave it open with no entry to close it.
     if (this._busy) { this._push(this._cur ? 'detail' : 'sheet'); return; }
@@ -8034,6 +8038,9 @@ const NhatKyCtrl = {
     const scrim = () => document.querySelector('#nkDetail .nk-scrim');
     stage.addEventListener('pointerdown', (e) => {
       if (!this._cur || this._busy) return;
+      // One finger drives the stage: a resting second finger (a pinch
+      // attempt) or a right-click must not become a tap on the photo.
+      if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
       this._drag.s = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, lock: null, tgt: e.target };
       try { stage.setPointerCapture(e.pointerId); } catch (_) {}
     });
@@ -8049,7 +8056,8 @@ const NhatKyCtrl = {
       }
     });
     const end = (e) => {
-      const s = this._drag.s; this._drag.s = null; if (!s || !this._cur) return;
+      const s = this._drag.s; if (!s || e.pointerId !== s.id) return;
+      this._drag.s = null; if (!this._cur) return;
       const dx = e.clientX - s.x, dy = e.clientY - s.y, dt = Math.max(1, performance.now() - s.t);
       const springBack = () => {
         card().animate([{ transform: card().style.transform || 'none' }, { transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.34,1.56,.64,1)' });
@@ -8308,7 +8316,7 @@ const NhatKyCtrl = {
     let r;
     try { r = await Community._fetch(`/api/collections/restaurants/records/${encodeURIComponent(e.rec.restaurant)}?expand=created_by`); }
     finally { this._quanBusy = false; }
-    if (!this._isOpen() || !this._cur || this._cur.id !== e.id) return; // left meanwhile
+    if (!this._isOpen() || !this._cur || this._cur.id !== e.id || this._lbOpen()) return; // left / moved on meanwhile
     if (r.ok && r.data) CommunityDetailModal.open(r.data);
     else showToast(I18N.t('nk.quanFail'));
   },
@@ -8343,9 +8351,17 @@ const NhatKyCtrl = {
     this._resetLb();
     if (!fromPop) this._back();
   },
+  // Inline drag-down styles beat .nk-lb{opacity:0} — a closed lightbox
+  // left with them stayed painted over the detail. Clear on every exit.
+  _lbUndrag() {
+    const box = document.getElementById('nkLb'), frame = document.getElementById('nkLbFrame');
+    if (box) box.style.opacity = '';
+    if (frame) frame.style.transform = '';
+  },
   _resetLb() {
     const box = document.getElementById('nkLb');
     if (!box) return;
+    this._lbUndrag();
     box.classList.remove('open'); box.setAttribute('aria-hidden', 'true');
     this._lb.pts.clear(); this._lb.g = null;
     this._lbReset();
@@ -8359,6 +8375,7 @@ const NhatKyCtrl = {
     const w = Math.max(1, Math.min(W, H * ar));
     frame.style.width = `${Math.round(w)}px`;
     frame.style.height = `${Math.round(w / ar)}px`;
+    this._lbApply(); // re-clamp pan/zoom to the new frame size
   },
   _lbReset() { Object.assign(this._lb, { s: 1, tx: 0, ty: 0 }); this._lbApply(); },
   _lbApply() {
@@ -8390,6 +8407,7 @@ const NhatKyCtrl = {
       try { stage.setPointerCapture(e.pointerId); } catch (_) {}
       const p = [...lb.pts.values()];
       if (p.length === 2) {
+        this._lbUndrag(); // a drag-down that turns into a pinch
         const mid = local({ clientX: (p[0].x + p[1].x) / 2, clientY: (p[0].y + p[1].y) / 2 });
         lb.g = { kind: 'pinch', d0: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1, s0: lb.s, mid };
       } else if (p.length === 1) {
@@ -8410,7 +8428,7 @@ const NhatKyCtrl = {
       const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
       if (Math.hypot(dx, dy) > 6) g.moved = true;
       if (lb.s > 1.01) { lb.tx = g.tx0 + dx; lb.ty = g.ty0 + dy; this._lbApply(); }
-      else if (dy > 0) { frame.style.transform = `translateY(${dy}px) scale(${Math.max(.85, 1 - dy / 900)})`; box.style.opacity = String(Math.max(.4, 1 - dy / 500)); }
+      else if (g.moved && dy > 0) { frame.style.transform = `translateY(${dy}px) scale(${Math.max(.85, 1 - dy / 900)})`; box.style.opacity = String(Math.max(.4, 1 - dy / 500)); }
     });
     const end = (e) => {
       const lb = this._lb, g = lb.g;
@@ -8422,9 +8440,9 @@ const NhatKyCtrl = {
         return;
       }
       lb.g = null;
+      this._lbUndrag();
       const dy = e.clientY - g.y0, dt = Math.max(1, performance.now() - g.t0);
       if (lb.s <= 1.01 && g.moved) {
-        frame.style.transform = ''; box.style.opacity = '';
         if (dy > 90 || (dy > 30 && dy / dt > .5)) this._closeLb();
         return;
       }
