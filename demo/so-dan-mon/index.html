@@ -167,7 +167,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--primary);outlin
 .ticket{margin:12px 16px 0;border-radius:18px;padding:12px 14px;position:relative;opacity:0;transform:translateY(40px);transition:opacity .3s var(--ease-out),transform .3s var(--ease-out)}
 .detail.open .ticket{opacity:1;transform:none;transition-delay:.18s}
 .t-a{display:flex;align-items:center;gap:10px;min-height:44px}
-.cat-dot{width:36px;height:36px;border-radius:50%;background:var(--cat,var(--text2));color:var(--white);border:2px solid var(--text);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cat-dot{width:36px;height:36px;border-radius:50%;background:var(--white);color:var(--text2);border:2px solid var(--text);box-shadow:inset 0 0 0 3px var(--cat,var(--text3));display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .cat-dot .icon{width:18px;height:18px}
 .t-a b{display:block;font-size:16px;font-weight:900;line-height:1.2}
 .t-a small{font-size:12px;font-weight:700;color:var(--text3)}
@@ -178,7 +178,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--primary);outlin
 .stars.none{color:var(--text3);font-weight:700}
 .priv{height:32px;padding:0 10px;border-radius:16px;background:var(--cream-2);display:flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:var(--text2)}
 .priv .icon{width:14px;height:14px}
-.t-c{display:flex;align-items:center;gap:8px;margin-top:4px;min-height:32px}
+.t-c{display:flex;align-items:center;gap:10px;margin-top:4px;min-height:40px}
+.t-c .who{display:flex;flex-direction:column;min-width:0;line-height:1.25}
+.t-c .who b,.t-c .who small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .avs{display:flex}
 .av{width:24px;height:24px;border-radius:50%;border:2px solid var(--white);margin-left:-6px;font-size:10px;font-weight:900;color:var(--white);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px var(--text)}
 .av:first-child{margin-left:0}
@@ -837,7 +839,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--primary);outlin
       : '<span class="stars none">Chưa chấm sao</span>';
     const ses = e.session ? SESSIONS[e.session] : null;
     const who = ses ? `<div class="t-c"><span class="avs">${ses.friends.slice(0, 3).map(f => `<span class="av" style="background:${AV_COLORS[f]}">${f[0]}</span>`).join('')}</span>
-      <b>Ăn cùng ${ses.friends.slice(0, 2).join(', ')}${ses.friends.length > 2 ? ` +${ses.friends.length - 2}` : ''}</b><small>· ${esc(ses.title)}</small></div>` : '';
+      <span class="who"><b>Ăn cùng ${ses.friends.slice(0, 2).join(', ')}${ses.friends.length > 2 ? ` +${ses.friends.length - 2}` : ''}</b><small>${esc(ses.title)}</small></span></div>` : '';
     const visits = e.visitNo >= 2 ? `<p class="visits">Lần ghé thứ ${e.visitNo} · lần đầu ${e.firstVisit.getDate()}/${e.firstVisit.getMonth() + 1}</p>` : '';
     $('ticket').innerHTML = `<div class="t-a"><span class="cat-dot" style="--cat:${cat ? cat.color : 'var(--text2)'}">${ic(cat ? cat.icon : DISH[e.dish].icon)}</span>
         <span><b>${esc(e.name)}</b><small>${cat ? `${cat.label} · ${e.price} · ${esc(e.address)}` : 'Quán ngoài cộng đồng'}</small></span></div>
@@ -910,6 +912,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--primary);outlin
     });
     frame.style.opacity = '';
     clone.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: 'forwards' }).finished.then(() => clone.remove());
+    setTimeout(() => clone.remove(), 400); // never leave a clone behind if frames stall
     if (cell) cell.classList.remove('peeled'); else sourceEl.style.visibility = '';
     if (cell) cell.classList.add('peeled'); // the sticker is "on your hand" now — the page shows its backing
     busy = false;
