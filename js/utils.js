@@ -377,6 +377,20 @@ function timeAgo(dateStr) {
 // default for accounts created before the avatar_emoji field existed, or
 // anyone who hasn't opened the avatar picker yet. avatarIcon() also
 // handles records that still have a legacy emoji stored (pre-icon-system).
-function authorAvatar(author) {
+// An uploaded photo (users.avatar file) wins over the icon. thumb: pass
+// '' for large renders (profile header, viewer) to get the full 320px file.
+function authorAvatar(author, thumb = '100x100') {
+  if (author && author.avatar && typeof Community !== 'undefined') {
+    const url = Community.userAvatarUrl(author, thumb);
+    if (url) return `<img class="avatar-img" src="${escapeHtml(url)}" alt="" loading="lazy" decoding="async">`;
+  }
   return avatarIcon(author && author.avatar_emoji);
+}
+
+// The signed-in user's own avatar: their photo if they uploaded one,
+// otherwise the locally picked icon (which also works signed out).
+function myAvatarHtml(thumb = '') {
+  const u = typeof Community !== 'undefined' && Community.isLoggedIn() ? Community.currentUser : null;
+  if (u && u.avatar) return authorAvatar(u, thumb);
+  return avatarIcon(State.profile.avatar);
 }

@@ -2362,6 +2362,10 @@ const ProfileCtrl = {
       this._openAccountModal();
     });
     this._initAccountModal();
+    // The header is re-rendered via innerHTML, so delegate from its container.
+    document.getElementById('myRProfileHeader')?.addEventListener('click', (e) => {
+      if (e.target.closest('#profileAvatarBtn')) AvatarCtrl.open();
+    });
 
     // Mời bạn bè — link cá nhân hoá ?ref=<my_id>, tracked bởi invited_by
     // (xem functions/api/register.js). Nút chỉ hiện khi đã đăng nhập
@@ -2536,25 +2540,9 @@ const ProfileCtrl = {
       if (e.key === 'Escape' && modal.classList.contains('show')) modal.classList.remove('show');
     });
 
-    const picker = document.getElementById('avatarPicker');
-    picker.innerHTML = AVATARS.map(a => `<button type="button" class="avatar-pick-btn" data-avatar="${a}">${svgIcon(a)}</button>`).join('');
-    picker.addEventListener('click', e => {
-      const btn = e.target.closest('.avatar-pick-btn');
-      if (!btn) return;
-      const a = btn.dataset.avatar;
-      State.profile.avatar = a;
-      // avatarBtn was removed from main profile — community header
-      // shows the current avatar and re-renders on next _renderMyRestaurants().
-      const avBtn = document.getElementById('avatarBtn'); if (avBtn) avBtn.innerHTML = svgIcon(a);
-      picker.querySelectorAll('.avatar-pick-btn').forEach(b => b.classList.toggle('active', b.dataset.avatar === a));
-      Storage.save();
-      // Refresh community header immediately so user sees the change
-      ProfileCtrl._renderMyRestaurants();
-      // Best-effort push to the server too — the picker used to be
-      // localStorage-only, so other people's feed/profile views had no way
-      // to see your chosen avatar. Silent no-op if not logged in.
-      if (Community.isLoggedIn()) Community.updateAvatar(a);
-    });
+    // The icon grid + photo upload live in their own sheet (AvatarCtrl);
+    // this modal just previews the current avatar and opens it.
+    document.getElementById('accountAvatarBtn').addEventListener('click', () => AvatarCtrl.open());
 
     // Ngôn ngữ — đổi xong áp lại bản dịch + báo cho các màn đang render
     // (Cộng đồng/Cá nhân) tự vẽ lại phần chữ động bằng ngôn ngữ mới.
@@ -2573,12 +2561,15 @@ const ProfileCtrl = {
   },
 
   _openAccountModal() {
-    document.querySelectorAll('#avatarPicker .avatar-pick-btn').forEach(b => {
-      b.classList.toggle('active', b.dataset.avatar === State.profile.avatar);
-    });
+    this._renderAccountAvatar();
     document.getElementById('accountModal').classList.add('show');
     this._renderPushToggle();
     this._renderRandomPickToggle();
+  },
+
+  _renderAccountAvatar() {
+    const el = document.getElementById('accountAvatarPreview');
+    if (el) el.innerHTML = myAvatarHtml('100x100');
   },
 
   _renderRandomPickToggle() {
@@ -2651,7 +2642,8 @@ const ProfileCtrl = {
       // No community identity yet — render a placeholder header from
       // local profile so the page isn't headless.
       if (headerEl) headerEl.innerHTML = communityProfileHeaderHtml({
-        avatar: avatarIcon(State.profile.avatar),
+        avatar: myAvatarHtml(),
+        avatarEditable: true,
         name: State.profile.name || I18N.t('profile.namePlaceholder'),
         tagline: I18N.t('profile.tagline'),
         postCount: 0, starCount: 0, followerCount: 0, followingCount: 0,
@@ -2711,7 +2703,8 @@ const ProfileCtrl = {
       : this._myRestaurants.filter(r => COMMUNITY_PB_TO_CAT[r.category] === this._myRFilter);
 
     const header = communityProfileHeaderHtml({
-      avatar: avatarIcon(State.profile.avatar),
+      avatar: myAvatarHtml(),
+      avatarEditable: true,
       name: Community.currentUser?.name || State.profile.name || I18N.t('profile.namePlaceholder'),
       tagline: I18N.t('profile.tagline'),
       postCount: this._myRestaurants.length,
@@ -3059,12 +3052,21 @@ function communityGridCellHtml(r) {
 // followingCount: CHỦ ĐỘNG chỉ truyền vào khi render header của CHÍNH CHỦ
 // (ProfileCtrl) — không truyền ở UserQuanModal (xem profile người khác).
 // "Đang theo dõi ai" là thông tin riêng tư, không public như 3 số kia.
-function communityProfileHeaderHtml({ avatar, name, tagline, postCount, starCount, followerCount, followingCount, followBtn }) {
+// avatarEditable: own profile — the avatar becomes a button opening AvatarCtrl.
+// reportUserId: someone else's profile that has a PHOTO avatar — adds the
+// "Báo cáo ảnh đại diện" link (icons are ours, nothing to report there).
+function communityProfileHeaderHtml({ avatar, name, tagline, postCount, starCount, followerCount, followingCount, followBtn, avatarEditable = false, reportUserId = '' }) {
   const followingStat = followingCount != null
     ? `<div class="social-stat" data-stat="following" role="button" tabindex="0"><b>${followingCount}</b><span>${I18N.t('social.following')}</span></div>`
     : '';
+  const avatarBlock = avatarEditable
+    ? `<button type="button" class="social-avatar is-editable" id="profileAvatarBtn" aria-label="${escapeHtml(I18N.t('avatar.change'))}">${avatar}<span class="social-avatar-edit" aria-hidden="true">${svgIcon('action-edit')}</span></button>`
+    : `<div class="social-avatar">${avatar}</div>`;
+  const reportLink = reportUserId
+    ? `<button type="button" class="social-report-link" data-report-avatar="${escapeHtml(reportUserId)}">${svgIcon('status-warning')}<span>${I18N.t('avatar.report')}</span></button>`
+    : '';
   return `<div class="social-profile-header">
-    <div class="social-avatar">${avatar}</div>
+    ${avatarBlock}
     <div class="social-name">${escapeHtml(name)}</div>
     ${tagline ? `<div class="social-tagline">${tagline}</div>` : ''}
     <div class="social-stats">
@@ -3074,6 +3076,7 @@ function communityProfileHeaderHtml({ avatar, name, tagline, postCount, starCoun
       ${followingStat}
     </div>
     ${followBtn || ''}
+    ${reportLink}
   </div>`;
 }
 
@@ -3572,11 +3575,7 @@ const CommunityCtrl = {
     // Referral consumed — clear so a later logout+register in the same tab
     // session doesn't wrongly re-attribute a second, unrelated account.
     if (this._mode === 'register') { try { sessionStorage.removeItem('nhopnhep_ref'); } catch (_) {} }
-    // One-time backfill: this account's avatar_emoji field didn't exist
-    // until this session's redesign, so anyone who already picked an
-    // emoji locally (or just registered, which never sets one) needs it
-    // pushed up once so their posts show the right avatar to others.
-    if (!r.data.avatar_emoji) Community.updateAvatar(State.profile.avatar);
+    AvatarCtrl.repairSync();
     this.render();
   },
 
@@ -4317,6 +4316,278 @@ const SavedListModal = {
    USER QUÁN MODAL — every quán 1 người đã đăng mà tôi xem được (rule
    visibility phía server tự lọc: public/friends-nếu-tôi-là-bạn/chính tôi)
 ═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   AVATAR — ảnh thật (chụp/chọn → cắt tròn → JPEG 320px ~30KB, lưu vào
+   users.avatar) hoặc 1 trong 18 icon món ăn (users.avatar_emoji).
+   Ảnh luôn thắng icon khi cả hai cùng có (xem authorAvatar()).
+═══════════════════════════════════════════════ */
+const AvatarCtrl = {
+  OUT: 320,
+  _img: null, _url: '', _S: 0, _base: 1, _z: 1, _tx: 0, _ty: 0,
+  _busy: false, _returnModalId: null,
+
+  init() {
+    const modal = document.getElementById('avatarModal');
+    document.getElementById('avatarModalClose').addEventListener('click', () => this.close());
+    modal.addEventListener('click', (e) => { if (e.target === modal) this.close(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal.classList.contains('show')) this.close();
+    });
+
+    const picker = document.getElementById('avatarPicker');
+    picker.innerHTML = AVATARS.map(a => `<button type="button" class="avatar-pick-btn" data-avatar="${a}">${svgIcon(a)}</button>`).join('');
+    picker.addEventListener('click', (e) => {
+      const btn = e.target.closest('.avatar-pick-btn');
+      if (btn) this._pickIcon(btn.dataset.avatar);
+    });
+
+    ['avatarFileCamera', 'avatarFileGallery'].forEach(id => {
+      document.getElementById(id).addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = ''; // lets the same file be picked again after "Chọn lại"
+        if (file) this._loadFile(file);
+      });
+    });
+    document.getElementById('avatarRemovePhoto').addEventListener('click', () => this._removePhoto());
+    document.getElementById('avatarCropCancel').addEventListener('click', () => this._showStep('choose'));
+    document.getElementById('avatarCropSave').addEventListener('click', () => this._saveCrop());
+    document.getElementById('avatarZoom').addEventListener('input', (e) => this._setZoom(+e.target.value));
+    this._wireCropGestures();
+    setTimeout(() => this.repairSync(), 3000); // after startup requests settle
+  },
+
+  // Reconcile the local icon pick with the server's avatar_emoji.
+  // Until migration 1790000003 the server capped that field at 8 chars,
+  // so every icon except 'food-pho' failed to sync silently — others kept
+  // seeing an old emoji. Also covers accounts that never had one set.
+  repairSync() {
+    if (!Community.isLoggedIn()) return;
+    const u = Community.currentUser, local = State.profile.avatar;
+    const server = u.avatar_emoji ? normalizeAvatarName(u.avatar_emoji) : '';
+    if (server === local) return;
+    if (server && local === AVATAR_DEFAULT) {
+      // New device that never picked anything: adopt the server's choice
+      // instead of overwriting it with the default.
+      State.profile.avatar = server;
+      Storage.save();
+      ProfileCtrl._renderMyRestaurants();
+      return;
+    }
+    Community.updateAvatar(local);
+  },
+
+  open() {
+    // Same "replace, don't stack" rule as UserQuanModal — all overlays share one z-index.
+    const prev = document.querySelector('.modal-overlay.show:not(#avatarModal)');
+    this._returnModalId = prev ? prev.id : null;
+    if (prev) prev.classList.remove('show');
+    this._showStep('choose');
+    document.getElementById('avatarModal').classList.add('show');
+  },
+
+  close() {
+    if (this._busy) return;
+    document.getElementById('avatarModal').classList.remove('show');
+    this._releaseImage();
+    const back = this._returnModalId && document.getElementById(this._returnModalId);
+    this._returnModalId = null;
+    if (back) {
+      back.classList.add('show');
+      if (back.id === 'accountModal') ProfileCtrl._renderAccountAvatar();
+    }
+  },
+
+  _showStep(step) {
+    document.getElementById('avatarChoose').classList.toggle('hidden', step !== 'choose');
+    document.getElementById('avatarCrop').classList.toggle('hidden', step !== 'crop');
+    document.getElementById('avatarCloseRow').classList.toggle('hidden', step !== 'choose');
+    if (step === 'choose') { this._releaseImage(); this._renderChoose(); }
+  },
+
+  _renderChoose() {
+    const loggedIn = Community.isLoggedIn();
+    const hasPhoto = !!(loggedIn && Community.currentUser.avatar);
+    document.getElementById('avatarCurrent').innerHTML = myAvatarHtml('');
+    document.getElementById('avatarPhotoActions').classList.toggle('is-disabled', !loggedIn);
+    ['avatarFileCamera', 'avatarFileGallery'].forEach(id => { document.getElementById(id).disabled = !loggedIn; });
+    document.getElementById('avatarLoginNote').classList.toggle('hidden', loggedIn);
+    document.getElementById('avatarRemovePhoto').classList.toggle('hidden', !hasPhoto);
+    document.querySelectorAll('#avatarPicker .avatar-pick-btn').forEach(b =>
+      b.classList.toggle('active', !hasPhoto && b.dataset.avatar === State.profile.avatar));
+  },
+
+  // Everything that shows the user's own avatar.
+  _afterChange() {
+    this._renderChoose();
+    const avBtn = document.getElementById('avatarBtn');
+    if (avBtn) avBtn.innerHTML = myAvatarHtml('100x100');
+    ProfileCtrl._renderMyRestaurants();
+    ProfileCtrl._renderAccountAvatar();
+  },
+
+  _setBusy(on) {
+    this._busy = on;
+    const save = document.getElementById('avatarCropSave');
+    save.disabled = on;
+    save.textContent = I18N.t(on ? 'avatar.saving' : 'avatar.save');
+    document.getElementById('avatarModal').classList.toggle('is-busy', on);
+  },
+
+  async _pickIcon(name) {
+    if (this._busy) return;
+    State.profile.avatar = name;
+    Storage.save();
+    if (Community.isLoggedIn()) {
+      const hadPhoto = !!Community.currentUser.avatar;
+      this._busy = true;
+      const r = await Community.updateAvatar(name, { clearPhoto: hadPhoto });
+      this._busy = false;
+      // Without a photo this stays best-effort like before (the icon is
+      // saved locally either way); with one, a failure means the photo
+      // would keep showing, so say so.
+      if (!r.ok && hadPhoto) showToast(`⚠️ ${r.error}`);
+      else if (hadPhoto) showToast(I18N.t('avatar.saved'));
+    }
+    this._afterChange();
+  },
+
+  async _removePhoto() {
+    if (this._busy) return;
+    this._busy = true;
+    const r = await Community.removeAvatarPhoto();
+    this._busy = false;
+    if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+    showToast(I18N.t('avatar.photoRemoved'));
+    this._afterChange();
+  },
+
+  _loadFile(file) {
+    if (file.type && !file.type.startsWith('image/')) { showToast(`⚠️ ${I18N.t('avatar.notImage')}`); return; }
+    if (file.size > 25 * 1024 * 1024) { showToast(`⚠️ ${I18N.t('avatar.tooBig')}`); return; }
+    this._releaseImage();
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      this._img = img;
+      this._url = url;
+      this._showStep('crop');
+      this._initCrop();
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      showToast(`⚠️ ${I18N.t('avatar.cantRead')}`);
+    };
+    img.src = url;
+  },
+
+  _releaseImage() {
+    if (this._url) URL.revokeObjectURL(this._url);
+    this._url = '';
+    this._img = null;
+    document.getElementById('avatarCropImg').removeAttribute('src');
+  },
+
+  // Crop model: the stage is an S×S square; the image is drawn at scale
+  // base·z (base = "cover" fit) with its top-left at (tx, ty), always
+  // clamped so it fully covers the square.
+  _initCrop() {
+    const stage = document.getElementById('avatarCropStage');
+    document.getElementById('avatarCropImg').src = this._url;
+    this._S = stage.clientWidth;
+    const w = this._img.naturalWidth, h = this._img.naturalHeight;
+    this._base = Math.max(this._S / w, this._S / h);
+    this._z = 1;
+    document.getElementById('avatarZoom').value = 1;
+    this._tx = (this._S - w * this._base) / 2;
+    this._ty = (this._S - h * this._base) / 2;
+    this._applyCrop();
+  },
+
+  _applyCrop() {
+    if (!this._img) return;
+    const w = this._img.naturalWidth, h = this._img.naturalHeight, s = this._base * this._z, S = this._S;
+    this._tx = Math.min(0, Math.max(S - w * s, this._tx));
+    this._ty = Math.min(0, Math.max(S - h * s, this._ty));
+    const el = document.getElementById('avatarCropImg');
+    el.style.width = `${w * s}px`;
+    el.style.height = `${h * s}px`;
+    el.style.transform = `translate(${this._tx}px, ${this._ty}px)`;
+  },
+
+  // Zoom around the stage centre so the part being framed stays put.
+  _setZoom(z) {
+    if (!this._img) return;
+    const S = this._S, s0 = this._base * this._z;
+    const cx = (S / 2 - this._tx) / s0, cy = (S / 2 - this._ty) / s0;
+    this._z = Math.max(1, Math.min(4, z));
+    const s1 = this._base * this._z;
+    this._tx = S / 2 - cx * s1;
+    this._ty = S / 2 - cy * s1;
+    this._applyCrop();
+  },
+
+  _wireCropGestures() {
+    const stage = document.getElementById('avatarCropStage');
+    const zoomEl = document.getElementById('avatarZoom');
+    const pts = new Map();
+    let pinch = null;
+    stage.addEventListener('pointerdown', (e) => {
+      if (!this._img) return;
+      e.preventDefault();
+      try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2) {
+        const [a, b] = [...pts.values()];
+        pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: this._z };
+      }
+    });
+    stage.addEventListener('pointermove', (e) => {
+      const prev = pts.get(e.pointerId);
+      if (!prev) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 1) {
+        this._tx += e.clientX - prev.x;
+        this._ty += e.clientY - prev.y;
+        this._applyCrop();
+      } else if (pts.size === 2 && pinch) {
+        const [a, b] = [...pts.values()];
+        this._setZoom(pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d);
+        zoomEl.value = this._z;
+      }
+    });
+    const up = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; };
+    stage.addEventListener('pointerup', up);
+    stage.addEventListener('pointercancel', up);
+    stage.addEventListener('wheel', (e) => {
+      if (!this._img) return;
+      e.preventDefault();
+      this._setZoom(this._z * (e.deltaY < 0 ? 1.08 : 1 / 1.08));
+      zoomEl.value = this._z;
+    }, { passive: false });
+  },
+
+  async _saveCrop() {
+    if (!this._img || this._busy) return;
+    const OUT = this.OUT, s = this._base * this._z;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = OUT;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#FFFDF5'; // transparent PNGs become cream, not black, as JPEG
+    ctx.fillRect(0, 0, OUT, OUT);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(this._img, -this._tx / s, -this._ty / s, this._S / s, this._S / s, 0, 0, OUT, OUT);
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.85));
+    if (!blob) { showToast(`⚠️ ${I18N.t('avatar.cantRead')}`); return; }
+    this._setBusy(true);
+    const r = await Community.uploadAvatarPhoto(blob);
+    this._setBusy(false);
+    if (!r.ok) { showToast(`⚠️ ${r.error}`); return; }
+    showToast(I18N.t('avatar.saved'));
+    this._showStep('choose');
+    this._afterChange();
+  },
+};
+
 const UserQuanModal = {
   _returnModalId: null,
 
@@ -4325,6 +4596,41 @@ const UserQuanModal = {
     document.getElementById('userQuanModal').addEventListener('click', (e) => {
       if (e.target.id === 'userQuanModal') this.close();
     });
+    document.getElementById('userQuanBody').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-report-avatar]');
+      if (btn) this._reportAvatar(btn);
+    });
+  },
+
+  // Two taps: the first arms it ("Chạm lần nữa để báo cáo"), so a stray
+  // tap while scrolling someone's profile doesn't file a report.
+  async _reportAvatar(btn) {
+    const label = btn.querySelector('span');
+    const state = btn.dataset.state || '';
+    if (state === 'sending' || state === 'sent') return;
+    if (state !== 'armed') {
+      btn.dataset.state = 'armed';
+      label.textContent = I18N.t('avatar.reportConfirm');
+      clearTimeout(this._reportTimer);
+      this._reportTimer = setTimeout(() => {
+        if (btn.dataset.state === 'armed') { btn.dataset.state = ''; label.textContent = I18N.t('avatar.report'); }
+      }, 3500);
+      return;
+    }
+    btn.dataset.state = 'sending';
+    const r = await Community.reportUser(btn.dataset.reportAvatar, 'avatar');
+    // user_reports has a unique (reported, reporter, reason) index, so a
+    // repeat report fails validation — that still means "already reported".
+    const already = !r.ok && JSON.stringify(r._pbData || {}).includes('not_unique');
+    if (r.ok || already) {
+      btn.dataset.state = 'sent';
+      label.textContent = I18N.t('avatar.reported');
+      showToast(I18N.t('checkin.reported'));
+    } else {
+      btn.dataset.state = '';
+      label.textContent = I18N.t('avatar.report');
+      showToast(`⚠️ ${r.error}`);
+    }
   },
 
   async open(userId, userName) {
@@ -4368,16 +4674,18 @@ const UserQuanModal = {
       return;
     }
     const items = listRes.data.items;
-    const avatar = authorAvatar(userRes.ok ? userRes.data : null);
+    const avatar = authorAvatar(userRes.ok ? userRes.data : null, '');
     const displayName = (userRes.ok && userRes.data.name) || userName || I18N.t('common.thisPerson');
     const starCounts = await Promise.all(items.map(x => Community.voteCount(x.id)));
     const starTotal = starCounts.reduce((a, b) => a + b, 0);
+    const canReport = Community.isLoggedIn() && !isSelf && userRes.ok && !!userRes.data.avatar;
 
     // followingCount CỐ Ý không truyền — ai người này đang theo dõi là
     // riêng tư, chỉ chính chủ mới xem được (xem communityProfileHeaderHtml).
     const header = communityProfileHeaderHtml({
       avatar, name: displayName, tagline: '',
       postCount: items.length, starCount: starTotal, followerCount,
+      reportUserId: canReport ? userId : '',
     });
 
     if (!items.length) {

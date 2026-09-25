@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2706">
+<link rel="stylesheet" href="css/styles.css?v=2710">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -1326,7 +1326,10 @@
 
     <div class="form-group">
       <label class="form-label" data-i18n="account.avatar">Avatar</label>
-      <div class="avatar-picker" id="avatarPicker"></div>
+      <div class="avatar-row">
+        <div class="avatar-row-preview" id="accountAvatarPreview"></div>
+        <button class="data-btn" id="accountAvatarBtn" type="button"><svg class="icon" width="20" height="20"><use href="#ic-action-edit"></use></svg> <span data-i18n="avatar.change">Đổi avatar</span></button>
+      </div>
     </div>
 
     <div class="form-group">
@@ -1439,6 +1442,45 @@
   </div>
 </div>
 
+<!-- AVATAR MODAL — ảnh thật (chụp/chọn → cắt tròn → nén ~30KB, lưu vào
+     users.avatar trên PocketBase) hoặc 1 trong 18 icon món ăn. Mở bằng
+     cách chạm avatar ở tab Cá nhân, hoặc nút "Đổi avatar" trong Tài khoản. -->
+<div class="modal-overlay" id="avatarModal">
+  <div class="modal-sheet list-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" data-i18n="avatar.title">Đổi <em>avatar</em></div>
+    <div class="modal-sub" data-i18n="avatar.sub">Ảnh đại diện hiện với mọi người trong cộng đồng.</div>
+
+    <div id="avatarChoose">
+      <div class="avatar-current" id="avatarCurrent"></div>
+      <div class="avatar-photo-actions" id="avatarPhotoActions">
+        <label class="data-btn" for="avatarFileCamera"><svg class="icon" width="20" height="20"><use href="#ic-nav-checkin"></use></svg> <span data-i18n="avatar.takePhoto">Chụp ảnh</span></label>
+        <label class="data-btn" for="avatarFileGallery"><svg class="icon" width="20" height="20"><use href="#ic-action-post-upload"></use></svg> <span data-i18n="avatar.choosePhoto">Chọn ảnh</span></label>
+        <input class="visually-hidden" type="file" id="avatarFileCamera" accept="image/*" capture="user" tabindex="-1">
+        <input class="visually-hidden" type="file" id="avatarFileGallery" accept="image/*" tabindex="-1">
+      </div>
+      <p class="avatar-note hidden" id="avatarLoginNote" data-i18n="avatar.loginNote">Đăng nhập ở tab Cộng đồng để dùng ảnh thật làm avatar.</p>
+      <button class="avatar-remove-photo hidden" id="avatarRemovePhoto" type="button" data-i18n="avatar.removePhoto">Bỏ ảnh, dùng icon</button>
+      <div class="row-label mini" data-i18n="avatar.orIcon">Hoặc chọn icon món ăn</div>
+      <div class="avatar-picker" id="avatarPicker"></div>
+    </div>
+
+    <div id="avatarCrop" class="hidden">
+      <div class="avatar-crop-stage" id="avatarCropStage"><img id="avatarCropImg" alt="" draggable="false"><div class="avatar-crop-mask"></div></div>
+      <input class="avatar-zoom" type="range" id="avatarZoom" min="1" max="4" step="0.01" value="1" data-i18n="avatar.zoom" data-i18n-attr="aria-label" aria-label="Phóng to">
+      <p class="avatar-note" data-i18n="avatar.cropHint">Kéo để căn chỉnh, chụm 2 ngón hoặc kéo thanh để phóng to</p>
+      <div class="form-actions">
+        <button class="btn-cancel" id="avatarCropCancel" type="button" data-i18n="avatar.back">Chọn lại</button>
+        <button class="btn-save" id="avatarCropSave" type="button" data-i18n="avatar.save">Lưu avatar</button>
+      </div>
+    </div>
+
+    <div class="form-actions" id="avatarCloseRow">
+      <button class="btn-cancel" id="avatarModalClose" type="button" data-i18n="common.close">Đóng</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast -->
 <div id="toast"></div>
 
@@ -1446,13 +1488,13 @@
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
 <script src="js/security.js?v=2672"></script>
-<script src="js/i18n.js?v=2698"></script>
-<script src="js/utils.js?v=2672"></script>
+<script src="js/i18n.js?v=2710"></script>
+<script src="js/utils.js?v=2710"></script>
 <script src="js/state.js?v=2672"></script>
 <script src="js/poi.js?v=2672"></script>
 <script src="js/geocoder.js?v=2672"></script>
 <script src="js/gemini.js?v=2672"></script>
-<script src="js/community.js?v=2679"></script>
+<script src="js/community.js?v=2710"></script>
 <script src="js/push.js?v=2672"></script>
 <script src="js/analytics.js?v=2672"></script>
 <script src="js/map.js?v=2672"></script>
@@ -1470,8 +1512,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2698"></script>
-<script src="js/app.js?v=2678"></script>
+<script src="js/controllers.js?v=2710"></script>
+<script src="js/app.js?v=2710"></script>
 
 </body>
 </html>

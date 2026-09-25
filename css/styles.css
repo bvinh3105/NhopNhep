@@ -1158,6 +1158,70 @@ body.map-full .tabbar{transform:translateY(105%)}
 .avatar-pick-btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
 .avatar-pick-btn.active{background:var(--primary-tint);border-color:var(--primary-2);box-shadow:2px 2px 0 var(--primary-2)}
 
+/* Photo avatars (users.avatar). Inline by default — sized like an icon
+   so it can sit in running text (dup-check prompt, linked-group author) —
+   and filling the circle in every dedicated avatar container. */
+.avatar-img{display:inline-block;width:1.15em;height:1.15em;border-radius:50%;object-fit:cover;vertical-align:-.22em;background:var(--cream-2)}
+.social-avatar .avatar-img,.post-avatar .avatar-img,.comment-avatar .avatar-img,
+.follower-avatar .avatar-img,.dup-check-avatar .avatar-img,.ci-viewer-avatar .avatar-img,
+.avatar-row-preview .avatar-img,.avatar-current .avatar-img{display:block;width:100%;height:100%;vertical-align:0}
+
+/* Own profile: the avatar is a button with a small pencil badge. */
+.social-avatar.is-editable{position:relative;cursor:pointer;padding:0;font:inherit;font-size:2.3rem;color:inherit}
+.social-avatar.is-editable:active{transform:scale(.95)}
+.social-avatar.is-editable:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
+.social-avatar-edit{
+  position:absolute;right:-4px;bottom:-4px;width:30px;height:30px;border-radius:50%;
+  background:var(--primary);color:var(--cream);border:2px solid var(--text);
+  display:flex;align-items:center;justify-content:center;box-shadow:1.5px 1.5px 0 var(--text);
+}
+.social-avatar-edit .icon{width:15px;height:15px}
+.social-report-link{
+  display:inline-flex;align-items:center;gap:.3rem;margin-top:.6rem;padding:.3rem .5rem;
+  background:none;border:none;color:var(--text3);font:inherit;font-size:.74rem;font-weight:700;cursor:pointer;
+}
+.social-report-link .icon{width:14px;height:14px}
+.social-report-link[data-state="armed"]{color:var(--primary)}
+.social-report-link[data-state="sent"]{color:var(--text3);cursor:default}
+
+/* Account modal row: current avatar + "Đổi avatar" */
+.avatar-row{display:flex;align-items:center;gap:.8rem}
+.avatar-row .data-btn{flex:0 0 auto}
+.avatar-row-preview{
+  width:48px;height:48px;border-radius:50%;flex-shrink:0;overflow:hidden;
+  background:var(--accent);border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
+  display:flex;align-items:center;justify-content:center;font-size:1.35rem;
+}
+
+/* Avatar sheet */
+.avatar-current{
+  width:96px;height:96px;margin:.2rem auto 1rem;border-radius:50%;overflow:hidden;
+  background:var(--accent);border:3px solid var(--text);box-shadow:2.5px 3px 0 var(--text);
+  display:flex;align-items:center;justify-content:center;font-size:2.6rem;
+}
+.avatar-photo-actions{display:flex;gap:.5rem}
+.avatar-photo-actions .data-btn{cursor:pointer}
+.avatar-photo-actions.is-disabled .data-btn{opacity:.45;cursor:not-allowed}
+.visually-hidden{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);border:0;opacity:0}
+.avatar-note{font-size:.76rem;color:var(--text2);font-weight:600;text-align:center;margin:.6rem 0 0;line-height:1.4}
+.avatar-remove-photo{
+  display:block;margin:.7rem auto 0;background:none;border:none;font:inherit;
+  font-size:.8rem;font-weight:800;color:var(--primary);text-decoration:underline;cursor:pointer;
+}
+#avatarChoose .row-label{margin-top:1rem}
+#avatarChoose .avatar-picker{justify-content:center}
+.avatar-crop-stage{
+  position:relative;width:min(100%,260px);aspect-ratio:1/1;margin:.2rem auto 0;overflow:hidden;
+  border-radius:18px;background:var(--text);touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;
+}
+.avatar-crop-stage:active{cursor:grabbing}
+.avatar-crop-stage img{position:absolute;top:0;left:0;max-width:none;transform-origin:0 0;pointer-events:none;-webkit-user-drag:none}
+/* Everything outside the circle is dimmed — what's inside is exactly
+   what gets saved (the export is square; avatars render as circles). */
+.avatar-crop-mask{position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 999px rgba(42,24,16,.55);border:2px solid var(--cream);pointer-events:none}
+.avatar-zoom{display:block;width:min(100%,260px);margin:.9rem auto 0;accent-color:var(--primary);height:28px}
+#avatarModal.is-busy .modal-sheet{cursor:progress}
+
 .profile-stats{
   display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;margin-top:1rem;
 }

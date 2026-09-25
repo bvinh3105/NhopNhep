@@ -632,15 +632,65 @@ const Community = {
   // people's feed/profile views can show it (the picker itself was
   // localStorage-only before this). Best-effort — a failure here just
   // means the avatar stays local for now, nothing else breaks.
-  async updateAvatar(avatar) {
+  // clearPhoto: picking an icon also drops any uploaded photo, since a
+  // photo always wins over the icon when both are set (see authorAvatar).
+  async updateAvatar(avatar, { clearPhoto = false } = {}) {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    const body = { avatar_emoji: avatar };
+    if (clearPhoto) body.avatar = null;
+    const r = await this._fetch(`/api/collections/users/records/${this.currentUser.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (r.ok) this.currentUser = r.data;
+    return r;
+  },
+
+  // Photo avatar → PocketBase's built-in users.avatar file field. The
+  // client always sends a small square JPEG (AvatarCtrl crops + resizes),
+  // but it still rides the home connection's upload bandwidth, hence the
+  // longer timeout (same reason as createRestaurant).
+  async uploadAvatarPhoto(blob) {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    const fd = new FormData();
+    fd.append('avatar', blob, 'avatar.jpg');
+    const r = await this._fetch(`/api/collections/users/records/${this.currentUser.id}`, {
+      method: 'PATCH', body: fd, timeoutMs: 45000,
+    });
+    if (r.ok) this.currentUser = r.data;
+    return r;
+  },
+
+  async removeAvatarPhoto() {
     if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
     const r = await this._fetch(`/api/collections/users/records/${this.currentUser.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ avatar_emoji: avatar }),
+      body: JSON.stringify({ avatar: null }),
     });
     if (r.ok) this.currentUser = r.data;
     return r;
+  },
+
+  // thumb '100x100' is PocketBase's built-in default thumb size, so it is
+  // always served; '' returns the original (320×320 as uploaded).
+  userAvatarUrl(user, thumb = '100x100') {
+    if (!user || !user.avatar || !user.id) return '';
+    const col = user.collectionId || user.collectionName || 'users';
+    const q = thumb ? `?thumb=${encodeURIComponent(thumb)}` : '';
+    return `${this.BASE_URL}/api/files/${encodeURIComponent(col)}/${encodeURIComponent(user.id)}/${encodeURIComponent(user.avatar)}${q}`;
+  },
+
+  // "Báo cáo ảnh đại diện" on someone else's profile — write-only queue
+  // (user_reports, superuser-only reads), same shape as reportCheckin.
+  async reportUser(userId, reason = 'avatar') {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    const fd = new FormData();
+    fd.append('reported', userId);
+    fd.append('reporter', this.currentUser.id);
+    fd.append('reason', reason);
+    return this._fetch('/api/collections/user_reports/records', { method: 'POST', body: fd });
   },
 
   // Fetch another member's public record directly (name, avatar_emoji) —

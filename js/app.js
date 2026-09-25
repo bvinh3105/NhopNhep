@@ -41,6 +41,7 @@ function boot() {
   ResultsCtrl.init();
   PlanCtrl.init();
   ProfileCtrl.init();
+  AvatarCtrl.init();
   DetailModal.init();
   HistoryModal.init();
   CommunityCtrl.init();
