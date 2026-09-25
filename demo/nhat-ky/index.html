@@ -1,0 +1,497 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#2A1810">
+<title>Nhật Ký Kiểu Locket</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --cream:#FBF3D9;--cream-2:#F5EBC1;--cream-3:#EEE0A6;--white:#FFFDF5;--paper:#FEF9E5;
+  --primary:#B92626;--primary-2:#8C1919;--primary-tint:#F8DFD3;
+  --accent:#E8843C;--accent-2:#D66A22;
+  --text:#2A1810;--text2:#6B4A38;--text3:#9C7F6B;--line-2:rgba(42,24,16,.16);
+  /* the dark check-in surfaces, derived from --text / --white like the camera screen */
+  --dk-card:rgba(255,253,245,.055);--dk-cell:rgba(255,253,245,.045);--dk-dot:rgba(251,243,217,.22);
+  --dk-muted:rgba(251,243,217,.52);--dk-faint:rgba(251,243,217,.32);
+  --safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px);
+  --ease-ios:cubic-bezier(.32,.72,0,1);--ease-out:cubic-bezier(.16,1,.3,1);
+  --font:'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  color-scheme:light;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+html,body{background:var(--cream)}
+body{font-family:var(--font);color:var(--text);font-size:15px;line-height:1.5;font-weight:500;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:none}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.icon{width:1em;height:1em;display:block;flex-shrink:0}
+
+.stage{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:28px;padding:28px 16px 56px}
+.phone{flex-shrink:0;padding:10px;border-radius:56px;background:#140b07;box-shadow:0 30px 70px rgba(42,24,16,.32),inset 0 0 0 1.5px rgba(255,253,245,.08)}
+.screen{position:relative;width:390px;height:844px;border-radius:46px;overflow:hidden;background:var(--text);color:var(--cream);user-select:none;-webkit-user-select:none}
+
+/* ── Memories (Nhật ký) ── */
+.mem{position:absolute;inset:0;display:flex;flex-direction:column}
+.mem-head{flex-shrink:0;display:grid;grid-template-columns:44px 1fr 44px;align-items:center;padding:calc(var(--safe-top) + 14px) 12px 8px;position:relative;z-index:2;background:linear-gradient(var(--text) 70%,rgba(42,24,16,0))}
+.mem-title{text-align:center;font-weight:900;font-size:1.08rem;letter-spacing:-.2px}
+.round-btn{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--cream)}
+.round-btn .icon{width:22px;height:22px}
+.round-btn:active{transform:scale(.92)}
+.mem-scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:6px 14px calc(var(--safe-bottom) + 96px);display:flex;flex-direction:column;gap:14px;scrollbar-width:none}
+.mem-scroll::-webkit-scrollbar{display:none}
+.month{background:var(--dk-card);border-radius:24px;padding:14px 12px 14px}
+.month-title{font-weight:800;font-size:.95rem;padding:0 4px 10px;display:flex;justify-content:space-between;align-items:baseline}
+.month-count{font-size:.72rem;font-weight:700;color:var(--dk-muted)}
+.dow{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:6px}
+.dow span{text-align:center;font-size:.6rem;font-weight:800;letter-spacing:.06em;color:var(--dk-faint)}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.day{position:relative;aspect-ratio:1/1;border-radius:10px;display:flex;align-items:center;justify-content:center}
+.day.empty::after{content:'';width:4px;height:4px;border-radius:50%;background:var(--dk-dot)}
+.day.future{background:var(--dk-cell)}
+.day.photo{background-size:cover;background-position:center;cursor:pointer;transition:transform .15s var(--ease-out)}
+.day.photo:active{transform:scale(.92)}
+.day.today.photo{box-shadow:0 0 0 2px var(--text),0 0 0 4px var(--accent)}
+.day.add{border:2px solid var(--accent);color:var(--accent);cursor:pointer}
+.day.add .icon{width:18px;height:18px}
+.day .count{position:absolute;right:-3px;top:-3px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--cream);color:var(--text);font-size:.62rem;font-weight:900;line-height:17px;text-align:center;box-shadow:0 0 0 2px var(--text)}
+.day.is-hidden-for-hero{visibility:hidden}
+
+.mem-stats{position:absolute;left:50%;bottom:calc(var(--safe-bottom) + 22px);transform:translateX(-50%);z-index:2;display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:999px;background:rgba(42,24,16,.86);box-shadow:0 0 0 1px rgba(251,243,217,.1),0 10px 30px rgba(0,0,0,.35);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font-weight:800;font-size:.82rem;white-space:nowrap}
+.mem-stat{display:flex;align-items:center;gap:6px}
+.mem-stat .icon{width:17px;height:17px;color:var(--accent)}
+.mem-stat b{font-weight:900;font-variant-numeric:tabular-nums}
+.mem-sep{width:1px;height:14px;background:rgba(251,243,217,.2)}
+
+/* ── Viewer ── */
+.viewer{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;background:var(--text);opacity:0;pointer-events:none;transition:opacity .22s ease}
+.viewer.open{opacity:1;pointer-events:auto}
+.v-head{flex-shrink:0;display:grid;grid-template-columns:44px 1fr 44px;align-items:center;padding:calc(var(--safe-top) + 14px) 12px 0}
+.v-date{text-align:center;line-height:1.25}
+.v-year{display:block;font-size:.68rem;font-weight:800;color:var(--dk-muted);letter-spacing:.04em}
+.v-day{display:block;font-size:.98rem;font-weight:900}
+.v-track{flex:1;min-height:0;display:flex;align-items:center;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 8%;scrollbar-width:none;overscroll-behavior-x:contain}
+.v-track::-webkit-scrollbar{display:none}
+.v-slide{flex:0 0 84%;scroll-snap-align:center;display:flex;flex-direction:column;align-items:center;gap:14px}
+.v-photo{width:100%;aspect-ratio:3/4;border-radius:30px;background-size:cover;background-position:center;box-shadow:0 18px 40px rgba(0,0,0,.35);transition:transform .25s var(--ease-out),opacity .25s}
+.v-slide:not(.current) .v-photo{transform:scale(.94);opacity:.55}
+.v-meta{text-align:center;display:flex;flex-direction:column;gap:3px;min-height:58px;transition:opacity .2s}
+.v-slide:not(.current) .v-meta{opacity:0}
+.v-place{display:flex;align-items:center;justify-content:center;gap:5px;font-weight:900;font-size:.92rem}
+.v-place .icon{width:15px;height:15px;color:var(--accent)}
+.v-sub{font-size:.76rem;color:var(--dk-muted);font-weight:700}
+.v-caption{font-size:.82rem;color:var(--cream);font-weight:600;max-width:30ch;margin:2px auto 0}
+.v-strip{flex-shrink:0;display:flex;align-items:center;gap:8px;overflow-x:auto;padding:14px 50% calc(var(--safe-bottom) + 26px);scrollbar-width:none;scroll-behavior:smooth}
+.v-strip::-webkit-scrollbar{display:none}
+.v-thumb{flex:0 0 auto;width:38px;height:38px;border-radius:10px;background-size:cover;background-position:center;opacity:.55;transition:width .2s var(--ease-out),height .2s var(--ease-out),opacity .2s,box-shadow .2s}
+.v-thumb.current{width:48px;height:48px;opacity:1;box-shadow:0 0 0 2px var(--text),0 0 0 4px var(--cream)}
+.v-thumb.day-start{margin-left:8px}
+
+.hero{position:absolute;z-index:9;background-size:cover;background-position:center;pointer-events:none;will-change:left,top,width,height}
+
+.toast{position:absolute;left:50%;top:calc(var(--safe-top) + 70px);transform:translate(-50%,-1.2rem);z-index:30;background:var(--text);color:var(--cream);padding:.6rem 1.15rem;border-radius:24px;font-size:.85rem;font-weight:700;box-shadow:0 4px 18px rgba(0,0,0,.35);border:2px solid var(--primary);opacity:0;pointer-events:none;transition:opacity .22s ease,transform .22s ease;white-space:nowrap}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ── Notes panel (the app's own components) ── */
+.panel{width:100%;max-width:420px;display:flex;flex-direction:column;gap:14px}
+.row-label{font-style:italic;font-weight:800;font-size:.75rem;color:var(--primary);letter-spacing:1px;text-transform:uppercase;display:flex;align-items:center;gap:.4rem;line-height:1.3}
+.row-label::before{content:'✦';font-style:normal}
+.panel-title{font-size:1.5rem;font-weight:900;letter-spacing:-.4px;line-height:1.15;margin-top:6px;text-wrap:balance}
+.panel-title em{font-style:italic;color:var(--primary)}
+.lede{font-size:.86rem;color:var(--text2);font-weight:600;margin-top:6px}
+.card{background:var(--white);border:2px solid var(--text);border-radius:14px;padding:14px;box-shadow:2px 2px 0 var(--text);display:flex;flex-direction:column;gap:10px}
+.list{display:flex;flex-direction:column;gap:9px;padding-left:1.1rem}
+.list li{font-size:.82rem;color:var(--text2);font-weight:600;line-height:1.45}
+.list li::marker{color:var(--primary)}
+.list b{color:var(--text)}
+.hint{font-size:.76rem;color:var(--text2);font-weight:600;line-height:1.45}
+
+@media (max-width:640px){
+  .stage{padding:0 0 48px;gap:0}
+  .phone{width:100%;padding:0;border-radius:0;box-shadow:none;background:none}
+  .screen{width:100%;height:100svh;min-height:620px;border-radius:0}
+  .panel{padding:22px 16px 0}
+}
+@media (prefers-reduced-motion:reduce){
+  .v-photo,.v-thumb,.viewer,.day.photo{transition:none}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="ic-action-close" viewBox="0 0 24 24"><path d="M5,5 L19,19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M19,5 L5,19" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-share" viewBox="0 0 24 24"><path d="M12,15 L12,4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M8,8 L12,4 L16,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M7,11 H6 a2,2 0 0 0 -2,2 v6 a2,2 0 0 0 2,2 h12 a2,2 0 0 0 2,-2 v-6 a2,2 0 0 0 -2,-2 h-1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-plus" viewBox="0 0 24 24"><path d="M12,5 L12,19" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path><path d="M5,12 L19,12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"></path></symbol>
+<symbol id="ic-action-pin-static" viewBox="0 0 24 24"><path d="M9,3 H15 L14,8 L17,12 H7 L10,8 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M12,12 L12,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-nav-checkin" viewBox="0 0 24 24"><path d="M4,9 a2,2 0 0 1 2,-2 H8 L9.5,5 H14.5 L16,7 H18 a2,2 0 0 1 2,2 V17 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M8.5,13 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-status-streak" viewBox="0 0 24 24"><path d="M12,21 c-3.6,0 -6.5,-2.7 -6.5,-6.3 c0,-3.4 2.6,-5.4 3.9,-8.7 c0.3,1.9 1.2,3 2.4,3.6 c0.2,-2.6 1.6,-4.7 3.4,-6.1 c-0.3,3.5 3.3,5.7 3.3,11.1 c0,3.6 -2.9,6.4 -6.5,6.4 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M12,21 c-1.6,0 -2.8,-1.2 -2.8,-2.8 c0,-1.8 1.6,-2.8 2.8,-4.6 c1.2,1.8 2.8,2.8 2.8,4.6 c0,1.6 -1.2,2.8 -2.8,2.8 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+</svg>
+
+<div class="stage">
+  <div class="phone">
+    <section class="screen" id="screen" aria-label="Nhật ký check-in (mô phỏng)">
+      <div class="mem" id="mem">
+        <header class="mem-head">
+          <button class="round-btn" id="memClose" type="button" aria-label="Về camera"><svg class="icon" aria-hidden="true"><use href="#ic-action-close"></use></svg></button>
+          <h1 class="mem-title">Nhật ký ăn</h1>
+          <span></span>
+        </header>
+        <div class="mem-scroll" id="memScroll"></div>
+        <div class="mem-stats" aria-label="Thống kê">
+          <span class="mem-stat"><svg class="icon" aria-hidden="true"><use href="#ic-nav-checkin"></use></svg><b id="statTotal">0</b> check-in</span>
+          <span class="mem-sep" aria-hidden="true"></span>
+          <span class="mem-stat"><svg class="icon" aria-hidden="true"><use href="#ic-status-streak"></use></svg><b id="statStreak">0</b> ngày liên tiếp</span>
+        </div>
+      </div>
+
+      <div class="viewer" id="viewer" aria-hidden="true">
+        <header class="v-head">
+          <button class="round-btn" id="vClose" type="button" aria-label="Đóng"><svg class="icon" aria-hidden="true"><use href="#ic-action-close"></use></svg></button>
+          <div class="v-date"><span class="v-year" id="vYear"></span><span class="v-day" id="vDay"></span></div>
+          <button class="round-btn" id="vShare" type="button" aria-label="Chia sẻ"><svg class="icon" aria-hidden="true"><use href="#ic-action-share"></use></svg></button>
+        </header>
+        <div class="v-track" id="vTrack"></div>
+        <div class="v-strip" id="vStrip"></div>
+      </div>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <aside class="panel" aria-label="Ghi chú thiết kế">
+    <header>
+      <p class="row-label">Check-in · Nhật ký</p>
+      <h1 class="panel-title">Nhật ký <em>kiểu Locket</em></h1>
+      <p class="lede">Dữ liệu và ảnh món ăn trong demo là mẫu. Cuộn lên để xem các tháng trước, chạm vào một ảnh để mở, vuốt ngang để xem các lần check-in khác.</p>
+    </header>
+    <div class="card">
+      <h2 class="row-label">Khác gì Nhật ký hiện tại</h2>
+      <ul class="list">
+        <li><b>Mọi tháng trên một màn cuộn</b>, tháng này ở dưới cùng — thay cho bấm ‹ › từng tháng.</li>
+        <li><b>Ảnh phóng ra từ đúng ô ngày</b> khi mở và thu về đúng ô khi đóng, nên luôn biết mình đang xem ngày nào.</li>
+        <li><b>Màn xem kiểu Locket:</b> ngày + giờ + tên quán, vuốt ngang qua mọi lần check-in (ảnh bên cạnh ló ra ở mép), dải ảnh nhỏ ở đáy để nhảy nhanh. Thay cho thanh tiến trình kiểu story.</li>
+        <li><b>Ô hôm nay có dấu +</b> nếu chưa check-in — chạm là về camera.</li>
+        <li><b>Nền tối cùng tông màn camera</b>, vì nhật ký mở ra từ camera. Thống kê dùng icon nét của app thay cho emoji.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2 class="row-label">Khi đưa vào app</h2>
+      <p class="hint">Dùng dữ liệu check-in thật của bạn, tải từng tháng khi cuộn tới. Nút chia sẻ, ẩn khỏi bạn bè và xoá giữ như trong trình xem hiện có.</p>
+    </div>
+  </aside>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const TODAY = new Date(2026, 8, 25); // demo "today" = 25/9/2026
+  const DOW = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+  const DOW_LONG = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+
+  // ── Sample food photos, drawn once (no image files) ──
+  const DISHES = [
+    { key: 'pho', place: 'Phở Thìn Lò Đúc', cap: 'Nước dùng đậm, thịt tái mềm' },
+    { key: 'buncha', place: 'Bún chả Hương Liên', cap: 'Chả nướng thơm, nước chấm vừa miệng' },
+    { key: 'banhmi', place: 'Bánh mì 25', cap: 'Bữa sáng nhanh trước giờ làm' },
+    { key: 'caphe', place: 'Cà phê Giảng', cap: 'Cà phê trứng, béo mà không ngấy' },
+    { key: 'trasua', place: 'Trà sữa Tocotoco', cap: 'Ít đường, nhiều trân châu' },
+    { key: 'comtam', place: 'Cơm tấm Cali', cap: 'Sườn nướng to, trứng lòng đào' },
+    { key: 'lau', place: 'Lẩu Phan', cap: 'Cả nhóm 5 người, ăn no căng' },
+    { key: 'kem', place: 'Kem Tràng Tiền', cap: 'Kem cốm, đúng vị tuổi thơ' },
+  ];
+  let seed = 7;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const TAU = Math.PI * 2;
+
+  function table(x, w, h, a, b) {
+    const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, a); g.addColorStop(1, b);
+    x.fillStyle = g; x.fillRect(0, 0, w, h);
+    x.globalAlpha = .12; x.strokeStyle = '#000'; x.lineWidth = 1;
+    for (let i = 0; i < 22; i++) { const y = (i / 22) * h + rnd() * 6; x.beginPath(); x.moveTo(0, y); for (let xx = 0; xx <= w; xx += 20) x.lineTo(xx, y + Math.sin(xx / 50 + i) * 2.5); x.stroke(); }
+    x.globalAlpha = 1;
+  }
+  function plate(x, cx, cy, r, rim = '#efe6d4', ring = '#2f5d86') {
+    x.save(); x.shadowColor = 'rgba(0,0,0,.45)'; x.shadowBlur = 22; x.shadowOffsetY = 10;
+    x.fillStyle = rim; x.beginPath(); x.arc(cx, cy, r, 0, TAU); x.fill(); x.restore();
+    if (ring) { x.strokeStyle = ring; x.lineWidth = 2; x.beginPath(); x.arc(cx, cy, r * .92, 0, TAU); x.stroke(); }
+  }
+  function herbs(x, cx, cy, r, n) {
+    for (let i = 0; i < n; i++) { const a = rnd() * TAU, d = r * rnd(); x.save(); x.translate(cx + Math.cos(a) * d, cy + Math.sin(a) * d); x.rotate(rnd() * 3); x.fillStyle = rnd() > .5 ? '#3f8f3a' : '#62ad4c'; x.beginPath(); x.ellipse(0, 0, 7, 3, 0, 0, TAU); x.fill(); x.restore(); }
+  }
+  function drawDish(key) {
+    const w = 300, h = 400, c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x = c.getContext('2d'), cx = w / 2, cy = h / 2;
+    if (key === 'pho') {
+      table(x, w, h, '#7a4a2a', '#5e3820'); plate(x, cx, cy, 118);
+      const g = x.createRadialGradient(cx - 30, cy - 30, 10, cx, cy, 100); g.addColorStop(0, '#e6a64a'); g.addColorStop(1, '#9f5e1b');
+      x.fillStyle = g; x.beginPath(); x.arc(cx, cy, 100, 0, TAU); x.fill();
+      x.strokeStyle = 'rgba(250,244,226,.9)'; x.lineWidth = 3; x.lineCap = 'round';
+      for (let i = 0; i < 26; i++) { const a = rnd() * TAU, d = rnd() * 70; const sx = cx + Math.cos(a) * d, sy = cy + Math.sin(a) * d; x.beginPath(); x.moveTo(sx, sy); x.quadraticCurveTo(sx + (rnd() - .5) * 70, sy + (rnd() - .5) * 70, sx + (rnd() - .5) * 80, sy + (rnd() - .5) * 80); x.stroke(); }
+      for (let i = 0; i < 4; i++) { x.save(); x.translate(cx + 30 - i * 12, cy - 20 + i * 18); x.rotate(.8); x.fillStyle = i % 2 ? '#8e4f3f' : '#a2604d'; x.beginPath(); x.ellipse(0, 0, 26, 14, 0, 0, TAU); x.fill(); x.restore(); }
+      herbs(x, cx, cy, 80, 16);
+    } else if (key === 'buncha') {
+      table(x, w, h, '#8a5a34', '#6a3e22'); plate(x, cx, cy - 70, 82, '#f3ecdf', '#b23a2e');
+      x.fillStyle = '#c9772e'; x.beginPath(); x.arc(cx, cy - 70, 68, 0, TAU); x.fill();
+      for (let i = 0; i < 6; i++) { x.fillStyle = '#6b3a1f'; x.beginPath(); x.ellipse(cx - 36 + (i % 3) * 36, cy - 86 + Math.floor(i / 3) * 34, 16, 12, rnd(), 0, TAU); x.fill(); }
+      plate(x, cx, cy + 95, 88, '#fbf7ee', null);
+      x.strokeStyle = 'rgba(255,255,255,.95)'; x.lineWidth = 2;
+      for (let i = 0; i < 40; i++) { const a = rnd() * TAU, d = rnd() * 60; x.beginPath(); x.arc(cx + Math.cos(a) * d, cy + 95 + Math.sin(a) * d, 8 + rnd() * 10, rnd() * 3, rnd() * 3 + 2); x.stroke(); }
+      herbs(x, cx + 90, cy + 20, 30, 14);
+    } else if (key === 'banhmi') {
+      table(x, w, h, '#d9c7a4', '#b89a6c');
+      x.save(); x.translate(cx, cy); x.rotate(-.5); x.shadowColor = 'rgba(0,0,0,.35)'; x.shadowBlur = 18; x.shadowOffsetY = 8;
+      x.fillStyle = '#d4913d'; x.beginPath(); x.ellipse(0, 0, 130, 46, 0, 0, TAU); x.fill(); x.restore();
+      x.save(); x.translate(cx, cy); x.rotate(-.5);
+      x.fillStyle = '#e8b062'; x.beginPath(); x.ellipse(0, -6, 118, 30, 0, 0, TAU); x.fill();
+      x.strokeStyle = '#b8742a'; x.lineWidth = 3; for (let i = -3; i <= 3; i++) { x.beginPath(); x.moveTo(i * 30 - 10, -20); x.lineTo(i * 30 + 10, 8); x.stroke(); }
+      x.fillStyle = '#4f9a3c'; for (let i = -4; i <= 4; i++) { x.beginPath(); x.ellipse(i * 24, 28, 12, 6, .4, 0, TAU); x.fill(); }
+      x.fillStyle = '#c8321e'; for (let i = -3; i <= 3; i++) { x.beginPath(); x.arc(i * 30 + 8, 34, 5, 0, TAU); x.fill(); }
+      x.restore();
+    } else if (key === 'caphe') {
+      table(x, w, h, '#3b2a22', '#23160f'); plate(x, cx, cy, 104, '#e8e1d4', null);
+      x.fillStyle = '#f2e3c4'; x.beginPath(); x.arc(cx, cy, 78, 0, TAU); x.fill();
+      const g = x.createRadialGradient(cx, cy, 5, cx, cy, 78); g.addColorStop(0, '#f7e2a8'); g.addColorStop(1, '#c98c3c');
+      x.fillStyle = g; x.beginPath(); x.arc(cx, cy, 70, 0, TAU); x.fill();
+      x.strokeStyle = 'rgba(120,70,30,.55)'; x.lineWidth = 3; x.beginPath(); for (let a = 0; a < 12; a += .1) { const r = a * 5; x.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } x.stroke();
+      x.fillStyle = '#e8e1d4'; x.fillRect(cx + 96, cy - 12, 38, 24);
+    } else if (key === 'trasua') {
+      table(x, w, h, '#f1d6c8', '#d9a88f');
+      x.save(); x.shadowColor = 'rgba(0,0,0,.3)'; x.shadowBlur = 18; x.shadowOffsetY = 8; x.fillStyle = 'rgba(255,255,255,.85)'; x.beginPath(); x.arc(cx, cy, 96, 0, TAU); x.fill(); x.restore();
+      const g = x.createRadialGradient(cx - 20, cy - 20, 10, cx, cy, 86); g.addColorStop(0, '#e9c9a0'); g.addColorStop(1, '#b98a5c');
+      x.fillStyle = g; x.beginPath(); x.arc(cx, cy, 86, 0, TAU); x.fill();
+      for (let i = 0; i < 38; i++) { const a = rnd() * TAU, d = rnd() * 70; x.fillStyle = '#2a1a12'; x.beginPath(); x.arc(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 7, 0, TAU); x.fill(); }
+      x.strokeStyle = '#B92626'; x.lineWidth = 14; x.lineCap = 'round'; x.beginPath(); x.moveTo(cx + 20, cy - 10); x.lineTo(cx + 120, cy - 150); x.stroke();
+    } else if (key === 'comtam') {
+      table(x, w, h, '#6d8a5a', '#4d6a3c'); plate(x, cx, cy, 124, '#fbf7ee', '#2f5d86');
+      for (let i = 0; i < 220; i++) { const a = rnd() * TAU, d = rnd() * 60; x.fillStyle = rnd() > .5 ? '#fffdf5' : '#efe8d8'; x.fillRect(cx - 40 + Math.cos(a) * d, cy + 20 + Math.sin(a) * d, 4, 2.5); }
+      x.save(); x.translate(cx + 40, cy - 40); x.rotate(.4); x.fillStyle = '#8a4a22'; x.beginPath(); x.ellipse(0, 0, 58, 34, 0, 0, TAU); x.fill(); x.strokeStyle = '#5a2e12'; x.lineWidth = 4; for (let i = -2; i <= 2; i++) { x.beginPath(); x.moveTo(i * 20 - 12, -24); x.lineTo(i * 20 + 12, 24); x.stroke(); } x.restore();
+      x.fillStyle = '#fffdf5'; x.beginPath(); x.arc(cx - 50, cy - 55, 30, 0, TAU); x.fill(); x.fillStyle = '#f2b523'; x.beginPath(); x.arc(cx - 50, cy - 55, 13, 0, TAU); x.fill();
+      for (let i = 0; i < 4; i++) { x.fillStyle = '#9ccc6a'; x.beginPath(); x.arc(cx + 60, cy + 40 + i * 18, 11, 0, TAU); x.fill(); x.fillStyle = '#d9ecb8'; x.beginPath(); x.arc(cx + 60, cy + 40 + i * 18, 7, 0, TAU); x.fill(); }
+    } else if (key === 'lau') {
+      table(x, w, h, '#3a3a3a', '#1f1f1f');
+      x.save(); x.shadowColor = 'rgba(0,0,0,.5)'; x.shadowBlur = 22; x.fillStyle = '#9a9a9a'; x.beginPath(); x.arc(cx, cy, 124, 0, TAU); x.fill(); x.restore();
+      x.fillStyle = '#7a7a7a'; x.fillRect(cx - 150, cy - 12, 30, 24); x.fillRect(cx + 120, cy - 12, 30, 24);
+      const g = x.createRadialGradient(cx, cy, 10, cx, cy, 110); g.addColorStop(0, '#e2532e'); g.addColorStop(1, '#9c2414');
+      x.fillStyle = g; x.beginPath(); x.arc(cx, cy, 110, 0, TAU); x.fill();
+      for (let i = 0; i < 9; i++) { const a = rnd() * TAU, d = rnd() * 70; x.fillStyle = i % 3 ? '#e7a1a1' : '#f2d7b0'; x.beginPath(); x.ellipse(cx + Math.cos(a) * d, cy + Math.sin(a) * d, 18, 10, rnd() * 3, 0, TAU); x.fill(); }
+      herbs(x, cx, cy, 90, 18);
+    } else {
+      table(x, w, h, '#bfe0e6', '#8cc2cc'); plate(x, cx, cy, 110, '#fbf7ee', '#e27fa3');
+      [['#f7c6d3', -34, -20], ['#fff4dc', 34, -24], ['#8ec46a', 0, 34], ['#7a4e2f', -40, 40]].forEach(([col, dx, dy]) => {
+        x.save(); x.shadowColor = 'rgba(0,0,0,.18)'; x.shadowBlur = 8; x.fillStyle = col; x.beginPath(); x.arc(cx + dx, cy + dy, 40, 0, TAU); x.fill(); x.restore();
+      });
+      x.fillStyle = '#c28b4b'; x.save(); x.translate(cx + 60, cy + 60); x.rotate(-.7); x.fillRect(-8, -40, 16, 80); x.restore();
+    }
+    // soft vignette like a phone photo
+    const v = x.createRadialGradient(cx, cy, h * .25, cx, cy, h * .75); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.35)');
+    x.fillStyle = v; x.fillRect(0, 0, w, h);
+    return c.toDataURL('image/jpeg', .82);
+  }
+  const PHOTOS = Object.fromEntries(DISHES.map(d => [d.key, drawDish(d.key)]));
+
+  // ── Sample check-ins: June → today ──
+  const posts = [];
+  seed = 42;
+  for (let d = new Date(2026, 5, 3); d <= TODAY; d.setDate(d.getDate() + 1)) {
+    const isToday = +d === +TODAY;
+    let p = d.getMonth() === 8 ? 0.62 : 0.38;
+    const inStreak = d >= new Date(2026, 8, 21) && d < TODAY; // 21–24/9 → 4-day streak ending yesterday
+    if (isToday) continue;
+    if (!inStreak && rnd() > p) continue;
+    const n = rnd() > .82 ? 2 : 1;
+    for (let k = 0; k < n; k++) {
+      const dish = DISHES[Math.floor(rnd() * DISHES.length)];
+      const at = new Date(d); at.setHours(k ? 19 : 7 + Math.floor(rnd() * 7), Math.floor(rnd() * 60));
+      posts.push({ at, dish });
+    }
+  }
+  posts.sort((a, b) => a.at - b.at);
+  posts.forEach((p, i) => { p.i = i; });
+  const key = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  const byDay = new Map();
+  posts.forEach(p => { const k = key(p.at); if (!byDay.has(k)) byDay.set(k, []); byDay.get(k).push(p); });
+
+  // ── Memories list ──
+  function renderMonths() {
+    const scroll = $('memScroll');
+    let html = '';
+    for (let m = new Date(2026, 5, 1); m <= TODAY; m.setMonth(m.getMonth() + 1)) {
+      const y = m.getFullYear(), mo = m.getMonth(), days = new Date(y, mo + 1, 0).getDate();
+      let count = 0, cells = '';
+      for (let i = 0; i < new Date(y, mo, 1).getDay(); i++) cells += '<div></div>';
+      for (let day = 1; day <= days; day++) {
+        const d = new Date(y, mo, day), list = byDay.get(key(d));
+        const isToday = +d === +TODAY, future = d > TODAY;
+        if (list) {
+          count += list.length;
+          const last = list[list.length - 1];
+          const badge = list.length > 1 ? `<span class="count">${list.length}</span>` : '';
+          cells += `<button class="day photo${isToday ? ' today' : ''}" type="button" data-post="${last.i}" data-day="${key(d)}" style="background-image:url('${PHOTOS[last.dish.key]}')" aria-label="${day}/${mo + 1}: ${list.length} check-in">${badge}</button>`;
+        } else if (isToday) {
+          cells += `<button class="day add" type="button" aria-label="Check-in hôm nay"><svg class="icon" aria-hidden="true"><use href="#ic-action-plus"></use></svg></button>`;
+        } else if (future) {
+          cells += '<div class="day future"></div>';
+        } else {
+          cells += '<div class="day empty"></div>';
+        }
+      }
+      html += `<section class="month" aria-label="Tháng ${mo + 1} ${y}">
+        <div class="month-title"><span>Tháng ${mo + 1}, ${y}</span><span class="month-count">${count ? count + ' check-in' : ''}</span></div>
+        <div class="dow">${DOW.map(s => `<span>${s}</span>`).join('')}</div>
+        <div class="grid">${cells}</div>
+      </section>`;
+    }
+    scroll.innerHTML = html;
+    scroll.scrollTop = scroll.scrollHeight; // this month sits at the bottom, like Locket
+    $('statTotal').textContent = posts.length;
+    let streak = 0;
+    for (let d = new Date(TODAY); ; d.setDate(d.getDate() - 1)) {
+      if (byDay.has(key(d))) streak++;
+      else if (+d === +TODAY) continue; // today not posted yet doesn't break the streak
+      else break;
+    }
+    $('statStreak').textContent = streak;
+  }
+
+  $('memScroll').addEventListener('click', (e) => {
+    const cell = e.target.closest('.day');
+    if (!cell) return;
+    if (cell.classList.contains('add')) { toast('Về camera để check-in hôm nay'); return; }
+    if (cell.dataset.post) openViewer(+cell.dataset.post, cell);
+  });
+  $('memClose').addEventListener('click', () => toast('Về màn camera'));
+
+  // ── Viewer ──
+  let current = 0, built = false;
+  function buildViewer() {
+    if (built) return;
+    built = true;
+    $('vTrack').innerHTML = posts.map(p => `<div class="v-slide" data-i="${p.i}">
+      <div class="v-photo" style="background-image:url('${PHOTOS[p.dish.key]}')" role="img" aria-label="${p.dish.place}"></div>
+      <div class="v-meta">
+        <div class="v-place"><svg class="icon" aria-hidden="true"><use href="#ic-action-pin-static"></use></svg>${p.dish.place}</div>
+        <div class="v-sub">${hhmm(p.at)}</div>
+        <div class="v-caption">${p.dish.cap}</div>
+      </div>
+    </div>`).join('');
+    let prevDay = '';
+    $('vStrip').innerHTML = posts.map(p => {
+      const k = key(p.at), start = k !== prevDay && p.i > 0; prevDay = k;
+      return `<button class="v-thumb${start ? ' day-start' : ''}" type="button" data-i="${p.i}" style="background-image:url('${PHOTOS[p.dish.key]}')" aria-label="${p.at.getDate()}/${p.at.getMonth() + 1} ${hhmm(p.at)}"></button>`;
+    }).join('');
+  }
+  const hhmm = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+  function setCurrent(i, { scrollTrack = false, smooth = true } = {}) {
+    current = Math.max(0, Math.min(posts.length - 1, i));
+    const p = posts[current];
+    $('vYear').textContent = p.at.getFullYear();
+    $('vDay').textContent = `${DOW_LONG[p.at.getDay()]}, ${p.at.getDate()} tháng ${p.at.getMonth() + 1}`;
+    document.querySelectorAll('.v-slide').forEach(s => s.classList.toggle('current', +s.dataset.i === current));
+    const strip = $('vStrip'), thumbs = strip.children;
+    [...thumbs].forEach(t => t.classList.toggle('current', +t.dataset.i === current));
+    const th = thumbs[current];
+    if (th) strip.scrollTo({ left: th.offsetLeft - strip.clientWidth / 2 + th.offsetWidth / 2, behavior: smooth ? 'smooth' : 'auto' });
+    if (scrollTrack) {
+      const slide = $('vTrack').children[current];
+      $('vTrack').scrollTo({ left: slide.offsetLeft - ($('vTrack').clientWidth - slide.offsetWidth) / 2, behavior: smooth ? 'smooth' : 'auto' });
+    }
+  }
+
+  let trackTimer = null;
+  $('vTrack').addEventListener('scroll', () => {
+    clearTimeout(trackTimer);
+    trackTimer = setTimeout(() => {
+      const track = $('vTrack'), mid = track.scrollLeft + track.clientWidth / 2;
+      let best = 0, bestD = Infinity;
+      [...track.children].forEach((s, i) => { const d = Math.abs(s.offsetLeft + s.offsetWidth / 2 - mid); if (d < bestD) { bestD = d; best = i; } });
+      if (best !== current) setCurrent(best);
+    }, 70);
+  }, { passive: true });
+  $('vStrip').addEventListener('click', (e) => {
+    const t = e.target.closest('.v-thumb');
+    if (t) setCurrent(+t.dataset.i, { scrollTrack: true });
+  });
+  $('vShare').addEventListener('click', () => toast('Chia sẻ check-in'));
+  $('vClose').addEventListener('click', closeViewer);
+  document.addEventListener('keydown', (e) => {
+    if (!$('viewer').classList.contains('open')) return;
+    if (e.key === 'Escape') closeViewer();
+    if (e.key === 'ArrowRight') setCurrent(current + 1, { scrollTrack: true });
+    if (e.key === 'ArrowLeft') setCurrent(current - 1, { scrollTrack: true });
+  });
+  // Swipe down on the photo closes, like pulling a card back into the grid.
+  let pull = null;
+  $('vTrack').addEventListener('pointerdown', (e) => { pull = { x: e.clientX, y: e.clientY }; });
+  $('vTrack').addEventListener('pointerup', (e) => {
+    if (pull && e.clientY - pull.y > 90 && Math.abs(e.clientX - pull.x) < 60) closeViewer();
+    pull = null;
+  });
+
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function rectIn(el) {
+    const s = $('screen').getBoundingClientRect(), r = el.getBoundingClientRect();
+    return { left: r.left - s.left, top: r.top - s.top, width: r.width, height: r.height };
+  }
+  function hero(from, to, src, rFrom, rTo) {
+    const el = document.createElement('div');
+    el.className = 'hero';
+    el.style.backgroundImage = `url('${src}')`;
+    $('screen').appendChild(el);
+    const frame = (r, rad) => ({ left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', borderRadius: rad + 'px' });
+    const anim = el.animate([frame(from, rFrom), frame(to, rTo)], { duration: reduced ? 1 : 340, easing: 'cubic-bezier(.32,.72,0,1)', fill: 'forwards' });
+    return anim.finished.then(() => el.remove());
+  }
+
+  async function openViewer(i, cell) {
+    buildViewer();
+    const viewer = $('viewer');
+    setCurrent(i, { scrollTrack: true, smooth: false });
+    const photo = $('vTrack').children[i].querySelector('.v-photo');
+    const to = rectIn(photo), from = rectIn(cell);
+    photo.style.visibility = 'hidden';
+    cell.classList.add('is-hidden-for-hero');
+    viewer.classList.add('open');
+    viewer.setAttribute('aria-hidden', 'false');
+    await hero(from, to, PHOTOS[posts[i].dish.key], 10, 30);
+    photo.style.visibility = '';
+    cell.classList.remove('is-hidden-for-hero');
+    $('vClose').focus({ preventScroll: true });
+  }
+
+  async function closeViewer() {
+    const viewer = $('viewer');
+    const p = posts[current];
+    // The grid cell shows a day's LAST photo; any post of that day flies back to it.
+    const cell = document.querySelector(`.day[data-day="${key(p.at)}"]`);
+    const photo = $('vTrack').children[current].querySelector('.v-photo');
+    const from = rectIn(photo);
+    cell.scrollIntoView({ block: 'center' });
+    const to = rectIn(cell);
+    photo.style.visibility = 'hidden';
+    cell.classList.add('is-hidden-for-hero');
+    viewer.classList.remove('open');
+    viewer.setAttribute('aria-hidden', 'true');
+    await hero(from, to, PHOTOS[p.dish.key], 30, 10);
+    photo.style.visibility = '';
+    cell.classList.remove('is-hidden-for-hero');
+    cell.focus({ preventScroll: true });
+  }
+
+  let toastTimer = null;
+  function toast(msg) {
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 1600);
+  }
+
+  renderMonths();
+})();
+</script>
+</body>
+</html>
