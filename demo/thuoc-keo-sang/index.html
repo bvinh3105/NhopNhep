@@ -22,7 +22,7 @@
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
-html,body{background:var(--cream-2)}
+html,body{background:var(--cream)}
 body{font-family:var(--font);color:var(--text);font-size:15px;line-height:1.5;font-weight:500;-webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
@@ -49,14 +49,18 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
 .flash{position:absolute;inset:0;background:var(--white);opacity:0;pointer-events:none;transition:opacity .15s;z-index:3}
 .flash.on{opacity:.9}
 
+/* One button family for every round control on the camera screen:
+   white chip + soft shadow, icon ≈ 45% of the diameter. */
+.cam-btn{flex-shrink:0;width:44px;height:44px;border:none;border-radius:50%;background:var(--white);color:var(--text2);box-shadow:0 6px 18px rgba(42,24,16,.2);display:flex;align-items:center;justify-content:center;transition:transform .1s,background-color .15s,color .15s}
+.cam-btn .icon{width:20px;height:20px}
+.cam-btn.lg{width:54px;height:54px}
+.cam-btn.lg .icon{width:24px;height:24px}
+.cam-btn:active{transform:scale(.92)}
+.cam-btn.on{background:var(--primary);color:var(--white)}
+.cam-btn.is-idle{color:var(--text3)}
+
 .manual-row{display:flex;align-items:center;gap:8px;padding:8px 18px 0;flex-shrink:0}
-.exposure{position:relative;flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:var(--white);border-radius:20px;padding:6px 8px;box-shadow:0 6px 18px rgba(42,24,16,.2);color:var(--text2)}
-.exp-btn{flex-shrink:0;width:30px;height:30px;border-radius:50%;border:none;background:var(--paper);color:var(--text2);display:flex;align-items:center;justify-content:center;transition:transform .1s}
-.exp-btn .icon{width:16px;height:16px}
-.exp-btn:active{transform:scale(.92)}
-.lock-btn{width:38px;height:38px;background:var(--white);box-shadow:0 6px 18px rgba(42,24,16,.2)}
-.lock-btn .icon{width:18px;height:18px}
-.lock-btn.on{background:var(--primary);color:var(--white)}
+.exposure{position:relative;flex:1;min-width:0;height:44px;display:flex;align-items:center;background:var(--white);border-radius:22px;padding:0 12px;box-shadow:0 6px 18px rgba(42,24,16,.2);color:var(--text2)}
 
 /* ── The new ruler ── */
 .dial{--inset:10px;position:relative;flex:1;min-width:0;height:30px;touch-action:none;cursor:ew-resize;border-radius:10px;outline:none}
@@ -84,9 +88,6 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
 .readout.show{opacity:1}
 
 .ctrl-row{display:flex;align-items:center;justify-content:space-between;padding:16px 34px calc(var(--safe-bottom) + 90px);flex-shrink:0}
-.float-btn{width:54px;height:54px;border:none;border-radius:50%;background:var(--white);box-shadow:0 6px 18px rgba(42,24,16,.2);display:flex;align-items:center;justify-content:center;color:var(--text2);transition:transform .1s}
-.float-btn .icon{width:24px;height:24px}
-.float-btn:active{transform:scale(.92)}
 .shutter{position:relative;width:80px;height:80px;border-radius:50%;background:var(--primary);border:2px solid var(--text);box-shadow:3px 3px 0 var(--text);transition:box-shadow .12s,transform .12s}
 .shutter::after{content:'';position:absolute;inset:6px;background:var(--white);border-radius:50%;border:2px solid var(--text)}
 .shutter:active{transform:translate(1px,1px);box-shadow:2px 2px 0 var(--text)}
@@ -98,42 +99,50 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
 .tab-btn.active .icon{transform:scale(1.1)}
 .tab-lbl{font-size:.68rem;font-weight:800;letter-spacing:.2px;line-height:1}
 
-.toast{position:absolute;left:50%;top:calc(var(--safe-top) + 84px);transform:translate(-50%,-8px);z-index:30;background:var(--white);color:var(--text);font-size:.78rem;font-weight:800;padding:.55rem .9rem;border-radius:14px;box-shadow:0 8px 22px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
+/* Same as the app's #toast */
+.toast{position:absolute;left:50%;top:calc(var(--safe-top) + 84px);transform:translate(-50%,-1.2rem);z-index:30;background:var(--text);color:var(--cream);padding:.6rem 1.15rem;border-radius:24px;font-size:.85rem;font-weight:700;box-shadow:0 4px 18px rgba(42,24,16,.28);border:2px solid var(--primary);opacity:0;pointer-events:none;transition:opacity .22s ease,transform .22s ease;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 
-/* ── Tuning panel ── */
+/* ── Tuning panel — built from the app's own components:
+   .row-label (section eyebrow), .psec-title, .settings-row card,
+   .radius-chip choices, .data-btn / .btn-save buttons, .form-input ── */
 .panel{width:100%;max-width:420px;display:flex;flex-direction:column;gap:14px}
-.panel-head{padding:4px 4px 2px}
-.eyebrow{font-size:.68rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--primary)}
-.panel-head h1{font-size:1.45rem;font-weight:900;letter-spacing:-.4px;line-height:1.15;margin-top:4px;text-wrap:balance}
-.lede{font-size:.88rem;color:var(--text2);margin-top:6px;max-width:60ch}
-.card{background:var(--white);border-radius:18px;padding:16px;box-shadow:0 1px 0 var(--line-2),0 8px 24px rgba(42,24,16,.07);display:flex;flex-direction:column;gap:10px}
-.card h2{font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)}
+.panel-head{padding:4px 2px 2px}
+.row-label{font-style:italic;font-weight:800;font-size:.75rem;color:var(--primary);letter-spacing:1px;text-transform:uppercase;display:flex;align-items:center;gap:.4rem;line-height:1.3}
+.row-label::before{content:'✦';font-style:normal}
+.panel-title{font-size:1.5rem;font-weight:900;letter-spacing:-.4px;line-height:1.15;margin-top:6px;text-wrap:balance;color:var(--text)}
+.panel-title em{font-style:italic;color:var(--primary)}
+.lede{font-size:.86rem;color:var(--text2);font-weight:600;margin-top:6px;max-width:60ch}
+.card{background:var(--white);border:2px solid var(--text);border-radius:14px;padding:14px;box-shadow:2px 2px 0 var(--text);display:flex;flex-direction:column;gap:10px}
 .status{display:flex;align-items:flex-start;gap:10px;font-size:.86rem;font-weight:700;color:var(--text);line-height:1.4}
 .status .icon{width:22px;height:22px;color:var(--primary);margin-top:1px}
 .status.warn .icon{color:var(--accent-2)}
 .status .icon.wiggle{animation:wiggle .24s ease-out}
 @keyframes wiggle{25%{transform:translateX(-2px) rotate(-6deg)}75%{transform:translateX(2px) rotate(6deg)}}
-.kv{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:.82rem;color:var(--text2);padding-top:8px;border-top:1px dashed var(--line-2)}
+.kv{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:.82rem;color:var(--text2);font-weight:600;padding-top:8px;border-top:1px dashed var(--line-2)}
 .kv b{color:var(--text);font-weight:900;font-variant-numeric:tabular-nums}
-.seg{display:flex;background:var(--cream);border-radius:999px;padding:4px;gap:4px}
-.seg button{flex:1;border:none;background:transparent;border-radius:999px;padding:9px 6px;font-size:.8rem;font-weight:800;color:var(--text2);white-space:nowrap}
-.seg button[aria-checked="true"]{background:var(--text);color:var(--cream)}
-.field{display:flex;flex-direction:column;gap:6px}
+.seg{display:flex;gap:8px}
+.seg button{flex:1;text-align:center;padding:.55rem 0;border-radius:24px;font-size:.82rem;font-weight:800;border:2px solid var(--text);color:var(--text);background:var(--white);box-shadow:2px 2px 0 var(--text);white-space:nowrap;transition:transform .15s var(--ease-spring),box-shadow .15s,background-color .15s,color .15s}
+.seg button:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.seg button[aria-checked="true"]{background:var(--primary);color:var(--cream);border-color:var(--primary-2);box-shadow:2px 2px 0 var(--primary-2)}
+.field{display:flex;flex-direction:column;gap:8px}
 .field-label{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:.84rem;font-weight:800;color:var(--text)}
 .field-label output{font-size:.78rem;font-weight:800;color:var(--primary);font-variant-numeric:tabular-nums}
 .field input[type=range]{width:100%;accent-color:var(--primary);height:28px}
-.hint{font-size:.76rem;color:var(--text3);line-height:1.45}
+.hint{font-size:.76rem;color:var(--text2);font-weight:600;line-height:1.45}
 .btn-row{display:flex;gap:8px;flex-wrap:wrap}
-.btn{border:none;border-radius:14px;padding:11px 14px;font-size:.84rem;font-weight:800}
-.btn-primary{background:var(--primary);color:var(--white)}
-.btn-ghost{background:var(--cream);color:var(--text)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;padding:.6rem .85rem;border-radius:14px;border:2px solid var(--text);background:var(--white);color:var(--text);font-size:.8rem;font-weight:800;box-shadow:2px 2px 0 var(--text);transition:transform .12s,box-shadow .12s}
+.btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.btn .icon{width:18px;height:18px}
+.btn-primary{background:var(--primary);color:var(--cream);font-weight:900;font-size:.9rem;padding:.7rem 1rem;box-shadow:3px 3px 0 var(--text)}
+.btn-primary:active{transform:translate(1.5px,1.5px);box-shadow:1.5px 1.5px 0 var(--text)}
 .why{display:flex;flex-direction:column;gap:8px;padding-left:1.1rem}
-.why li{font-size:.82rem;color:var(--text2);line-height:1.45}
+.why li{font-size:.82rem;color:var(--text2);font-weight:600;line-height:1.45}
+.why li::marker{color:var(--primary)}
 .why b{color:var(--text)}
-.cfg-line{display:block;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.76rem;background:var(--paper);border:1px dashed var(--line-2);border-radius:10px;padding:10px 12px;color:var(--text);user-select:all;-webkit-user-select:all;word-break:break-word}
+.cfg-line{display:block;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.76rem;background:var(--white);border:2px solid var(--text);border-radius:12px;box-shadow:2px 2px 0 var(--text);padding:.6rem .85rem;color:var(--text);user-select:all;-webkit-user-select:all;word-break:break-word}
 .preview{display:flex;gap:14px;align-items:center}
-.preview canvas{width:132px;height:132px;border-radius:12px;background:var(--white);box-shadow:0 0 0 1px var(--line-2);flex-shrink:0}
+.preview canvas{width:132px;height:132px;border-radius:12px;background:var(--white);border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);flex-shrink:0}
 .preview a{font-size:.84rem;font-weight:800;color:var(--primary);word-break:break-all}
 
 @media (max-width:640px){
@@ -150,11 +159,26 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
 </head>
 <body>
 
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="ic-action-pin-static" viewBox="0 0 24 24"><path d="M9,3 H15 L14,8 L17,12 H7 L10,8 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M12,12 L12,21" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-undo-reset" viewBox="0 0 24 24"><path d="M14.74,4.48 A8,8 0 1 1 5.07,8.00" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5,7 L4,12 L9,11" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-flip-camera" viewBox="0 0 24 24"><path d="M4,9 a2,2 0 0 1 2,-2 H8 L9.5,5 H14.5 L16,7 H18 a2,2 0 0 1 2,2 V17 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M8.8,13 a3.2,3.2 0 0 1 5.9,-1.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M14.82,9.22 L14.7,11.3 L12.78,10.49" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M15.2,13 a3.2,3.2 0 0 1 -5.9,1.7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M11.22,15.51 L9.3,14.7 L9.18,16.78" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-focus-lock" viewBox="0 0 24 24"><path d="M4,8.5 V6 a2,2 0 0 1 2,-2 H8.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M15.5,4 H18 a2,2 0 0 1 2,2 V8.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M20,15.5 V18 a2,2 0 0 1 -2,2 H15.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M8.5,20 H6 a2,2 0 0 1 -2,-2 V15.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M9,11.5 h6 a1.2,1.2 0 0 1 1.2,1.2 v3.3 a1.2,1.2 0 0 1 -1.2,1.2 h-6 a1.2,1.2 0 0 1 -1.2,-1.2 v-3.3 a1.2,1.2 0 0 1 1.2,-1.2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M9.8,11.5 V9.6 a2.2,2.2 0 0 1 4.4,0 V11.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-focus-unlock" viewBox="0 0 24 24"><path d="M4,8.5 V6 a2,2 0 0 1 2,-2 H8.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M15.5,4 H18 a2,2 0 0 1 2,2 V8.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M20,15.5 V18 a2,2 0 0 1 -2,2 H15.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M8.5,20 H6 a2,2 0 0 1 -2,-2 V15.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M9,11.5 h6 a1.2,1.2 0 0 1 1.2,1.2 v3.3 a1.2,1.2 0 0 1 -1.2,1.2 h-6 a1.2,1.2 0 0 1 -1.2,-1.2 v-3.3 a1.2,1.2 0 0 1 1.2,-1.2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M9.8,11.5 V8.6 a2.2,2.2 0 0 1 4.4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-proto-diary" viewBox="0 0 24 24"><path d="M6,4 h11 a1,1 0 0 1 1,1 v15 H7 a2,2 0 0 1 -2,-2 V5 a1,1 0 0 1 1,-1 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5,17 a2,2 0 0 1 2,-2 H18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M9,8 L15,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M9,11.5 L13,11.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-nav-home" viewBox="0 0 24 24"><path d="M4,12 a8,6 0 0 0 16,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M3,12 L21,12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M9,5 L9,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M12,4 L12,7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M15,5 L15,8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-nav-checkin" viewBox="0 0 24 24"><path d="M4,9 a2,2 0 0 1 2,-2 H8 L9.5,5 H14.5 L16,7 H18 a2,2 0 0 1 2,2 V17 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M8.5,13 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-nav-community" viewBox="0 0 24 24"><path d="M6,9 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M3,20 a6,6 0 0 1 12,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M14.7,10 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M13,20 a5,5 0 0 1 8.5,-0.6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-nav-profile" viewBox="0 0 24 24"><path d="M8.8,8 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M5,20 A7,7 0 0 1 19,20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-copy-link" viewBox="0 0 24 24"><path d="M6,4 h8 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-8 a2,2 0 0 1 -2,-2 v-8 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M11,9 h8 a2,2 0 0 1 2,2 v8 a2,2 0 0 1 -2,2 h-8 a2,2 0 0 1 -2,-2 v-8 a2,2 0 0 1 2,-2 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-status-confirmed" viewBox="0 0 24 24"><path d="M3,12 a9,9 0 1,0 18,0 a9,9 0 1,0 -18,0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M8,12 L11,15 L16,9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+<symbol id="ic-action-vibrate" viewBox="0 0 24 24"><path d="M9.5,4 h5 a1.5,1.5 0 0 1 1.5,1.5 v13 a1.5,1.5 0 0 1 -1.5,1.5 h-5 a1.5,1.5 0 0 1 -1.5,-1.5 v-13 a1.5,1.5 0 0 1 1.5,-1.5 z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M4.5,9 V15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M19.5,9 V15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M1.8,10.8 V13.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M22.2,10.8 V13.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+</svg>
 <div class="stage">
   <div class="phone">
     <section class="screen" id="screen" aria-label="Màn chụp check-in (mô phỏng)">
       <button class="quan-pill" id="quanPill" type="button">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9,3 H15 L14,8 L17,12 H7 L10,8 Z"/><path d="M12,12 L12,21"/></svg>
+        <svg class="icon" aria-hidden="true"><use href="#ic-action-pin-static"></use></svg>
         <span class="quan-name">Phở Thìn Lò Đúc</span>
         <span class="quan-dist">120m</span>
         <span class="chevron">▾</span>
@@ -171,10 +195,8 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
       </div>
 
       <div class="manual-row">
+        <button class="cam-btn is-idle" id="resetBtn" type="button" aria-label="Đặt lại độ sáng" title="Đặt lại độ sáng" aria-disabled="true"><svg class="icon" aria-hidden="true"><use href="#ic-action-undo-reset"></use></svg></button>
         <div class="exposure" id="exposure">
-          <button class="exp-btn" id="resetBtn" type="button" aria-label="Đặt lại độ sáng" title="Đặt lại độ sáng">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.74,4.48 A8,8 0 1 1 5.07,8.00"/><path d="M5,7 L4,12 L9,11"/></svg>
-          </button>
           <div class="dial" id="dial" role="slider" tabindex="0" aria-label="Độ sáng" aria-valuemin="-2" aria-valuemax="2" aria-valuenow="0" aria-valuetext="Tự động">
             <div class="ticks" id="ticks"></div>
             <div class="thumb" id="thumb"></div>
@@ -182,37 +204,31 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
           <input type="range" class="old-slider" id="oldSlider" min="-2" max="2" step="0.1666667" value="0" aria-label="Độ sáng (thanh cũ)" hidden>
           <div class="readout" id="readout">Tự động</div>
         </div>
-        <button class="exp-btn lock-btn" id="lockBtn" type="button" aria-label="Khóa nét &amp; sáng" aria-pressed="false" title="Khóa nét &amp; sáng">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7,11 h10 a2,2 0 0 1 2,2 v6 a2,2 0 0 1 -2,2 h-10 a2,2 0 0 1 -2,-2 v-6 a2,2 0 0 1 2,-2 z"/><path d="M8,11 V7 a4,4 0 0 1 8,0 v4"/></svg>
-        </button>
+        <button class="cam-btn" id="lockBtn" type="button" aria-label="Khóa nét &amp; sáng" aria-pressed="false" title="Khóa nét &amp; sáng"><svg class="icon" aria-hidden="true"><use id="lockIcon" href="#ic-action-focus-unlock"></use></svg></button>
       </div>
 
       <div class="ctrl-row">
-        <button class="float-btn" id="diaryBtn" type="button" aria-label="Nhật ký check-in">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6,4 h11 a1,1 0 0 1 1,1 v15 H7 a2,2 0 0 1 -2,-2 V5 a1,1 0 0 1 1,-1 z"/><path d="M5,17 a2,2 0 0 1 2,-2 H18"/><path d="M9,8 L15,8"/><path d="M9,11.5 L13,11.5"/></svg>
-        </button>
+        <button class="cam-btn lg" id="diaryBtn" type="button" aria-label="Nhật ký check-in"><svg class="icon" aria-hidden="true"><use href="#ic-proto-diary"></use></svg></button>
         <button class="shutter" id="shutter" type="button" aria-label="Chụp check-in"></button>
-        <button class="float-btn" id="flipBtn" type="button" aria-label="Đổi camera trước/sau">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.74,4.48 A8,8 0 1 1 5.07,8.00"/><path d="M5,7 L4,12 L9,11"/></svg>
-        </button>
+        <button class="cam-btn lg" id="flipBtn" type="button" aria-label="Đổi camera trước/sau"><svg class="icon" aria-hidden="true"><use href="#ic-action-flip-camera"></use></svg></button>
       </div>
       <div class="spacer-bottom"></div>
 
       <nav class="tabbar" aria-label="Thanh điều hướng (mô phỏng)">
         <button class="tab-btn" type="button">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4,12 a8,6 0 0 0 16,0"/><path d="M3,12 L21,12"/><path d="M9,5 L9,8"/><path d="M12,4 L12,7"/><path d="M15,5 L15,8"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="#ic-nav-home"></use></svg>
           <span class="tab-lbl">Trang chủ</span>
         </button>
         <button class="tab-btn active" type="button" aria-current="page">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4,9 a2,2 0 0 1 2,-2 H8 L9.5,5 H14.5 L16,7 H18 a2,2 0 0 1 2,2 V17 a2,2 0 0 1 -2,2 H6 a2,2 0 0 1 -2,-2 Z"/><path d="M8.5,13 a3.5,3.5 0 1,0 7,0 a3.5,3.5 0 1,0 -7,0"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="#ic-nav-checkin"></use></svg>
           <span class="tab-lbl">Check-in</span>
         </button>
         <button class="tab-btn" type="button">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6,9 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0"/><path d="M3,20 a6,6 0 0 1 12,0"/><path d="M14.7,10 a2.3,2.3 0 1,0 4.6,0 a2.3,2.3 0 1,0 -4.6,0"/><path d="M13,20 a5,5 0 0 1 8.5,-0.6"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="#ic-nav-community"></use></svg>
           <span class="tab-lbl">Cộng đồng</span>
         </button>
         <button class="tab-btn" type="button">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.8,8 a3.2,3.2 0 1,0 6.4,0 a3.2,3.2 0 1,0 -6.4,0"/><path d="M5,20 A7,7 0 0 1 19,20"/></svg>
+          <svg class="icon" aria-hidden="true"><use href="#ic-nav-profile"></use></svg>
           <span class="tab-lbl">Cá nhân</span>
         </button>
       </nav>
@@ -221,13 +237,13 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
 
   <aside class="panel" aria-label="Tinh chỉnh cảm giác thước kéo sáng">
     <header class="panel-head">
-      <p class="eyebrow">Check-in · Thước kéo sáng</p>
-      <h1>Mỗi nấc một lần rung</h1>
+      <p class="row-label">Check-in · Thước kéo sáng</p>
+      <h1 class="panel-title">Mỗi nấc <em>một lần rung</em></h1>
       <p class="lede">Kéo thước ngay dưới khung ảnh. Qua mỗi vạch là sáng/tối thêm 1 nấc và rung nhẹ một cái; về mốc 0 (Tự động) rung đậm hơn; kéo quá hai đầu thanh sẽ rung 2 nhịp báo đã hết.</p>
     </header>
 
     <div class="card" id="previewCard" hidden>
-      <h2>Thử rung thật trên điện thoại</h2>
+      <h2 class="row-label">Thử rung thật trên điện thoại</h2>
       <div class="preview">
         <canvas id="qr" width="264" height="264" aria-label="Mã QR mở bản thử trên điện thoại"></canvas>
         <div>
@@ -239,16 +255,16 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
 
     <div class="card">
       <div class="status" id="hapticStatus">
-        <svg class="icon" id="hapticIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="4" width="8" height="16" rx="2"/><path d="M4.5 9v6M19.5 9v6M2 11v2M22 11v2"/></svg>
+        <svg class="icon" id="hapticIcon" aria-hidden="true"><use href="#ic-action-vibrate"></use></svg>
         <span id="hapticText">Đang kiểm tra khả năng rung…</span>
       </div>
       <div class="kv"><span>Độ sáng đang chọn</span><b id="valNow">0 EV · Tự động</b></div>
       <div class="kv"><span>Số lần rung</span><b id="hapticCount">0</b></div>
-      <div class="btn-row"><button class="btn btn-ghost" id="testBuzz" type="button">Thử rung một cái</button></div>
+      <div class="btn-row"><button class="btn" id="testBuzz" type="button"><svg class="icon" aria-hidden="true"><use href="#ic-action-vibrate"></use></svg>Thử rung một cái</button></div>
     </div>
 
     <div class="card">
-      <h2>So sánh</h2>
+      <h2 class="row-label">So sánh</h2>
       <div class="seg" id="modeSeg" role="radiogroup" aria-label="Kiểu thanh">
         <button type="button" role="radio" data-v="dial">Thước mới</button>
         <button type="button" role="radio" data-v="old">Thanh cũ</button>
@@ -257,7 +273,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
     </div>
 
     <div class="card">
-      <h2>Tinh chỉnh cảm giác</h2>
+      <h2 class="row-label">Tinh chỉnh cảm giác</h2>
       <div class="field">
         <div class="field-label"><span>Mỗi nấc</span><output id="spacingOut">≈ 18px</output></div>
         <div class="seg" id="stepSeg" role="radiogroup" aria-label="Độ lớn mỗi nấc">
@@ -286,17 +302,17 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
         <label class="field-label" for="zeroMs"><span>Rung ở mốc 0</span><output id="zeroOut" for="zeroMs">24 ms</output></label>
         <input type="range" id="zeroMs" min="10" max="50" step="1">
       </div>
-      <div class="btn-row"><button class="btn btn-ghost" id="resetCfg" type="button">Về mặc định</button></div>
+      <div class="btn-row"><button class="btn" id="resetCfg" type="button"><svg class="icon" aria-hidden="true"><use href="#ic-action-undo-reset"></use></svg>Về mặc định</button></div>
     </div>
 
     <div class="card">
-      <h2>Camera thật</h2>
-      <div class="btn-row"><button class="btn btn-primary" id="camBtn" type="button">Mở camera thật</button></div>
+      <h2 class="row-label">Camera thật</h2>
+      <div class="btn-row"><button class="btn btn-primary" id="camBtn" type="button"><svg class="icon" aria-hidden="true"><use href="#ic-nav-checkin"></use></svg><span id="camBtnLbl">Mở camera thật</span></button></div>
       <p class="hint" id="camStatus">Đang dùng ảnh mẫu, độ sáng mô phỏng bằng bộ lọc. Mở camera thật để thước chỉnh đúng độ sáng của camera điện thoại.</p>
     </div>
 
     <div class="card">
-      <h2>Vì sao dễ chỉnh hơn</h2>
+      <h2 class="row-label">Vì sao dễ chỉnh hơn</h2>
       <ul class="why">
         <li><b>Nấc to gấp đôi:</b> mỗi nấc 1/3 EV (bước chuẩn của máy ảnh) thay vì 1/6 EV, nên mỗi nấc rộng ~18px thay vì ~9px.</li>
         <li><b>Chạm không nhảy:</b> chạm vào thước không đổi gì, chỉ khi kéo mới đổi — không lỡ tay nhảy vọt tới chỗ vừa chạm.</li>
@@ -306,10 +322,10 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
     </div>
 
     <div class="card">
-      <h2>Thông số bạn chọn</h2>
+      <h2 class="row-label">Thông số bạn chọn</h2>
       <p class="hint">Khi thấy vừa tay, gửi lại dòng này để tôi đưa đúng thông số vào app:</p>
       <code class="cfg-line" id="cfgLine"></code>
-      <div class="btn-row"><button class="btn btn-ghost" id="copyCfg" type="button">Sao chép</button></div>
+      <div class="btn-row"><button class="btn" id="copyCfg" type="button"><svg class="icon" aria-hidden="true"><use id="copyIcon" href="#ic-action-copy-link"></use></svg><span id="copyLbl">Sao chép</span></button></div>
     </div>
   </aside>
 </div>
@@ -390,6 +406,14 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
     readout.textContent = fmt(v);
     readout.style.left = `${dialX(p)}px`;
     $('valNow').textContent = isZero(v) ? '0 EV · Tự động' : `${fmt(v)} EV`;
+    setResetIdle(isZero(v));
+  }
+
+  // Reset has nothing to do at 0 (Tự động) — show it as idle there.
+  function setResetIdle(idle) {
+    const b = $('resetBtn');
+    b.classList.toggle('is-idle', idle);
+    b.setAttribute('aria-disabled', String(idle));
   }
 
   function dialX(p) {
@@ -632,7 +656,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
         status.textContent = 'Camera thật · máy này không cho web chỉnh độ sáng, thước đang mô phỏng bằng bộ lọc.';
       }
       ecLast = null; ecPending = null; ecBusy = false;
-      $('camBtn').textContent = 'Tắt camera thật';
+      $('camBtnLbl').textContent = 'Tắt camera thật';
       buildNotches();
       oldSlider.value = 0;
     } catch (err) {
@@ -648,7 +672,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
     const v = $('cam');
     v.srcObject = null; v.hidden = true; v.style.filter = '';
     $('scene').hidden = false;
-    $('camBtn').textContent = 'Mở camera thật';
+    $('camBtnLbl').textContent = 'Mở camera thật';
     device = null;
     oldSlider.min = -2; oldSlider.max = 2; oldSlider.step = 1 / 6; oldSlider.value = 0;
     buildNotches();
@@ -668,6 +692,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
     readout.style.left = `${oldSlider.offsetLeft + pct * oldSlider.offsetWidth}px`;
     showReadout(false);
     $('valNow').textContent = v === 0 ? '0 EV · Tự động' : `${fmt(v)} EV`;
+    setResetIdle(v === 0);
     applyExposure(v);
   }
   oldSlider.addEventListener('input', onOldInput);
@@ -690,9 +715,13 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
       if (caps.exposureMode && caps.exposureMode.includes(mode)) adv.push({ exposureMode: mode });
       if (adv.length) { try { await track.applyConstraints({ advanced: adv }); } catch (_) {} }
     }
-    $('lockBtn').classList.toggle('on', locked);
-    $('lockBtn').setAttribute('aria-pressed', String(locked));
-    toast(locked ? '🔒 Đã khóa nét & sáng — tự do đổi góc chụp' : '🔓 Đã mở khóa — camera tự lấy nét/sáng lại');
+    const btn = $('lockBtn'), label = locked ? 'Mở khóa nét & sáng' : 'Khóa nét & sáng';
+    btn.classList.toggle('on', locked);
+    btn.setAttribute('aria-pressed', String(locked));
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+    $('lockIcon').setAttribute('href', locked ? '#ic-action-focus-lock' : '#ic-action-focus-unlock');
+    toast(locked ? 'Đã khóa nét & sáng — tự do đổi góc chụp' : 'Đã mở khóa — camera tự lấy nét và sáng lại');
   });
   $('shutter').addEventListener('click', () => {
     const f = $('flash');
@@ -764,19 +793,20 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
     $('cfgLine').textContent = `Thước kéo sáng: nấc 1/${cfg.stepDiv} EV · ±${cfg.range} EV · dính ${cfg.hyst.toFixed(2)} · rung nấc ${cfg.tickMs}ms · rung mốc 0 ${cfg.zeroMs}ms`;
   }
   $('copyCfg').addEventListener('click', async () => {
-    const btn = $('copyCfg');
+    const lbl = $('copyLbl'), icon = $('copyIcon');
     try {
       await navigator.clipboard.writeText($('cfgLine').textContent);
-      btn.textContent = 'Đã sao chép';
+      lbl.textContent = 'Đã sao chép';
+      icon.setAttribute('href', '#ic-status-confirmed');
     } catch (_) {
       const r = document.createRange();
       r.selectNodeContents($('cfgLine'));
-      const s = getSelection();
-      s.removeAllRanges();
-      s.addRange(r);
-      btn.textContent = 'Đã chọn — nhấn giữ để sao chép';
+      const sel = getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      lbl.textContent = 'Đã chọn — nhấn giữ để sao chép';
     }
-    setTimeout(() => { btn.textContent = 'Sao chép'; }, 1800);
+    setTimeout(() => { lbl.textContent = 'Sao chép'; icon.setAttribute('href', '#ic-action-copy-link'); }, 1800);
   });
 
   // ── Sample photo: a bowl of phở, drawn so no image files are needed ──
