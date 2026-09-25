@@ -5545,6 +5545,225 @@ const CommunityAddModal = {
    to the closest saved quán from State (or an OSM/Gemini placeholder
    the user picks manually via the top pill). Never blocks the shutter.
 ═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   EXPOSURE DIAL — thước kéo sáng có vạch nấc cho camera check-in.
+   Thông số do Vinh chỉnh trên bản demo "thuoc-keo-sang" (2026-09-25):
+   nấc 1/6 EV · ±2 EV · độ dính 0.20 · rung nấc 28ms · rung mốc 0 24ms.
+   Kéo tương đối (chạm không nhảy), mỗi nấc = 1 lần rung, mốc 0 dính
+   hơn để dễ về "Tự động", kéo quá đầu thanh rung 2 nhịp.
+═══════════════════════════════════════════════ */
+const ExposureDial = {
+  STEP: 1 / 6, RANGE: 2, HYST: 0.2, ZERO_EXTRA: 0.25, INSET: 10,
+  TICK_MS: 28, ZERO_MS: 24, EDGE_MS: 34,
+  // Ticks closer together than the pulse itself would blur into one buzz.
+  get TICK_GAP_MS() { return this.TICK_MS + 16; },
+
+  _values: [0], _idx: 0, _zero: 0, _ticks: [],
+  _drag: null, _lastTap: null, _lastBuzz: 0, _readoutTimer: null, _onChange: null, _iosTap: null,
+
+  init(onChange) {
+    this._onChange = onChange;
+    const dial = document.getElementById('checkinExposureDial');
+    // iOS Safari has no Vibration API; toggling a hidden <input switch>
+    // produces the system haptic tick on iOS 18+ (no-op elsewhere).
+    if (typeof navigator.vibrate !== 'function' && /iP(hone|ad|od)/.test(navigator.userAgent)) {
+      const label = document.createElement('label');
+      label.setAttribute('aria-hidden', 'true');
+      label.className = 'visually-hidden';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.setAttribute('switch', '');
+      input.tabIndex = -1;
+      label.appendChild(input);
+      document.body.appendChild(label);
+      this._iosTap = () => label.click();
+    }
+    dial.addEventListener('pointerdown', (e) => this._down(e));
+    dial.addEventListener('pointermove', (e) => this._move(e));
+    dial.addEventListener('pointerup', (e) => this._up(e));
+    dial.addEventListener('pointercancel', (e) => this._up(e));
+    dial.addEventListener('keydown', (e) => this._key(e));
+    let wheelAcc = 0;
+    dial.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      wheelAcc += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : -e.deltaY;
+      while (wheelAcc >= 40) { wheelAcc -= 40; this._step(1); }
+      while (wheelAcc <= -40) { wheelAcc += 40; this._step(-1); }
+    }, { passive: false });
+  },
+
+  // ec = track.getCapabilities().exposureCompensation. Notches sit on
+  // multiples of STEP within ±RANGE, snapped to what the camera supports.
+  setup(ec, current) {
+    const lo = Math.max(ec.min, -this.RANGE), hi = Math.min(ec.max, this.RANGE);
+    const vals = [];
+    for (let k = Math.ceil(lo / this.STEP - 1e-9); k <= Math.floor(hi / this.STEP + 1e-9); k++) {
+      let v = k * this.STEP;
+      if (ec.step) v = Math.round(v / ec.step) * ec.step;
+      v = Math.round(v * 1000) / 1000;
+      if (!vals.length || Math.abs(vals[vals.length - 1] - v) > 1e-6) vals.push(v);
+    }
+    this._values = vals.length ? vals : [0];
+    this._zero = Math.max(0, this._values.findIndex(v => Math.abs(v) < 1e-6));
+    let best = this._zero;
+    this._values.forEach((v, i) => { if (Math.abs(v - current) < Math.abs(this._values[best] - current)) best = i; });
+    this._idx = best;
+
+    const wrap = document.getElementById('checkinExposureTicks');
+    wrap.textContent = '';
+    const n = this._values.length - 1;
+    this._ticks = this._values.map((v, i) => {
+      const t = document.createElement('span');
+      const zero = Math.abs(v) < 1e-6, major = Math.abs(v - Math.round(v)) < 1e-6;
+      t.className = 'checkin-dial-tick' + (zero ? ' zero' : major ? ' major' : '');
+      t.style.setProperty('--p', n ? i / n : 0.5);
+      wrap.appendChild(t);
+      return t;
+    });
+    const dial = document.getElementById('checkinExposureDial');
+    dial.setAttribute('aria-valuemin', this._values[0]);
+    dial.setAttribute('aria-valuemax', this._values[n]);
+    this._render();
+  },
+
+  reset() {
+    if (!this._setIdx(this._zero)) this._buzz('zero');
+    this._flashReadout();
+  },
+
+  _fmt(v) {
+    if (Math.abs(v) < 1e-6) return I18N.t('checkin.exposureAuto');
+    return (v > 0 ? '+' : '−') + Math.abs(v).toFixed(1);
+  },
+
+  _render() {
+    const n = this._values.length - 1, idx = this._idx, zero = this._zero;
+    const p = n ? idx / n : 0.5;
+    document.getElementById('checkinExposureThumb').style.setProperty('--p', p);
+    this._ticks.forEach((t, i) => {
+      // Ticks near the thumb grow a little — shows exactly where you are.
+      t.style.setProperty('--s', (1 + 0.6 * Math.max(0, 1 - Math.abs(i - idx) / 2.4)).toFixed(3));
+      t.classList.toggle('fill', (idx > zero && i > zero && i <= idx) || (idx < zero && i < zero && i >= idx));
+    });
+    const v = this._values[idx], atZero = Math.abs(v) < 1e-6;
+    const dial = document.getElementById('checkinExposureDial');
+    dial.setAttribute('aria-valuenow', v);
+    dial.setAttribute('aria-valuetext', atZero ? I18N.t('checkin.exposureAuto') : `${this._fmt(v)} EV`);
+    const readout = document.getElementById('checkinExposureReadout');
+    readout.textContent = this._fmt(v);
+    const box = document.getElementById('checkinExposureWrap').clientWidth;
+    const x = dial.offsetLeft + this.INSET + (dial.clientWidth - 2 * this.INSET) * p;
+    readout.style.left = `${Math.max(26, Math.min(box - 26, x))}px`;
+    const reset = document.getElementById('checkinExposureReset');
+    reset.classList.toggle('is-idle', atZero);
+    reset.setAttribute('aria-disabled', String(atZero));
+  },
+
+  _setIdx(n) {
+    n = Math.max(0, Math.min(this._values.length - 1, n));
+    if (n === this._idx) return false;
+    const prev = this._idx;
+    this._idx = n;
+    this._render();
+    const crossedZero = (prev - this._zero) * (n - this._zero) < 0;
+    this._buzz(n === this._zero || crossedZero ? 'zero' : 'tick');
+    if (this._onChange) this._onChange(this._values[n]);
+    return true;
+  },
+
+  _step(d) {
+    if (!this._setIdx(this._idx + d)) { this._buzz('edge'); this._bump(d); }
+    this._flashReadout();
+  },
+
+  _threshold(i) { return 0.5 + this.HYST + (i === this._zero ? this.ZERO_EXTRA : 0); },
+
+  _down(e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    const dial = e.currentTarget;
+    try { dial.setPointerCapture(e.pointerId); } catch (_) {}
+    const n = Math.max(1, this._values.length - 1);
+    this._drag = { id: e.pointerId, x0: e.clientX, i0: this._idx, spacing: (dial.clientWidth - 2 * this.INSET) / n, moved: false, edge: 0 };
+    dial.classList.add('dragging');
+    clearTimeout(this._readoutTimer);
+    document.getElementById('checkinExposureReadout').classList.add('show');
+  },
+
+  _move(e) {
+    const d = this._drag;
+    if (!d || e.pointerId !== d.id) return;
+    const last = this._values.length - 1;
+    const dx = e.clientX - d.x0;
+    if (!d.moved && Math.abs(dx) > 4) d.moved = true;
+    const pos = d.i0 + dx / d.spacing;
+    let next = this._idx;
+    while (next < last && pos >= next + this._threshold(next)) next++;
+    while (next > 0 && pos <= next - this._threshold(next)) next--;
+    this._setIdx(next);
+    const over = pos > last + 0.6 && this._idx === last ? 1 : pos < -0.6 && this._idx === 0 ? -1 : 0;
+    if (over) {
+      if (d.edge !== over) { d.edge = over; this._buzz('edge'); this._bump(over); }
+      // Pin the finger to the wall so dragging back responds at once.
+      d.x0 = e.clientX - ((over === 1 ? last : 0) - d.i0) * d.spacing;
+    } else if ((d.edge === 1 && pos < last - 0.3) || (d.edge === -1 && pos > 0.3)) {
+      d.edge = 0;
+    }
+  },
+
+  _up(e) {
+    const d = this._drag;
+    if (!d || e.pointerId !== d.id) return;
+    const tapped = !d.moved && e.type === 'pointerup';
+    this._drag = null;
+    e.currentTarget.classList.remove('dragging');
+    this._flashReadout();
+    if (!tapped) { this._lastTap = null; return; }
+    // Double-tap = back to "Tự động" (same shortcut the old slider had).
+    const now = performance.now(), t = this._lastTap;
+    if (t && now - t.t < 320 && Math.hypot(e.clientX - t.x, e.clientY - t.y) < 24) { this._lastTap = null; this.reset(); }
+    else this._lastTap = { t: now, x: e.clientX, y: e.clientY };
+  },
+
+  _key(e) {
+    const big = Math.round(1 / this.STEP);
+    const delta = { ArrowRight: 1, ArrowUp: 1, ArrowLeft: -1, ArrowDown: -1, PageUp: big, PageDown: -big }[e.key];
+    if (delta) { e.preventDefault(); this._step(delta); return; }
+    if (e.key === 'Home' || e.key === 'End' || e.key === '0') {
+      e.preventDefault();
+      this._setIdx(e.key === 'Home' ? 0 : e.key === 'End' ? this._values.length - 1 : this._zero);
+      this._flashReadout();
+    }
+  },
+
+  _flashReadout() {
+    const readout = document.getElementById('checkinExposureReadout');
+    readout.classList.add('show');
+    clearTimeout(this._readoutTimer);
+    this._readoutTimer = setTimeout(() => readout.classList.remove('show'), 700);
+  },
+
+  _bump(dir) {
+    const thumb = document.getElementById('checkinExposureThumb');
+    thumb.classList.remove('bump-l', 'bump-r');
+    void thumb.offsetWidth; // restart the animation on rapid re-triggers
+    thumb.classList.add(dir < 0 ? 'bump-l' : 'bump-r');
+  },
+
+  _buzz(kind) {
+    const now = performance.now();
+    if (kind === 'tick' && now - this._lastBuzz < this.TICK_GAP_MS) return;
+    this._lastBuzz = now;
+    if (typeof navigator.vibrate === 'function') {
+      const pattern = kind === 'tick' ? this.TICK_MS : kind === 'zero' ? this.ZERO_MS : [this.EDGE_MS, 55, Math.round(this.EDGE_MS * 0.6)];
+      try { navigator.vibrate(pattern); } catch (_) {}
+    } else if (this._iosTap) {
+      this._iosTap();
+      if (kind === 'edge') setTimeout(this._iosTap, 70);
+    }
+  },
+};
+
 const CheckinCtrl = {
   _stream: null,
   _facing: 'environment',  // start with rear camera on phones
@@ -5566,32 +5785,15 @@ const CheckinCtrl = {
   PHOTO_FILTER: 'contrast(1.08) saturate(1.16) brightness(1.02) sepia(.06)',
   _locked: false, // AE/AF lock state for the current stream — see _toggleLock()
 
-  // Exposure-slider interaction state — see _queueExposure()/_drainExposure()
-  // (in-flight-gated coalescing queue) and _checkExposureDoubleTap().
+  // Exposure apply queue — see _queueExposure()/_drainExposure(). The
+  // ruler itself (ticks, detents, haptics) is ExposureDial.
   _exposureLastSent: null, _exposurePending: null, _exposureApplying: false,
-  _exposureFadeTimer: null, _lastExposureTap: null,
 
   init() {
     document.getElementById('checkinQuanPill').addEventListener('click', () => this._openPicker());
     document.getElementById('checkinLockBtn').addEventListener('click', () => this._toggleLock());
-    document.getElementById('checkinExposureSlider').addEventListener('input', (e) => this._onExposureInput(+e.target.value));
-    // Explicit reset button (2026-09-25 dial redesign, docked to the
-    // slider's left) — same reset _onExposureInput(0) the double-tap
-    // below already did, just discoverable without knowing the gesture.
-    document.getElementById('checkinExposureReset').addEventListener('click', () => {
-      document.getElementById('checkinExposureSlider').value = 0;
-      this._onExposureInput(0);
-    });
-    // Double-tap anywhere on the wrap (padding or the slider itself —
-    // pointerdown bubbles up regardless) also resets to 0. Doesn't
-    // block the native slider's own drag handling; it only reacts to a
-    // second rapid tap, see _checkExposureDoubleTap().
-    document.getElementById('checkinExposureWrap').addEventListener('pointerdown', (e) => {
-      if (!this._checkExposureDoubleTap(e)) return;
-      const slider = document.getElementById('checkinExposureSlider');
-      slider.value = 0;
-      this._onExposureInput(0);
-    });
+    ExposureDial.init((value) => this._queueExposure(value));
+    document.getElementById('checkinExposureReset').addEventListener('click', () => ExposureDial.reset());
     document.getElementById('checkinDiaryBtn').addEventListener('click', () => this._openDiary());
     document.getElementById('checkinFlipBtn').addEventListener('click', () => this._flipCamera());
     document.getElementById('checkinShutterBtn').addEventListener('click', () => this._tapShutter());
@@ -5795,10 +5997,12 @@ const CheckinCtrl = {
     const row = document.getElementById('checkinManualRow');
     const lockBtn = document.getElementById('checkinLockBtn');
     const expWrap = document.getElementById('checkinExposureWrap');
-    const expSlider = document.getElementById('checkinExposureSlider');
+    const resetBtn = document.getElementById('checkinExposureReset');
     lockBtn.classList.remove('on');
+    this._renderLockBtn();
     lockBtn.classList.add('hidden');
     expWrap.classList.add('hidden');
+    resetBtn.classList.add('hidden');
     // .checkin-manual-row wraps both as independent siblings (see its
     // CSS comment) — synced at the end from whichever of the two ends
     // up visible, so the row itself only shows when at least one does.
@@ -5820,17 +6024,14 @@ const CheckinCtrl = {
     // slider stuck in place.
     const ec = caps.exposureCompensation;
     if (ec && typeof ec.min === 'number' && typeof ec.max === 'number' && ec.max > ec.min) {
-      expSlider.min = ec.min;
-      expSlider.max = ec.max;
-      expSlider.step = ec.step || 1;
       const settings = track.getSettings ? track.getSettings() : {};
-      expSlider.value = settings.exposureCompensation ?? 0;
       // Fresh track → fresh coalescing queue (see _queueExposure/_drainExposure).
       this._exposureLastSent = null;
       this._exposurePending = null;
       this._exposureApplying = false;
-      this._lastExposureTap = null;
       expWrap.classList.remove('hidden');
+      resetBtn.classList.remove('hidden');
+      ExposureDial.setup(ec, settings.exposureCompensation ?? 0); // after un-hiding: it measures its width
     }
     syncRow();
   },
@@ -5852,7 +6053,7 @@ const CheckinCtrl = {
     if (caps.whiteBalanceMode && caps.whiteBalanceMode.includes(mode)) advanced.push({ whiteBalanceMode: mode });
     try {
       await track.applyConstraints({ advanced });
-      document.getElementById('checkinLockBtn').classList.toggle('on', this._locked);
+      this._renderLockBtn();
       showToast(I18N.t(this._locked ? 'checkin.locked' : 'checkin.unlocked'));
     } catch (_) {
       this._locked = !this._locked; // revert — the device refused the mode switch
@@ -5860,66 +6061,16 @@ const CheckinCtrl = {
     }
   },
 
-  // Fires on every native 'input' tick. Kept the real <input type=range>
-  // as the sole interactive element (no custom pointer-driven surface) —
-  // arrow-key stepping and screen-reader value announcements keep
-  // working for free, and there's no second state machine to drift out
-  // of sync with it. Everything below just decorates that one control.
-  _onExposureInput(rawValue) {
-    const slider = document.getElementById('checkinExposureSlider');
-    const min = +slider.min, max = +slider.max;
-    let value = rawValue;
-    // Magnetic snap-to-zero — a precision-assist for a drag already in
-    // progress near center, so returning to "auto" doesn't mean hunting
-    // for one exact pixel. Separate from (and complementary to) the
-    // double-tap reset below, which is a zero-motion shortcut instead.
-    if (min < 0 && max > 0 && Math.abs(value) < 0.3) {
-      value = 0;
-      slider.value = 0;
-      this._pulseExposureThumb();
-    }
-    this._showExposureReadout(value, min, max);
-    this._queueExposure(value);
-  },
-
-  _showExposureReadout(value, min, max) {
-    const label = document.getElementById('checkinExposureReadout');
-    const slider = document.getElementById('checkinExposureSlider');
-    label.textContent = value === 0
-      ? I18N.t('checkin.exposureAuto')
-      : (value > 0 ? `+${value.toFixed(1)}` : value.toFixed(1));
-    // Slider is a plain horizontal LTR range now (2026-09-25 dial
-    // redesign) — track the thumb's x position in px relative to
-    // .checkin-exposure (the readout's containing block), not just
-    // centered over the slider, since the slider shares its row with
-    // the reset button and isn't flush with the row's own left edge.
-    const pct = (value - min) / (max - min);
-    label.style.left = `${slider.offsetLeft + pct * slider.offsetWidth}px`;
-    label.classList.add('show');
-    // One shared timeout — cleared and restarted on every interaction —
-    // so two overlapping fades from a fast double-drag can't race.
-    clearTimeout(this._exposureFadeTimer);
-    this._exposureFadeTimer = setTimeout(() => label.classList.remove('show'), 600);
-  },
-
-  _pulseExposureThumb() {
-    const slider = document.getElementById('checkinExposureSlider');
-    slider.classList.remove('pulse');
-    void slider.offsetWidth; // reflow — restarts the animation on rapid re-triggers
-    slider.classList.add('pulse');
-  },
-
-  // Double-tap anywhere on the slider resets to 0 ("Tự động") — a
-  // zero-motion shortcut distinct from the drag-based snap-to-zero
-  // above, which only helps once a drag is already near center.
-  _checkExposureDoubleTap(e) {
-    const now = Date.now();
-    const last = this._lastExposureTap;
-    this._lastExposureTap = { time: now, x: e.clientX, y: e.clientY };
-    if (!last) return false;
-    const closeInTime = now - last.time < 300;
-    const closeInSpace = Math.hypot(e.clientX - last.x, e.clientY - last.y) < 24;
-    return closeInTime && closeInSpace;
+  // Focus-bracket padlock, open or closed — deliberately NOT the privacy
+  // padlock (ic-privacy-lock), which means "riêng tư" everywhere else.
+  _renderLockBtn() {
+    const btn = document.getElementById('checkinLockBtn');
+    const label = I18N.t(this._locked ? 'checkin.unlockTitle' : 'checkin.lockTitle');
+    btn.classList.toggle('on', this._locked);
+    btn.setAttribute('aria-pressed', String(this._locked));
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+    btn.querySelector('use').setAttribute('href', this._locked ? '#ic-action-focus-lock' : '#ic-action-focus-unlock');
   },
 
   // In-flight-gated trailing coalescing: guarantees at most ONE
@@ -5935,7 +6086,7 @@ const CheckinCtrl = {
   // raw call volume. Rounded-value dedup separately skips scheduling a
   // no-op call during tiny finger jitter.
   _queueExposure(value) {
-    const rounded = Math.round(value * 10) / 10;
+    const rounded = Math.round(value * 1000) / 1000; // dial values are already camera-snapped
     if (rounded === this._exposureLastSent) return;
     this._exposurePending = rounded;
     if (this._exposureApplying) return; // in-flight call picks up the latest on settle

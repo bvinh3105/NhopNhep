@@ -33,6 +33,19 @@ function todayICT() {
   return new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
+// Record id + stored key derived from ip+day, so this Function never has
+// to LIST the collection (listRule became superuser-only in migration
+// 1790000004 — the public list exposed every tester's IP) and never stores
+// the raw IP. Ids must match PocketBase's default ^[a-z0-9]{15}$.
+async function quotaKeys(ip, day) {
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`nhopnhep-quota|${ip}|${day}`)));
+  const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let id = '';
+  for (let i = 0; i < 15; i++) id += alphabet[digest[i] % 36];
+  const ipHash = Array.from(digest.slice(15, 31), b => b.toString(16).padStart(2, '0')).join('');
+  return { id, ipHash };
+}
+
 function json(obj) {
   return new Response(JSON.stringify(obj), { status: 200, headers: { 'Content-Type': 'application/json' } });
 }
@@ -46,29 +59,27 @@ export async function onRequestPost(context) {
   const signal = AbortSignal.timeout(5000);
 
   try {
-    const filter = encodeURIComponent(`ip="${ip}" && day="${day}"`);
-    const listRes = await fetch(`${PB_URL}/api/collections/${COLLECTION}/records?filter=${filter}&perPage=1`, { signal });
-    if (!listRes.ok) throw new Error(`list ${listRes.status}`);
-    const listData = await listRes.json();
-    const existing = listData.items && listData.items[0];
+    const { id, ipHash } = await quotaKeys(ip, day);
+    const getRes = await fetch(`${PB_URL}/api/collections/${COLLECTION}/records/${id}`, { signal });
+    if (!getRes.ok && getRes.status !== 404) throw new Error(`view ${getRes.status}`);
+    const existing = getRes.ok ? await getRes.json() : null;
 
     let result;
     if (!existing) {
       // First request today from this IP. A near-simultaneous duplicate
-      // could race here (two inserts for the same ip+day) — the unique
-      // index on (ip,day) rejects the loser, caught below and fail-opened
-      // rather than retried; this is a soft cap, not a security boundary.
+      // could race here (two inserts for the same id) — PocketBase rejects
+      // the loser, which is fine: this is a soft cap, not a security boundary.
       await fetch(`${PB_URL}/api/collections/${COLLECTION}/records`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ip, day, count: 1 }),
+        body: JSON.stringify({ id, ip: ipHash, day, count: 1 }),
         signal,
       });
       result = { allowed: true, remaining: DAILY_LIMIT - 1 };
     } else if (existing.count >= DAILY_LIMIT) {
       result = { allowed: false, remaining: 0 };
     } else {
-      await fetch(`${PB_URL}/api/collections/${COLLECTION}/records/${existing.id}`, {
+      await fetch(`${PB_URL}/api/collections/${COLLECTION}/records/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ count: existing.count + 1 }),

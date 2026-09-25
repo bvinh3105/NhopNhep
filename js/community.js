@@ -104,8 +104,33 @@ const Community = {
         this.BASE_URL = '';
         return this._fetch(path, opts, true);
       }
+      if (!_retried && await this.refreshBackendUrl()) return this._fetch(path, opts, true);
       return { ok: false, status: 0, error: I18N.t('err.serverUnreachable') };
     }
+  },
+
+  // The quick-tunnel URL changes whenever the tunnel is replaced, and a
+  // tab opened before that keeps the dead one baked into this file. The
+  // watchdog publishes the current URL in /backend.json (same origin) with
+  // every redeploy — read it, and switch at runtime if it moved, so open
+  // tabs recover on their own instead of needing a reload. A dead tunnel
+  // surfaces as a CORS/network error (its error page has no CORS headers),
+  // which lands in _fetch's catch above.
+  _lastBackendCheck: 0,
+  async refreshBackendUrl() {
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') return false;
+    const now = Date.now();
+    if (now - this._lastBackendCheck < 15000) return false;
+    this._lastBackendCheck = now;
+    try {
+      const res = await fetch(`/backend.json?t=${now}`, { cache: 'no-store' });
+      if (!res.ok) return false;
+      const { url } = await res.json();
+      if (typeof url !== 'string' || !/^https:\/\/[a-z0-9.-]+$/i.test(url) || url === this.DEFAULT_URL) return false;
+      console.warn('[Community] backend moved to', url);
+      this.DEFAULT_URL = url;
+      return true;
+    } catch (_) { return false; }
   },
 
   // ── Auth ────────────────────────────────────────────────────────────────
@@ -1103,3 +1128,9 @@ const Community = {
     return this._fetch(`/api/collections/comments/records/${id}`, { method: 'DELETE' });
   },
 };
+
+// Coming back to a tab that sat in the background is exactly when the
+// tunnel is most likely to have moved — check before the first request fails.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') Community.refreshBackendUrl();
+});

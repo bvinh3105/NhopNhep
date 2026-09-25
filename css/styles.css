@@ -254,48 +254,65 @@ input,textarea,select{font-family:var(--font-body)}
 .checkin-manual-row.hidden{display:none}
 .checkin-exposure{
   position:relative; /* containing block for .checkin-exposure-readout below */
-  flex:1;min-width:0;display:flex;align-items:center;gap:6px;
-  background:var(--white);border-radius:20px;padding:6px 8px;
+  flex:1;min-width:0;height:44px;display:flex;align-items:center;
+  background:var(--white);border-radius:22px;padding:0 12px;
   box-shadow:0 6px 18px rgba(42,24,16,.2);
   color:var(--text2);
 }
 .checkin-exposure.hidden{display:none}
-/* Reset + lock share one small circular-icon-button look — same
-   visual family as .checkin-float-btn's diary/flip circles, just
-   smaller since they're nested in a slim bar instead of floating
-   solo. Intentionally still a real, native <input type=range> for the
-   slider itself — NOT a custom pointer-driven surface — so keyboard
-   stepping and screen-reader value announcements keep working for
-   free and there's no second state machine to keep in sync. */
-.checkin-exposure-btn{
-  flex-shrink:0;width:30px;height:30px;border-radius:50%;border:none;
-  background:var(--paper);color:var(--text2);
+/* Reset + lock: one round-chip family with diary/flip (.checkin-float-btn),
+   same white chip + soft shadow, icon ≈45% of the diameter. Reset dims at
+   0 ("Tự động") since there is nothing to reset. */
+.checkin-cam-btn{
+  flex-shrink:0;width:44px;height:44px;border-radius:50%;border:none;
+  background:var(--white);color:var(--text2);box-shadow:0 6px 18px rgba(42,24,16,.2);
   display:flex;align-items:center;justify-content:center;
+  transition:transform .1s,background-color .15s,color .15s;
 }
-.checkin-exposure-btn.checkin-lock-btn{width:38px;height:38px;background:var(--white);box-shadow:0 6px 18px rgba(42,24,16,.2)}
-.checkin-exposure-btn.checkin-lock-btn.on{background:var(--primary);color:var(--white)}
-.checkin-exposure-slider{
-  flex:1;min-width:0;-webkit-appearance:none;appearance:none;
-  height:30px;accent-color:var(--primary);
-  cursor:pointer;
-}
-/* Snap-to-zero confirmation pulse — re-triggerable via classList.remove
-   then .add (see CheckinCtrl._pulseExposureThumb) since removing and
-   re-adding the same class in the same tick doesn't reliably restart a
-   CSS animation on its own. */
-.checkin-exposure-slider.pulse{animation:checkinExposurePulse .18s ease}
-@keyframes checkinExposurePulse{50%{transform:scale(1.15)}}
+.checkin-cam-btn .icon{width:20px;height:20px}
+.checkin-cam-btn:active{transform:scale(.92)}
+.checkin-cam-btn.is-idle{color:var(--text3)}
+.checkin-cam-btn.checkin-lock-btn.on{background:var(--primary);color:var(--white)}
 
-/* Floating "+1.5" / "Tự động" readout — sits ABOVE the slider now
-   (was to its left, when the slider was vertical) and tracks the
-   thumb's horizontal position, set inline via JS as a left:<px>
-   relative to .checkin-exposure. Only visible while actively dragging
-   + briefly after (see the 600ms fade in _showExposureReadout). */
+/* Ruler (ExposureDial): one tick per notch, taller at whole EVs, darkest
+   at 0; ticks between 0 and the thumb are tinted, ticks near the thumb
+   grow. Relative drag — touch-action:none keeps the page from scrolling. */
+.checkin-dial{--inset:10px;position:relative;flex:1;min-width:0;height:30px;touch-action:none;cursor:ew-resize;border-radius:10px;outline:none}
+.checkin-dial:focus-visible{box-shadow:0 0 0 2px var(--primary)}
+.checkin-dial-ticks{position:absolute;inset:0;pointer-events:none}
+.checkin-dial-tick{
+  position:absolute;top:50%;left:calc(var(--inset) + (100% - 2 * var(--inset)) * var(--p));
+  width:2px;height:7px;margin-left:-1px;border-radius:1px;background:var(--text3);opacity:.5;
+  transform:translateY(-50%) scaleY(var(--s,1));
+  transition:transform .16s var(--ease-out),background-color .16s,opacity .16s;
+}
+.checkin-dial-tick.major{height:12px;background:var(--text2);opacity:.7}
+.checkin-dial-tick.zero{height:16px;background:var(--text);opacity:.9}
+.checkin-dial-tick.fill{background:var(--primary);opacity:.85}
+.checkin-dial-thumb{
+  position:absolute;top:50%;left:calc(var(--inset) + (100% - 2 * var(--inset)) * var(--p,.5));
+  width:4px;height:24px;margin-left:-2px;border-radius:2px;background:var(--primary);
+  transform:translateY(-50%);box-shadow:0 0 0 3px rgba(185,38,38,.14);pointer-events:none;
+  transition:left .12s var(--ease-spring),height .15s var(--ease-out);
+}
+.checkin-dial.dragging .checkin-dial-thumb{height:28px}
+.checkin-dial-thumb.bump-l{animation:checkinDialBumpL .22s ease-out}
+.checkin-dial-thumb.bump-r{animation:checkinDialBumpR .22s ease-out}
+@keyframes checkinDialBumpL{40%{transform:translate(-4px,-50%) scaleY(.86)}}
+@keyframes checkinDialBumpR{40%{transform:translate(4px,-50%) scaleY(.86)}}
+@media (prefers-reduced-motion:reduce){
+  .checkin-dial-tick,.checkin-dial-thumb{transition:none}
+  .checkin-dial-thumb.bump-l,.checkin-dial-thumb.bump-r{animation:none}
+}
+
+/* Floating "+1.5" / "Tự động" readout above the thumb, set inline via
+   ExposureDial._render() as left:<px> relative to .checkin-exposure.
+   Visible while dragging + 700ms after. */
 .checkin-exposure-readout{
-  position:absolute;bottom:calc(100% + 8px);left:0;
+  position:absolute;bottom:calc(100% + 8px);left:0;z-index:2;
   transform:translateX(-50%);
   background:var(--text);color:var(--cream);
-  font-size:.68rem;font-weight:800;line-height:1;
+  font-size:.72rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;
   padding:.3rem .55rem;border-radius:8px;white-space:nowrap;
   opacity:0;pointer-events:none;transition:opacity .2s;
 }
