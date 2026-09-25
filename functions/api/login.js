@@ -22,7 +22,7 @@
 // $pagesFunctionsWithPbUrl in both scripts or it will drift to a
 // dead tunnel on the next rotation.
 
-const PB_URL = 'https://annual-cam-huge-candle.trycloudflare.com';
+const PB_URL = 'https://interfaces-rural-participants-studied.trycloudflare.com';
 
 function jsonError(status, message) {
   return new Response(JSON.stringify({ message }), {
