@@ -5836,11 +5836,6 @@ const CheckinCtrl = {
       if (e.key === 'Enter') { e.preventDefault(); this._useManualAddress(); }
     });
 
-    // Diary overlay
-    const diaryOv = document.getElementById('checkinDiaryOverlay');
-    diaryOv.addEventListener('click', (e) => { if (e.target === diaryOv) this._closeDiary(); });
-    document.getElementById('checkinDiaryClose').addEventListener('click', () => this._closeDiary());
-
     // Auto-teardown when the tab bar hides this screen. Belt-and-braces:
     // TabNav.switchTo does the .hidden add first, we watch for it to know
     // when to stop the stream (not everywhere calls .leave() explicitly).
@@ -5874,6 +5869,9 @@ const CheckinCtrl = {
 
   leave() {
     this._stopStream();
+    // The diary sits over this screen — never leave it floating over
+    // whatever tab comes next.
+    if (typeof NhatKyCtrl !== 'undefined') NhatKyCtrl.close({ instant: true });
     // Belt-and-braces: if the user swaps tabs mid-preview, put the tab
     // bar back so the destination tab isn't stuck with a hidden bar.
     document.querySelector('.tabbar')?.classList.remove('checkin-hidden');
@@ -6464,20 +6462,16 @@ const CheckinCtrl = {
     if (isShared && typeof CheckinDiscoverCtrl !== 'undefined') {
       CheckinDiscoverCtrl.refresh();
     }
-    // Always refresh calendar (even private check-ins appear in own calendar).
-    if (typeof CheckinCalendarCtrl !== 'undefined') CheckinCalendarCtrl._fetchMonth();
+    // Diary: private check-ins land there too. The next open refetches and
+    // drops this one into its cell with the streak stamp.
+    if (typeof NhatKyCtrl !== 'undefined') NhatKyCtrl.noteNewCheckin(r.data);
 
     // Reset for the next check-in
     this._retake();
     this._setStars(document.getElementById('checkinStars'), 0);
   },
 
-  async _openDiary() {
-    document.getElementById('checkinDiaryOverlay').classList.add('show');
-    if (typeof CheckinCalendarCtrl !== 'undefined') CheckinCalendarCtrl.show();
-  },
-
-  _closeDiary() { document.getElementById('checkinDiaryOverlay').classList.remove('show'); },
+  _openDiary() { NhatKyCtrl.open(); },
 
   _starsRow(n) {
     let out = '';
@@ -6817,155 +6811,1329 @@ const CheckinDiscoverCtrl = {
 };
 
 /* ═══════════════════════════════════════════════
-   CHECK-IN CALENDAR  (v1.0 — 2026-09-22)
-   Locket-style monthly grid inside the Cộng đồng → Check-in subtab.
-   Shows the logged-in user's own check-ins grouped by calendar day:
-   days with posts → photo thumbnail (or emoji fallback), days without
-   → a small dot. Tap a day → opens CheckinViewerCtrl with that day's
-   posts. Bottom stat bar: total check-ins + consecutive-day streak.
+   NHẬT KÝ ĂN — "Sổ Dán Món" (2026-09-25)
+   Replaces the old one-month CheckinCalendarCtrl grid. Every check-in is a
+   photo sticker stuck on a monthly page:
 
-   Data source: Community._fetch with a month-range filter on the
-   `checkins` collection (user + created window). Max 200 records/month
-   — realistic ceiling for daily check-ins over 31 days.
+     Sổ    — month chips + a Monday-first grid of 3:4 stickers. Raised solid
+             border = friends can see it, flat dashed border = private.
+             The coloured strip under each photo is the quán category.
+             A weekly streak stamp (eating out rarely never "breaks" it the
+             way a daily streak would), "tầm này tháng trước" memory card,
+             search, and the Mâm tháng recap.
+     Bữa   — tapping a sticker peels it off the page (the strip stays
+             behind) into the opened photo + a ticket-stub card: rating,
+             privacy, visit count, Đi tới / Ghé lại / Xem quán. Swipe the
+             photo to flip meals, scrub the day ruler to jump.
+
+   Meals come from the local `created` time: 04:00–10:29 sáng, 10:30–13:59
+   trưa, 14:00–16:59 xế, 17:00–23:59 tối, 00:00–03:59 khuya — and khuya
+   counts on the PREVIOUS day (a 00:40 phở after the match belongs to the
+   evening before).
+
+   Data: all of the user's own check-ins in one list (expand=restaurant for
+   category/price/address), cached per user in localStorage so the sổ still
+   opens offline. Photos use PocketBase thumbs — 150x200 on the page (see
+   migration 1790000006 for why big sizes stay on the webp original).
 ═══════════════════════════════════════════════ */
-const CheckinCalendarCtrl = {
-  _year: 0,
-  _month: 0,
-  _items: [],
-  _byDay: null, // Map<dayNum, record[]>
+const NhatKyCtrl = {
+  CAT_ICON: { restaurant: 'cat-nhahang', street: 'cat-viahe', snack: 'cat-anvat', cafe: 'cat-caphe' },
+  CAT_FOOD: { restaurant: 'food-com', street: 'food-bun', snack: 'food-kem', cafe: 'food-caphe' },
+  MEAL_ICON: { sang: 'food-banhmi', trua: 'food-com', xe: 'food-che', toi: 'food-nuong', khuya: 'food-pho' },
+  PRICE_KEY: { binh_dan: 'priceLabel.cheap', tam_trung: 'priceLabel.mid', sang_chanh: 'priceLabel.premium' },
+  FIELDS: 'id,collectionId,user,created,restaurant,restaurant_name,restaurant_lat,restaurant_lng,rating,note,photo,is_shared,' +
+          'expand.restaurant.id,expand.restaurant.name,expand.restaurant.category,expand.restaurant.price_range,expand.restaurant.address',
+  PER_PAGE: 500,
+  CACHE_KEY: 'nk_cache_',
+  COACH_KEY: 'nk_coach_seen',
+  DROP_TTL_MS: 30 * 60 * 1000,
+
+  _entries: [], _dayMap: new Map(), _badPhotos: new Set(),
+  _uid: '', _loaded: false, _stale: true, _loading: null, _offline: false, _failed: false,
+  _month: '', _filter: null, _searching: false, _cur: null, _openSource: null,
+  _busy: false, _idle: [], _pendingDrop: null, _pulsed: false, _hideT: null, _flashT: null,
+  _swipe: {}, _drag: {}, _rs: {}, _sd: null,
 
   init() {
-    const now = new Date();
-    this._year  = now.getFullYear();
-    this._month = now.getMonth() + 1;
-    document.getElementById('ciCalPrev')?.addEventListener('click', () => this._shiftMonth(-1));
-    document.getElementById('ciCalNext')?.addEventListener('click', () => this._shiftMonth(1));
-  },
+    const $ = (id) => document.getElementById(id);
+    const root = $('nkRoot');
+    if (!root) return;
+    $('nkBackdrop').addEventListener('click', () => this.close());
+    $('nkCloseBtn').addEventListener('click', () => this.close());
+    $('nkSearchBtn').addEventListener('click', () => this._startSearch());
+    $('nkSearchCancel').addEventListener('click', () => this._stopSearch());
+    $('nkQuery').addEventListener('input', () => this._runSearch());
+    $('nkNotice').addEventListener('click', (e) => { if (e.target.closest('button')) this._refresh(); });
+    $('nkMonths').addEventListener('click', (e) => { const b = e.target.closest('[data-m]'); if (b) this._goMonth(b.dataset.m); });
+    $('nkPageWrap').addEventListener('click', (e) => this._onPageClick(e));
+    $('nkMemory').addEventListener('click', () => {
+      const m = $('nkMemory');
+      this._openDetail(this._find(m.dataset.id), m.querySelector('.nk-thumb'), 'memory');
+    });
+    $('nkTrayBtn').addEventListener('click', () => {
+      if ($('nkTrayBtn').classList.contains('locked')) showToast(I18N.t('nk.trayLockedToast'));
+      else this._openMam(this._month);
+    });
+    $('nkResults').addEventListener('click', (ev) => {
+      const r = ev.target.closest('.nk-r-row');
+      if (r) this._openDetail(this._find(r.dataset.id), r.querySelector('.nk-thumb'), 'search');
+    });
+    this._wireSheetDrag();
+    this._wirePageSwipe();
 
-  async show() {
-    await this._fetchMonth();
-  },
+    // Detail
+    $('nkDetailClose').addEventListener('click', () => this._closeDetail());
+    $('nkMeals').addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-id]');
+      if (!b || !this._cur || b.dataset.id === this._cur.id) return;
+      const t = this._find(b.dataset.id);
+      if (t) this._deal(t.i, t.at > this._cur.at ? 1 : -1);
+    });
+    $('nkTicket').addEventListener('click', (ev) => {
+      if (!this._cur) return;
+      if (ev.target.closest('#nkPriv')) return this._privacyPop();
+      if (ev.target.closest('#nkGo')) return this._go();
+      if (ev.target.closest('#nkAgain')) return this._again();
+      if (ev.target.closest('#nkQuan')) return this._viewQuan();
+    });
+    $('nkMore').addEventListener('click', () => this._moreMenu());
+    this._wireStageDrag();
+    this._wireRuler();
 
-  async _fetchMonth() {
-    if (!Community.isLoggedIn()) return;
-    const pad    = n => String(n).padStart(2, '0');
-    const lastD  = new Date(this._year, this._month, 0).getDate();
-    const start  = `${this._year}-${pad(this._month)}-01 00:00:00`;
-    const end    = `${this._year}-${pad(this._month)}-${lastD} 23:59:59`;
-    const uid    = Community.currentUser?.id;
-    if (!uid) return;
-    const filter = encodeURIComponent(`user="${uid}" && created >= "${start}" && created <= "${end}"`);
-    // expand=user — without it CheckinViewerCtrl._renderPost() has no
-    // rec.expand.user to read a name/avatar from and falls back to
-    // "Anonymous", which is wrong here specifically: every record this
-    // fetch returns already belongs to the viewer (own diary), so it
-    // should show their own name, not a stranger placeholder.
-    const r = await Community._fetch(
-      `/api/collections/checkins/records?filter=${filter}&sort=created&perPage=200&expand=user`
-    );
-    if (r.ok) this._items = r.data?.items || [];
-    this._buildByDay();
-    this._render();
-  },
+    // Photo load/error don't bubble — catch them on the way down instead of
+    // wiring every <img>. A thumb that fails turns its cell into the
+    // no-photo sticker; the opened photo's full-size layer fades in once
+    // it has loaded over the (already cached) thumb underneath.
+    root.addEventListener('error', (ev) => this._onImgError(ev.target), true);
+    root.addEventListener('load', (ev) => {
+      const img = ev.target;
+      if (img.tagName === 'IMG' && img.classList.contains('hi')) img.classList.add('ready');
+    }, true);
 
-  _buildByDay() {
-    this._byDay = new Map();
-    this._items.forEach(rec => {
-      const d = new Date(rec.created).getDate();
-      if (!this._byDay.has(d)) this._byDay.set(d, []);
-      this._byDay.get(d).push(rec);
+    document.addEventListener('pointerdown', (ev) => {
+      if (!ev.target.closest('.nk-pop,.nk-menu,#nkPriv,#nkMore')) this._closePops();
+    }, true);
+    document.addEventListener('keydown', (ev) => {
+      if (root.hidden) return;
+      if (ev.key === 'Escape') {
+        if (this._cur) this._closeDetail();
+        else if (this._mamOpen()) this._closeMam();
+        else if (this._searching) this._stopSearch();
+        else this.close();
+        return;
+      }
+      if (!this._cur || ev.target.closest('input')) return;
+      if (ev.key === 'ArrowRight') this._step(1);
+      if (ev.key === 'ArrowLeft') this._step(-1);
+    });
+    window.addEventListener('popstate', () => this._onPop());
+    // A reload while the sổ was open leaves our entry on top of the stack —
+    // drop the marker so a later Back doesn't look like one of ours.
+    try { if (history.state && history.state.nk) history.replaceState(null, ''); } catch (_) {}
+    document.addEventListener('i18n:changed', () => { if (this._isOpen()) this._rerender(); });
+    document.addEventListener('community:session-expired', () => {
+      this._uid = ''; this._entries = []; this._dayMap = new Map();
+      this._loaded = false; this._stale = true; this._offline = false; this._failed = false;
+      if (!document.getElementById('nkRoot').hidden) { this._resetDetail(); this._resetMam(); this._render(); }
     });
   },
 
-  _calcStreak() {
-    if (!this._byDay) return 0;
-    const now = new Date();
-    if (this._year !== now.getFullYear() || this._month !== now.getMonth() + 1) return 0;
-    let streak = 0;
-    for (let d = now.getDate(); d >= 1; d--) {
-      if (this._byDay.has(d)) streak++;
-      else break;
+  // ── public ──────────────────────────────────────────────
+  open() {
+    const root = document.getElementById('nkRoot');
+    if (!root || this._isOpen()) return;
+    clearTimeout(this._hideT);
+    const uid = Community.isLoggedIn() ? (Community.currentUser?.id || '') : '';
+    if (uid !== this._uid) {
+      this._uid = uid;
+      this._entries = []; this._dayMap = new Map(); this._badPhotos = new Set();
+      this._loaded = false; this._stale = true; this._offline = false; this._failed = false;
+      if (uid) this._readCache();
     }
-    return streak;
+    this._month = this._mkey(this._today());
+    this._filter = null;
+    this._pulsed = false;
+    root.hidden = false;
+    this._render();
+    const sheet = document.getElementById('nkSheet');
+    sheet.scrollTop = 0;
+    void root.offsetWidth; // commit the off-screen position so the slide-up animates
+    root.classList.add('open');
+    this._push('sheet');
+    const opened = new Promise(r => setTimeout(r, this._reduced() ? 150 : 380));
+    const fresh = uid && (this._stale || !this._loaded) ? this._refresh() : Promise.resolve();
+    if (this._pendingDrop) Promise.all([opened, fresh]).then(() => this._maybeDrop());
   },
 
-  _render() {
-    const grid     = document.getElementById('ciCalGrid');
-    const monthLbl = document.getElementById('ciCalMonthLbl');
-    const nextBtn  = document.getElementById('ciCalNext');
-    if (!grid) return;
+  close({ fromPop = false, instant = false } = {}) {
+    const root = document.getElementById('nkRoot');
+    if (!root || root.hidden) return;
+    this._closePops();
+    this._resetDetail();
+    this._resetMam();
+    if (this._searching) this._stopSearch(false);
+    const sheet = document.getElementById('nkSheet');
+    sheet.classList.remove('dragging');
+    sheet.style.transform = '';
+    root.classList.remove('open');
+    clearTimeout(this._hideT);
+    if (instant) root.hidden = true;
+    else this._hideT = setTimeout(() => { root.hidden = true; }, this._reduced() ? 160 : 380);
+    if (!fromPop) this._unwindHistory();
+  },
 
-    const VI_MONTHS = ['tháng 1','tháng 2','tháng 3','tháng 4','tháng 5','tháng 6',
-                       'tháng 7','tháng 8','tháng 9','tháng 10','tháng 11','tháng 12'];
-    if (monthLbl) monthLbl.textContent = `${VI_MONTHS[this._month - 1]} ${this._year}`;
+  // Called by CheckinCtrl._submit() with the record PocketBase just
+  // created. The next open refetches (that response carries expand, so the
+  // quán category fills in) and plays the drop + stamp moment for it.
+  noteNewCheckin(rec) {
+    this._stale = true;
+    if (!rec || !rec.id) return;
+    this._pendingDrop = { id: rec.id, at: Date.now() };
+    if (this._uid && rec.user === this._uid && !this._find(rec.id)) {
+      const e = this._toEntry(rec);
+      if (e) { this._entries.push(e); this._sortEntries(); }
+    }
+  },
 
-    const now = new Date();
-    const isCurr = this._year === now.getFullYear() && this._month === now.getMonth() + 1;
-    if (nextBtn) nextBtn.disabled = isCurr;
+  // Something outside the diary (the check-in viewer) deleted or re-shared
+  // one of my check-ins — refetch on next open.
+  invalidate() { this._stale = true; },
 
-    const daysInMonth = new Date(this._year, this._month, 0).getDate();
-    const firstDow    = new Date(this._year, this._month - 1, 1).getDay(); // 0=Sun
-    const todayDate   = now.getDate();
-
-    let html = '';
-    for (let i = 0; i < firstDow; i++) html += '<div></div>';
-
-    for (let d = 1; d <= daysInMonth; d++) {
-      const isFuture = isCurr && d > todayDate;
-      const isToday  = isCurr && d === todayDate;
-      const items    = this._byDay?.get(d);
-
-      if (isFuture) {
-        html += '<div></div>';
-      } else if (items?.length) {
-        const rec      = items[items.length - 1]; // most recent of the day
-        const photoUrl = Community.checkinPhotoUrl(rec, '100x100');
-        const todayCls = isToday ? ' ci-cal-today' : '';
-        const badge    = items.length > 1 ? `<div class="ci-cal-badge">${items.length}</div>` : '';
-        if (photoUrl) {
-          html += `<div class="ci-cal-cell${todayCls}" data-day="${d}" style="background-image:url('${escapeHtml(photoUrl)}')">${badge}</div>`;
-        } else {
-          const emoji = escapeHtml(rec.restaurant_emoji || '🍜');
-          html += `<div class="ci-cal-cell ci-cal-noimg${todayCls}" data-day="${d}">${emoji}${badge}</div>`;
-        }
+  // ── data ────────────────────────────────────────────────
+  async _refresh() {
+    if (this._loading) return this._loading;
+    const uid = this._uid;
+    this._failed = false;
+    this._loading = this._load(uid).then(async (res) => {
+      if (uid !== this._uid) return; // logged out / switched account mid-flight
+      if (res.ok && !res.items.length && this._entries.length) {
+        // PocketBase answers an expired token as a guest — an empty list,
+        // not a 401. Before wiping a sổ that had meals, check the session:
+        // refreshToken() fires community:session-expired on a dead token
+        // (handled in init), otherwise retry once with the fresh one.
+        const t = await Community.refreshToken();
+        if (uid !== this._uid) return;
+        if (t.ok) res = await this._load(uid);
+        else res = { ok: false };
+        if (uid !== this._uid) return;
+      }
+      if (res.ok) {
+        this._loaded = true; this._stale = false; this._offline = false;
+        this._setRecords(res.items);
+        this._writeCache();
+      } else if (this._entries.length) {
+        this._offline = true;
       } else {
-        html += '<div class="ci-cal-empty"><div class="ci-cal-dot"></div></div>';
+        this._failed = true;
+      }
+    });
+    if (this._isOpen() || !document.getElementById('nkRoot').hidden) this._renderNotice();
+    try { await this._loading; } finally { this._loading = null; }
+    this._whenIdle(() => { if (!document.getElementById('nkRoot').hidden) this._rerender(); });
+  },
+
+  async _load(uid) {
+    const filter = encodeURIComponent(`user="${uid}"`);
+    const fields = encodeURIComponent(this.FIELDS);
+    let all = [];
+    for (let page = 1; page <= 10; page++) {
+      const r = await Community._fetch(`/api/collections/checkins/records?filter=${filter}&sort=-created&page=${page}&perPage=${this.PER_PAGE}&skipTotal=1&expand=restaurant&fields=${fields}`);
+      if (!r.ok) return { ok: false };
+      const items = (r.data && r.data.items) || [];
+      all = all.concat(items);
+      if (items.length < this.PER_PAGE) break;
+    }
+    return { ok: true, items: all };
+  },
+
+  _readCache() {
+    try {
+      const raw = localStorage.getItem(this.CACHE_KEY + this._uid);
+      const c = raw && JSON.parse(raw);
+      if (c && Array.isArray(c.items)) this._setRecords(c.items);
+    } catch (_) { /* no cache / private mode — open empty and fetch */ }
+  },
+
+  _writeCache() {
+    try {
+      const items = this._entries.slice(-600).map(e => e.rec);
+      localStorage.setItem(this.CACHE_KEY + this._uid, JSON.stringify({ savedAt: Date.now(), items }));
+    } catch (_) { /* quota / private mode — the network copy still works */ }
+  },
+
+  _setRecords(items) {
+    this._entries = (items || []).map(r => this._toEntry(r)).filter(Boolean);
+    this._sortEntries();
+  },
+
+  _toEntry(rec) {
+    if (!rec || !rec.id || !rec.created) return null;
+    const at = new Date(String(rec.created).replace(' ', 'T'));
+    if (isNaN(at)) return null;
+    const meal = this._mealOf(at);
+    const day = new Date(at);
+    if (meal === 'khuya') day.setDate(day.getDate() - 1);
+    day.setHours(0, 0, 0, 0);
+    const rq = rec.expand && rec.expand.restaurant;
+    // PocketBase number fields come back 0 when never set — 0,0 is "no location".
+    const lat = +rec.restaurant_lat || 0, lng = +rec.restaurant_lng || 0;
+    const name = (rec.restaurant_name || '').trim() || (rq && rq.name) || I18N.t('checkin.anonSpot');
+    return {
+      id: rec.id, rec, at, day, meal, name,
+      qk: rec.restaurant || 'n:' + this._norm(name),
+      cat: rq ? (COMMUNITY_PB_TO_CAT[rq.category] || null) : null,
+      rel: !!(rq && rq.id),
+      priceKey: (rq && rq.price_range) || '',
+      address: (rq && rq.address) || '',
+      rating: Math.max(0, Math.min(5, Math.round(+rec.rating || 0))),
+      shared: !!rec.is_shared,
+      note: (rec.note || '').trim(),
+      photo: !!rec.photo,
+      loc: !!(lat || lng),
+    };
+  },
+
+  _sortEntries() {
+    this._entries.sort((a, b) => a.at - b.at);
+    const visits = {}, first = {};
+    this._dayMap = new Map();
+    this._entries.forEach((e, i) => {
+      e.i = i;
+      visits[e.qk] = (visits[e.qk] || 0) + 1;
+      e.visitNo = visits[e.qk];
+      if (!first[e.qk]) first[e.qk] = e.day;
+      e.firstVisit = first[e.qk];
+      const k = this._dkey(e.day);
+      if (!this._dayMap.has(k)) this._dayMap.set(k, []);
+      this._dayMap.get(k).push(e);
+    });
+  },
+
+  _find(id) { return this._entries.find(x => x.id === id) || null; },
+
+  // ── small helpers ───────────────────────────────────────
+  _ic(n, cls = 'icon') { return `<svg class="${cls}" aria-hidden="true"><use href="#ic-${n}"></use></svg>`; },
+  _pad(n) { return String(n).padStart(2, '0'); },
+  _dkey(d) { return `${d.getFullYear()}-${this._pad(d.getMonth() + 1)}-${this._pad(d.getDate())}`; },
+  _mkey(d) { return `${d.getFullYear()}-${this._pad(d.getMonth() + 1)}`; },
+  _today() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; },
+  _mondayOf(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; },
+  _mealOf(at) {
+    const m = at.getHours() * 60 + at.getMinutes();
+    if (m < 240) return 'khuya';
+    if (m < 630) return 'sang';
+    if (m < 840) return 'trua';
+    if (m < 1020) return 'xe';
+    return 'toi';
+  },
+  _norm(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase(); },
+  _reduced() { return window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches; },
+  _buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (_) {} },
+  _isOpen() { const r = document.getElementById('nkRoot'); return !!r && !r.hidden && r.classList.contains('open'); },
+  _mamOpen() { return document.getElementById('nkMam').classList.contains('open'); },
+  _hasPhoto(e) { return !!e && e.photo && !this._badPhotos.has(e.id); },
+  _thumb(e, size = '150x200') { return this._hasPhoto(e) ? Community.checkinPhotoUrl(e.rec, size) : ''; },
+  _full(e) { return this._hasPhoto(e) ? Community.checkinPhotoUrl(e.rec) : ''; },
+  _bg(url) { return url ? `background-image:url('${escapeHtml(url)}')` : ''; },
+  _foodIcon(e) { return this.CAT_FOOD[e.cat] || 'food-pho'; },
+  _catColor(k) { return k ? `var(--cat-${k})` : 'var(--text2)'; },
+  _catLabel(k) { return CATEGORIES[k] ? CATEGORIES[k].label : ''; },
+  _mealLabel(m) { return I18N.t('nk.meal.' + m); },
+  _mealShort(m) { return I18N.t('nk.mealShort.' + m); },
+  _hm(at) { return `${this._pad(at.getHours())}:${this._pad(at.getMinutes())}`; },
+  _dm(d) { return `${d.getDate()}/${d.getMonth() + 1}`; },
+  _monthShort(m) { return I18N.t('nk.monthShort').split(',')[m - 1]; },
+  _monthLong(m) { return I18N.t('nk.monthLong').split(',')[m - 1]; },
+  _dateLabel(d) { return `${I18N.t('nk.dowLong').split(',')[d.getDay()]}, ${this._dm(d)}`; },
+  _tiltOf(e) { return e.i % 2 ? 1.5 : -1.5; },
+  _dayMeals(e) { return this._dayMap.get(this._dkey(e.day)) || [e]; },
+  _userName() { return Community.currentUser?.name || (State.profile && State.profile.name) || I18N.t('nk.you'); },
+
+  // Resolve when a WAAPI animation ends, or shortly after it should have —
+  // a backgrounded tab or a stalled compositor must never leave the diary
+  // stuck "busy" (every gesture is ignored while busy).
+  _done(anim, dur) {
+    return Promise.race([anim.finished.catch(() => {}), new Promise(r => setTimeout(r, dur + 200))]);
+  },
+
+  // Id of the check-in waiting for its drop moment, while still fresh.
+  _dropId() {
+    const p = this._pendingDrop;
+    return p && Date.now() - p.at <= this.DROP_TTL_MS ? p.id : '';
+  },
+
+  _whenIdle(fn) { if (this._busy) this._idle.push(fn); else fn(); },
+  _setBusy(on) {
+    this._busy = on;
+    if (!on) { const q = this._idle.splice(0); q.forEach(fn => fn()); }
+  },
+
+  // ── history (Android back closes the top layer) ─────────
+  // Each layer pushes an entry carrying its level in the stack. Every
+  // history change goes through one queue, and a traversal must land (its
+  // popstate) before the next op runs: history.go() is async, so a close
+  // followed straight away by a re-open would otherwise race — the push
+  // lands under the pending back, and a later go(-n) walks past the app's
+  // own entries (in an installed PWA, that exits the app). How far to go
+  // back is read from the entry on top at run time, never from a counter.
+  _hq: [], _hBusy: false, _hWait: null,
+  _ours() { return !!(history.state && history.state.nk); },
+  _push(layer) { this._hq.push({ t: 'push', layer }); this._hRun(); },
+  _back() { this._hq.push({ t: 'one' }); this._hRun(); },
+  _unwindHistory() { this._hq.push({ t: 'all' }); this._hRun(); },
+  _hRun() {
+    while (!this._hBusy && this._hq.length) {
+      const op = this._hq.shift();
+      if (op.t === 'push') {
+        try {
+          const lvl = (this._ours() ? (history.state.lvl || 1) : 0) + 1;
+          history.pushState({ nk: op.layer, lvl }, '');
+        } catch (_) {}
+        continue;
+      }
+      const n = !this._ours() ? 0 : op.t === 'all' ? (history.state.lvl || 1) : 1;
+      if (!n) continue;
+      this._hBusy = true;
+      // Popstate never arrived (odd webview) — don't block the queue forever.
+      this._hWait = setTimeout(() => this._hDone(), 1500);
+      try { history.go(-n); } catch (_) { this._hDone(); }
+    }
+  },
+  _hDone() { clearTimeout(this._hWait); this._hBusy = false; this._hRun(); },
+  _onPop() {
+    if (this._hBusy) { this._hDone(); return; } // our own traversal landed
+    // Back pressed mid-peel: the layer can't close yet, so put its history
+    // entry back rather than leave it open with no entry to close it.
+    if (this._busy) { this._push(this._cur ? 'detail' : 'sheet'); return; }
+    if (this._cur) this._closeDetail({ fromPop: true });
+    else if (this._mamOpen()) this._closeMam({ fromPop: true });
+    else if (this._isOpen()) this.close({ fromPop: true });
+  },
+
+  // ── Sổ ──────────────────────────────────────────────────
+  _rerender() {
+    if (this._searching) this._runSearch();
+    else this._render();
+    if (this._cur) {
+      const e = this._find(this._cur.id);
+      if (e) { this._renderDetail(e); this._markPeeled(e); }
+    }
+  },
+
+  _render({ slide = 0 } = {}) {
+    this._renderNotice();
+    const signedIn = !!this._uid;
+    document.getElementById('nkSearchBtn').hidden = !signedIn;
+    this._renderMemory();
+    this._renderMonths();
+    this._renderPage(slide);
+    this._renderTray();
+  },
+
+  _renderNotice() {
+    const el = document.getElementById('nkNotice');
+    let key = '';
+    if (this._uid) {
+      if (this._offline) key = 'nk.offline';
+      else if (this._failed) key = 'nk.loadFail';
+      else if (this._loading && !this._entries.length) key = 'nk.loading';
+    }
+    el.hidden = !key;
+    el.innerHTML = !key ? '' : key === 'nk.loading'
+      ? `<span>${I18N.t(key)}</span>`
+      : `<button type="button">${I18N.t(key)}</button>`;
+  },
+
+  _renderMemory() {
+    const el = document.getElementById('nkMemory');
+    const target = this._today(); target.setMonth(target.getMonth() - 1);
+    let best = null, bestD = 4;
+    this._entries.forEach(e => {
+      const d = Math.abs((e.day - target) / 864e5);
+      if (d < bestD && this._hasPhoto(e)) { bestD = d; best = e; }
+    });
+    if (!best || this._searching || !this._uid) { el.hidden = true; return; }
+    el.hidden = false;
+    el.dataset.id = best.id;
+    el.innerHTML = `<span class="nk-thumb" style="${this._bg(this._thumb(best))}"></span>
+      <span class="nk-txt"><span class="nk-mem-eyebrow">${I18N.t('nk.memEyebrow')}</span>
+      <span class="nk-mem-name">${escapeHtml(best.name)}</span>
+      <span class="nk-mem-sub">${this._dateLabel(best.day)} · ${this._mealLabel(best.meal)}</span></span>
+      <svg class="icon nk-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9,6 L15,12 L9,18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  },
+
+  _monthsList() {
+    const today = this._today();
+    const first = this._entries[0] ? new Date(this._entries[0].day) : new Date(today);
+    const out = [];
+    const d = new Date(first.getFullYear(), first.getMonth(), 1);
+    while (d <= today) { out.push(this._mkey(d)); d.setMonth(d.getMonth() + 1); }
+    if (!out.includes(this._month)) out.push(this._month);
+    return out;
+  },
+  _monthEntries(mk) { return this._entries.filter(e => this._mkey(e.day) === mk); },
+
+  _renderMonths() {
+    const nav = document.getElementById('nkMonths');
+    nav.hidden = !this._uid;
+    if (!this._uid) return;
+    nav.innerHTML = this._monthsList().map(mk => {
+      const m = +mk.split('-')[1];
+      const empty = !this._monthEntries(mk).length;
+      return `<button class="nk-chip${mk === this._month ? ' on' : ''}${empty ? ' empty' : ''}" type="button" data-m="${mk}" aria-pressed="${mk === this._month}">${this._monthShort(m)}</button>`;
+    }).join('');
+    const on = nav.querySelector('.on');
+    if (on) nav.scrollLeft = on.offsetLeft - nav.clientWidth / 2 + on.offsetWidth / 2;
+  },
+
+  _weekStreak(excludeId) {
+    const list = excludeId ? this._entries.filter(e => e.id !== excludeId) : this._entries;
+    const weeks = new Set(list.map(e => +this._mondayOf(e.day)));
+    const thisWeek = this._mondayOf(this._today());
+    const current = weeks.has(+thisWeek);
+    const w = new Date(thisWeek);
+    if (!current) w.setDate(w.getDate() - 7);
+    let n = 0;
+    while (weeks.has(+w)) { n++; w.setDate(w.getDate() - 7); }
+    return { n, pending: !current && n > 0 };
+  },
+  _bestStreak() {
+    const weeks = [...new Set(this._entries.map(e => +this._mondayOf(e.day)))].sort((a, b) => a - b);
+    let best = 0, run = 0, prev = null;
+    weeks.forEach(w => {
+      const next = prev == null ? null : new Date(prev);
+      if (next) next.setDate(next.getDate() + 7);
+      run = next && +next === w ? run + 1 : 1;
+      best = Math.max(best, run);
+      prev = w;
+    });
+    return best;
+  },
+
+  _pageHtml(mk) {
+    const [y, m] = mk.split('-').map(Number);
+    const list = this._monthEntries(mk);
+    const days = new Date(y, m, 0).getDate();
+    const first = (new Date(y, m - 1, 1).getDay() + 6) % 7; // Monday-first
+    const today = this._today();
+    const quan = new Set(list.map(e => e.qk)).size;
+    const isCur = mk === this._mkey(today);
+    // A sticker still waiting to drop in stays hidden, and the stamp shows
+    // the count from before it — _maybeDrop() animates both into place.
+    const dropId = this._dropId();
+    const st = this._weekStreak(dropId);
+    const stamp = isCur && st.n
+      ? `<button class="nk-stamp${st.pending ? ' pending' : ''}" id="nkStamp" type="button" aria-label="${escapeHtml(I18N.t('nk.streakAria', { n: st.n }))}"><b>${st.n}</b><span>${I18N.t(st.pending ? 'nk.streakPending' : 'nk.streakWeeks')}</span></button>`
+      : '';
+    let cells = '';
+    for (let i = 0; i < first; i++) cells += '<div></div>';
+    for (let d = 1; d <= days; d++) {
+      const date = new Date(y, m - 1, d), k = this._dkey(date), meals = this._dayMap.get(k);
+      const isToday = +date === +today, future = date > today;
+      if (meals && this._uid) {
+        const e = meals[meals.length - 1];
+        const photo = this._hasPhoto(e);
+        const mark = e.rating === 5 ? this._ic('rating-star-filled') : '';
+        const cls = ['nk-cell', 'photo', e.shared ? 'shared' : 'private', photo ? '' : 'nophoto', isToday ? 'today-filled' : '', e.id === dropId ? 'dropping' : ''].filter(Boolean).join(' ');
+        const label = I18N.t(meals.length > 1 ? 'nk.cellAriaMulti' : 'nk.cellAria', { d, m, name: e.name, n: meals.length });
+        cells += `<button class="${cls}" type="button" data-day="${k}" data-id="${e.id}" data-cat="${e.cat || ''}" style="--cat:${this._catColor(e.cat)}" aria-label="${escapeHtml(label)}">
+          ${meals.length > 1 ? '<span class="nk-back"></span>' : ''}
+          <span class="nk-ph">${photo ? `<img src="${escapeHtml(this._thumb(e))}" alt="" loading="lazy" decoding="async" data-nk-id="${e.id}">` : this._ic(this._foodIcon(e))}</span>
+          <span class="nk-strip"><span>${d}</span>${mark}</span>
+          ${meals.length > 1 ? `<span class="nk-count">×${meals.length}</span>` : ''}
+        </button>`;
+      } else if (isToday && this._uid) {
+        cells += `<button class="nk-cell today" id="nkTodayCell" type="button" aria-label="${escapeHtml(I18N.t('nk.todayAria'))}">${this._ic('nav-checkin')}<small>${I18N.t('nk.today')}</small></button>`;
+      } else {
+        cells += `<div class="nk-cell num${future ? ' future' : ''}">${d}</div>`;
       }
     }
-    grid.innerHTML = html;
-
-    // Tap any filled day → open viewer with that day's posts
-    grid.querySelectorAll('.ci-cal-cell[data-day]').forEach(el => {
-      el.addEventListener('click', () => {
-        const d     = +el.dataset.day;
-        const items = this._byDay?.get(d);
-        if (!items?.length) return;
-        const group = {
-          user:     Community.currentUser,
-          items,
-          newestAt: new Date(items[items.length - 1].created).getTime(),
-          hasFresh: false,
-        };
-        CheckinViewerCtrl.open([group], 0);
-      });
-    });
-
-    const totalEl  = document.getElementById('ciStatTotal');
-    const streakEl = document.getElementById('ciStatStreak');
-    if (totalEl)  totalEl.textContent  = this._items.length;
-    if (streakEl) streakEl.textContent = this._calcStreak() + 'd';
+    const legend = Object.keys(this.CAT_ICON).map(k =>
+      `<button type="button" data-f="${k}" class="${this._filter === k ? 'on' : ''}" style="--c:${this._catColor(k)}" aria-pressed="${this._filter === k}"><i></i>${escapeHtml(this._catLabel(k))}</button>`).join('');
+    const blank = this._uid && this._loaded && !this._entries.length;
+    const emptyMonth = this._uid && !list.length && this._entries.length;
+    return `<article class="nk-page nk-stk" id="nkPage" data-m="${mk}">
+      ${stamp}
+      <div class="nk-p-head"><h3>${this._monthLong(m)}</h3><div class="nk-meta">${list.length ? I18N.t('nk.meta', { n: list.length, q: quan }) : ''}</div></div>
+      ${emptyMonth ? `<p class="nk-empty-month">${I18N.t('nk.emptyMonth', { m, month: this._monthLong(m) })}</p>` : ''}
+      <div class="nk-dow">${I18N.t('nk.dow').split(',').map(s => `<span>${s}</span>`).join('')}</div>
+      <div class="nk-grid">${cells}</div>
+      ${this._uid ? `<div class="nk-legend${this._filter ? ' filtering' : ''}">${legend}</div>` : ''}
+    </article>
+    ${!this._uid ? `<div class="nk-blank nk-stk"><p>${I18N.t('nk.signInMsg')}</p><button type="button" id="nkSignIn">${I18N.t('nk.signIn')}</button></div>` : ''}
+    ${blank ? `<div class="nk-blank nk-stk"><p>${I18N.t('nk.blank')}</p><button type="button" id="nkFirstShot">${I18N.t('nk.blankBtn')}</button></div>` : ''}`;
   },
 
-  _shiftMonth(delta) {
-    let m = this._month + delta;
-    let y = this._year;
-    if (m > 12) { m = 1; y++; }
-    if (m < 1)  { m = 12; y--; }
-    const now = new Date();
-    if (y > now.getFullYear() || (y === now.getFullYear() && m > now.getMonth() + 1)) return;
-    this._month = m;
-    this._year  = y;
-    this._fetchMonth();
+  _renderPage(slide) {
+    const wrap = document.getElementById('nkPageWrap');
+    wrap.innerHTML = this._pageHtml(this._month);
+    this._applyFilter();
+    const page = document.getElementById('nkPage');
+    if (slide && !this._reduced()) page.animate([{ transform: `translateX(${slide * 100}%)` }, { transform: 'none' }], { duration: 280, easing: 'cubic-bezier(.32,.72,0,1)' });
+    const today = document.getElementById('nkTodayCell');
+    if (today && !this._pulsed) { this._pulsed = true; today.classList.add('pulse'); }
+  },
+
+  _renderTray() {
+    const btn = document.getElementById('nkTrayBtn');
+    const n = this._monthEntries(this._month).length;
+    btn.hidden = !this._uid || !this._entries.length;
+    if (btn.hidden) return;
+    const m = +this._month.split('-')[1];
+    if (n >= 3) {
+      btn.className = 'nk-tray-btn';
+      btn.textContent = I18N.t('nk.trayBtn', { m, month: this._monthLong(m) });
+    } else {
+      btn.className = 'nk-tray-btn locked';
+      btn.innerHTML = `${escapeHtml(I18N.t('nk.trayLocked', { n: 3 - n }))}<span class="nk-prog" style="width:${n / 3 * 100}%"></span>`;
+    }
+  },
+
+  _applyFilter() {
+    document.querySelectorAll('#nkPage .nk-cell.photo').forEach(c => c.classList.toggle('dim', !!this._filter && c.dataset.cat !== this._filter));
+  },
+
+  _goMonth(mk, dir) {
+    if (mk === this._month) return;
+    const list = this._monthsList();
+    dir = dir || (list.indexOf(mk) > list.indexOf(this._month) ? 1 : -1);
+    this._month = mk;
+    this._renderMonths(); this._renderPage(dir); this._renderTray();
+  },
+
+  _onPageClick(e) {
+    if (this._swipe.justDragged) return;
+    const cell = e.target.closest('.nk-cell.photo');
+    if (cell) { this._openDetail(this._find(cell.dataset.id), cell.querySelector('.nk-ph'), 'cell'); return; }
+    // Today's empty cell and "Chụp món đầu tiên" — the camera is already
+    // running underneath the sổ, so closing it IS opening the camera.
+    if (e.target.closest('#nkTodayCell, #nkFirstShot')) { this.close(); return; }
+    if (e.target.closest('#nkSignIn')) { this.close({ instant: true }); TabNav.switchTo('community'); return; }
+    if (e.target.closest('#nkStamp')) {
+      const s = this._weekStreak();
+      showToast(I18N.t('nk.streakToast', { n: s.n, best: Math.max(s.n, this._bestStreak()) }));
+      return;
+    }
+    const f = e.target.closest('[data-f]');
+    if (f) {
+      this._filter = this._filter === f.dataset.f ? null : f.dataset.f;
+      document.querySelector('#nkPage .nk-legend').classList.toggle('filtering', !!this._filter);
+      document.querySelectorAll('#nkPage [data-f]').forEach(b => {
+        b.classList.toggle('on', b.dataset.f === this._filter);
+        b.setAttribute('aria-pressed', b.dataset.f === this._filter);
+      });
+      this._applyFilter();
+    }
+  },
+
+  // Drag the handle down >120px (or flick) to close.
+  _wireSheetDrag() {
+    const grab = document.getElementById('nkGrab');
+    const sheet = document.getElementById('nkSheet');
+    grab.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      this._sd = { y: e.clientY, t: performance.now(), id: e.pointerId };
+      try { grab.setPointerCapture(e.pointerId); } catch (_) {}
+      sheet.classList.add('dragging');
+    });
+    grab.addEventListener('pointermove', (e) => {
+      const s = this._sd; if (!s || e.pointerId !== s.id) return;
+      sheet.style.transform = `translateY(${Math.max(0, e.clientY - s.y)}px)`;
+    });
+    const end = (e) => {
+      const s = this._sd; this._sd = null; if (!s) return;
+      const dy = Math.max(0, e.clientY - s.y), v = dy / (performance.now() - s.t);
+      sheet.classList.remove('dragging');
+      if (dy > 120 || (v > .5 && dy > 24)) { this.close(); return; }
+      sheet.style.transform = '';
+    };
+    grab.addEventListener('pointerup', end);
+    grab.addEventListener('pointercancel', end);
+  },
+
+  // Page swipe (axis-locked) switches month.
+  _wirePageSwipe() {
+    const wrap = document.getElementById('nkPageWrap');
+    wrap.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (!e.target.closest('#nkPage')) return;
+      this._swipe.s = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, lock: null };
+    });
+    wrap.addEventListener('pointermove', (e) => {
+      const s = this._swipe.s; if (!s || e.pointerId !== s.id) return;
+      const dx = e.clientX - s.x, dy = e.clientY - s.y;
+      if (!s.lock && Math.hypot(dx, dy) > 8) s.lock = Math.abs(dx) > 1.3 * Math.abs(dy) ? 'x' : 'y';
+      if (s.lock !== 'x') return;
+      const list = this._monthsList(), i = list.indexOf(this._month);
+      const atEnd = (dx < 0 && i === list.length - 1) || (dx > 0 && i === 0);
+      const page = document.getElementById('nkPage');
+      if (page) page.style.transform = `translateX(${atEnd ? dx * .3 : dx}px)`;
+      try { wrap.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    const end = (e) => {
+      const s = this._swipe.s; this._swipe.s = null; if (!s || s.lock !== 'x') return;
+      this._swipe.justDragged = true; setTimeout(() => { this._swipe.justDragged = false; }, 50);
+      const dx = e.clientX - s.x, v = Math.abs(dx) / (performance.now() - s.t);
+      const list = this._monthsList(), i = list.indexOf(this._month);
+      const page = document.getElementById('nkPage');
+      const next = dx < 0 ? list[i + 1] : list[i - 1];
+      if ((Math.abs(dx) > 60 || v > .4) && next) {
+        const go = () => { this._month = next; this._renderMonths(); this._renderPage(dx < 0 ? 1 : -1); this._renderTray(); };
+        if (this._reduced()) { go(); return; }
+        this._done(page.animate([{ transform: `translateX(${dx}px)` }, { transform: `translateX(${dx < 0 ? -110 : 110}%)` }], { duration: 160, easing: 'ease-in', fill: 'forwards' }), 160).then(go);
+      } else {
+        page.animate([{ transform: `translateX(${dx * (next ? 1 : .3)}px)` }, { transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+        page.style.transform = '';
+      }
+    };
+    wrap.addEventListener('pointerup', end);
+    wrap.addEventListener('pointercancel', end);
+  },
+
+  // ── search ──────────────────────────────────────────────
+  _startSearch() {
+    this._searching = true;
+    document.getElementById('nkHead').classList.add('searching');
+    document.getElementById('nkBrowse').hidden = true;
+    document.getElementById('nkResults').hidden = false;
+    const q = document.getElementById('nkQuery');
+    q.value = '';
+    this._runSearch();
+    setTimeout(() => q.focus(), 60);
+  },
+  _stopSearch(rerender = true) {
+    this._searching = false;
+    document.getElementById('nkHead').classList.remove('searching');
+    document.getElementById('nkBrowse').hidden = false;
+    document.getElementById('nkResults').hidden = true;
+    document.getElementById('nkQuery').blur();
+    if (rerender) this._render();
+  },
+  _runSearch() {
+    const raw = document.getElementById('nkQuery').value.trim();
+    const q = this._norm(raw);
+    const hits = this._entries.filter(e => !q || this._norm(`${e.name} ${e.note} ${e.address}`).includes(q)).slice().reverse();
+    const box = document.getElementById('nkResults');
+    if (!hits.length) {
+      box.innerHTML = `<p class="nk-no-results">${escapeHtml(raw ? I18N.t('nk.noResults', { q: raw }) : I18N.t('nk.noEntries'))}</p>`;
+      return;
+    }
+    let html = '', lastM = '';
+    hits.forEach(e => {
+      const mk = this._mkey(e.day);
+      if (mk !== lastM) { html += `<p class="nk-r-month">${this._monthLong(+mk.split('-')[1])}${mk.slice(0, 4) !== String(new Date().getFullYear()) ? ' · ' + mk.slice(0, 4) : ''}</p>`; lastM = mk; }
+      html += `<button class="nk-r-row" type="button" data-id="${e.id}"><span class="nk-thumb" style="${this._bg(this._thumb(e))}">${this._hasPhoto(e) ? '' : this._ic(this._foodIcon(e))}</span>
+        <span class="nk-t"><b>${escapeHtml(e.name)}</b><small>${this._dateLabel(e.day)} · ${this._mealLabel(e.meal)}${e.rating ? ` · ★${e.rating}` : ''}</small></span>
+        <i style="--c:${this._catColor(e.cat)}"></i></button>`;
+    });
+    box.innerHTML = html;
+  },
+
+  _onImgError(img) {
+    if (!img || img.tagName !== 'IMG') return;
+    if (img.dataset.nkId) {
+      this._badPhotos.add(img.dataset.nkId);
+      const cell = img.closest('.nk-cell');
+      const e = this._find(img.dataset.nkId);
+      if (cell && e) { cell.classList.add('nophoto'); img.parentNode.innerHTML = this._ic(this._foodIcon(e)); }
+      return;
+    }
+    const photo = img.closest('.nk-d-photo');
+    if (!photo) return;
+    img.remove();
+    if (!photo.querySelector('img') && this._cur) photo.innerHTML = this._ic(this._foodIcon(this._cur));
+  },
+
+  // ── Bữa (detail) ────────────────────────────────────────
+  _renderDetail(e) {
+    this._cur = e;
+    document.getElementById('nkDate').textContent = this._dateLabel(e.day);
+    const meals = this._dayMeals(e);
+    document.getElementById('nkMeals').innerHTML = meals.length > 1
+      ? meals.map(m => `<button class="nk-chip${m.id === e.id ? ' on' : ''}" type="button" data-id="${m.id}" aria-pressed="${m.id === e.id}">${this._mealShort(m.meal)} ${this._hm(m.at)}</button>`).join('')
+      : `<span class="nk-static">${this._mealLabel(e.meal)} · ${this._hm(e.at)}</span>`;
+    const photo = this._hasPhoto(e);
+    document.getElementById('nkCard').innerHTML = `${meals.length > 1 ? '<div class="nk-behind"></div>' : ''}
+      <div class="nk-d-frame" id="nkFrame" style="--tilt:${this._tiltOf(e)}deg">
+        <div class="nk-d-photo" id="nkPhoto">${photo
+          ? `<img class="lo" src="${escapeHtml(this._thumb(e))}" alt="${escapeHtml(e.name)}"><img class="hi" src="${escapeHtml(this._full(e))}" alt="">`
+          : this._ic(this._foodIcon(e))}</div>
+        <div class="nk-d-chin${e.note ? '' : ' name'}" id="nkChin">${escapeHtml(e.note || e.name)}</div>
+        <span class="nk-meal-stk">${this._ic(this.MEAL_ICON[e.meal])}${this._mealLabel(e.meal)}</span>
+        ${e.rating === 5 ? `<span class="nk-star-stk">${this._ic('rating-star-filled')}</span>` : ''}
+      </div>`;
+    const hi = document.querySelector('#nkPhoto img.hi');
+    if (hi && hi.complete && hi.naturalWidth) hi.classList.add('ready');
+    const catIcon = e.cat ? this.CAT_ICON[e.cat] : this._foodIcon(e);
+    const sub = e.rel
+      ? [this._catLabel(e.cat), this.PRICE_KEY[e.priceKey] ? I18N.t(this.PRICE_KEY[e.priceKey]) : '', e.address].filter(Boolean).map(s => escapeHtml(s)).join(' · ')
+      : escapeHtml(I18N.t('nk.outside'));
+    const stars = e.rating
+      ? `<span class="nk-stars" aria-label="${e.rating}/5">${[1, 2, 3, 4, 5].map(i => this._ic(i <= e.rating ? 'rating-star-filled' : 'rating-star-outline')).join('')}<em>${e.rating}/5</em></span>`
+      : `<span class="nk-stars none">${I18N.t('nk.unrated')}</span>`;
+    const visits = e.visitNo >= 2 ? `<p class="nk-visits">${I18N.t('nk.visits', { n: e.visitNo, d: this._dm(e.firstVisit) })}</p>` : '';
+    document.getElementById('nkTicket').innerHTML = `<div class="nk-t-a"><span class="nk-cat-dot" style="--cat:${this._catColor(e.cat)}">${this._ic(catIcon)}</span>
+        <span><b>${escapeHtml(e.name)}</b><small>${sub}</small></span></div>
+      <div class="nk-t-b">${stars}<button class="nk-priv nk-hit" id="nkPriv" type="button">${this._ic(e.shared ? 'privacy-friends' : 'privacy-lock')}${I18N.t(e.shared ? 'nk.privFriends' : 'nk.privMine')}</button></div>
+      ${visits}
+      <div class="nk-tear" aria-hidden="true"></div>
+      <div class="nk-t-btns">
+        <button class="nk-stk nk-go${e.loc ? '' : ' off'}" id="nkGo" type="button">${this._ic('route-scooter')}${I18N.t('nk.go')}</button>
+        <button class="nk-stk" id="nkAgain" type="button">${this._ic('nav-checkin')}${I18N.t('nk.again')}</button>
+        ${e.rel ? `<button class="nk-stk" id="nkQuan" type="button">${this._ic(catIcon)}${I18N.t('nk.viewQuan')}</button>` : ''}
+      </div>`;
+    this._renderRuler();
+  },
+
+  _renderRuler() {
+    const e = this._cur, y = e.day.getFullYear(), m = e.day.getMonth();
+    const N = new Date(y, m + 1, 0).getDate();
+    const ruler = document.getElementById('nkRuler');
+    const W = ruler.clientWidth || 306, span = W - 24;
+    const xOf = (d) => 12 + (d - 1) / (N - 1) * span;
+    let html = '';
+    for (let d = 1; d <= N; d++) {
+      const list = this._dayMap.get(this._dkey(new Date(y, m, d)));
+      const h = !list ? 6 : list.length > 1 ? 24 : 16;
+      const col = list ? this._catColor(list[list.length - 1].cat) : 'var(--line-2)';
+      html += `<span class="nk-tick" data-d="${d}" style="left:${xOf(d)}px;height:${h}px;--c:${col}"></span>`;
+    }
+    [1, 10, 20, 30].filter(d => d <= N).forEach(d => { html += `<span class="nk-r-lbl" style="left:${xOf(d)}px">${d}</span>`; });
+    html += `<span class="nk-r-handle" id="nkHandle" style="left:${xOf(e.day.getDate())}px"></span>`;
+    ruler.innerHTML = html;
+    ruler.dataset.n = N;
+    ruler.setAttribute('aria-valuemin', 1);
+    ruler.setAttribute('aria-valuemax', N);
+    ruler.setAttribute('aria-valuenow', e.day.getDate());
+    ruler.setAttribute('aria-valuetext', this._dateLabel(e.day));
+  },
+
+  _rectIn(el) {
+    const s = document.getElementById('nkRoot').getBoundingClientRect(), r = el.getBoundingClientRect();
+    return { left: r.left - s.left, top: r.top - s.top, width: r.width, height: r.height };
+  },
+  _photoSlotRect() {
+    const f = document.getElementById('nkFrame');
+    const t = f.style.transform; f.style.transform = 'none';
+    const r = this._rectIn(document.getElementById('nkPhoto'));
+    f.style.transform = t;
+    return r;
+  },
+  _flyClone(src, from, to, frames) {
+    const el = document.createElement('div');
+    el.className = 'nk-peel';
+    if (src) el.style.backgroundImage = `url('${src.replace(/'/g, '%27')}')`;
+    document.getElementById('nkRoot').appendChild(el);
+    const fr = (r, x) => Object.assign({ left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' }, x);
+    const dur = this._reduced() ? 150 : frames.dur;
+    const anim = el.animate(frames.kf(fr, from, to), { duration: dur, fill: 'forwards' });
+    // Never hang on a stalled animation (backgrounded tab, slow device).
+    return this._done(anim, dur).then(() => el);
+  },
+  _markPeeled(e) {
+    document.querySelectorAll('.nk-cell.peeled').forEach(c => c.classList.remove('peeled'));
+    const cell = document.querySelector(`#nkPage .nk-cell[data-day="${this._dkey(e.day)}"]`);
+    if (cell) cell.classList.add('peeled');
+  },
+
+  // "Bóc sticker": the photo lifts off its cell (the category strip stays
+  // on the page) and flies up into the opened frame.
+  async _openDetail(e, sourceEl, source) {
+    if (this._busy || !e || !sourceEl) return;
+    this._setBusy(true);
+    this._closePops();
+    this._openSource = source;
+    this._renderDetail(e);
+    const det = document.getElementById('nkDetail');
+    det.classList.toggle('over-mam', source === 'plate');
+    det.classList.add('open'); det.setAttribute('aria-hidden', 'false');
+    document.getElementById('nkSheet').classList.add('behind');
+    document.getElementById('nkBody').scrollTop = 0;
+    const frame = document.getElementById('nkFrame'); frame.style.opacity = 0;
+    const from = this._rectIn(sourceEl), to = this._photoSlotRect();
+    const cell = sourceEl.closest('.nk-cell');
+    if (cell) cell.classList.add('peeled'); else sourceEl.style.visibility = 'hidden';
+    const round = source === 'plate';
+    const tilt = this._tiltOf(e);
+    const clone = await this._flyClone(this._thumb(e), from, to, {
+      dur: 470,
+      kf: (fr, a, b) => [
+        fr(a, { transform: 'rotate(0deg) scale(1)', borderRadius: round ? '50%' : '6px', easing: 'ease-out' }),
+        fr(a, { offset: .19, transform: 'rotate(0deg) scale(1.06)', borderRadius: round ? '50%' : '6px', easing: 'cubic-bezier(.34,1.56,.64,1)' }),
+        fr(b, { transform: `rotate(${tilt}deg) scale(1)`, borderRadius: '8px' }),
+      ],
+    });
+    frame.style.opacity = '';
+    this._done(clone.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 140, fill: 'forwards' }), 140).then(() => clone.remove());
+    if (!cell) sourceEl.style.visibility = '';
+    this._push('detail');
+    this._setBusy(false);
+    this._showCoach();
+  },
+
+  _sourceFor(e) {
+    if (this._openSource === 'search' && this._searching) return document.querySelector(`.nk-r-row[data-id="${e.id}"] .nk-thumb`);
+    if (this._openSource === 'plate' && this._mamOpen()) return document.querySelector(`.nk-plate[data-id="${e.id}"]`);
+    const mem = document.getElementById('nkMemory');
+    if (this._openSource === 'memory' && mem.dataset.id === e.id && !mem.hidden) return mem.querySelector('.nk-thumb');
+    return null;
+  },
+
+  // Close flies the sticker back to the cell of the meal being viewed NOW
+  // (the grid switches month first if the user flipped across months).
+  async _closeDetail({ fromPop = false } = {}) {
+    if (this._busy || !this._cur) return;
+    this._setBusy(true);
+    this._closePops();
+    const e = this._cur;
+    let target = this._sourceFor(e);
+    if (!target) {
+      if (this._searching) this._stopSearch();
+      if (this._mkey(e.day) !== this._month) { this._month = this._mkey(e.day); this._renderMonths(); this._renderPage(0); this._renderTray(); }
+      this._markPeeled(e);
+      const cell = document.querySelector(`#nkPage .nk-cell[data-day="${this._dkey(e.day)}"]`);
+      target = cell && cell.querySelector('.nk-ph');
+      if (cell) cell.scrollIntoView({ block: 'nearest' });
+    }
+    const from = this._photoSlotRect();
+    document.getElementById('nkFrame').style.opacity = 0;
+    const det = document.getElementById('nkDetail');
+    det.classList.remove('open'); det.setAttribute('aria-hidden', 'true');
+    document.getElementById('nkSheet').classList.remove('behind');
+    document.getElementById('nkCoach').classList.remove('show');
+    if (target) {
+      const to = this._rectIn(target);
+      const round = target.classList.contains('nk-plate');
+      const clone = await this._flyClone(this._thumb(e), from, to, {
+        dur: 340,
+        kf: (fr, a, b) => [
+          fr(a, { transform: `rotate(${this._tiltOf(e)}deg)`, borderRadius: '8px', easing: 'cubic-bezier(.32,.72,0,1)' }),
+          fr(b, { transform: 'rotate(0deg)', borderRadius: round ? '50%' : '6px' }),
+        ],
+      });
+      clone.remove();
+      const cell = target.closest('.nk-cell');
+      document.querySelectorAll('.nk-cell.peeled').forEach(c => c.classList.remove('peeled'));
+      if (cell) { cell.classList.add('press'); setTimeout(() => cell.classList.remove('press'), 100); }
+      this._buzz(8);
+    } else {
+      document.querySelectorAll('.nk-cell.peeled').forEach(c => c.classList.remove('peeled'));
+    }
+    this._cur = null;
+    this._setBusy(false);
+    if (!fromPop) this._back();
+  },
+
+  // Instant teardown for close()/leave(): no fly-back, no history.
+  _resetDetail() {
+    const det = document.getElementById('nkDetail');
+    if (!det) return;
+    det.classList.remove('open'); det.setAttribute('aria-hidden', 'true');
+    document.getElementById('nkSheet').classList.remove('behind');
+    document.getElementById('nkCoach').classList.remove('show');
+    document.getElementById('nkBubble').classList.remove('show');
+    document.querySelectorAll('.nk-peel').forEach(c => c.remove());
+    document.querySelectorAll('.nk-cell.peeled').forEach(c => c.classList.remove('peeled'));
+    const card = document.getElementById('nkCard');
+    card.getAnimations().forEach(a => a.cancel());
+    card.style.transform = '';
+    this._cur = null;
+    this._drag.s = null; this._rs.on = false;
+    this._setBusy(false);
+  },
+
+  _showCoach() {
+    let seen = false;
+    try { seen = localStorage.getItem(this.COACH_KEY) === '1'; } catch (_) {}
+    if (seen) return;
+    const c = document.getElementById('nkCoach');
+    c.classList.add('show');
+    setTimeout(() => c.classList.remove('show'), 3200);
+    try { localStorage.setItem(this.COACH_KEY, '1'); } catch (_) {}
+  },
+
+  // Swipe between meals ("chia bài"), chronological across months.
+  async _deal(toIdx, dir) {
+    if (this._busy || !this._cur) return;
+    const next = this._entries[toIdx];
+    if (!next) { this._rubber(dir); this._flash(I18N.t(dir > 0 ? 'nk.newest' : 'nk.oldest')); return; }
+    this._setBusy(true);
+    const card = document.getElementById('nkCard');
+    if (!this._reduced()) {
+      await this._done(card.animate([{ transform: card.style.transform || 'none' }, { transform: `translateX(${dir * 420}px) rotate(${dir * 14}deg)` }], { duration: 240, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' }), 240);
+    }
+    card.getAnimations().forEach(a => a.cancel()); card.style.transform = '';
+    this._renderDetail(next);
+    card.animate(this._reduced() ? [{ opacity: 0 }, { opacity: 1 }] : [{ transform: 'scale(.94)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: this._reduced() ? 150 : 220, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+    this._markPeeledIfVisible(next);
+    this._setBusy(false);
+  },
+  _step(dir) { if (this._cur) this._deal(this._cur.i + dir, dir); },
+  _rubber(dir) {
+    if (this._reduced()) return;
+    document.getElementById('nkCard').animate([{ transform: 'none' }, { transform: `translateX(${-dir * 24}px)` }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+  },
+  // Keep the page's "peeled" backing on the meal being viewed, if its
+  // month is the one on screen (otherwise close() switches month anyway).
+  _markPeeledIfVisible(e) {
+    document.querySelectorAll('.nk-cell.peeled').forEach(c => c.classList.remove('peeled'));
+    if (this._mkey(e.day) === this._month) this._markPeeled(e);
+  },
+
+  _wireStageDrag() {
+    const stage = document.getElementById('nkStage');
+    const card = () => document.getElementById('nkCard');
+    const scrim = () => document.querySelector('#nkDetail .nk-scrim');
+    stage.addEventListener('pointerdown', (e) => {
+      if (!this._cur || this._busy) return;
+      this._drag.s = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId, lock: null };
+      try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    stage.addEventListener('pointermove', (e) => {
+      const s = this._drag.s; if (!s || e.pointerId !== s.id) return;
+      const dx = e.clientX - s.x, dy = e.clientY - s.y;
+      if (!s.lock && Math.hypot(dx, dy) > 8) s.lock = Math.abs(dx) > Math.abs(dy) ? 'x' : (dy > 0 ? 'down' : 'y');
+      if (s.lock === 'x') card().style.transform = `translateX(${dx}px) rotate(${dx / 30}deg)`;
+      if (s.lock === 'down') {
+        const k = Math.max(.75, 1 - dy / 800);
+        card().style.transform = `translateY(${dy}px) scale(${k})`;
+        scrim().style.opacity = Math.max(.3, .97 - dy / 400);
+      }
+    });
+    const end = (e) => {
+      const s = this._drag.s; this._drag.s = null; if (!s || !this._cur) return;
+      const dx = e.clientX - s.x, dy = e.clientY - s.y, dt = Math.max(1, performance.now() - s.t);
+      const springBack = () => {
+        card().animate([{ transform: card().style.transform || 'none' }, { transform: 'none' }], { duration: 220, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+        card().style.transform = '';
+      };
+      if (s.lock === 'x') {
+        if (Math.abs(dx) > 70 || Math.abs(dx) / dt > .4) { this._deal(this._cur.i + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1); return; }
+        springBack();
+      } else if (s.lock === 'down') {
+        scrim().style.opacity = '';
+        if (dy > 100 || dy / dt > .5) { card().style.transform = ''; this._closeDetail(); return; }
+        springBack();
+      } else if (!s.lock && e.type === 'pointerup' && e.target.closest('#nkChin')) {
+        document.getElementById('nkChin').classList.toggle('open');
+      }
+    };
+    stage.addEventListener('pointerup', end);
+    stage.addEventListener('pointercancel', end);
+  },
+
+  // Ruler scrub: snaps to days that have meals, a light tick on each change.
+  _wireRuler() {
+    const ruler = document.getElementById('nkRuler');
+    const dayAtX = (clientX) => {
+      const r = ruler.getBoundingClientRect(), N = +ruler.dataset.n;
+      const d = Math.round(1 + (clientX - r.left - 12) / (r.width - 24) * (N - 1));
+      return Math.max(1, Math.min(N, d));
+    };
+    const nearestWithMeal = (d) => {
+      const y = this._cur.day.getFullYear(), m = this._cur.day.getMonth(), N = +ruler.dataset.n;
+      for (let k = 0; k < N; k++) for (const s of [d - k, d + k]) if (s >= 1 && s <= N && this._dayMap.has(this._dkey(new Date(y, m, s)))) return s;
+      return null;
+    };
+    const showBubble = (d) => {
+      const y = this._cur.day.getFullYear(), m = this._cur.day.getMonth();
+      const list = this._dayMap.get(this._dkey(new Date(y, m, d)));
+      const e = list[list.length - 1], b = document.getElementById('nkBubble');
+      b.querySelector('i').style.backgroundImage = this._hasPhoto(e) ? `url('${this._thumb(e).replace(/'/g, '%27')}')` : '';
+      b.querySelector('b').textContent = `${d}/${m + 1}`;
+      const tick = ruler.querySelector(`.nk-tick[data-d="${d}"]`), x = this._rectIn(tick).left;
+      const W = document.getElementById('nkRoot').clientWidth;
+      b.style.left = `${Math.max(16 + 28, Math.min(W - 16 - 28, x))}px`;
+      b.classList.add('show');
+      document.getElementById('nkHandle').style.left = tick.style.left;
+    };
+    const move = (e) => {
+      if (!this._rs.on || !this._cur) return;
+      const d = nearestWithMeal(dayAtX(e.clientX));
+      if (d && d !== this._rs.day) { if (this._rs.day) this._buzz(6); this._rs.day = d; showBubble(d); }
+    };
+    ruler.addEventListener('pointerdown', (e) => {
+      if (!this._cur || this._busy) return;
+      this._rs.on = true; this._rs.day = null;
+      ruler.classList.add('dragging');
+      try { ruler.setPointerCapture(e.pointerId); } catch (_) {}
+      move(e);
+    });
+    ruler.addEventListener('pointermove', move);
+    const end = () => {
+      if (!this._rs.on) return;
+      this._rs.on = false;
+      ruler.classList.remove('dragging');
+      document.getElementById('nkBubble').classList.remove('show');
+      if (!this._rs.day || !this._cur) return;
+      const y = this._cur.day.getFullYear(), m = this._cur.day.getMonth();
+      const list = this._dayMap.get(this._dkey(new Date(y, m, this._rs.day)));
+      const t = list[list.length - 1];
+      if (t.id === this._cur.id) { this._renderRuler(); return; }
+      const card = document.getElementById('nkCard');
+      const swap = () => { this._renderDetail(t); this._markPeeledIfVisible(t); card.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160 }); };
+      this._done(card.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 80 }), 80).then(swap);
+    };
+    ruler.addEventListener('pointerup', end);
+    ruler.addEventListener('pointercancel', end);
+    ruler.addEventListener('keydown', (ev) => {
+      if (ev.key === 'ArrowRight') { ev.preventDefault(); ev.stopPropagation(); this._step(1); }
+      if (ev.key === 'ArrowLeft') { ev.preventDefault(); ev.stopPropagation(); this._step(-1); }
+    });
+  },
+
+  // ── ticket actions ──────────────────────────────────────
+  _closePops() { document.querySelectorAll('.nk-pop,.nk-menu').forEach(p => p.remove()); },
+
+  _privacyPop() {
+    this._closePops();
+    const e = this._cur, box = document.createElement('div');
+    box.className = 'nk-pop';
+    box.innerHTML = `<p>${I18N.t(e.shared ? 'nk.askPrivate' : 'nk.askShare')}</p><div class="nk-btns"><button class="nk-stk nk-yes" type="button">${I18N.t(e.shared ? 'nk.doPrivate' : 'nk.doShare')}</button><button class="nk-stk nk-no" type="button">${I18N.t('nk.no')}</button></div>`;
+    const r = this._rectIn(document.getElementById('nkPriv'));
+    box.style.left = `${Math.max(16, r.left + r.width - 250)}px`;
+    box.style.top = `${Math.max(8, r.top - 118)}px`;
+    document.getElementById('nkRoot').appendChild(box);
+    box.querySelector('.nk-no').onclick = () => this._closePops();
+    box.querySelector('.nk-yes').onclick = () => { this._closePops(); this._setShared(e, !e.shared); };
+  },
+
+  // Optimistic: the sticker flips raised ↔ flat right away and rolls back
+  // if the PATCH fails.
+  async _setShared(e, next) {
+    const apply = (v) => {
+      e.shared = v; e.rec.is_shared = v;
+      if (this._cur && this._cur.id === e.id) this._renderDetail(e);
+      if (!this._searching) { this._renderPage(0); if (this._cur) this._markPeeledIfVisible(this._cur); }
+    };
+    apply(next);
+    const r = await Community.setCheckinShared(e.id, next);
+    if (!r.ok) { apply(!next); showToast(I18N.t('nk.changeFail')); return; }
+    showToast(I18N.t(next ? 'nk.shared' : 'nk.madePrivate'));
+    this._writeCache();
+    if (typeof CheckinFeedCtrl !== 'undefined') CheckinFeedCtrl.refresh({ force: true });
+    if (typeof CheckinDiscoverCtrl !== 'undefined') CheckinDiscoverCtrl.refresh();
+  },
+
+  _moreMenu() {
+    if (!this._cur) return;
+    if (document.querySelector('.nk-menu')) { this._closePops(); return; }
+    this._closePops();
+    const m = document.createElement('div');
+    m.className = 'nk-menu';
+    m.innerHTML = `${this._hasPhoto(this._cur) ? `<button type="button" data-a="save">${this._ic('action-save-disk')}${I18N.t('nk.savePhoto')}</button>` : ''}<button type="button" class="nk-danger" data-a="del">${this._ic('action-delete')}${I18N.t('nk.delete')}</button>`;
+    document.getElementById('nkRoot').appendChild(m);
+    m.onclick = (ev) => {
+      const a = ev.target.closest('[data-a]'); if (!a) return;
+      if (a.dataset.a === 'save') { this._closePops(); this._savePhoto(); return; }
+      if (a.dataset.a === 'del') {
+        m.innerHTML = `<p>${I18N.t('nk.deleteAsk')}</p><button type="button" class="nk-danger" data-a="yes">${this._ic('action-delete')}${I18N.t('nk.deleteYes')}</button><button type="button" data-a="no">${I18N.t('nk.no')}</button>`;
+        m.onclick = (ev2) => {
+          const b = ev2.target.closest('[data-a]'); if (!b) return;
+          this._closePops();
+          if (b.dataset.a === 'yes') this._deleteCur();
+        };
+      }
+    };
+  },
+
+  async _savePhoto() {
+    const e = this._cur;
+    if (!this._hasPhoto(e)) return;
+    try {
+      const resp = await fetch(Community.checkinPhotoUrl(e.rec));
+      if (!resp.ok) throw new Error(String(resp.status));
+      const blob = await resp.blob();
+      const ext = (String(e.rec.photo).split('.').pop() || 'webp').toLowerCase();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `nhopnhep-${this._dkey(e.day)}.${ext}`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      showToast(I18N.t('nk.saved'));
+    } catch (_) {
+      showToast(I18N.t('nk.saveFail'));
+    }
+  },
+
+  async _deleteCur() {
+    const gone = this._cur;
+    if (!gone || this._busy) return;
+    this._setBusy(true);
+    const r = await Community.deleteCheckin(gone.id);
+    // 404 = already gone server-side — the state the user asked for.
+    if (!r.ok && r.status !== 404) { this._setBusy(false); showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
+    const card = document.getElementById('nkCard');
+    await this._done(card.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(.6)', opacity: 0 }], { duration: this._reduced() ? 150 : 200, fill: 'forwards' }), 200);
+    const idx = gone.i;
+    this._entries = this._entries.filter(x => x !== gone);
+    this._sortEntries();
+    this._writeCache();
+    card.getAnimations().forEach(a => a.cancel());
+    const next = this._entries[Math.min(idx, this._entries.length - 1)];
+    this._renderMemory(); this._renderMonths(); this._renderPage(0); this._renderTray();
+    showToast(I18N.t('nk.deleted'));
+    if (typeof CheckinFeedCtrl !== 'undefined') CheckinFeedCtrl.refresh({ force: true });
+    if (typeof CheckinDiscoverCtrl !== 'undefined') CheckinDiscoverCtrl.refresh();
+    if (next) {
+      this._renderDetail(next);
+      this._markPeeledIfVisible(next);
+      card.animate([{ transform: 'scale(.94)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 220, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+      this._setBusy(false);
+    } else {
+      // Last meal in the sổ — nothing to flip to.
+      this._resetDetail();
+      this._back();
+      this._render();
+    }
+  },
+
+  _go() {
+    const e = this._cur;
+    if (!e.loc) { showToast(I18N.t('nk.noLoc')); return; }
+    this.close({ instant: true });
+    showCheckinItinerary(e.rec);
+  },
+
+  // Ghé lại — back to the camera with this quán already picked.
+  _again() {
+    const e = this._cur;
+    const lat = +e.rec.restaurant_lat || 0, lng = +e.rec.restaurant_lng || 0;
+    const dist = e.loc && State.userLat != null && State.userLng != null
+      ? fmtDist(haversine(State.userLat, State.userLng, lat, lng)) : '';
+    CheckinCtrl._selected = {
+      id: e.rel ? e.rec.restaurant : '', name: e.name,
+      lat: e.loc ? lat : null, lng: e.loc ? lng : null,
+      source: e.rel ? 'community' : 'diary', dist,
+    };
+    CheckinCtrl._refreshQuan();
+    this.close();
+    showToast(I18N.t('nk.againToast', { name: e.name }));
+  },
+
+  async _viewQuan() {
+    const e = this._cur;
+    if (!e.rel) return;
+    const r = await Community._fetch(`/api/collections/restaurants/records/${encodeURIComponent(e.rec.restaurant)}?expand=created_by`);
+    if (r.ok && r.data) CommunityDetailModal.open(r.data);
+    else showToast(I18N.t('nk.quanFail'));
+  },
+
+  // ── Mâm tháng ───────────────────────────────────────────
+  _openMam(mk) {
+    const [y, m] = mk.split('-').map(Number);
+    const list = this._monthEntries(mk), withPhoto = list.filter(e => this._hasPhoto(e));
+    const center = withPhoto.slice().sort((a, b) => (b.rating - a.rating) || (b.at - a.at))[0];
+    const sats = withPhoto.filter(e => e !== center).slice(-6).reverse();
+    const top = (arr) => { const c = {}; arr.forEach(k => { c[k] = (c[k] || 0) + 1; }); return Object.entries(c).sort((a, b) => b[1] - a[1])[0] || [null, 0]; };
+    const [topQ, topQn] = top(list.map(e => e.qk));
+    const topQName = topQ ? list.find(e => e.qk === topQ).name : '';
+    const [topMeal, topMealN] = top(list.map(e => e.meal));
+    const five = list.filter(e => e.rating === 5).length;
+    const newQuan = list.filter(e => e.visitNo === 1).length;
+    const quanN = new Set(list.map(e => e.qk)).size;
+    const name = this._userName();
+    const box = document.getElementById('nkMam');
+    const plateAt = (e, size, ang, r) => {
+      const cx = 130 + Math.cos(ang) * r - size / 2, cy = 130 + Math.sin(ang) * r - size / 2;
+      return `<button class="nk-plate" type="button" data-id="${e.id}" aria-label="${escapeHtml(e.name)}" style="width:${size}px;height:${size}px;left:${cx}px;top:${cy}px;${this._bg(this._thumb(e, size > 80 ? '300x400' : '150x200'))}"></button>`;
+    };
+    box.innerHTML = `<button class="nk-circle nk-float" id="nkMamClose" type="button" aria-label="${escapeHtml(I18N.t('common.close'))}">${this._ic('action-close')}</button>
+      <p class="nk-eyebrow">${I18N.t('nk.mamEyebrow', { m, y, month: this._monthLong(m) })}</p>
+      <h2>${I18N.t('nk.mamTitle', { n: list.length, q: quanN })}</h2>
+      <div class="nk-poster" id="nkPoster">
+        <div class="nk-tray">${center ? plateAt(center, 104, 0, 0) : ''}${sats.map((e, i) => plateAt(e, 60, -Math.PI / 2 + i * Math.PI / 3, 90)).join('')}
+          <span class="nk-chop" style="transform:rotate(20deg)"></span><span class="nk-chop" style="transform:rotate(26deg);right:10px"></span></div>
+        <p class="nk-tray-cap">${escapeHtml(I18N.t('nk.mamCap', { m, name, month: this._monthLong(m) }))}</p>
+      </div>
+      <div class="nk-m-stats">
+        <div class="nk-m-stat nk-stk"><small>${I18N.t('nk.statFav')}</small><b>${topQ ? escapeHtml(topQName) + ' ×' + topQn : '—'}</b></div>
+        <div class="nk-m-stat nk-stk"><small>${I18N.t('nk.statMeal')}</small><b>${topMeal ? I18N.t('nk.statMealVal', { meal: this._mealLabel(topMeal), n: topMealN }) : '—'}</b></div>
+        <div class="nk-m-stat nk-stk"><small>${I18N.t('nk.stat5')}</small><b>${I18N.t('nk.stat5Val', { n: five })}</b></div>
+        <div class="nk-m-stat nk-stk"><small>${I18N.t('nk.statNew')}</small><b>${newQuan}</b></div>
+      </div>
+      <div class="nk-m-btns"><button class="nk-stk nk-share" id="nkMamShare" type="button">${I18N.t('nk.mamShare')}</button><button class="nk-stk" id="nkMamDone" type="button">${I18N.t('nk.mamDone')}</button></div>`;
+    box.classList.add('open'); box.setAttribute('aria-hidden', 'false'); box.scrollTop = 0;
+    this._push('mam');
+    if (!this._reduced()) {
+      document.getElementById('nkPoster').animate([{ transform: 'scale(.92)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 280, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+      box.querySelectorAll('.nk-plate').forEach((p, i) => { p.style.animationDelay = `${i * 50}ms`; p.classList.add('pop-in'); });
+      box.querySelectorAll('.nk-m-stat').forEach((c, i) => c.animate([{ transform: 'translateY(12px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 240, delay: 200 + i * 60, fill: 'backwards', easing: 'cubic-bezier(.16,1,.3,1)' }));
+    }
+    const summary = I18N.t('nk.mamSummary', { m, month: this._monthLong(m), name, n: list.length, q: quanN, fav: topQ ? I18N.t('nk.mamSummaryFav', { name: topQName }) : '' });
+    document.getElementById('nkMamClose').onclick = document.getElementById('nkMamDone').onclick = () => this._closeMam();
+    document.getElementById('nkMamShare').onclick = async () => {
+      try { if (navigator.share) { await navigator.share({ text: summary }); return; } } catch (_) { return; }
+      try { await navigator.clipboard.writeText(summary); showToast(I18N.t('nk.copied')); } catch (_) { showToast(I18N.t('nk.copyFail')); }
+    };
+    box.querySelectorAll('.nk-plate').forEach(p => p.addEventListener('click', () => this._openDetail(this._find(p.dataset.id), p, 'plate')));
+  },
+  _closeMam({ fromPop = false } = {}) {
+    if (!this._mamOpen()) return;
+    this._resetMam();
+    if (!fromPop) this._back();
+  },
+  _resetMam() {
+    const box = document.getElementById('nkMam');
+    if (!box) return;
+    box.classList.remove('open'); box.setAttribute('aria-hidden', 'true');
+  },
+
+  // ── after a check-in: the new sticker drops into its cell ──
+  async _maybeDrop() {
+    const id = this._dropId();
+    const e = id && this._find(id);
+    const skip = !e || !this._isOpen() || this._cur || this._searching || this._mamOpen();
+    if (skip) {
+      // Not playing it — show the sticker and the real count as they are.
+      this._pendingDrop = null;
+      if (this._isOpen() && !this._searching) {
+        this._renderPage(0);
+        if (this._cur) this._markPeeledIfVisible(this._cur);
+      }
+      return;
+    }
+    if (this._mkey(e.day) !== this._month) { this._month = this._mkey(e.day); this._render(); }
+    this._pendingDrop = null;
+    const cell = document.querySelector(`#nkPage .nk-cell[data-id="${e.id}"]`);
+    if (!cell) { this._renderPage(0); return; }
+    cell.scrollIntoView({ block: 'nearest' });
+    const reduced = this._reduced();
+    const before = this._weekStreak(e.id).n;
+    cell.classList.remove('dropping');
+    if (!reduced) {
+      cell.querySelector('.nk-ph').animate([{ transform: 'translateY(-40px) scale(1.3)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 420, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+      cell.querySelector('.nk-strip').animate([{ transform: 'scaleX(0)', transformOrigin: 'left' }, { transform: 'scaleX(1)', transformOrigin: 'left' }], { duration: 140, delay: 140, fill: 'backwards' });
+    }
+    await new Promise(r => setTimeout(r, reduced ? 0 : 420));
+    const stamp = document.getElementById('nkStamp');
+    if (stamp) {
+      const b = stamp.querySelector('b');
+      if (before) b.textContent = before;
+      if (!reduced) {
+        stamp.animate([{ transform: 'rotate(-24deg) scale(1.6)', opacity: 0 }, { transform: 'rotate(-12deg) scale(1)', opacity: .92 }], { duration: 260, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+        const ink = document.createElement('span');
+        ink.className = 'nk-ink';
+        const r = this._rectIn(stamp);
+        document.getElementById('nkRoot').appendChild(ink);
+        ink.animate([
+          { left: `${r.left + r.width / 2 - 38}px`, top: `${r.top + r.height / 2 - 38}px`, width: '76px', height: '76px', opacity: .9 },
+          { left: `${r.left + r.width / 2 - 55}px`, top: `${r.top + r.height / 2 - 55}px`, width: '110px', height: '110px', opacity: 0 },
+        ], { duration: 300, fill: 'forwards' });
+        this._done(ink.getAnimations()[0], 300).then(() => ink.remove());
+      }
+      setTimeout(() => { b.textContent = this._weekStreak().n; }, reduced ? 0 : 160);
+      this._buzz(15);
+    }
+    this._flash(e.visitNo >= 2 ? I18N.t('nk.visitNth', { n: e.visitNo }) : I18N.t('nk.newQuan'), 1600);
+  },
+
+  _flash(msg, ms = 1400) {
+    const f = document.getElementById('nkFlash');
+    f.textContent = msg;
+    f.classList.add('show');
+    clearTimeout(this._flashT);
+    this._flashT = setTimeout(() => f.classList.remove('show'), ms);
   },
 };
 
@@ -7417,6 +8585,7 @@ const CheckinViewerCtrl = {
       I18N.t(rec.is_shared ? 'checkin.optHideOwn' : 'checkin.optShowOwn');
     this._closeOptMenu(true);
     showToast(I18N.t(rec.is_shared ? 'checkin.sharedAgain' : 'checkin.hiddenPrivate'));
+    if (typeof NhatKyCtrl !== 'undefined') NhatKyCtrl.invalidate();
     if (typeof CheckinFeedCtrl !== 'undefined') CheckinFeedCtrl.refresh({ force: true });
     if (typeof CheckinDiscoverCtrl !== 'undefined') CheckinDiscoverCtrl.refresh();
   },
@@ -7455,7 +8624,7 @@ const CheckinViewerCtrl = {
   _removeCurrentLocally() {
     const g = this._groups && this._groups[this._gi];
     if (g) g.items.splice(this._pi, 1);
-    if (typeof CheckinCalendarCtrl !== 'undefined') CheckinCalendarCtrl._fetchMonth();
+    if (typeof NhatKyCtrl !== 'undefined') NhatKyCtrl.invalidate();
     if (typeof CheckinFeedCtrl !== 'undefined') CheckinFeedCtrl.refresh({ force: true });
     if (typeof CheckinDiscoverCtrl !== 'undefined') CheckinDiscoverCtrl.refresh();
     if (g && g.items.length > 0) {

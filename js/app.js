@@ -59,7 +59,7 @@ function boot() {
   CheckinCtrl.init();
   CheckinFeedCtrl.init();
   CheckinViewerCtrl.init();
-  CheckinCalendarCtrl.init();
+  NhatKyCtrl.init();
   CheckinDiscoverCtrl.init();
   wireScrollMasks();
 
