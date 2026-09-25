@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2719">
+<link rel="stylesheet" href="css/styles.css?v=2720">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -805,6 +805,9 @@
   <div class="checkin-frame-zone">
     <div class="checkin-frame">
       <video id="checkinVideo" class="checkin-video" autoplay playsinline muted></video>
+      <!-- Zoom — filled by CheckinCtrl._setupZoom() per stream (1× 2× 3×,
+           plus .5× when the camera can go wider); pinch the frame too. -->
+      <div class="checkin-zoom hidden" id="checkinZoom" role="group" data-i18n="checkin.zoomLabel" data-i18n-attr="aria-label" aria-label="Thu phóng"></div>
     </div>
   </div>
 
@@ -1095,10 +1098,18 @@
       <div class="nk-ruler nk-stk" id="nkRuler" role="slider" tabindex="0" data-i18n="nk.rulerAria" data-i18n-attr="aria-label" aria-label="Tua theo ngày"></div>
     </div>
     <div class="nk-bubble nk-float" id="nkBubble"><i></i><b></b></div>
-    <div class="nk-coach nk-float" id="nkCoach" data-i18n="nk.coach">Vuốt ngang để lật bữa · kéo thước để tua</div>
+    <div class="nk-coach nk-float" id="nkCoach" data-i18n="nk.coach">Vuốt ngang để lật bữa · kéo thước để tua<br>Chạm hai bên ảnh: bữa khác trong ngày · chạm giữa: xem to</div>
   </div>
 
   <div class="nk-mam" id="nkMam" aria-hidden="true"></div>
+  <div class="nk-lb" id="nkLb" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="nkLbTitle">
+    <div class="nk-lb-top">
+      <div class="nk-d-date nk-float" id="nkLbTitle"></div>
+      <button class="nk-circle nk-stk" id="nkLbClose" type="button" data-i18n="common.close" data-i18n-attr="aria-label" aria-label="Đóng"><svg class="icon" aria-hidden="true"><use href="#ic-action-close"></use></svg></button>
+    </div>
+    <div class="nk-lb-stage" id="nkLbStage"><div class="nk-lb-frame" id="nkLbFrame"><img id="nkLbImg" alt="" draggable="false"></div></div>
+    <p class="nk-lb-hint" data-i18n="nk.lbHint">Chụm hai ngón hoặc chạm đúp để phóng to · vuốt xuống để đóng</p>
+  </div>
   <div class="nk-flash nk-float" id="nkFlash" role="status" aria-live="polite"></div>
 </div>
 
@@ -1556,18 +1567,18 @@
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
 <script src="js/security.js?v=2672"></script>
-<script src="js/i18n.js?v=2719"></script>
+<script src="js/i18n.js?v=2720"></script>
 <script src="js/utils.js?v=2710"></script>
 <script src="js/state.js?v=2672"></script>
 <script src="js/poi.js?v=2672"></script>
 <script src="js/geocoder.js?v=2672"></script>
 <script src="js/gemini.js?v=2672"></script>
-<script src="js/community.js?v=2713"></script>
+<script src="js/community.js?v=2720"></script>
 <script src="js/push.js?v=2672"></script>
 <script src="js/analytics.js?v=2672"></script>
-<script src="js/map.js?v=2672"></script>
+<script src="js/map.js?v=2720"></script>
 <script src="js/gps.js?v=2672"></script>
-<script src="js/locationPicker.js?v=2672"></script>
+<script src="js/locationPicker.js?v=2720"></script>
 <!-- Trip name dialog — thay thế window.prompt() native -->
 <div class="trip-name-overlay" id="tripNameOverlay" role="dialog" aria-modal="true">
   <div class="trip-name-card">
@@ -1580,8 +1591,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2719"></script>
-<script src="js/app.js?v=2719"></script>
+<script src="js/controllers.js?v=2720"></script>
+<script src="js/app.js?v=2720"></script>
 
 </body>
 </html>

@@ -854,7 +854,14 @@ const Community = {
     fd.append('is_shared', isShared ? true : false);
     if (sessionId) fd.append('session', sessionId);
 
-    if (photoBlob && photoBlob.size) {
+    // The camera already captures at the upload size (CheckinCtrl.CAPTURE_MAX,
+    // WebP/JPEG) — re-decoding and re-encoding it again would only add
+    // delay to Send. Anything else still goes through compressImage.
+    const uploadReady = photoBlob && photoBlob.size && photoBlob.size <= 1.4 * 1024 * 1024
+      && /^image\/(webp|jpeg)$/.test(photoBlob.type || '');
+    if (uploadReady) {
+      fd.append('photo', photoBlob, `checkin-${Date.now()}.${photoBlob.type === 'image/webp' ? 'webp' : 'jpg'}`);
+    } else if (photoBlob && photoBlob.size) {
       // Photo from camera is already a WebP-ish blob from CheckinCtrl's
       // canvas.toBlob() — but a raw high-res frame (CheckinCtrl now asks
       // getUserMedia for as much sensor resolution as the device has)

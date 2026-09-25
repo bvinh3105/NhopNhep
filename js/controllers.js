@@ -5790,6 +5790,11 @@ const CheckinCtrl = {
   // gets saved — see _startStream() and _tapShutter().
   PHOTO_FILTER: 'contrast(1.08) saturate(1.16) brightness(1.02) sepia(.06)',
   _locked: false, // AE/AF lock state for the current stream — see _toggleLock()
+  AUTO_PICK_M: 150,  // _findClosest(): farthest quán auto-selected as "you're here"
+  CAPTURE_MAX: 1920, // longest side of the captured photo (the upload budget, see createCheckin)
+  // Zoom — native track zoom when the camera exposes it (Android Chrome),
+  // otherwise a digital crop (CSS scale on the preview, cropped on capture).
+  _zoom: 1, _zoomNative: null, _zoomMax: 3, _zoomPending: null, _zoomApplying: false, _pinch: null,
 
   // Exposure apply queue — see _queueExposure()/_drainExposure(). The
   // ruler itself (ticks, detents, haptics) is ExposureDial.
@@ -5802,6 +5807,7 @@ const CheckinCtrl = {
     document.getElementById('checkinExposureReset').addEventListener('click', () => ExposureDial.reset());
     document.getElementById('checkinDiaryBtn').addEventListener('click', () => this._openDiary());
     document.getElementById('checkinFlipBtn').addEventListener('click', () => this._flipCamera());
+    this._wireZoom();
     document.getElementById('checkinShutterBtn').addEventListener('click', () => this._tapShutter());
     document.getElementById('checkinRetryCam').addEventListener('click', () => this._startStream());
     document.getElementById('checkinGoSignIn').addEventListener('click', () => TabNav.switchTo('community'));
@@ -5893,7 +5899,7 @@ const CheckinCtrl = {
   // class-based hiding: .hidden{display:none!important} always wins
   // over this inline style either way.
   _toggleChrome(show) {
-    ['checkinQuanPill','checkinStars','checkinShutterBtn','checkinDiaryBtn','checkinFlipBtn','checkinManualRow'].forEach(id => {
+    ['checkinQuanPill','checkinStars','checkinShutterBtn','checkinDiaryBtn','checkinFlipBtn','checkinManualRow','checkinZoom'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = show ? '' : 'none';
     });
@@ -5935,6 +5941,9 @@ const CheckinCtrl = {
           // the standard way to say "give me your best", without an
           // enumerateDevices()/getCapabilities() round-trip first.
           width: { ideal: 3840 }, height: { ideal: 3840 },
+          // Ask for the zoom capability (Chrome gates it behind this); a
+          // browser or camera without it just ignores the request.
+          zoom: true,
           advanced: [
             { focusMode: 'continuous' },
             { whiteBalanceMode: 'continuous' },
@@ -5945,6 +5954,7 @@ const CheckinCtrl = {
       });
       video.srcObject = this._stream;
       video.style.filter = this.PHOTO_FILTER;
+      video.style.transform = '';
       video.classList.remove('hidden');
       noperm.classList.add('hidden');
       this._toggleChrome(true);
@@ -5997,6 +6007,7 @@ const CheckinCtrl = {
   // controls entirely rather than showing dead buttons on most iPhones.
   // Runs fresh on every _startStream() (flip camera = a new track).
   _setupManualControls() {
+    this._setupZoom();
     this._locked = false;
     const row = document.getElementById('checkinManualRow');
     const lockBtn = document.getElementById('checkinLockBtn');
@@ -6038,6 +6049,90 @@ const CheckinCtrl = {
       ExposureDial.setup(ec, settings.exposureCompensation ?? 0); // after un-hiding: it measures its width
     }
     syncRow();
+  },
+
+  // ── Zoom: 1× 2× 3× chips on the frame + pinch on the viewfinder ──
+  _setupZoom() {
+    const track = this._stream && this._stream.getVideoTracks()[0];
+    const caps = track && track.getCapabilities ? track.getCapabilities() : null;
+    const z = caps && caps.zoom;
+    this._zoomNative = z && typeof z.min === 'number' && typeof z.max === 'number' && z.max > z.min ? z : null;
+    this._zoomMax = this._zoomNative ? Math.min(this._zoomNative.max, 10) : 3;
+    this._zoomPending = null; this._zoomApplying = false;
+    const settings = track && track.getSettings ? track.getSettings() : {};
+    this._zoom = this._zoomNative ? (settings.zoom || Math.max(1, this._zoomNative.min)) : 1;
+    const minZ = this._zoomMin();
+    const levels = [minZ < .95 ? minZ : null, 1, 2, 3].filter(v => v != null && v <= this._zoomMax + 1e-6);
+    const wrap = document.getElementById('checkinZoom');
+    wrap.innerHTML = levels.map(v => `<button type="button" class="checkin-zoom-chip" data-z="${v}">${this._zoomLabel(v)}</button>`).join('');
+    wrap.classList.toggle('hidden', !this._stream || levels.length < 2);
+    document.getElementById('checkinVideo').style.transform = '';
+    if (this._zoomNative && this._zoom !== 1 && minZ <= 1) this._setZoom(1);
+    this._renderZoom();
+  },
+  _zoomMin() { return this._zoomNative ? Math.max(this._zoomNative.min, .5) : 1; },
+  _zoomLabel(v) { return (v < 1 ? String(Math.round(v * 10) / 10).replace(/^0/, '') : String(Math.round(v * 10) / 10)) + '×'; },
+  _renderZoom() {
+    const chips = [...document.querySelectorAll('#checkinZoom .checkin-zoom-chip')];
+    if (!chips.length) return;
+    // Light up the chip at or just below the current zoom; it reads the
+    // live value ("1.6×") while between levels.
+    let on = chips[0];
+    chips.forEach(c => { if (+c.dataset.z <= this._zoom + 1e-6) on = c; });
+    chips.forEach(c => {
+      const active = c === on;
+      c.classList.toggle('on', active);
+      c.textContent = active ? this._zoomLabel(this._zoom) : this._zoomLabel(+c.dataset.z);
+      c.setAttribute('aria-pressed', active);
+    });
+  },
+  _setZoom(v) {
+    const z = Math.max(this._zoomMin(), Math.min(this._zoomMax, Math.round(v * 20) / 20));
+    this._zoom = z;
+    if (this._zoomNative) { this._zoomPending = z; this._drainZoom(); }
+    else document.getElementById('checkinVideo').style.transform = z > 1 ? `scale(${z})` : '';
+    this._renderZoom();
+  },
+  // Same coalescing as the exposure queue: at most one applyConstraints in
+  // flight, always converging on the latest pinch value.
+  async _drainZoom() {
+    if (this._zoomApplying) return;
+    const track = this._stream && this._stream.getVideoTracks()[0];
+    if (!track || this._zoomPending == null) return;
+    this._zoomApplying = true;
+    const v = this._zoomPending;
+    try { await track.applyConstraints({ advanced: [{ zoom: v }] }); } catch (_) { /* superseded/rejected — next value lands */ }
+    this._zoomApplying = false;
+    if (this._zoomPending !== v) this._drainZoom();
+  },
+  _wireZoom() {
+    const wrap = document.getElementById('checkinZoom');
+    wrap.addEventListener('click', (e) => {
+      const c = e.target.closest('.checkin-zoom-chip');
+      if (!c) return;
+      try { if (navigator.vibrate) navigator.vibrate(8); } catch (_) {}
+      this._setZoom(+c.dataset.z);
+    });
+    // Pinch anywhere on the viewfinder.
+    const frame = document.querySelector('#checkinScreen .checkin-frame');
+    const pts = new Map();
+    const dist = () => { const p = [...pts.values()]; return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1; };
+    frame.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('#checkinZoom')) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 2) this._pinch = { d0: dist(), z0: this._zoom, lastWhole: Math.floor(this._zoom) };
+    });
+    frame.addEventListener('pointermove', (e) => {
+      if (!pts.has(e.pointerId)) return;
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (!this._pinch || pts.size < 2) return;
+      this._setZoom(this._pinch.z0 * dist() / this._pinch.d0);
+      const whole = Math.floor(this._zoom);           // a tick each time a whole × is crossed
+      if (whole !== this._pinch.lastWhole) { this._pinch.lastWhole = whole; try { if (navigator.vibrate) navigator.vibrate(6); } catch (_) {} }
+    });
+    const end = (e) => { pts.delete(e.pointerId); if (pts.size < 2) this._pinch = null; };
+    frame.addEventListener('pointerup', end);
+    frame.addEventListener('pointercancel', end);
   },
 
   async _toggleLock() {
@@ -6114,9 +6209,11 @@ const CheckinCtrl = {
     // has them cached) sorted by distance from State.userLat/userLng.
     // If nothing usable, leave selected=null — user must pick via picker
     // (which prompts them to enter a name for OSM/Gemini spots too).
-    if (!this._selected) {
+    // An automatic pick (never one the user chose) is re-evaluated every
+    // time, so it follows the user instead of sticking to an old spot.
+    if (!this._selected || this._selected.auto) {
       const closest = this._findClosest();
-      if (closest) this._selected = closest;
+      this._selected = closest ? { ...closest, auto: true } : null;
     }
     const pill = document.getElementById('checkinQuanName');
     const dist = document.getElementById('checkinQuanDist');
@@ -6159,8 +6256,11 @@ const CheckinCtrl = {
         });
       }
     });
-    if (!pool.length) return null;
-    if (lat == null || lng == null) return { ...pool[0], dist: '' };
+    // Only auto-pick a quán the user is plausibly AT: with no GPS fix, or
+    // nothing within AUTO_PICK_M, leave it to the picker. An unedited pick
+    // now keeps its restaurant relation (and feeds that quán's verified
+    // rating), so a far-off "closest" guess must not slip in unnoticed.
+    if (!pool.length || lat == null || lng == null) return null;
     // Cheap flat-earth distance — accurate enough at neighborhood scale.
     const withDist = pool.map(p => {
       const dLat = (p.lat - lat) * 111320;
@@ -6169,7 +6269,7 @@ const CheckinCtrl = {
       return { ...p, _d: d, dist: d < 1000 ? `${d}m` : `${(d/1000).toFixed(1)}km` };
     });
     withDist.sort((a, b) => a._d - b._d);
-    return withDist[0];
+    return withDist[0]._d <= this.AUTO_PICK_M ? withDist[0] : null;
   },
 
   _openPicker() {
@@ -6337,27 +6437,45 @@ const CheckinCtrl = {
     const w = video.videoWidth, h = video.videoHeight;
     if (!w || !h) { showToast(I18N.t('checkin.noStream')); return; }
 
+    // Capture exactly what the frame shows: the region object-fit:cover
+    // leaves visible, divided by the digital zoom (native zoom is already
+    // in the frames). It used to encode the WHOLE sensor frame (up to
+    // ~12 MP) twice — WebP blob + a synchronous toDataURL — for a photo
+    // that is uploaded at CAPTURE_MAX anyway: ~3 s before the preview
+    // appeared, which read as a hang.
+    const fr = video.parentElement.getBoundingClientRect();
+    const A = fr.width && fr.height ? fr.width / fr.height : 3 / 4;
+    let vw = w, vh = h;
+    if (w / h > A) vw = h * A; else vh = w / A;
+    const dz = this._zoomNative ? 1 : this._zoom;
+    const sw = vw / dz, sh = vh / dz, sx = (w - sw) / 2, sy = (h - sh) / 2;
+    const k = Math.min(1, this.CAPTURE_MAX / Math.max(sw, sh));
     const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
+    canvas.width = Math.round(sw * k); canvas.height = Math.round(sh * k);
     const ctx = canvas.getContext('2d');
     // Bake in the same grade the live preview showed (ctx.filter takes
     // the same syntax as CSS filter) — WYSIWYG, and unsupported browsers
     // just silently skip it (assigning an unsupported value is a no-op,
     // not an error) rather than failing the capture.
     try { ctx.filter = this.PHOTO_FILTER; } catch (_) {}
-    ctx.drawImage(video, 0, 0, w, h);
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
 
-    // WebP first (smaller); fall back to JPEG on Safari <14 or when the
-    // browser silently returns image/png (canvas.toBlob spec quirk).
-    const blob = await new Promise(res => {
+    // The preview shows at once from a small copy; the upload blob keeps
+    // encoding in the background (_submit awaits it). WebP first
+    // (smaller); JPEG on Safari <14 or when the browser silently returns
+    // image/png (canvas.toBlob spec quirk).
+    const pk = Math.min(1, 900 / Math.max(canvas.width, canvas.height));
+    const pc = document.createElement('canvas');
+    pc.width = Math.round(canvas.width * pk); pc.height = Math.round(canvas.height * pk);
+    pc.getContext('2d').drawImage(canvas, 0, 0, pc.width, pc.height);
+    const blobPromise = new Promise(res => {
       canvas.toBlob(b => {
         if (b && b.type === 'image/webp') return res(b);
-        canvas.toBlob(j => res(j), 'image/jpeg', 0.85);
-      }, 'image/webp', 0.85);
+        canvas.toBlob(j => res(j), 'image/jpeg', 0.88);
+      }, 'image/webp', 0.88);
     });
-    if (!blob) { showToast(I18N.t('checkin.captureErr')); return; }
-
-    this._captured = { blob, dataUrl: canvas.toDataURL(blob.type, 0.85) };
+    const cap = this._captured = { blob: null, blobPromise, dataUrl: pc.toDataURL('image/jpeg', 0.82) };
+    blobPromise.then(b => { cap.blob = b; });
 
     // Wire the preview: copy over the pre-selected rating from the live
     // pill so user isn't asked twice. Default 4 stars if none set.
@@ -6420,8 +6538,11 @@ const CheckinCtrl = {
     } else if (q) {
       restaurantId = q.source === 'community' && q.id ? q.id : '';
       restaurantName = q.name;
-      restaurantLat = shareLocation ? (q.lat ?? null) : null;
-      restaurantLng = shareLocation ? (q.lng ?? null) : null;
+      // A pick without its own coordinates (a diary spot saved without
+      // location, a typed address picked before the GPS fix) takes where
+      // the user is now.
+      restaurantLat = shareLocation ? (q.lat ?? State.userLat ?? null) : null;
+      restaurantLng = shareLocation ? (q.lng ?? State.userLng ?? null) : null;
       source = q.source;
     } else {
       restaurantName = I18N.t('checkin.anonSpot');
@@ -6430,13 +6551,20 @@ const CheckinCtrl = {
       source = 'anon';
     }
 
+    const photoBlob = this._captured.blob || await this._captured.blobPromise;
+    if (!photoBlob) {
+      btn.disabled = false;
+      if (spanEl) spanEl.textContent = originalLabel;
+      showToast(I18N.t('checkin.captureErr'));
+      return;
+    }
     const r = await Community.createCheckin({
       restaurantId,
       restaurantName,
       restaurantLat,
       restaurantLng,
       restaurantEmoji: '',  // reserved for a future emoji picker
-      rating, note, photoBlob: this._captured.blob, isShared,
+      rating, note, photoBlob, isShared,
     });
 
     btn.disabled = false;
@@ -6857,7 +6985,7 @@ const NhatKyCtrl = {
           'expand.restaurant.id,expand.restaurant.name,expand.restaurant.category,expand.restaurant.price_range,expand.restaurant.address',
   PER_PAGE: 500,
   CACHE_KEY: 'nk_cache_',
-  COACH_KEY: 'nk_coach_seen',
+  COACH_KEY: 'nk_coach_seen2',
   DROP_TTL_MS: 30 * 60 * 1000,
 
   _entries: [], _dayMap: new Map(), _badPhotos: new Set(),
@@ -6913,6 +7041,7 @@ const NhatKyCtrl = {
     $('nkMore').addEventListener('click', () => { if (!this._busy) this._moreMenu(); });
     this._wireStageDrag();
     this._wireRuler();
+    this._wireLb();
 
     // Photo load/error don't bubble — catch them on the way down instead of
     // wiring every <img>. A thumb that fails turns its cell into the
@@ -6930,13 +7059,14 @@ const NhatKyCtrl = {
     document.addEventListener('keydown', (ev) => {
       if (root.hidden || document.querySelector('.modal-overlay.show')) return;
       if (ev.key === 'Escape') {
-        if (this._cur) this._closeDetail();
+        if (this._lbOpen()) this._closeLb();
+        else if (this._cur) this._closeDetail();
         else if (this._mamOpen()) this._closeMam();
         else if (this._searching) this._stopSearch();
         else this.close();
         return;
       }
-      if (!this._cur || ev.target.closest('input')) return;
+      if (!this._cur || this._lbOpen() || ev.target.closest('input')) return;
       if (ev.key === 'ArrowRight') this._step(1);
       if (ev.key === 'ArrowLeft') this._step(-1);
     });
@@ -6946,12 +7076,14 @@ const NhatKyCtrl = {
     try { if (history.state && history.state.nk) history.replaceState(null, ''); } catch (_) {}
     document.addEventListener('i18n:changed', () => { if (this._isOpen()) this._rerender(); });
     document.addEventListener('community:session-expired', () => {
-      const layers = (this._cur ? 1 : 0) + (this._mamOpen() ? 1 : 0);
       this._uid = ''; this._entries = []; this._dayMap = new Map();
       this._loaded = false; this._stale = true; this._offline = false; this._failed = false;
       if (!document.getElementById('nkRoot').hidden) {
-        this._closePops(); this._resetDetail(); this._resetMam(); this._render();
-        for (let i = 0; i < layers; i++) this._back();
+        this._closePops(); this._resetLb(); this._resetDetail(); this._resetMam(); this._render();
+        // Back down to the sheet's own entry. Read from history at run time,
+        // not counted from _cur/_mamOpen(): mid-peel _cur is set before the
+        // detail's entry exists, mid-close the entry may already be gone.
+        this._unwindTo(1);
       }
     });
   },
@@ -6987,6 +7119,7 @@ const NhatKyCtrl = {
     const root = document.getElementById('nkRoot');
     if (!root || root.hidden) return;
     this._closePops();
+    this._resetLb();
     this._resetDetail();
     this._resetMam();
     if (this._searching) this._stopSearch(false);
@@ -7068,7 +7201,10 @@ const NhatKyCtrl = {
     if (this._tokenExpired() && !(await this._sessionOk())) return { ok: false };
     if (uid !== this._uid) return { ok: false };
     let res = await this._load(uid);
-    if (res.ok && !res.items.length && uid === this._uid) {
+    // Probe only when there are meals to protect: for an empty diary the
+    // expiry check above already covers the common case, and a flaky
+    // auth-refresh must not turn a correct empty sổ into "can't load".
+    if (res.ok && !res.items.length && uid === this._uid && this._entries.length) {
       if (!(await this._sessionOk())) return { ok: false };
       res = await this._load(uid);
     }
@@ -7241,6 +7377,7 @@ const NhatKyCtrl = {
   _push(layer) { this._hq.push({ t: 'push', layer }); this._hRun(); },
   _back() { this._hq.push({ t: 'one' }); this._hRun(); },
   _unwindHistory() { this._hq.push({ t: 'all' }); this._hRun(); },
+  _unwindTo(lvl) { this._hq.push({ t: 'to', lvl }); this._hRun(); },
   _hRun() {
     while (!this._hBusy && this._hq.length) {
       const op = this._hq.shift();
@@ -7251,7 +7388,8 @@ const NhatKyCtrl = {
         } catch (_) {}
         continue;
       }
-      const n = !this._ours() ? 0 : op.t === 'all' ? (history.state.lvl || 1) : 1;
+      const top = this._ours() ? (history.state.lvl || 1) : 0;
+      const n = !top ? 0 : op.t === 'all' ? top : op.t === 'to' ? Math.max(0, top - op.lvl) : 1;
       if (!n) continue;
       this._hBusy = true;
       // Popstate never arrived (odd webview) — don't block the queue forever.
@@ -7262,6 +7400,7 @@ const NhatKyCtrl = {
   _hDone() { clearTimeout(this._hWait); this._hBusy = false; this._hRun(); },
   _onPop() {
     if (this._hBusy) { this._hDone(); return; } // our own traversal landed
+    if (this._lbOpen()) { this._closeLb({ fromPop: true }); return; }
     // Back while "Xem quán" (CommunityDetailModal) sits on top of the sổ:
     // close the modal, and put back the entry of the layer underneath.
     const modal = this._isOpen() && document.querySelector('.modal-overlay.show');
@@ -7788,6 +7927,7 @@ const NhatKyCtrl = {
     det.classList.remove('open'); det.setAttribute('aria-hidden', 'true');
     document.getElementById('nkSheet').classList.remove('behind');
     document.getElementById('nkCoach').classList.remove('show');
+    const gen = this._tgen;
     if (target && !this._reduced()) {
       const to = this._rectIn(target);
       const round = target.classList.contains('nk-plate');
@@ -7799,6 +7939,9 @@ const NhatKyCtrl = {
         ],
       });
       clone.remove();
+      // Torn down during the fly-back (session expiry, close+reopen): the
+      // teardown already reset state and history — don't pop a second entry.
+      if (gen !== this._tgen) return;
       const cell = target.closest('.nk-cell');
       document.querySelectorAll('.nk-cell.peeled').forEach(c => c.classList.remove('peeled'));
       if (cell) { cell.classList.add('press'); setTimeout(() => cell.classList.remove('press'), 100); }
@@ -7859,13 +8002,24 @@ const NhatKyCtrl = {
     this._setBusy(false);
   },
   _step(dir) { if (this._cur) this._deal(this._cur.i + dir, dir); },
-  // Start from wherever a drag left the card, and don't leave it there.
+  // Nothing further that way: spring back from wherever a drag left the
+  // card, or nudge it toward `dir` and back when there was no drag.
   _rubber(dir) {
     const card = document.getElementById('nkCard');
-    const from = card.style.transform || 'none';
+    const from = card.style.transform || '';
     card.style.transform = '';
     if (this._reduced()) return;
-    card.animate([{ transform: from }, { transform: `translateX(${-dir * 24}px)` }, { transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+    const kf = from ? [{ transform: from }, { transform: 'none' }]
+      : [{ transform: 'none' }, { transform: `translateX(${dir * 24}px)` }, { transform: 'none' }];
+    card.animate(kf, { duration: 260, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+  },
+  // Step within the same day (photo edge taps).
+  _dayStep(dir) {
+    if (!this._cur || this._busy) return;
+    const meals = this._dayMeals(this._cur);
+    const t = meals[meals.findIndex(m => m.id === this._cur.id) + dir];
+    if (!t) { this._rubber(dir); this._flash(I18N.t(dir > 0 ? 'nk.dayLast' : 'nk.dayFirst')); return; }
+    this._deal(t.i, dir);
   },
   // Keep the page's "peeled" backing on the meal being viewed, if its
   // month is the one on screen (otherwise close() switches month anyway).
@@ -7902,14 +8056,26 @@ const NhatKyCtrl = {
         card().style.transform = '';
       };
       if (s.lock === 'x') {
-        if (Math.abs(dx) > 70 || Math.abs(dx) / dt > .4) { this._deal(this._cur.i + (dx < 0 ? 1 : -1), dx < 0 ? 1 : -1); return; }
+        // Finger moves right → the next (later) meal, like the ruler reads
+        // left→right; the card leaves in the direction the finger went.
+        if (Math.abs(dx) > 70 || Math.abs(dx) / dt > .4) { const dir = dx > 0 ? 1 : -1; this._deal(this._cur.i + dir, dir); return; }
         springBack();
       } else if (s.lock === 'down') {
         scrim().style.opacity = '';
         if (dy > 100 || dy / dt > .5) { card().style.transform = ''; this._closeDetail(); return; }
         springBack();
-      } else if (!s.lock && e.type === 'pointerup' && s.tgt && s.tgt.closest && s.tgt.closest('#nkChin')) {
-        document.getElementById('nkChin').classList.toggle('open');
+      } else if (!s.lock && e.type === 'pointerup' && s.tgt && s.tgt.closest) {
+        if (s.tgt.closest('#nkChin')) { document.getElementById('nkChin').classList.toggle('open'); return; }
+        if (!s.tgt.closest('#nkFrame')) return;
+        // Photo taps: the outer thirds step through the SAME day's meals
+        // (left = earlier, right = later), the middle opens it full size.
+        // A one-meal day has nothing to step to, so all of it opens.
+        const fr = document.getElementById('nkPhoto').getBoundingClientRect();
+        const rx = (e.clientX - fr.left) / fr.width;
+        const many = this._dayMeals(this._cur).length > 1;
+        if (many && rx < .3) this._dayStep(-1);
+        else if (many && rx > .7) this._dayStep(1);
+        else this._openLb();
       }
     };
     stage.addEventListener('pointerup', end);
@@ -8007,6 +8173,7 @@ const NhatKyCtrl = {
     let r = await Community.setCheckinShared(id, next);
     // An expired session is answered 404 (see _fetchFresh) — refresh it and retry once.
     if (!r.ok && r.status === 404 && await this._sessionOk()) r = await Community.setCheckinShared(id, next);
+    this._mut++; // any list GET sent while the PATCH was in flight predates it
     if (!r.ok) { apply(!next); showToast(I18N.t('nk.changeFail')); return; }
     showToast(I18N.t(next ? 'nk.shared' : 'nk.madePrivate'));
     this._writeCache();
@@ -8069,6 +8236,7 @@ const NhatKyCtrl = {
       if (!(await this._sessionOk())) { if (gen === this._tgen) this._setBusy(false); showToast(I18N.t('nk.changeFail')); return; }
       r = await Community.deleteCheckin(id);
     }
+    this._mut++; // any list GET sent while the DELETE was in flight predates it
     if (!r.ok && r.status !== 404) { if (gen === this._tgen) this._setBusy(false); showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
     const card = document.getElementById('nkCard');
     if (gen === this._tgen) {
@@ -8143,6 +8311,134 @@ const NhatKyCtrl = {
     if (!this._isOpen() || !this._cur || this._cur.id !== e.id) return; // left meanwhile
     if (r.ok && r.data) CommunityDetailModal.open(r.data);
     else showToast(I18N.t('nk.quanFail'));
+  },
+
+  // ── Ảnh to (lightbox) ───────────────────────────────────
+  // Tap the middle of the opened photo. Paper ground, same sticker frame —
+  // not a dark Locket viewer. Pinch or double-tap to zoom, drag to pan;
+  // swipe down, ✕, Back or a tap outside the photo closes it.
+  _lb: { s: 1, tx: 0, ty: 0, pts: new Map(), g: null, lastTap: 0 },
+  _lbOpen() { const el = document.getElementById('nkLb'); return !!el && el.classList.contains('open'); },
+  _openLb() {
+    const e = this._cur;
+    if (!e || !this._hasPhoto(e) || this._lbOpen() || this._busy) return;
+    const box = document.getElementById('nkLb');
+    const img = document.getElementById('nkLbImg');
+    const lo = this._thumb(e), hi = this._full(e);
+    img.src = lo;                    // cached already — shows at once
+    const full = new Image();
+    full.onload = () => { if (this._lbOpen() && img.dataset.id === e.id) { img.src = hi; this._fitLb(); } };
+    full.src = hi;
+    img.dataset.id = e.id;
+    img.alt = e.name;
+    document.getElementById('nkLbTitle').textContent = `${this._dateLabel(e.day)} · ${this._hm(e.at)}`;
+    this._lbReset();
+    box.classList.add('open'); box.setAttribute('aria-hidden', 'false');
+    this._fitLb();
+    if (!this._reduced()) document.getElementById('nkLbFrame').animate([{ transform: 'scale(.94)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 220, easing: 'cubic-bezier(.34,1.56,.64,1)' });
+    this._push('lb');
+  },
+  _closeLb({ fromPop = false } = {}) {
+    if (!this._lbOpen()) return;
+    this._resetLb();
+    if (!fromPop) this._back();
+  },
+  _resetLb() {
+    const box = document.getElementById('nkLb');
+    if (!box) return;
+    box.classList.remove('open'); box.setAttribute('aria-hidden', 'true');
+    this._lb.pts.clear(); this._lb.g = null;
+    this._lbReset();
+  },
+  // Size the frame to the photo's own aspect, as big as the stage allows.
+  _fitLb() {
+    const stage = document.getElementById('nkLbStage'), frame = document.getElementById('nkLbFrame');
+    const img = document.getElementById('nkLbImg');
+    const ar = img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : .75;
+    const W = stage.clientWidth - 24, H = stage.clientHeight - 8;
+    const w = Math.max(1, Math.min(W, H * ar));
+    frame.style.width = `${Math.round(w)}px`;
+    frame.style.height = `${Math.round(w / ar)}px`;
+  },
+  _lbReset() { Object.assign(this._lb, { s: 1, tx: 0, ty: 0 }); this._lbApply(); },
+  _lbApply() {
+    const lb = this._lb, frame = document.getElementById('nkLbFrame');
+    // Keep the photo covering the frame: no panning past its edges.
+    const W = frame.clientWidth, H = frame.clientHeight;
+    lb.tx = Math.min(0, Math.max(W - W * lb.s, lb.tx));
+    lb.ty = Math.min(0, Math.max(H - H * lb.s, lb.ty));
+    document.getElementById('nkLbImg').style.transform = `translate(${lb.tx}px, ${lb.ty}px) scale(${lb.s})`;
+    frame.classList.toggle('zoomed', lb.s > 1.01);
+  },
+  _lbZoomAt(s, px, py) {
+    // Keep the photo point under (px,py) — frame coords — fixed while scaling.
+    const lb = this._lb, ns = Math.max(1, Math.min(4, s));
+    const cx = (px - lb.tx) / lb.s, cy = (py - lb.ty) / lb.s;
+    lb.s = ns; lb.tx = px - cx * ns; lb.ty = py - cy * ns;
+    this._lbApply();
+  },
+  _wireLb() {
+    const box = document.getElementById('nkLb'), stage = document.getElementById('nkLbStage');
+    const frame = document.getElementById('nkLbFrame');
+    document.getElementById('nkLbClose').addEventListener('click', () => this._closeLb());
+    document.getElementById('nkLbImg').addEventListener('load', () => { if (this._lbOpen()) this._fitLb(); });
+    window.addEventListener('resize', () => { if (this._lbOpen()) { this._fitLb(); this._lbReset(); } });
+    const local = (e) => { const r = frame.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    stage.addEventListener('pointerdown', (e) => {
+      const lb = this._lb;
+      lb.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      try { stage.setPointerCapture(e.pointerId); } catch (_) {}
+      const p = [...lb.pts.values()];
+      if (p.length === 2) {
+        const mid = local({ clientX: (p[0].x + p[1].x) / 2, clientY: (p[0].y + p[1].y) / 2 });
+        lb.g = { kind: 'pinch', d0: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) || 1, s0: lb.s, mid };
+      } else if (p.length === 1) {
+        lb.g = { kind: 'one', x0: e.clientX, y0: e.clientY, tx0: lb.tx, ty0: lb.ty, t0: performance.now(), moved: false, inFrame: !!e.target.closest('#nkLbFrame') };
+      }
+    });
+    stage.addEventListener('pointermove', (e) => {
+      const lb = this._lb, g = lb.g;
+      if (!g || !lb.pts.has(e.pointerId)) return;
+      lb.pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (g.kind === 'pinch') {
+        const p = [...lb.pts.values()];
+        if (p.length < 2) return;
+        const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+        this._lbZoomAt(g.s0 * d / g.d0, g.mid.x, g.mid.y);
+        return;
+      }
+      const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
+      if (Math.hypot(dx, dy) > 6) g.moved = true;
+      if (lb.s > 1.01) { lb.tx = g.tx0 + dx; lb.ty = g.ty0 + dy; this._lbApply(); }
+      else if (dy > 0) { frame.style.transform = `translateY(${dy}px) scale(${Math.max(.85, 1 - dy / 900)})`; box.style.opacity = String(Math.max(.4, 1 - dy / 500)); }
+    });
+    const end = (e) => {
+      const lb = this._lb, g = lb.g;
+      lb.pts.delete(e.pointerId);
+      if (!g) return;
+      if (g.kind === 'pinch') {
+        if (lb.pts.size === 0) lb.g = null;
+        else { const [id, pt] = [...lb.pts.entries()][0]; lb.g = { kind: 'one', x0: pt.x, y0: pt.y, tx0: lb.tx, ty0: lb.ty, t0: performance.now(), moved: true, inFrame: true }; }
+        return;
+      }
+      lb.g = null;
+      const dy = e.clientY - g.y0, dt = Math.max(1, performance.now() - g.t0);
+      if (lb.s <= 1.01 && g.moved) {
+        frame.style.transform = ''; box.style.opacity = '';
+        if (dy > 90 || (dy > 30 && dy / dt > .5)) this._closeLb();
+        return;
+      }
+      if (g.moved || e.type !== 'pointerup') return;
+      if (!g.inFrame) { this._closeLb(); return; }  // tap outside the photo
+      const now = performance.now();
+      if (now - lb.lastTap < 300) {                  // double tap: zoom in / back out
+        lb.lastTap = 0;
+        const p = local(e);
+        if (lb.s > 1.01) this._lbReset(); else this._lbZoomAt(2.5, p.x, p.y);
+      } else lb.lastTap = now;
+    };
+    stage.addEventListener('pointerup', end);
+    stage.addEventListener('pointercancel', end);
   },
 
   // ── Mâm tháng ───────────────────────────────────────────

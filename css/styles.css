@@ -474,7 +474,17 @@ input,textarea,select{font-family:var(--font-body)}
    too tight made adjacent ones easy to mis-tap (feedback 2026-09-17). */
 #catChips{gap:.55rem;flex-wrap:wrap}
 #catChips .cat-chip{padding:.5rem .5rem;font-size:.74rem;gap:.3rem}
+/* Home's "Nguồn dữ liệu" (#srcChips) is a primary filter too: all 3 chips
+   must stay plainly visible. It overflowed by a few px on ~360-384px
+   phones, so the scroll-fade ate "Cộng đồng" and it looked cut off.
+   Slightly tighter chips fit one row on those widths; anything narrower
+   (or a longer locale) wraps instead of scrolling behind a fade. */
+#srcChips{flex-wrap:wrap;overflow-x:visible;-webkit-mask-image:none;mask-image:none;gap:.4rem;padding-right:6px}
+#srcChips .cat-chip{padding:.5rem .48rem;font-size:.78rem}
 .cat-chip[data-cat="cafe"].active{background:var(--cat-cafe);border-color:#5A3B24;box-shadow:2px 2px 0 #5A3B24}
+/* Category icons carry their own category colour, which vanished on the
+   same-coloured active chip (pink "Ăn vặt" on pink) — draw them white there. */
+.cat-chip[data-cat].active .icon{filter:brightness(0) invert(1)}
 /* Community source chip — was flagged "sắp có" until the PocketBase
    backend went live. Now a normal, selectable source. */
 
@@ -500,7 +510,9 @@ input,textarea,select{font-family:var(--font-body)}
   background:var(--cream);border-radius:20px;padding:.5rem .6rem;
   transition:box-shadow .18s ease;
 }
-.loc-row:focus-within{box-shadow:0 0 0 2px var(--primary-2)}
+/* Inset, not outset: .sheet-inner-scroll (overflow:auto, no side padding)
+   clipped an outer ring at the row's left/right edges. */
+.loc-row:focus-within{box-shadow:inset 0 0 0 2px var(--primary-2)}
 
 /* Geocode suggestion dropdown — used on home input, modal address input,
    and friend search. position:fixed, coordinates computed by
@@ -2414,7 +2426,14 @@ body.map-full .tabbar{transform:translateY(105%)}
   border-radius:32px;overflow:hidden;
   background:var(--cam-bg,#0e0806);
 }
-.checkin-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.checkin-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform-origin:50% 50%}
+.checkin-frame{touch-action:none}
+/* Zoom chips — native-camera style, bottom-centre of the viewfinder. */
+.checkin-zoom{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);z-index:3;display:flex;gap:4px;padding:3px;border-radius:22px;background:rgba(20,10,5,.42);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.checkin-zoom.hidden{display:none}
+.checkin-zoom-chip{min-width:34px;height:34px;padding:0 6px;border-radius:17px;border:none;background:transparent;color:var(--cream);font-size:11px;font-weight:800;font-variant-numeric:tabular-nums;display:flex;align-items:center;justify-content:center;transition:background-color .15s,color .15s,transform .1s}
+.checkin-zoom-chip.on{background:var(--white);color:var(--text);font-size:12px}
+.checkin-zoom-chip:active{transform:scale(.92)}
 .checkin-video.hidden{display:none}
 
 .checkin-ctrl-row{
@@ -3291,7 +3310,7 @@ body.map-full .tabbar{transform:translateY(105%)}
 .nk-bubble.show{opacity:1}
 .nk-bubble i{width:44px;height:58px;border-radius:6px;background-color:var(--cream-2);background-size:cover;background-position:center;border:2px solid var(--text)}
 .nk-bubble b{font-size:10px;font-weight:900}
-.nk-coach{position:absolute;left:50%;bottom:calc(var(--safe-bottom) + 84px);transform:translateX(-50%);height:32px;padding:0 12px;border-radius:16px;display:flex;align-items:center;font-size:12px;font-weight:800;white-space:nowrap;z-index:6;opacity:0;pointer-events:none;transition:opacity .2s}
+.nk-coach{position:absolute;left:50%;bottom:calc(var(--safe-bottom) + 84px);transform:translateX(-50%);width:max-content;max-width:calc(100% - 32px);padding:7px 14px;border-radius:16px;font-size:12px;font-weight:800;line-height:1.35;text-align:center;z-index:6;opacity:0;pointer-events:none;transition:opacity .2s}
 .nk-coach.show{opacity:1}
 
 .nk-peel{position:absolute;z-index:11;background-color:var(--cream-2);background-size:cover;background-position:center;pointer-events:none;border:2px solid var(--text);will-change:left,top,width,height,transform}
@@ -3332,6 +3351,16 @@ body.map-full .tabbar{transform:translateY(105%)}
 .nk-m-btns button{height:48px;border-radius:14px;font-size:14px;font-weight:900;flex:1}
 .nk-m-btns .nk-share{flex:1.6;background:var(--primary);color:var(--cream);border-color:var(--primary-2)}
 
+/* ── Ảnh to (lightbox) — paper ground, same sticker frame ── */
+.nk-lb{position:absolute;inset:0;z-index:14;background:var(--paper);display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .2s}
+.nk-lb.open{opacity:1;pointer-events:auto}
+.nk-lb-top{position:relative;display:flex;align-items:center;justify-content:center;min-height:44px;margin:calc(var(--safe-top) + 12px) 16px 6px}
+.nk-lb-top .nk-circle{position:absolute;right:0;top:0}
+.nk-lb-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;touch-action:none;overflow:hidden}
+.nk-lb-frame{position:relative;border:2px solid var(--text);border-radius:14px;overflow:hidden;background:var(--cream-2);max-width:100%}
+.nk-lb-frame img{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;transform-origin:0 0;will-change:transform;user-select:none;-webkit-user-drag:none}
+.nk-lb-frame.zoomed{cursor:grab}
+.nk-lb-hint{text-align:center;font-size:12px;font-weight:700;color:var(--text3);padding:10px 16px calc(var(--safe-bottom) + 16px)}
 .nk-flash{position:absolute;left:50%;top:calc(var(--safe-top) + 64px);transform:translate(-50%,-10px);z-index:12;height:36px;padding:0 14px;border-radius:18px;display:flex;align-items:center;font-size:13px;font-weight:900;white-space:nowrap;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none}
 .nk-flash.show{opacity:1;transform:translate(-50%,0)}
 .nk-ink{position:absolute;z-index:3;border-radius:50%;border:2px solid var(--primary);pointer-events:none}

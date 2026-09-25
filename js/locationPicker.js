@@ -99,7 +99,7 @@ const LocationPicker = {
   initMap(divId, stateMapKey, stateMarkerKey, center, onMapClick) {
     if (State[stateMapKey]) { try { State[stateMapKey].remove(); } catch(_) {} State[stateMapKey] = null; }
     if (State[stateMarkerKey]) { try { State[stateMarkerKey].remove(); } catch(_) {} State[stateMarkerKey] = null; }
-    State[stateMapKey] = L.map(divId, { center, zoom: 15, zoomControl: false, attributionControl: false });
+    State[stateMapKey] = L.map(divId, { center, zoom: 15, zoomControl: false, attributionControl: false, rotateControl: false });
     TileLayer.add(State[stateMapKey]);
     State[stateMapKey].on('click', e => onMapClick(e.latlng.lat, e.latlng.lng));
   },

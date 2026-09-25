@@ -6,11 +6,14 @@
 // the CSS right-edge fade disappears once the user is at the last chip.
 function wireScrollMasks() {
   const selectors = '.cat-chips, .cat-tabs, .plan-summary';
+  // "At the end" = the last item's right edge (plus its 2px sticker
+  // shadow) is inside the box. scrollWidth alone counted the row's right
+  // PADDING (2.2rem on .cat-chips) as overflow, so a row that fitted still
+  // faded its last chip out — the "Cộng đồng" chip looked cut off.
   const update = (el) => {
-    const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
+    const last = el.lastElementChild;
+    const atEnd = !last || last.getBoundingClientRect().right + 2 <= el.getBoundingClientRect().right + 1;
     el.classList.toggle('at-end', atEnd);
-    // If content fits without scrolling, no fade needed either.
-    if (el.scrollWidth <= el.clientWidth + 1) el.classList.add('at-end');
   };
   const bind = (el) => {
     if (el._scrollMaskBound) return;

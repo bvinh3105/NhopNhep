@@ -149,7 +149,10 @@ const MapHome = {
     const defLat = 21.0285, defLng = 105.8542;
     State.mainMap = L.map('mainMap', {
       center: [defLat, defLng], zoom: 15,
-      zoomControl: false, attributionControl: false,
+      // rotateControl:false — the leaflet-rotate plugin otherwise adds its
+      // compass button top-left, where it peeked out half-hidden behind
+      // the logo pill as a cut-off box.
+      zoomControl: false, attributionControl: false, rotateControl: false,
     });
     TileLayer.add(State.mainMap);
     // Only show user marker if we already have a real GPS/address fix
