@@ -431,8 +431,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--primary);outline-of
   dial.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
-    dial.focus({ preventScroll: true });
-    dial.setPointerCapture(e.pointerId);
+    try { dial.setPointerCapture(e.pointerId); } catch (_) {}
     const n = Math.max(1, values.length - 1);
     drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, i0: idx, spacing: (dial.clientWidth - 2 * INSET) / n, moved: false, edge: 0 };
     dial.classList.add('dragging');
