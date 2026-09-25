@@ -266,6 +266,13 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--primary);outlin
 .p-btns button{height:44px;padding:0 14px;border-radius:14px;font-size:.84rem;font-weight:800}
 .p-btns .primary{background:var(--primary);color:var(--cream);border-color:var(--primary-2);box-shadow:2px 2px 0 var(--primary-2)}
 
+/* Flat stickers — no drop shadows (per Vinh, 2026-09-25). Shared vs
+   private still reads from solid vs dashed borders. */
+.stk,.chip,.chip.on,.cell .ph,.meal-stk,.star-stk,.d-frame,.d-card .behind,.plate,.tray,.pop,.menu,
+.tray-btn,.tray-btn.locked,.t-btns .go,.m-btns .share,.p-btns .primary,.pop .btns .yes,.s-search input{box-shadow:none}
+.stk:active,.chip:active,.tray-btn:active{transform:scale(.97);box-shadow:none}
+.cell.press .ph{transform:scale(.96);box-shadow:none}
+
 @media (max-width:640px){
   .stage{padding:0 0 48px;gap:0}
   .phone{width:100%;padding:0;border-radius:0;box-shadow:none;background:none}
@@ -905,9 +912,9 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--primary);outlin
     const clone = await flyClone(photoOf(e), from, to, {
       dur: 470,
       kf: (fr, a, b) => [
-        fr(a, { transform: 'rotate(0deg) scale(1)', boxShadow: '2px 2px 0 #2A1810', borderRadius: round ? '50%' : '6px', easing: 'ease-out' }),
-        fr(a, { offset: .19, transform: 'rotate(0deg) scale(1.06)', boxShadow: '5px 5px 0 #2A1810', borderRadius: round ? '50%' : '6px', easing: 'cubic-bezier(.34,1.56,.64,1)' }),
-        fr(b, { transform: `rotate(${tiltOf(e)}deg) scale(1)`, boxShadow: '4px 4px 0 #2A1810', borderRadius: '8px' }),
+        fr(a, { transform: 'rotate(0deg) scale(1)', boxShadow: 'none', borderRadius: round ? '50%' : '6px', easing: 'ease-out' }),
+        fr(a, { offset: .19, transform: 'rotate(0deg) scale(1.06)', boxShadow: 'none', borderRadius: round ? '50%' : '6px', easing: 'cubic-bezier(.34,1.56,.64,1)' }),
+        fr(b, { transform: `rotate(${tiltOf(e)}deg) scale(1)`, boxShadow: 'none', borderRadius: '8px' }),
       ],
     });
     frame.style.opacity = '';
@@ -950,8 +957,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--primary);outlin
       const clone = await flyClone(photoOf(e), from, to, {
         dur: 340,
         kf: (fr, a, b) => [
-          fr(a, { transform: `rotate(${tiltOf(e)}deg)`, boxShadow: '4px 4px 0 #2A1810', borderRadius: '8px', easing: 'cubic-bezier(.32,.72,0,1)' }),
-          fr(b, { transform: 'rotate(0deg)', boxShadow: '2px 2px 0 #2A1810', borderRadius: round ? '50%' : '6px' }),
+          fr(a, { transform: `rotate(${tiltOf(e)}deg)`, boxShadow: 'none', borderRadius: '8px', easing: 'cubic-bezier(.32,.72,0,1)' }),
+          fr(b, { transform: 'rotate(0deg)', boxShadow: 'none', borderRadius: round ? '50%' : '6px' }),
         ],
       });
       clone.remove();
