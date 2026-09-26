@@ -108,6 +108,7 @@ const HomeCtrl = {
     // scroll-hide để lướt danh sách filter dài cũng làm tab bar tự ẩn,
     // giải phóng chỗ nhìn thấy nút "Quét ngay!" ở đáy sheet.
     TabNav.wireScrollHide(document.querySelector('#homeSheet .sheet-inner-scroll'));
+    this._initSheetCollapse();
 
     this._initRandomPickDrag();
     this._updateRandomPickVisibility();
@@ -121,6 +122,151 @@ const HomeCtrl = {
     });
 
     this._updateBadge();
+  },
+
+  // Kéo sheet xuống → thu gọn: chỉ còn nút "Quét ngay", map gần như cả màn
+  // hình. Kéo lên / chạm thanh kéo → mở lại. The form's max-height follows
+  // the finger, then snaps open or shut. Drags start on the handle (any
+  // state), anywhere on the collapsed sheet (the scan button still takes a
+  // plain tap), or as a pull-down on the open form while it's at the top.
+  _sheetCollapsed: false,
+  _initSheetCollapse() {
+    const sheet = document.getElementById('homeSheet');
+    const form = document.getElementById('homeSheetForm');
+    const handle = document.getElementById('homeSheetHandle');
+    if (!sheet || !form || !handle) return;
+    // Height the form takes when open: its content, capped by the sheet's
+    // max-height (68% of the home screen) minus handle/button/padding.
+    const openH = () => {
+      const rest = sheet.offsetHeight - form.offsetHeight;
+      return Math.max(0, Math.min(form.scrollHeight, sheet.parentElement.clientHeight * 0.68 - rest));
+    };
+    let settle = null;
+    const snap = (collapse) => {
+      const from = form.offsetHeight;
+      const to = collapse ? 0 : openH();
+      clearTimeout(settle);
+      sheet.classList.remove('sheet-dragging');
+      form.style.opacity = '';
+      form.style.maxHeight = from + 'px';
+      void form.offsetHeight;                        // the transition starts from here
+      this._sheetCollapsed = collapse;
+      sheet.classList.toggle('collapsed', collapse);
+      handle.setAttribute('aria-expanded', String(!collapse));
+      handle.setAttribute('aria-label', I18N.t(collapse ? 'home.sheetExpand' : 'home.sheetCollapse'));
+      form.style.maxHeight = to + 'px';
+      // Open: drop the inline cap once it lands, so the sheet reflows
+      // naturally again (keyboard, suggestion lists, rotation).
+      if (!collapse) settle = setTimeout(() => { if (!this._sheetCollapsed) form.style.maxHeight = ''; }, 380);
+      if (collapse) {
+        if (form.contains(document.activeElement)) document.activeElement.blur();
+        document.querySelectorAll('#locSuggest.show, #dishSuggest.show').forEach(el => el.classList.remove('show'));
+      }
+    };
+    this._snapSheet = snap;
+
+    // Live drag, shared by the pointer (handle / collapsed sheet) and the
+    // touch (pull-down on the form) paths. dy > 0 = finger moved down.
+    let drag = null;
+    const begin = (y, x) => {
+      drag = { y, x, h0: form.offsetHeight, full: openH(), moved: false, t: performance.now() };
+    };
+    const move = (y, x) => {
+      if (!drag) return;
+      const dy = y - drag.y;
+      if (!drag.moved) {
+        if (Math.abs(dy) < 8 || Math.abs(x - drag.x) > Math.abs(dy)) return;
+        drag.moved = true;
+        sheet.classList.add('sheet-dragging');
+        clearTimeout(settle);
+      }
+      drag.ly = y;
+      const h = Math.max(0, Math.min(drag.full, drag.h0 - dy));
+      form.style.maxHeight = h + 'px';
+      form.style.opacity = drag.full ? String(Math.min(1, .15 + h / drag.full)) : '1';
+    };
+    // y omitted (a cancelled gesture) → the last position seen.
+    const finish = (y) => {
+      const d = drag; drag = null;
+      if (!d) return 'none';
+      if (!d.moved) return 'tap';
+      if (y == null) y = d.ly ?? d.y;
+      const dy = y - d.y, v = dy / Math.max(1, performance.now() - d.t);   // px/ms, + = down
+      const h = Math.max(0, Math.min(d.full, d.h0 - dy));
+      snap(v > .5 ? true : v < -.5 ? false : h < d.full / 2);
+      return 'drag';
+    };
+
+    // Handle + collapsed sheet: pointer events (mouse too). Captured only
+    // once it is really a drag: capturing on pointerdown would retarget
+    // the click of a plain tap to the sheet, and the scan button would
+    // stop working while collapsed. Move/up are read on window: a mouse
+    // can leave the sheet before the capture is taken (touch pointers are
+    // implicitly captured anyway).
+    let pid = null, swallowClick = false;
+    sheet.addEventListener('pointerdown', (e) => {
+      if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      if (!(handle.contains(e.target) || this._sheetCollapsed)) return;
+      pid = e.pointerId; begin(e.clientY, e.clientX);
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== pid || !drag) return;
+      move(e.clientY, e.clientX);
+      if (drag && drag.moved && !drag.cap) { drag.cap = true; try { sheet.setPointerCapture(pid); } catch (_) {} }
+    });
+    const up = (e) => {
+      if (e.pointerId !== pid) return;
+      pid = null;
+      const r = finish(e.type === 'pointercancel' ? null : e.clientY);
+      if (r === 'drag') swallowClick = true;           // a drag over the scan button is not a tap on it
+      else if (r === 'tap' && e.type === 'pointerup' && handle.contains(e.target)) snap(!this._sheetCollapsed);
+    };
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    sheet.addEventListener('click', (e) => {
+      if (swallowClick) { swallowClick = false; e.stopPropagation(); e.preventDefault(); }
+    }, true);
+    sheet.addEventListener('pointerdown', () => { swallowClick = false; }, true);
+    handle.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); snap(!this._sheetCollapsed); }
+    });
+
+    // Pull-down on the open form while it sits at the top. Touch events,
+    // because they keep coming while the browser overscrolls (pointer
+    // events get cancelled). Sideways chip rows and the suggestion lists
+    // keep their own gestures; a finger going up is a normal scroll.
+    let pull = false;
+    const dropPull = () => {
+      pull = false; drag = null;
+      sheet.classList.remove('sheet-dragging');
+      form.style.maxHeight = ''; form.style.opacity = '';
+    };
+    form.addEventListener('touchstart', (e) => {
+      pull = false;
+      if (this._sheetCollapsed || e.touches.length !== 1 || form.scrollTop > 0) return;
+      if (e.target.closest('.geocode-suggest, .dish-suggest')) return;
+      const t = e.touches[0];
+      pull = true; begin(t.clientY, t.clientX);
+    }, { passive: true });
+    form.addEventListener('touchmove', (e) => {
+      if (!pull || !drag) return;
+      const t = e.touches[0];
+      if (e.touches.length !== 1 || form.scrollTop > 0 || (!drag.moved && t.clientY < drag.y - 4)) { dropPull(); return; }
+      move(t.clientY, t.clientX);
+    }, { passive: true });
+    const pullEnd = (e) => {
+      if (!pull) return;
+      pull = false;
+      const t = e.type === 'touchend' && e.changedTouches && e.changedTouches[0];
+      if (finish(t ? t.clientY : null) === 'drag') return;
+      form.style.maxHeight = ''; form.style.opacity = '';
+    };
+    form.addEventListener('touchend', pullEnd);
+    form.addEventListener('touchcancel', pullEnd);
+
+    // Anything focusing a field of the collapsed form (a GPS-failure
+    // prompt, keyboard Tab) opens it again.
+    form.addEventListener('focusin', () => { if (this._sheetCollapsed) snap(false); });
   },
 
   // Easter egg — "vi vu cùng Vinh và Thảo ♥" ẩn mặc định, bấm liên tiếp 5

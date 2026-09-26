@@ -349,6 +349,18 @@ input,textarea,select{font-family:var(--font-body)}
 }
 .sheet-drag-handle{width:34px;height:4px;background:var(--line-2);border-radius:2px;margin:0 auto .6rem;flex-shrink:0}
 .sheet-inner-scroll{flex:1 1 auto;overflow-y:auto;min-height:0;scrollbar-width:none}
+/* Home sheet collapse (HomeCtrl._initSheetCollapse): drag it down and only
+   the scan button stays, so the map gets nearly the whole screen. The
+   form's max-height follows the finger, then snaps; the handle gets a
+   finger-sized hit area (the bar itself is 4 px). */
+#homeSheet .sheet-drag-handle{position:relative;touch-action:none;cursor:grab;transition:background-color .2s}
+#homeSheet .sheet-drag-handle::before{content:'';position:absolute;left:-70px;right:-70px;top:-12px;bottom:-12px}
+#homeSheet .sheet-drag-handle:focus-visible{outline:2px solid var(--primary);outline-offset:6px}
+#homeSheet .sheet-inner-scroll{overscroll-behavior-y:contain;transition:max-height .34s var(--ease-ios),opacity .24s var(--ease-ios)}
+#homeSheet.sheet-dragging .sheet-inner-scroll{transition:none}
+#homeSheet.collapsed .sheet-inner-scroll{opacity:0;pointer-events:none}
+#homeSheet.collapsed,#homeSheet.collapsed *{touch-action:none}
+#homeSheet.collapsed .sheet-drag-handle{background:var(--text3)}
 .sheet-inner-scroll::-webkit-scrollbar{display:none}
 /* Chừa chỗ cho tab bar pill nổi (54px pill + 10px margin + safe area + hơi thở
    16px) — trước để 14px nên nút Quét ngay bị che. */
