@@ -271,6 +271,8 @@ const I18N = {
       // ── Check-in ("chụp NGAY" tab) ──
       'checkin.needLoginToSave': '📸 Ảnh đã lưu — đăng nhập để đăng check-in này nhé',
       'checkin.draftRestoredToast': '✨ Đã khôi phục ảnh check-in, bấm Gửi để đăng',
+      'checkin.toastLocalSaved': '📔 Đã lưu vào Diary trên máy này — đăng nhập để đồng bộ & chia sẻ',
+      'nk.localNeedAccount': 'Cần tài khoản để chia sẻ — đăng nhập hoặc đăng ký để chia sẻ ảnh này với bạn bè nhé',
       'checkin.noPermTitle': 'Chưa mở được camera',
       'checkin.noPermSub': 'Bạn cần cho phép Nhóp Nhép dùng camera để check-in. Bấm 🔒 cạnh URL để bật lại quyền.',
       'checkin.needHttpsTitle': 'Cần kết nối bảo mật',
@@ -956,6 +958,8 @@ const I18N = {
       // ── Check-in ──
       'checkin.needLoginToSave': "📸 Photo saved — sign in to post this check-in",
       'checkin.draftRestoredToast': '✨ Check-in photo restored — tap Gửi to post it',
+      'checkin.toastLocalSaved': "📔 Saved to your Diary on this device — sign in to sync & share",
+      'nk.localNeedAccount': 'Sharing needs an account — sign in or sign up to share this with friends',
       'checkin.noPermTitle': "Camera didn't open",
       'checkin.noPermSub': 'Allow Nhóp Nhép to use the camera to check in. Tap 🔒 next to the URL to re-grant permission.',
       'checkin.needHttpsTitle': 'Secure connection required',

@@ -6060,6 +6060,135 @@ const ExposureDial = {
   },
 };
 
+/* ═══════════════════════════════════════════════
+   LOCAL DIARY — private check-ins saved with NO account at all
+   A guest's check-in that isn't shared never needs a server identity, so
+   instead of going through CheckinCtrl's guest-draft-then-sign-in flow
+   (that one's still how SHARING works — a public post has to be
+   attributed to someone), it's saved entirely on this device: IndexedDB
+   for the photo, localStorage for everything else. CheckinCtrl._submit()
+   writes here; NhatKyCtrl reads it back MERGED into the same Sổ Dán Món
+   as any server check-in (_setRecords()), so a guest gets the full
+   "chụp → xem lại trong nhật ký" loop with no account — labeled "Bạn"
+   wherever the diary shows a name, since that's already _userName()'s
+   fallback with no Community.currentUser.
+
+   Records are shaped exactly like the server's own checkins fields
+   (NhatKyCtrl.FIELDS) so NhatKyCtrl._toEntry() handles them completely
+   unchanged; only the photo URL needs a different resolver, since there's
+   no PocketBase file to point ?thumb= at — see NhatKyCtrl._thumb()/_full()
+   and this object's photoUrl()/preload(). id uses an 'lcl' prefix (real
+   PocketBase ids are exactly 15 lowercase-alnum chars, this is 21) so the
+   two can never collide and a record's origin is obvious from its id alone.
+
+   Never sent to the server, never visible to anyone else, and NOT merged
+   into a real account if the guest later signs up — this device's local
+   diary stays a separate thing from any account's, a boundary simple
+   enough that a user can actually reason about it.
+═══════════════════════════════════════════════ */
+const LocalDiary = {
+  KEY: 'nk_local_checkins',
+  DB_NAME: 'nhopnhep_local_diary',
+  _dbPromise: null,
+  _urls: new Map(),   // record id → object URL, (re)created once per page load
+
+  _db() {
+    if (this._dbPromise) return this._dbPromise;
+    this._dbPromise = new Promise((resolve) => {
+      let req;
+      try { req = indexedDB.open(this.DB_NAME, 1); }
+      catch (_) { return resolve(null); }
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('photos')) db.createObjectStore('photos');
+      };
+      req.onerror = () => resolve(null);
+      req.onblocked = () => resolve(null);
+      req.onsuccess = () => resolve(req.result);
+    });
+    return this._dbPromise;
+  },
+
+  // Mọi lỗi IndexedDB (tab ẩn danh, quota, trình duyệt chặn) đều trả null
+  // chứ không throw — mất ảnh không được phép làm hỏng cả tính năng.
+  async _idb(mode, fn) {
+    const db = await this._db();
+    if (!db) return null;
+    return new Promise((resolve) => {
+      try {
+        const op = fn(db.transaction('photos', mode).objectStore('photos'));
+        if (!op) return resolve(null);
+        op.onsuccess = () => resolve(op.result);
+        op.onerror = () => resolve(null);
+      } catch (_) { resolve(null); }
+    });
+  },
+
+  _newId() {
+    const abc = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let s = 'lcl';
+    for (let i = 0; i < 18; i++) s += abc[Math.floor(Math.random() * abc.length)];
+    return s;
+  },
+
+  list() {
+    try {
+      const arr = JSON.parse(localStorage.getItem(this.KEY) || '[]');
+      return Array.isArray(arr) ? arr : [];
+    } catch (_) { return []; }
+  },
+
+  _write(arr) {
+    try { localStorage.setItem(this.KEY, JSON.stringify(arr)); } catch (_) { /* quota/private mode — best-effort only */ }
+  },
+
+  // Saves one private check-in with no account. Returns the record
+  // (NhatKyCtrl._toEntry()-ready) so the caller can drop it straight into
+  // the diary the same way a real post does (see noteNewLocalCheckin()).
+  async add({ blob, restaurantName, restaurantLat, restaurantLng, rating, note }) {
+    const id = this._newId();
+    if (blob) await this._idb('readwrite', s => s.put(blob, id));
+    const rec = {
+      id, user: '', restaurant: '',
+      created: new Date().toISOString().replace('T', ' '),
+      restaurant_name: (restaurantName || '').trim().slice(0, 120),
+      restaurant_lat: restaurantLat, restaurant_lng: restaurantLng, restaurant_emoji: '',
+      rating: Math.max(0, Math.min(5, Math.round(+rating || 0))),
+      note: (note || '').trim().slice(0, 200),
+      // A real extension so _savePhoto()'s "download" keeps one, not just
+      // a truthy marker for _hasPhoto().
+      photo: blob ? (blob.type === 'image/webp' ? 'local.webp' : 'local.jpg') : '',
+      is_shared: false,
+      _local: true,
+    };
+    const arr = this.list(); arr.push(rec); this._write(arr);
+    if (blob) this._urls.set(id, URL.createObjectURL(blob));
+    return rec;
+  },
+
+  remove(id) {
+    this._write(this.list().filter(r => r.id !== id));
+    this._idb('readwrite', s => s.delete(id));
+    const u = this._urls.get(id);
+    if (u) { try { URL.revokeObjectURL(u); } catch (_) {} this._urls.delete(id); }
+  },
+
+  // Object URL for a local photo. '' until preload() (or add(), for a
+  // brand new one) has resolved it — every _thumb()/_full() caller in
+  // NhatKyCtrl is synchronous, so a cold page load shows these blank for
+  // a moment until the preload below finishes and re-renders.
+  photoUrl(id) { return this._urls.get(id) || ''; },
+
+  async preload() {
+    const todo = this.list().filter(r => r.photo && !this._urls.has(r.id));
+    if (!todo.length) return;
+    await Promise.all(todo.map(async (r) => {
+      const blob = await this._idb('readonly', s => s.get(r.id));
+      if (blob) this._urls.set(r.id, URL.createObjectURL(blob));
+    }));
+  },
+};
+
 const CheckinCtrl = {
   _stream: null,
   _facing: 'environment',  // start with rear camera on phones
@@ -6825,15 +6954,30 @@ const CheckinCtrl = {
       return;
     }
 
-    // Guest: let them shoot/rate/write freely, but posting needs an
-    // account. Stash exactly what they typed (not the restaurantId/Name/
-    // Lat/Lng inferred above — _rehydrateDraft() re-runs that same
-    // inference through this same _submit() on the real "Gửi" tap, so
-    // there's only one place this logic has to be right), then open the
-    // sign-in form. _submitAuth() calls _rehydrateDraft() once they're in
-    // to bring this sheet right back — never auto-posted, so a shared
-    // device logging into a different account doesn't silently upload
-    // the previous person's photo.
+    // Guest, not sharing: save it entirely on this device — no account
+    // needed at all (see LocalDiary's header comment). Sharing publicly
+    // still needs a real identity to attribute the post to, so THAT path
+    // stashes the draft and asks to sign in instead (below).
+    if (!Community.isLoggedIn() && !isShared) {
+      const rec = await LocalDiary.add({ blob: photoBlob, restaurantName, restaurantLat, restaurantLng, rating, note });
+      btn.disabled = false;
+      if (spanEl) spanEl.textContent = originalLabel;
+      if (typeof Analytics !== 'undefined') Analytics.track('checkin_guest_local', {});
+      showToast(I18N.t('checkin.toastLocalSaved'));
+      if (typeof NhatKyCtrl !== 'undefined') NhatKyCtrl.noteNewLocalCheckin(rec);
+      this._retake();
+      this._setStars(document.getElementById('checkinStars'), 0);
+      return;
+    }
+    // Guest, sharing: needs a real account to attribute the post to.
+    // Stash exactly what they typed (not the restaurantId/Name/Lat/Lng
+    // inferred above — _rehydrateDraft() re-runs that same inference
+    // through this same _submit() on the real "Gửi" tap, so there's only
+    // one place this logic has to be right), then open the sign-in form.
+    // _submitAuth() calls _rehydrateDraft() once they're in to bring this
+    // sheet right back — never auto-posted, so a shared device logging
+    // into a different account doesn't silently upload the previous
+    // person's photo.
     if (!Community.isLoggedIn()) {
       await this._stashDraft({ dataUrl: this._captured.dataUrl, blob: photoBlob, rating, note, isShared, shareLocation, typedAddr, selected: this._selected });
       btn.disabled = false;
@@ -7418,7 +7562,7 @@ const NhatKyCtrl = {
     });
     $('nkTicket').addEventListener('click', (ev) => {
       if (!this._cur || this._busy) return;
-      if (ev.target.closest('#nkPriv')) return this._privacyPop();
+      if (ev.target.closest('#nkPriv')) return this._isLocal(this._cur) ? this._localShareHint() : this._privacyPop();
       if (ev.target.closest('#nkGo')) return this._go();
       if (ev.target.closest('#nkAgain')) return this._again();
       if (ev.target.closest('#nkQuan')) return this._viewQuan();
@@ -7479,11 +7623,19 @@ const NhatKyCtrl = {
     if (!root || this._isOpen()) return;
     clearTimeout(this._hideT);
     const uid = Community.isLoggedIn() ? (Community.currentUser?.id || '') : '';
-    if (uid !== this._uid) {
+    // Also re-populate for a GUEST even when uid "didn't change" (it's ''
+    // both before and after — that's just this._uid's own initial value,
+    // true on the very first open of a fresh page load): without the
+    // !this._loaded escape hatch, a guest's local entries would never get
+    // merged in until they actually logged in or out at least once.
+    if (uid !== this._uid || (!uid && !this._loaded)) {
       this._uid = uid;
       this._entries = []; this._dayMap = new Map(); this._badPhotos = new Set();
       this._loaded = false; this._stale = true; this._offline = false; this._failed = false;
-      if (uid) this._readCache();
+      // uid === '' (guest): no server data ever loads, but _setRecords([])
+      // still pulls in LocalDiary's entries — otherwise a guest's sổ would
+      // stay empty forever even with locally-saved check-ins sitting there.
+      if (uid) this._readCache(); else { this._setRecords([]); this._loaded = true; }
     }
     this._month = this._mkey(this._today());
     this._filter = null;
@@ -7498,6 +7650,9 @@ const NhatKyCtrl = {
     const opened = new Promise(r => setTimeout(r, this._reduced() ? 150 : 380));
     const fresh = uid && (this._stale || !this._loaded) ? this._refresh() : Promise.resolve();
     if (this._pendingDrop) Promise.all([opened, fresh]).then(() => this._maybeDrop());
+    // Local entries' photos resolve async (IndexedDB) — idempotent, and
+    // usually already warm by now from the fire-and-forget call in boot().
+    LocalDiary.preload().then(() => { if (this._isOpen()) this._rerender(); });
   },
 
   close({ fromPop = false, instant = false } = {}) {
@@ -7526,6 +7681,15 @@ const NhatKyCtrl = {
     if (!rec || !rec.id) return;
     this._pendingDrop = { id: rec.id, at: Date.now() };
     if (this._uid && rec.user === this._uid && !this._find(rec.id)) {
+      const e = this._toEntry(rec);
+      if (e) { this._entries.push(e); this._sortEntries(); }
+    }
+  },
+
+  noteNewLocalCheckin(rec) {
+    if (!rec || !rec.id) return;
+    this._pendingDrop = { id: rec.id, at: Date.now() };
+    if (!this._find(rec.id)) {
       const e = this._toEntry(rec);
       if (e) { this._entries.push(e); this._sortEntries(); }
     }
@@ -7628,13 +7792,17 @@ const NhatKyCtrl = {
 
   _writeCache() {
     try {
-      const items = this._entries.slice(-600).map(e => e.rec);
+      // Local (guest, no-account) entries are never server data — keeping
+      // them out of the SERVER cache blob is what keeps _setRecords()'s
+      // concat(local) idempotent (else they'd double up on the next read).
+      const items = this._entries.filter(e => !this._isLocal(e)).slice(-600).map(e => e.rec);
       localStorage.setItem(this.CACHE_KEY + this._uid, JSON.stringify({ savedAt: Date.now(), items }));
     } catch (_) { /* quota / private mode — the network copy still works */ }
   },
 
   _setRecords(items) {
-    this._entries = (items || []).map(r => this._toEntry(r)).filter(Boolean);
+    const local = LocalDiary.list().map(r => this._toEntry(r)).filter(Boolean);
+    this._entries = (items || []).map(r => this._toEntry(r)).filter(Boolean).concat(local);
     this._sortEntries();
   },
 
@@ -7713,8 +7881,19 @@ const NhatKyCtrl = {
   _isOpen() { const r = document.getElementById('nkRoot'); return !!r && !r.hidden && r.classList.contains('open'); },
   _mamOpen() { return document.getElementById('nkMam').classList.contains('open'); },
   _hasPhoto(e) { return !!e && e.photo && !this._badPhotos.has(e.id); },
-  _thumb(e, size = '150x200') { return this._hasPhoto(e) ? Community.checkinPhotoUrl(e.rec, size) : ''; },
-  _full(e) { return this._hasPhoto(e) ? Community.checkinPhotoUrl(e.rec) : ''; },
+  _isLocal(e) { return !!(e && e.rec && e.rec._local); },
+  // Most of the sổ's rendering gates on "is there anything to show" —
+  // historically just this._uid (signed in), but a guest with local-only
+  // entries (LocalDiary) has content too, with no account at all. _blank
+  // below (the logged-in-but-truly-empty CTA) intentionally still checks
+  // this._uid alone — that one specific case stays account-only.
+  _hasContent() { return !!this._uid || !!this._entries.length; },
+  // Local (guest, no-account) entries have no PocketBase file to build a
+  // ?thumb= URL for — LocalDiary.photoUrl() resolves an IndexedDB blob to
+  // an object URL instead (same one regardless of `size`; these photos
+  // are already capture-sized, not worth a second thumbnail tier for).
+  _thumb(e, size = '150x200') { return this._hasPhoto(e) ? (this._isLocal(e) ? LocalDiary.photoUrl(e.id) : Community.checkinPhotoUrl(e.rec, size)) : ''; },
+  _full(e) { return this._hasPhoto(e) ? (this._isLocal(e) ? LocalDiary.photoUrl(e.id) : Community.checkinPhotoUrl(e.rec)) : ''; },
   _bg(url) { return url ? `background-image:url('${escapeHtml(url)}')` : ''; },
   _foodIcon(e) { return this.CAT_FOOD[e.cat] || 'food-pho'; },
   _catColor(k) { return k ? `var(--cat-${k})` : 'var(--text2)'; },
@@ -7822,8 +8001,7 @@ const NhatKyCtrl = {
 
   _render({ slide = 0 } = {}) {
     this._renderNotice();
-    const signedIn = !!this._uid;
-    document.getElementById('nkSearchBtn').hidden = !signedIn;
+    document.getElementById('nkSearchBtn').hidden = !this._hasContent();
     this._renderMemory();
     this._renderMonths();
     this._renderPage(slide);
@@ -7854,7 +8032,7 @@ const NhatKyCtrl = {
       const d = Math.abs((e.day - target) / 864e5);
       if (d < bestD && this._hasPhoto(e)) { bestD = d; best = e; }
     });
-    if (!best || this._searching || !this._uid) { el.hidden = true; return; }
+    if (!best || this._searching || !this._hasContent()) { el.hidden = true; return; }
     el.hidden = false;
     el.dataset.id = best.id;
     el.innerHTML = `<span class="nk-thumb" style="${this._bg(this._thumb(best))}"></span>
@@ -7878,8 +8056,8 @@ const NhatKyCtrl = {
 
   _renderMonths() {
     const nav = document.getElementById('nkMonths');
-    nav.hidden = !this._uid;
-    if (!this._uid) return;
+    nav.hidden = !this._hasContent();
+    if (!this._hasContent()) return;
     nav.innerHTML = this._monthsList().map(mk => {
       const m = +mk.split('-')[1];
       const empty = !this._monthEntries(mk).length;
@@ -7936,7 +8114,7 @@ const NhatKyCtrl = {
     for (let d = 1; d <= days; d++) {
       const date = new Date(y, m - 1, d), k = this._dkey(date), meals = this._dayMap.get(k);
       const isToday = +date === +today, future = date > today;
-      if (meals && this._uid) {
+      if (meals && this._hasContent()) {
         const e = meals[meals.length - 1];
         const photo = this._hasPhoto(e);
         const mark = e.rating === 5 ? this._ic('rating-star-filled') : '';
@@ -7948,7 +8126,7 @@ const NhatKyCtrl = {
           <span class="nk-strip"><span>${d}</span>${mark}</span>
           ${meals.length > 1 ? `<span class="nk-count">×${meals.length}</span>` : ''}
         </button>`;
-      } else if (isToday && this._uid) {
+      } else if (isToday && this._hasContent()) {
         cells += `<button class="nk-cell today" id="nkTodayCell" type="button" aria-label="${escapeHtml(I18N.t('nk.todayAria'))}">${this._ic('nav-checkin')}<small>${I18N.t('nk.today')}</small></button>`;
       } else {
         cells += `<div class="nk-cell num${future ? ' future' : ''}">${d}</div>`;
@@ -7957,16 +8135,16 @@ const NhatKyCtrl = {
     const legend = Object.keys(this.CAT_ICON).map(k =>
       `<button type="button" data-f="${k}" class="${this._filter === k ? 'on' : ''}" style="--c:${this._catColor(k)}" aria-pressed="${this._filter === k}"><i></i>${escapeHtml(this._catLabel(k))}</button>`).join('');
     const blank = this._uid && this._loaded && !this._entries.length;
-    const emptyMonth = this._uid && !list.length && this._entries.length;
+    const emptyMonth = this._hasContent() && !list.length && this._entries.length;
     return `<article class="nk-page nk-stk" id="nkPage" data-m="${mk}">
       ${stamp}
       <div class="nk-p-head"><h3>${this._monthLong(m)}${this._otherYear(mk) ? ` · ${y}` : ''}</h3><div class="nk-meta">${list.length ? I18N.t('nk.meta', { n: list.length, q: quan }) : ''}</div></div>
       ${emptyMonth ? `<p class="nk-empty-month">${I18N.t('nk.emptyMonth', { m, month: this._monthLong(m) })}</p>` : ''}
       <div class="nk-dow">${I18N.t('nk.dow').split(',').map(s => `<span>${s}</span>`).join('')}</div>
       <div class="nk-grid">${cells}</div>
-      ${this._uid ? `<div class="nk-legend${this._filter ? ' filtering' : ''}">${legend}</div>` : ''}
+      ${this._hasContent() ? `<div class="nk-legend${this._filter ? ' filtering' : ''}">${legend}</div>` : ''}
     </article>
-    ${!this._uid ? `<div class="nk-blank nk-stk"><p>${I18N.t('nk.signInMsg')}</p><button type="button" id="nkSignIn">${I18N.t('nk.signIn')}</button></div>` : ''}
+    ${!this._hasContent() ? `<div class="nk-blank nk-stk"><p>${I18N.t('nk.signInMsg')}</p><button type="button" id="nkSignIn">${I18N.t('nk.signIn')}</button></div>` : ''}
     ${blank ? `<div class="nk-blank nk-stk"><p>${I18N.t('nk.blank')}</p><button type="button" id="nkFirstShot">${I18N.t('nk.blankBtn')}</button></div>` : ''}`;
   },
 
@@ -7983,7 +8161,7 @@ const NhatKyCtrl = {
   _renderTray() {
     const btn = document.getElementById('nkTrayBtn');
     const n = this._monthEntries(this._month).length;
-    btn.hidden = !this._uid || !this._entries.length;
+    btn.hidden = !this._entries.length;
     if (btn.hidden) return;
     const m = +this._month.split('-')[1];
     if (n >= 3) {
@@ -8541,6 +8719,14 @@ const NhatKyCtrl = {
   // ── ticket actions ──────────────────────────────────────
   _closePops() { document.querySelectorAll('.nk-pop,.nk-menu').forEach(p => p.remove()); },
 
+  // A local (guest, no-account) entry has nowhere to attribute a public
+  // post to — offer the sign-in form instead of the ask-to-share popover,
+  // which would just fail against a server record that doesn't exist.
+  _localShareHint() {
+    showToast(I18N.t('nk.localNeedAccount'));
+    if (typeof CommunityCtrl !== 'undefined') CommunityCtrl.showAuthPrompt('login');
+  },
+
   _privacyPop() {
     this._closePops();
     const e = this._cur, box = document.createElement('div');
@@ -8618,7 +8804,7 @@ const NhatKyCtrl = {
     const e = this._cur;
     if (!this._hasPhoto(e)) return;
     try {
-      const resp = await fetch(Community.checkinPhotoUrl(e.rec));
+      const resp = await fetch(this._full(e));
       if (!resp.ok) throw new Error(String(resp.status));
       const blob = await resp.blob();
       const ext = (String(e.rec.photo).split('.').pop() || 'webp').toLowerCase();
@@ -8639,16 +8825,20 @@ const NhatKyCtrl = {
     const id = gone.id, gen = this._tgen;
     this._setBusy(true);
     this._mut++;
-    let r = await Community.deleteCheckin(id);
-    // 404 normally means "already gone" — the state the user asked for. But
-    // PocketBase also answers 404 to an expired session (owner rule fails as
-    // a guest), so confirm the session and retry once before believing it.
-    if (!r.ok && r.status === 404) {
-      if (!(await this._sessionOk())) { if (gen === this._tgen) this._setBusy(false); showToast(I18N.t('nk.changeFail')); return; }
-      r = await Community.deleteCheckin(id);
+    if (this._isLocal(gone)) {
+      LocalDiary.remove(id);
+    } else {
+      let r = await Community.deleteCheckin(id);
+      // 404 normally means "already gone" — the state the user asked for. But
+      // PocketBase also answers 404 to an expired session (owner rule fails as
+      // a guest), so confirm the session and retry once before believing it.
+      if (!r.ok && r.status === 404) {
+        if (!(await this._sessionOk())) { if (gen === this._tgen) this._setBusy(false); showToast(I18N.t('nk.changeFail')); return; }
+        r = await Community.deleteCheckin(id);
+      }
+      this._mut++; // any list GET sent while the DELETE was in flight predates it
+      if (!r.ok && r.status !== 404) { if (gen === this._tgen) this._setBusy(false); showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
     }
-    this._mut++; // any list GET sent while the DELETE was in flight predates it
-    if (!r.ok && r.status !== 404) { if (gen === this._tgen) this._setBusy(false); showToast(`⚠️ ${r.error || I18N.t('err.serverGeneric')}`); return; }
     const card = document.getElementById('nkCard');
     if (gen === this._tgen) {
       await this._done(card.animate([{ transform: 'scale(1)', opacity: 1 }, { transform: 'scale(.6)', opacity: 0 }], { duration: this._reduced() ? 150 : 200, fill: 'forwards' }), 200);

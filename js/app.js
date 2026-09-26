@@ -121,6 +121,11 @@ function boot() {
     setTimeout(() => CheckinCtrl._rehydrateDraft(), 400);
   }
 
+  // Warm the local (guest, no-account) diary's photo URLs early, so
+  // they're usually already resolved by the time someone opens Sổ Dán
+  // Món — NhatKyCtrl.open() also kicks this off itself as a fallback.
+  if (typeof LocalDiary !== 'undefined') LocalDiary.preload();
+
   // Fire-and-forget one app_open event per page load. Skipped on
   // localhost by Analytics itself so dev noise doesn't hit prod stats.
   if (typeof Analytics !== 'undefined') Analytics.boot();
