@@ -1273,7 +1273,7 @@ const ResultsCtrl = {
       const r = State.filteredResults.find(x => x.id === id)
         || (Array.isArray(State.results) ? State.results.find(x => x.id === id) : null);
       if (!r) return;
-      if (r._community && r._pb) CommunityDetailModal.open(r._pb);
+      if (r._community && r._pb) CommunityDetailModal.open(r._pb, { source: 'map' });
       else DetailModal.open(r);
     });
 
@@ -1285,7 +1285,7 @@ const ResultsCtrl = {
       const id = parseInt(card.dataset.id);
       const r = State.filteredResults.find(x => x.id === id);
       if (!r) return;
-      if (r._community && r._pb) CommunityDetailModal.open(r._pb);
+      if (r._community && r._pb) CommunityDetailModal.open(r._pb, { source: 'map' });
       else DetailModal.open(r);
     });
     document.getElementById('planBtn').addEventListener('click', () => {
@@ -2518,6 +2518,10 @@ const ProfileCtrl = {
     document.getElementById('settingsGearBtn')?.addEventListener('click', () => {
       this._openAccountModal();
     });
+    // Thống kê tài khoản (InsightsSheet) — shown only when logged in, see render().
+    document.getElementById('insightsBtn')?.addEventListener('click', () => {
+      if (typeof InsightsSheet !== 'undefined' && Community.isLoggedIn()) InsightsSheet.openAccount();
+    });
     this._initAccountModal();
     // The header is re-rendered via innerHTML, so delegate from its container.
     document.getElementById('myRProfileHeader')?.addEventListener('click', (e) => {
@@ -2764,6 +2768,7 @@ const ProfileCtrl = {
     this._renderAiStatus();
 
     const loggedIn = Community.isLoggedIn();
+    document.getElementById('insightsBtn')?.classList.toggle('hidden', !loggedIn);
     document.getElementById('profileLoggedOutHint').classList.toggle('hidden', loggedIn);
     document.getElementById('profileLoggedIn').classList.toggle('hidden', !loggedIn);
     if (loggedIn) {
@@ -2891,7 +2896,7 @@ const ProfileCtrl = {
     }
 
     list.innerHTML = `<div class="social-grid">${items.map(r => communityGridCellHtml(r)).join('')}</div>`;
-    wireCardDetail(list, items);
+    wireCardDetail(list, items, 'profile');
   },
 };
 
@@ -3257,8 +3262,10 @@ function wireCarousels(container) {
 // Copy link tới 1 bài viết cộng đồng — dùng chung cho nút 📤 trên card feed
 // VÀ nút "📋 Sao chép link" trong CommunityDetailModal (trước đây code lặp
 // lại y hệt ở 2 nơi, giờ chỉ 1 chỗ).
-async function copyPostLink(id) {
+// o (insights): { s, owner } — a successful copy counts as a share.
+async function copyPostLink(id, o = {}) {
   const url = `${location.origin}/?q=${encodeURIComponent(id)}`;
+  let copied = true;
   try {
     await navigator.clipboard.writeText(url);
     showToast(I18N.t('toast.linkCopied'));
@@ -3267,20 +3274,38 @@ async function copyPostLink(id) {
     ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
     document.body.appendChild(ta); ta.select();
     try { document.execCommand('copy'); showToast(I18N.t('toast.linkCopied')); }
-    catch (_) { showToast(I18N.t('toast.linkCopyFail')); }
+    catch (_) { copied = false; showToast(I18N.t('toast.linkCopyFail')); }
     document.body.removeChild(ta);
   }
+  if (copied && typeof Insights !== 'undefined') Insights.hit('share', 'quan', id, o);
+}
+
+// Deep links (?q= / ?checkin=): a 4xx means the post is gone or not ours to
+// see — done; a network error / timeout may clear up, keep the link.
+function linkGone(r) {
+  return typeof r.status === 'number' && r.status >= 400 && r.status < 500;
+}
+// Resolves once the page is on screen (immediately if it already is).
+function untilVisible() {
+  if (document.visibilityState === 'visible') return Promise.resolve();
+  return new Promise((res) => {
+    const f = () => { if (document.visibilityState === 'visible') { document.removeEventListener('visibilitychange', f); res(); } };
+    document.addEventListener('visibilitychange', f);
+  });
 }
 
 // Toggle bookmark 1 bài (localStorage-only, không cần login) — dùng chung
 // cho nút 🔖 trên card feed VÀ nút "Lưu" trong CommunityDetailModal. Trả về
 // trạng thái MỚI (true = vừa lưu) để caller tự cập nhật UI của mình.
-function toggleSavedPost(id) {
+// o (insights): { s, owner } — the save/unsave event makes the device-local
+// bookmark countable for the post's owner.
+function toggleSavedPost(id, o = {}) {
   const wasSaved = State.savedPosts.has(id);
   if (wasSaved) State.savedPosts.delete(id);
   else State.savedPosts.add(id);
   Storage.save();
   showToast(I18N.t(wasSaved ? 'toast.postUnsaved' : 'toast.postSaved'));
+  if (typeof Insights !== 'undefined') Insights.hit(wasSaved ? 'unsave' : 'save', 'quan', id, o);
   return !wasSaved;
 }
 
@@ -3293,19 +3318,20 @@ function wireCardActions(container, items) {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const r = items.find(x => x.id === btn.dataset.id);
-      if (r) CommunityDetailModal.open(r, { focusComment: true });
+      if (r) CommunityDetailModal.open(r, { focusComment: true, source: 'feed' });
     });
   });
+  const ownerOf = (id) => (items.find(x => x.id === id) || {}).created_by || '';
   container.querySelectorAll('.share-icon-btn[data-id]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      copyPostLink(btn.dataset.id);
+      copyPostLink(btn.dataset.id, { s: 'feed', owner: ownerOf(btn.dataset.id) });
     });
   });
   container.querySelectorAll('.save-icon-btn[data-id]').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      const nowSaved = toggleSavedPost(btn.dataset.id);
+      const nowSaved = toggleSavedPost(btn.dataset.id, { s: 'feed', owner: ownerOf(btn.dataset.id) });
       btn.classList.toggle('on', nowSaved);
     });
   });
@@ -3343,24 +3369,28 @@ async function _loadHeartState(restaurantId, container) {
 // "👤 tên tác giả" — bấm mở UserQuanModal xem hết quán người đó đã đăng.
 // Matches both the old list-card author button and the feed post's
 // avatar/name buttons (all three carry data-user-id the same way).
-function wireAuthorButtons(container) {
+// s + postId (insights): the profile visit is credited to that quán —
+// feed cards pass only s and the post is read off the enclosing card.
+function wireAuthorButtons(container, s = '', postId = '') {
   container.querySelectorAll('.comm-r-author[data-user-id], .post-avatar[data-user-id], .post-author-name[data-user-id]').forEach(btn => {
     if (!btn.dataset.userId) return;
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      UserQuanModal.open(btn.dataset.userId, btn.dataset.userName);
+      const vid = postId || btn.closest('.comm-r-card[data-id]')?.dataset.id || '';
+      UserQuanModal.open(btn.dataset.userId, btn.dataset.userName, { s, vt: vid ? 'quan' : '', vid });
     });
   });
 }
 
 // Bấm vào thân card (không phải 1 nút con) mở CommunityDetailModal — đủ ảnh
 // + thông tin đầy đủ, thay vì chỉ xem được ảnh đại diện + mô tả rút gọn.
-function wireCardDetail(container, items) {
+// source (insights): where the view came from — 'feed' | 'profile'.
+function wireCardDetail(container, items, source = '') {
   container.querySelectorAll('.comm-r-card[data-id]').forEach(cardEl => {
     cardEl.addEventListener('click', (e) => {
       if (e.target.closest('button')) return;
       const r = items.find(x => x.id === cardEl.dataset.id);
-      if (r) CommunityDetailModal.open(r);
+      if (r) CommunityDetailModal.open(r, { source });
     });
   });
 }
@@ -3383,7 +3413,9 @@ function followBtnHtml(userId, userName, following, theyFollowMe = false) {
   const tag = (!following && theyFollowMe) ? `<span class="follows-you-tag">${I18N.t('follow.followsYou')}</span>` : '';
   return `<span class="follow-btn-wrap">${tag}<button type="button" class="follow-btn${cls}" data-user-id="${userId}" data-user-name="${escapeHtml(userName)}" data-they-follow-me="${theyFollowMe ? '1' : '0'}">${label}</button></span>`;
 }
-function wireFollowButtons(container, onChange) {
+// via: { s, vt, vid } for insights — where the follow happened and, from
+// a profile opened off a post, which post brought the follower there.
+function wireFollowButtons(container, onChange, via = {}) {
   container.querySelectorAll('.follow-btn[data-user-id]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -3400,6 +3432,9 @@ function wireFollowButtons(container, onChange) {
         // separate metric later if we ever need to look at churn.
         Analytics.track('follow', {});
       }
+      // Insights "theo dõi mới" for the followed person (follow ON only;
+      // the server re-checks that our friends list really has them now).
+      if (nowFollowing && typeof Insights !== 'undefined') Insights.hit('follow', 'user', id, { ...via, owner: id });
       // Push notification to the person just followed — fire-and-forget,
       // never blocks the follow UI or shows an error if it fails (best-
       // effort, see functions/api/notify-follow.js header for why).
@@ -3890,11 +3925,73 @@ const CommunityCtrl = {
     });
     list.innerHTML = items.map(r => communityCardHtml(r, (groupCounts.get(Community.resolveRootId(r)) || 1) - 1)).join('');
     wireHeartButtons(list);
-    wireAuthorButtons(list);
+    wireAuthorButtons(list, 'feed');
     wireCarousels(list);
-    wireCardDetail(list, items);
+    wireCardDetail(list, items, 'feed');
     wireCardActions(list, items);
     this._observeSubtabPhotos();
+    this._observeImpressions(list, items);
+  },
+
+  // ── Insights: feed impressions ("lượt xem" of a quán in the feed) ────
+  // A card counts once it has been ≥60% on screen for ≥1s — or, for a
+  // card taller than the feed window, once it fills ≥60% of that window.
+  // _renderList() replaces every card on each re-render (20s live poll at
+  // the top, search, "N quán mới" pill), so the observer is re-pointed at
+  // the new cards each time, and _impSeen (on top of Insights' own
+  // per-session dedupe) keeps an already-counted post from counting again.
+  // Own posts are never observed.
+  IMP_RATIO: 0.6,
+  IMP_MS: 1000,
+  _impObserver: null,
+  _impTimers: new Map(),   // card element → pending 1s timer
+  _impSeen: new Set(),     // quán ids already counted this page session
+  _impOwner: new Map(),    // quán id → created_by (Insights skips own posts)
+  _observeImpressions(list, items) {
+    if (!('IntersectionObserver' in window) || typeof Insights === 'undefined') return;
+    const root = document.querySelector('#communityScreen .profile-scroll');
+    if (!root) return;
+    if (!this._impObserver) {
+      this._impObserver = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          const onScreen = e.isIntersecting && (e.intersectionRatio >= this.IMP_RATIO
+            || (e.rootBounds && e.intersectionRect.height >= e.rootBounds.height * this.IMP_RATIO));
+          if (onScreen && !this._impTimers.has(e.target)) {
+            this._impTimers.set(e.target, setTimeout(() => this._impFire(e.target), this.IMP_MS));
+          } else if (!onScreen && this._impTimers.has(e.target)) {
+            clearTimeout(this._impTimers.get(e.target));
+            this._impTimers.delete(e.target);
+          }
+        });
+      }, { root, threshold: [0, .1, .2, .3, .4, .5, .6, .7, .8, .9, 1] });
+    }
+    // The previous render's cards are gone from the DOM — drop them.
+    this._impObserver.disconnect();
+    this._impTimers.forEach(t => clearTimeout(t));
+    this._impTimers.clear();
+    const me = Community.currentUser && Community.currentUser.id;
+    items.forEach(r => this._impOwner.set(r.id, r.created_by));
+    list.querySelectorAll('.post-card[data-id]').forEach(el => {
+      const id = el.dataset.id;
+      if (!this._impSeen.has(id) && !(me && this._impOwner.get(id) === me)) this._impObserver.observe(el);
+    });
+  },
+  _impFire(el) {
+    this._impTimers.delete(el);
+    const id = el.dataset.id;
+    if (!el.isConnected || this._impSeen.has(id)) return;
+    // Page in the background, or the feed covered by a modal / the check-in
+    // viewer / the stats sheet (the 20 s poll can render new cards under
+    // them): not seen yet — check again in a moment (the card is still
+    // observed; leaving the screen cancels this).
+    if (document.visibilityState !== 'visible' || document.querySelector('.modal-overlay.show')
+      || (typeof InsightsSheet !== 'undefined' && InsightsSheet.isOpen())) {
+      this._impTimers.set(el, setTimeout(() => this._impFire(el), this.IMP_MS));
+      return;
+    }
+    this._impSeen.add(id);
+    this._impObserver.unobserve(el);
+    Insights.hit('view', 'quan', id, { s: 'feed', owner: this._impOwner.get(id) });
   },
 
   // ── Header .comm-subtabs — màu chữ tự đổi theo nội dung ngay dưới ────
@@ -3951,6 +4048,7 @@ const CommunityDetailModal = {
       const r = this._current;
       const hasLoc = r && r.location && (r.location.lat !== 0 || r.location.lon !== 0);
       if (!hasLoc) { showToast(I18N.t('toast.noLocationYet')); return; }
+      if (typeof Insights !== 'undefined') Insights.hit('dir', 'quan', r.id, { s: 'detail', owner: r.created_by });
       window.open(gmapsUrl({ name: r.name, address: r.address, lat: r.location.lat, lng: r.location.lon }), '_blank', 'noopener');
     });
 
@@ -3958,7 +4056,7 @@ const CommunityDetailModal = {
     document.getElementById('communityDetailSave').addEventListener('click', () => {
       const r = this._current;
       if (!r || !r.id) return;
-      toggleSavedPost(r.id);
+      toggleSavedPost(r.id, { s: 'detail', owner: r.created_by });
       this._syncSaveBtn();
     });
 
@@ -3966,7 +4064,7 @@ const CommunityDetailModal = {
     // and auto-opens this modal on load.
     document.getElementById('communityDetailCopy').addEventListener('click', () => {
       const r = this._current;
-      if (r && r.id) copyPostLink(r.id);
+      if (r && r.id) copyPostLink(r.id, { s: 'detail', owner: r.created_by });
     });
 
     // Bình luận — nút Gửi + Enter đều submit. Delegated trên body vì
@@ -4000,12 +4098,16 @@ const CommunityDetailModal = {
   // chia sẻ…) — đóng modal đang mở (nếu có) trước khi hiện, cùng lý do
   // và cùng cách xử lý như UserQuanModal.open() ở trên (2 modal cùng
   // z-index sẽ chồng lớp thay vì thay thế đúng nghĩa nếu cùng .show).
+  //
+  // opts.source (insights): where this view came from — feed, profile,
+  // saved, link, map (scan results), diary, group (linked-group item).
   open(r, opts = {}) {
     const prevModal = document.querySelector('.modal-overlay.show:not(#communityDetailModal)');
     this._returnModalId = prevModal ? prevModal.id : null;
     if (prevModal) prevModal.classList.remove('show');
 
     this._current = r;
+    if (typeof Insights !== 'undefined') Insights.hit('view', 'quan', r.id, { s: opts.source || '', owner: r.created_by });
     if (typeof Analytics !== 'undefined') Analytics.track('detail_open', {
       source: 'community',
       has_image: !!(r.photos && r.photos.length),
@@ -4034,7 +4136,8 @@ const CommunityDetailModal = {
     const isOwner = !!(Community.currentUser && (r.created_by === Community.currentUser.id || authorId === Community.currentUser.id));
 
     const footerHtml = isOwner
-      ? `<button class="data-btn" id="cdmEdit">${svgIcon('action-edit')} Sửa</button>
+      ? `<button class="data-btn" id="cdmStats">${svgIcon('action-stats')} ${I18N.t('ins.open')}</button>
+         <button class="data-btn" id="cdmEdit">${svgIcon('action-edit')} Sửa</button>
          <button class="my-r-del" id="cdmDelete" title="${I18N.t('myR.delete')}">${svgIcon('action-delete')}</button>`
       : `<button class="post-avatar" type="button" data-user-id="${authorId}" data-user-name="${escapeHtml(authorName)}" style="width:30px;height:30px;font-size:1rem">${authorAvatar(author)}</button>
          <button class="comm-r-author" type="button" data-user-id="${authorId}" data-user-name="${escapeHtml(authorName)}">${escapeHtml(authorName)}</button>
@@ -4074,6 +4177,12 @@ const CommunityDetailModal = {
     this._loadComments(r);
     if (isOwner) {
       document.getElementById('cdmEdit').addEventListener('click', () => { this.close(); CommunityAddModal.open(r); });
+      // Thống kê stays on top of this modal (its own layer) — closing it
+      // lands back here.
+      document.getElementById('cdmStats').addEventListener('click', () => {
+        if (typeof InsightsSheet === 'undefined') return;
+        InsightsSheet.open({ t: 'quan', id: r.id, title: r.name || '', sub: InsightsSheet.postedSub(r.created), img: Community.thumbnailUrl(r) });
+      });
       document.getElementById('cdmDelete').addEventListener('click', async () => {
         if (!confirm(I18N.t('myR.confirmDelete', { name: r.name }))) return;
         const res = await Community.deleteRestaurant(r.id);
@@ -4084,7 +4193,7 @@ const CommunityDetailModal = {
       });
     } else {
       wireHeartButtons(body);
-      wireAuthorButtons(body);
+      wireAuthorButtons(body, 'detail', r.id);
     }
 
     const hasLoc = r.location && (r.location.lat !== 0 || r.location.lon !== 0);
@@ -4142,7 +4251,7 @@ const CommunityDetailModal = {
     slot.querySelectorAll('.linked-group-item').forEach(btn => {
       btn.addEventListener('click', () => {
         const target = others.find(x => x.id === btn.dataset.id);
-        if (target) this.open(target);
+        if (target) this.open(target, { source: 'group' });
       });
     });
   },
@@ -4450,7 +4559,7 @@ const SavedListModal = {
         const r = items.find(x => x.id === cardEl.dataset.id);
         if (!r) return;
         this._close();
-        CommunityDetailModal.open(r);
+        CommunityDetailModal.open(r, { source: 'saved' });
       });
     });
   },
@@ -4462,11 +4571,15 @@ const SavedListModal = {
   // Called on boot when URL has ?q=<pb_id> — fetches that quán and
   // opens CommunityDetailModal so a shared link lands directly on the
   // right modal instead of the app's home page.
+  // true = the link is done with (opened, or gone for good); false on a
+  // network error/timeout, so boot keeps ?q= in the URL for a reload.
   async openFromLink(id) {
-    if (!id || typeof Community === 'undefined' || !Community.BASE_URL) return;
+    if (!id || typeof Community === 'undefined' || !Community.BASE_URL) return true;
     const r = await Community._fetch(`/api/collections/restaurants/records/${id}?expand=created_by`);
-    if (r.ok && r.data) CommunityDetailModal.open(r.data);
-    else showToast(I18N.t('toast.linkExpired'));
+    if (!r.ok || !r.data) { showToast(I18N.t('toast.linkExpired')); return linkGone(r); }
+    await untilVisible();   // a background tab: count the view when it's seen
+    CommunityDetailModal.open(r.data, { source: 'link' });
+    return true;
   },
 };
 
@@ -4791,7 +4904,11 @@ const UserQuanModal = {
     }
   },
 
-  async open(userId, userName) {
+  // opts (insights): s = where the tap came from (feed/detail/viewer/…),
+  // vt + vid = the post it came from ('quan'|'checkin' + id) — counted as
+  // a profile visit for this person, and a follow made here is credited
+  // to that same post.
+  async open(userId, userName, opts = {}) {
     // Mở được từ NHIỀU chỗ (card feed, CommunityDetailModal, danh sách
     // follower/following…) — nếu modal đó đang mở thì đóng nó trước, vì
     // mọi .modal-overlay dùng chung z-index nên 2 modal cùng .show sẽ
@@ -4812,6 +4929,8 @@ const UserQuanModal = {
     const followSlot = document.getElementById('userQuanFollowSlot');
     followSlot.innerHTML = '';
     const isSelf = Community.currentUser && userId === Community.currentUser.id;
+    const via = { vt: opts.vt || '', vid: opts.vid || '' };
+    if (typeof Insights !== 'undefined') Insights.hit('profile', 'user', userId, { ...via, s: opts.s || '', owner: userId });
     const [userRes, listRes, followerCount, friendsRes] = await Promise.all([
       Community.getUser(userId),
       Community.listRestaurants({ filter: `created_by="${userId}"` }),
@@ -4825,7 +4944,7 @@ const UserQuanModal = {
       // để biết "họ có theo dõi mình không" mà không cần thêm request nào.
       const theyFollowMe = !!(userRes.ok && (userRes.data.friends || []).includes(Community.currentUser.id));
       followSlot.innerHTML = followBtnHtml(userId, userName || I18N.t('common.thisPerson'), following, theyFollowMe);
-      wireFollowButtons(followSlot, () => CommunityCtrl._renderFriends());
+      wireFollowButtons(followSlot, () => CommunityCtrl._renderFriends(), { ...via, s: 'profile' });
     }
     if (!listRes.ok) {
       body.innerHTML = `<div class="empty-comm"><div class="em-icon">${svgIcon('status-error-face')}</div><div class="em-msg">${I18N.t('em.loadFail')}</div></div>`;
@@ -4851,7 +4970,7 @@ const UserQuanModal = {
       return;
     }
     body.innerHTML = header + `<div class="social-grid">${items.map(x => communityGridCellHtml(x)).join('')}</div>`;
-    wireCardDetail(body, items);
+    wireCardDetail(body, items, 'profile');
   },
 
   close() {
@@ -6884,7 +7003,7 @@ const CheckinFeedCtrl = {
     bubbles.querySelectorAll('.ci-bubble[data-group-idx]').forEach(el => {
       el.addEventListener('click', () => {
         const gi = +el.dataset.groupIdx;
-        if (this._groups[gi]) CheckinViewerCtrl.open(this._groups, gi);
+        if (this._groups[gi]) CheckinViewerCtrl.open(this._groups, gi, { src: 'feed' });
       });
     });
   },
@@ -7075,7 +7194,7 @@ const CheckinDiscoverCtrl = {
     grid.querySelectorAll('.ci-disc-card[data-group-idx]').forEach(el => {
       el.addEventListener('click', () => {
         const g = groups[+el.dataset.groupIdx];
-        if (g && typeof CheckinViewerCtrl !== 'undefined') CheckinViewerCtrl.open([g], 0);
+        if (g && typeof CheckinViewerCtrl !== 'undefined') CheckinViewerCtrl.open([g], 0, { src: 'discover' });
       });
     });
   },
@@ -7531,6 +7650,13 @@ const NhatKyCtrl = {
   _hDone() { clearTimeout(this._hWait); this._hBusy = false; this._hRun(); },
   _onPop() {
     if (this._hBusy) { this._hDone(); return; } // our own traversal landed
+    // Back while the Thống kê sheet sits on top of the sổ: close only the
+    // sheet, and put back the entry of the layer underneath.
+    if (this._isOpen() && typeof InsightsSheet !== 'undefined' && InsightsSheet.isOpen()) {
+      InsightsSheet.close();
+      this._push(this._lbOpen() ? 'lb' : this._cur ? 'detail' : this._mamOpen() ? 'mam' : 'sheet');
+      return;
+    }
     // Back while "Xem quán" (CommunityDetailModal) sits on top of the sổ:
     // close the modal, and put back the entry of the layer underneath.
     const modal = this._isOpen() && document.querySelector('.modal-overlay.show');
@@ -8322,11 +8448,13 @@ const NhatKyCtrl = {
     this._closePops();
     const m = document.createElement('div');
     m.className = 'nk-menu';
-    m.innerHTML = `${this._hasPhoto(this._cur) ? `<button type="button" data-a="save">${this._ic('action-save-disk')}${I18N.t('nk.savePhoto')}</button>` : ''}<button type="button" class="nk-danger" data-a="del">${this._ic('action-delete')}${I18N.t('nk.delete')}</button>`;
+    const stats = !!(this._cur.rec && this._cur.rec.is_shared) && typeof InsightsSheet !== 'undefined';
+    m.innerHTML = `${stats ? `<button type="button" data-a="stats">${this._ic('action-stats')}${I18N.t('ins.open')}</button>` : ''}${this._hasPhoto(this._cur) ? `<button type="button" data-a="save">${this._ic('action-save-disk')}${I18N.t('nk.savePhoto')}</button>` : ''}<button type="button" class="nk-danger" data-a="del">${this._ic('action-delete')}${I18N.t('nk.delete')}</button>`;
     document.getElementById('nkRoot').appendChild(m);
     m.onclick = (ev) => {
       const a = ev.target.closest('[data-a]'); if (!a) return;
       if (a.dataset.a === 'save') { this._closePops(); this._savePhoto(); return; }
+      if (a.dataset.a === 'stats') { this._closePops(); this._openStats(); return; }
       if (a.dataset.a === 'del') {
         m.innerHTML = `<p>${I18N.t('nk.deleteAsk')}</p><button type="button" class="nk-danger" data-a="yes">${this._ic('action-delete')}${I18N.t('nk.deleteYes')}</button><button type="button" data-a="no">${I18N.t('nk.no')}</button>`;
         m.onclick = (ev2) => {
@@ -8336,6 +8464,19 @@ const NhatKyCtrl = {
         };
       }
     };
+  },
+
+  // Owner-only numbers of this (shared) check-in. The sheet sits above the
+  // sổ; Android Back closes just the sheet (see _onPop).
+  _openStats() {
+    const e = this._cur;
+    if (!e || !e.rec || typeof InsightsSheet === 'undefined') return;
+    InsightsSheet.open({
+      t: 'checkin', id: e.id,
+      title: e.rec.restaurant_name || '',
+      sub: InsightsSheet.postedSub(e.rec.created),
+      img: this._hasPhoto(e) ? Community.checkinPhotoUrl(e.rec, '100x100') : '',
+    });
   },
 
   async _savePhoto() {
@@ -8444,7 +8585,7 @@ const NhatKyCtrl = {
     try { r = await Community._fetch(`/api/collections/restaurants/records/${encodeURIComponent(e.rec.restaurant)}?expand=created_by`); }
     finally { this._quanBusy = false; }
     if (!this._isOpen() || !this._cur || this._cur.id !== e.id || this._lbOpen()) return; // left / moved on meanwhile
-    if (r.ok && r.data) CommunityDetailModal.open(r.data);
+    if (r.ok && r.data) CommunityDetailModal.open(r.data, { source: 'diary' });
     else showToast(I18N.t('nk.quanFail'));
   },
 
@@ -8832,6 +8973,10 @@ const CheckinViewerCtrl = {
   _timer: null, _delTimer: null,
   _seen: null, _liked: null, _saved: null, _hidden: null,
   _dragStartX: null, _dragStartY: null, _dragZone: null,
+  // Insights: _src = where this open came from (feed|discover|link),
+  // _viewed = check-ins already counted as a view during this open,
+  // _suspended = paused behind the author's profile (see _openProfile).
+  _src: '', _viewed: new Set(), _suspended: false, _resumeObs: null,
 
   init() {
     this._seen = this._loadSeen();
@@ -8877,13 +9022,35 @@ const CheckinViewerCtrl = {
     document.getElementById('ciOptStats').addEventListener('click', () => this._stats());
     document.getElementById('ciOptReport').addEventListener('click', () => this._report());
     document.getElementById('ciOptHideViewer').addEventListener('click', () => this._hideForViewer());
+
+    // Header avatar + name → the author's profile. Plain divs in the
+    // markup, so give them button semantics here (keyboard too).
+    ['ciViewerAvatar', 'ciViewerUsername'].forEach(id => {
+      const el = document.getElementById(id);
+      el.setAttribute('role', 'button');
+      el.tabIndex = 0;
+      el.addEventListener('click', (e) => { e.stopPropagation(); this._openProfile(); });
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this._openProfile(); }
+      });
+    });
+    // Back from another tab/app: the post on screen now is actually seen
+    // (the auto-advance timer kept running while the page was hidden, so
+    // the posts it skipped through there are, correctly, not counted).
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this._groups && ov.classList.contains('show')) this._trackView();
+    });
   },
 
-  open(groups, gi = 0) {
+  // opts.src: where the viewer was opened from, for insights — 'feed'
+  // (bubbles), 'discover' (Khám phá grid), 'link' (?checkin= deep link).
+  open(groups, gi = 0, opts = {}) {
     if (!groups || !groups[gi]) return;
     this._groups = groups;
     this._gi = gi;
     this._pi = 0;
+    this._src = opts.src || '';
+    this._viewed = new Set();
     this._closeOptMenu(true);
     document.getElementById('checkinViewer').classList.add('show');
     // Hide the floating tab bar while the viewer takes the whole screen.
@@ -8897,8 +9064,27 @@ const CheckinViewerCtrl = {
     clearTimeout(this._timer); this._timer = null;
     this._closeOptMenu(true);
     this._groups = null;
+    this._suspended = false;
+    this._resumeObs?.disconnect();
     // Re-render bubbles so newly-seen groups turn gray.
     if (typeof CheckinFeedCtrl !== 'undefined') CheckinFeedCtrl._render();
+  },
+
+  // Boot deep link /?checkin=<id> (the link _share() copies) — fetch that
+  // one check-in and open it on its own, as a view from 'link'. The
+  // viewRule has no 24h limit, so older shared posts open too; anything
+  // the reader may not see (or that's gone) gets the same toast as ?q=.
+  // Returns true once the link is done with (opened, or gone for good) —
+  // false on a network error/timeout, so boot keeps ?checkin= for a reload.
+  async openFromLink(id) {
+    if (!/^[a-z0-9]{15}$/.test(id || '')) { showToast(I18N.t('toast.linkExpired')); return true; }
+    const r = await Community._fetch(`/api/collections/checkins/records/${id}?expand=user`);
+    if (!r.ok || !r.data) { showToast(I18N.t('toast.linkExpired')); return linkGone(r); }
+    // Opened in a background tab: wait until it is actually looked at —
+    // the viewer would otherwise auto-advance and close unseen.
+    await untilVisible();
+    this.open([{ user: r.data.expand && r.data.expand.user, items: [r.data] }], 0, { src: 'link' });
+    return true;
   },
 
   _current() {
@@ -8930,6 +9116,7 @@ const CheckinViewerCtrl = {
       ? authorAvatar(author) : (rec.restaurant_emoji || '🦊');
     document.getElementById('ciViewerUsername').textContent =
       (author && author.name) || I18N.t('common.anonymous');
+    avEl.setAttribute('aria-label', I18N.t('ins.openProfile', { name: (author && author.name) || I18N.t('common.anonymous') }));
     document.getElementById('ciViewerTime').textContent = timeAgo(rec.created);
     document.getElementById('ciViewerLock').classList.toggle('hidden', !!rec.is_shared);
 
@@ -8967,9 +9154,55 @@ const CheckinViewerCtrl = {
     // re-render). Doesn't affect this render — only the next bubbles pass.
     this._seen.add(rec.id);
     this._saveSeen();
+    this._trackView();
 
     // Kick auto-advance
     this._restartAutoTimer();
+  },
+
+  // Insights "lượt xem": the post is on screen now. Skipped for our own
+  // posts (Insights.hit checks owner), while the page is in the
+  // background, and when this post was already counted during this open
+  // (_prev() at the very first post, or resuming after the profile,
+  // re-renders the same post).
+  _trackView() {
+    const rec = this._current();
+    if (!rec || this._viewed.has(rec.id) || document.visibilityState !== 'visible') return;
+    this._viewed.add(rec.id);
+    if (typeof Insights !== 'undefined') Insights.hit('view', 'checkin', rec.id, { s: this._src, owner: rec.user });
+  },
+
+  // Tap the header avatar/name → UserQuanModal for the author, counted as
+  // a profile visit that came from this check-in. That modal hides the
+  // first .modal-overlay.show (this viewer) and re-shows it on close, but
+  // our auto-advance timer would keep running behind it and advance or
+  // close the hidden viewer — so pause here and resume only once the
+  // viewer is visible again. Watching the overlays (instead of a close
+  // callback) also covers profile → quán detail → back chains, and if
+  // such a chain ends with nothing open at all (UserQuanModal re-opened
+  // from inside it forgets where it came from), bring the viewer back
+  // rather than leave it half-closed with the tab bar hidden.
+  _openProfile() {
+    const rec = this._current();
+    if (!rec || !rec.user || this._suspended || typeof UserQuanModal === 'undefined') return;
+    const author = rec.expand && rec.expand.user;
+    const ov = document.getElementById('checkinViewer');
+    this._pauseAutoTimer();
+    this._suspended = true;
+    this._resumeObs?.disconnect();
+    this._resumeObs = new MutationObserver(() => {
+      if (!this._suspended) return;
+      if (!ov.classList.contains('show')) {
+        if (document.querySelector('.modal-overlay.show')) return; // still inside the profile chain
+        ov.classList.add('show');
+      }
+      this._suspended = false;
+      this._resumeObs.disconnect();
+      if (this._groups) this._renderPost();   // same post, fresh progress bar + timer
+    });
+    document.querySelectorAll('.modal-overlay').forEach(el =>
+      this._resumeObs.observe(el, { attributes: true, attributeFilter: ['class'] }));
+    UserQuanModal.open(rec.user, (author && author.name) || '', { vt: 'checkin', vid: rec.id, s: 'viewer' });
   },
 
   // Owner: Lưu / Chia sẻ / Đi tới. Viewer: Thích / Lưu / Chia sẻ / Đi tới.
@@ -9053,10 +9286,17 @@ const CheckinViewerCtrl = {
     const rec = this._current();
     if (!rec) return;
     clearTimeout(this._timer);
+    // Counted as the "Đi tới" tap — showCheckinItinerary() may still stop
+    // with a toast (no GPS, too far away), the intent was shown anyway.
+    if (typeof Insights !== 'undefined') Insights.hit('dir', 'checkin', rec.id, { s: 'viewer', owner: rec.user });
     this.close();
     showCheckinItinerary(rec);
   },
 
+  // Like/save stay device-local (the Sets below drive the UI); the
+  // insights event only makes them countable for the owner — the server
+  // keeps each viewer's latest like/unlike (save/unsave), so toggling back
+  // and forth nets out.
   _toggleLike() {
     const rec = this._current();
     if (!rec) return;
@@ -9065,6 +9305,7 @@ const CheckinViewerCtrl = {
     this._saveSet(this.LIKES_KEY, this._liked);
     this._renderActions();
     showToast(I18N.t(on ? 'toast.postLiked' : 'toast.postUnliked'));
+    if (typeof Insights !== 'undefined') Insights.hit(on ? 'like' : 'unlike', 'checkin', rec.id, { s: 'viewer', owner: rec.user });
   },
 
   _toggleSave() {
@@ -9075,12 +9316,14 @@ const CheckinViewerCtrl = {
     this._saveSet(this.SAVES_KEY, this._saved);
     this._renderActions();
     showToast(I18N.t(on ? 'toast.postSaved' : 'toast.postUnsaved'));
+    if (typeof Insights !== 'undefined') Insights.hit(on ? 'save' : 'unsave', 'checkin', rec.id, { s: 'viewer', owner: rec.user });
   },
 
   async _share() {
     const rec = this._current();
     if (!rec) return;
     const url = location.origin + '/?checkin=' + encodeURIComponent(rec.id);
+    let copied = true;
     try {
       await navigator.clipboard.writeText(url);
       showToast(I18N.t('toast.linkCopied'));
@@ -9089,9 +9332,10 @@ const CheckinViewerCtrl = {
       ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
       document.body.appendChild(ta); ta.select();
       try { document.execCommand('copy'); showToast(I18N.t('toast.linkCopied')); }
-      catch (_) { showToast(I18N.t('toast.linkCopyFail')); }
+      catch (_) { copied = false; showToast(I18N.t('toast.linkCopyFail')); }
       document.body.removeChild(ta);
     }
+    if (copied && typeof Insights !== 'undefined') Insights.hit('share', 'checkin', rec.id, { s: 'viewer', owner: rec.user });
   },
 
   _openOptMenu() {
@@ -9180,9 +9424,25 @@ const CheckinViewerCtrl = {
   // No view/like/interaction tracking exists server-side yet (likes here
   // are a local-only Set, not aggregated — see header comment), so this
   // is an honest "coming soon" rather than fabricated numbers.
+  // Owner-only numbers for this check-in (InsightsSheet). _closeOptMenu()
+  // restarts the auto-advance, so stop it again while the sheet is up, and
+  // resume only if the viewer is still the thing on screen when it closes.
   _stats() {
+    const rec = this._current();
     this._closeOptMenu(true);
-    showToast(I18N.t('checkin.statsComingSoon'));
+    if (!rec || typeof InsightsSheet === 'undefined') return;
+    this._pauseAutoTimer();
+    InsightsSheet.open({
+      t: 'checkin', id: rec.id,
+      title: rec.restaurant_name || '',
+      sub: InsightsSheet.postedSub(rec.created),
+      img: rec.photo ? Community.checkinPhotoUrl(rec, '100x100') : '',
+      // Re-render, not just restart the timer: the progress bar's CSS fill
+      // kept running under the sheet (the view is already counted — _viewed).
+      onClose: () => {
+        if (this._groups && !this._suspended && document.getElementById('checkinViewer').classList.contains('show')) this._renderPost();
+      },
+    });
   },
 
   async _report() {

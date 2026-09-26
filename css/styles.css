@@ -3016,7 +3016,7 @@ body.map-full .tabbar{transform:translateY(105%)}
   width:40px;height:40px;border-radius:50%;
   background:var(--accent,#E8843C);border:2px solid var(--white,#FFFDF5);
   display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;
-  color:var(--text);
+  color:var(--text);cursor:pointer;
 }
 .ci-viewer-avatar .icon{width:1.15rem;height:1.15rem;color:var(--text)}
 .ci-viewer-hd-txt{flex:1;min-width:0;line-height:1.2}
@@ -3024,7 +3024,7 @@ body.map-full .tabbar{transform:translateY(105%)}
 .ci-viewer-username{
   font-size:.98rem;font-weight:900;text-transform:uppercase;letter-spacing:-.01em;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  text-shadow:0 1px 4px rgba(0,0,0,.45);
+  text-shadow:0 1px 4px rgba(0,0,0,.45);cursor:pointer;
 }
 .ci-viewer-lock{flex-shrink:0;width:14px;height:14px;opacity:.85}
 .ci-viewer-time{font-size:.7rem;font-weight:700;opacity:.9;text-shadow:0 1px 3px rgba(0,0,0,.4)}
@@ -3428,3 +3428,155 @@ body.map-full .tabbar{transform:translateY(105%)}
 .ci-disc-card-body{position:relative;z-index:2;padding:8px;width:100%;color:var(--white)}
 .ci-disc-card-name{font-size:.75rem;font-weight:800;line-height:1.25;margin-bottom:3px;text-shadow:0 1px 2px rgba(0,0,0,.3)}
 .ci-disc-card-meta{font-size:.6rem;font-weight:700;opacity:.92;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ═══════════════════════════════════════════════
+   THỐNG KÊ — InsightsSheet (js/insights-sheet.js, 2026-09-26)
+   Its own fixed layer: above the check-in viewer (300) and the diary
+   (150), below #toast (999). Not a .modal-overlay on purpose (other
+   modals hide "the first .modal-overlay.show"). House style only: paper
+   sheet, 2px ink borders, hard offset shadows, italic display type.
+═══════════════════════════════════════════════ */
+.ins-ov{position:fixed;inset:0;z-index:400;display:flex;align-items:flex-end;justify-content:center;pointer-events:none}
+/* The author display:flex above beats the UA [hidden] rule — without this the
+   closed sheet stays rendered (its shadow, its ✕ in the Tab order, an
+   aria-modal dialog in the a11y tree). Same trap as .photo-view[hidden]. */
+.ins-ov[hidden]{display:none}
+.ins-ov.show{pointer-events:auto}
+.ins-backdrop{position:absolute;inset:0;background:rgba(42,24,16,.5);opacity:0;transition:opacity .25s}
+.ins-ov.show .ins-backdrop{opacity:1}
+.ins-sheet{
+  position:relative;width:100%;max-width:520px;max-height:90vh;max-height:90dvh;display:flex;flex-direction:column;
+  background:var(--paper);border-top:2px solid var(--text);border-radius:var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow:0 -8px 24px rgba(42,24,16,.18);outline:none;
+  transform:translateY(100%);transition:transform .32s var(--ease-ios);
+}
+.ins-ov.show .ins-sheet{transform:translateY(0)}
+.ins-sheet.dragging{transition:none}
+.ins-grab{padding:.6rem 0 .1rem;touch-action:none;cursor:grab;flex-shrink:0}
+.ins-grab .modal-handle{margin:0 auto}
+.ins-top{display:flex;align-items:center;gap:.5rem;padding:.25rem .9rem .55rem;touch-action:none;flex-shrink:0}
+.ins-title{flex:1;min-width:0;margin:0;font-size:1.3rem;line-height:1.2;text-wrap:balance}
+.ins-title em{color:var(--text)}
+.ins-ic{
+  width:2.2rem;height:2.2rem;flex-shrink:0;border-radius:50%;
+  background:var(--white);border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);
+  display:flex;align-items:center;justify-content:center;color:var(--text);
+  font-size:1.35rem;font-weight:900;line-height:1;cursor:pointer;
+}
+.ins-ic .icon{width:1rem;height:1rem}
+.ins-ic:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.ins-ic.off{visibility:hidden}
+.ins-ic:focus-visible,.ins-seg button:focus-visible,.ins-topp:focus-visible,.ins-chart:focus-visible,.ins-retry:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.ins-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:.1rem 1rem calc(var(--safe-bottom) + 1.2rem);scrollbar-width:none}
+.ins-body::-webkit-scrollbar{display:none}
+
+/* Post header: thumbnail + name + date */
+.ins-post{display:flex;align-items:center;gap:.7rem;padding:.6rem .7rem;background:var(--white);border:2px solid var(--text);border-radius:14px;box-shadow:2px 2px 0 var(--text)}
+.ins-thumb{width:46px;height:46px;flex-shrink:0;border-radius:10px;border:2px solid var(--text);background:var(--cream-2) center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:var(--text2)}
+.ins-thumb.empty .icon{width:1.3rem;height:1.3rem}
+.ins-post-txt{min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.ins-post-txt b{font-family:var(--font-display);font-weight:900;font-size:.98rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ins-post-txt span{font-size:.74rem;font-weight:700;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.ins-h{font-family:var(--font-display);font-style:italic;font-weight:800;font-size:.72rem;color:var(--primary);letter-spacing:.8px;text-transform:uppercase;margin:1.05rem 0 .5rem}
+
+/* Overview tiles (2×2); the first one is the hero */
+.ins-tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:.8rem}
+.ins-h + .ins-tiles{margin-top:0}
+.ins-tile{min-width:0;min-height:84px;padding:10px 12px;border-radius:14px;background:var(--white);border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);display:flex;flex-direction:column;justify-content:center;gap:1px}
+.ins-tile small{font-size:.7rem;font-weight:800;color:var(--text2);line-height:1.2}
+.ins-tile b{font-family:var(--font-display);font-size:1.55rem;font-weight:900;color:var(--text);line-height:1.1;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis}
+.ins-tile span{font-size:.66rem;font-weight:700;color:var(--text3);line-height:1.2}
+.ins-tile.hero{background:var(--primary);border-color:var(--primary-2);box-shadow:2px 2px 0 var(--primary-3)}
+.ins-tile.hero small,.ins-tile.hero span{color:var(--cream)}
+.ins-tile.hero b{color:var(--white)}
+.ins-loading .ins-tile b{color:var(--text3)}
+.ins-tile.hero.ins-tile b{color:var(--white)}
+.ins-wait{text-align:center;font-size:.78rem;font-weight:700;color:var(--text3);margin:.9rem 0 0}
+
+/* Interactions row */
+.ins-acts{display:grid;grid-template-columns:repeat(auto-fit,minmax(58px,1fr));gap:6px}
+.ins-act{min-width:0;padding:.55rem .2rem .5rem;border-radius:12px;background:var(--white);border:1.5px solid var(--line-2);display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--primary)}
+.ins-act .icon{width:1.05rem;height:1.05rem}
+.ins-act b{font-family:var(--font-display);font-weight:900;font-size:1.05rem;color:var(--text);font-variant-numeric:tabular-nums;line-height:1.15}
+.ins-act span{font-size:.62rem;font-weight:800;color:var(--text2);text-align:center;line-height:1.15}
+
+.ins-card{padding:.75rem .8rem;border-radius:14px;background:var(--white);border:2px solid var(--text);box-shadow:2px 2px 0 var(--text)}
+
+/* Daily chart */
+.ins-chart{display:flex;align-items:flex-end;gap:3px;height:112px;padding-top:16px;touch-action:pan-y;cursor:pointer;outline:none;border-radius:6px}
+.ins-chart-card.dense .ins-chart{gap:1.5px}
+.ins-col{flex:1 1 0;min-width:0;height:100%;display:flex;align-items:flex-end;justify-content:center;border-radius:5px 5px 0 0}
+.ins-bars{position:relative;width:100%;max-width:18px;height:100%;display:flex;align-items:flex-end;justify-content:center;gap:1px}
+.ins-bar{position:relative;flex:1;min-width:0;height:calc(var(--h) * 1%);background:var(--primary);border-radius:4px 4px 0 0;transition:height .3s var(--ease-ios),opacity .15s}
+.ins-bar.p{background:var(--accent)}
+.ins-bar.z{height:3px;background:var(--line-2);border-radius:2px}
+.ins-col.pre .ins-bar{height:100%;background:transparent;border:1.5px dashed var(--line-2);border-bottom:0}
+.ins-col.today .ins-bar:not(.z):not(.p){background:var(--primary-2)}
+.ins-chart.has-sel .ins-col:not(.sel) .ins-bar{opacity:.4}
+.ins-col.sel{background:var(--primary-tint)}
+/* Value label over the peak day, or over the picked one */
+.ins-chart:not(.has-sel) .ins-col.peak .ins-bar:not(.p)::after,
+.ins-col.sel .ins-bar:not(.p):not(.z)::after{
+  content:attr(data-v);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:2px;
+  font-size:.62rem;font-weight:900;color:var(--text);white-space:nowrap;font-variant-numeric:tabular-nums;
+}
+.ins-col.pre .ins-bar::after{display:none}
+.ins-axis{display:flex;gap:3px;margin-top:4px}
+.ins-chart-card.dense .ins-axis{gap:1.5px}
+.ins-axis span{flex:1 1 0;min-width:0;text-align:center;font-size:.58rem;font-weight:700;color:var(--text3);line-height:1.15;white-space:nowrap;overflow:visible}
+.ins-axis b{display:block;font-weight:800}
+.ins-axis span.today{color:var(--primary)}
+.ins-cap{margin:.55rem 0 0;font-size:.74rem;font-weight:800;color:var(--text2);text-align:center;min-height:1.1em}
+.ins-cleg{display:flex;flex-wrap:wrap;justify-content:center;gap:.4rem .9rem;margin-top:.45rem;font-size:.66rem;font-weight:700;color:var(--text2)}
+.ins-cleg span{display:inline-flex;align-items:center;gap:.3rem}
+.ins-cleg i{width:10px;height:10px;border-radius:3px;background:var(--primary)}
+.ins-cleg i.p{background:var(--accent)}
+.ins-cleg i.pre{background:transparent;border:1.5px dashed var(--line-2)}
+
+/* View sources */
+.ins-srcs{display:flex;flex-direction:column;gap:.5rem}
+.ins-src{display:grid;grid-template-columns:minmax(0,7.5rem) 1fr auto 2.6rem;align-items:center;gap:.5rem}
+.ins-src-l{font-size:.74rem;font-weight:800;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ins-src-t{height:9px;border-radius:5px;background:var(--cream-2);overflow:hidden}
+.ins-src-t i{display:block;height:100%;border-radius:5px;background:var(--primary)}
+.ins-src b{font-size:.78rem;font-weight:900;color:var(--text);font-variant-numeric:tabular-nums;text-align:right}
+.ins-src small{font-size:.66rem;font-weight:700;color:var(--text3);text-align:right;font-variant-numeric:tabular-nums}
+
+/* Followers vs others */
+.ins-split{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--cream-2);border:1.5px solid var(--text)}
+.ins-split i{display:block;height:100%}
+.ins-split i.f,.ins-leg i.f{background:var(--primary)}
+.ins-split i.o,.ins-leg i.o{background:var(--accent)}
+.ins-leg{display:flex;flex-direction:column;gap:.35rem;margin-top:.6rem}
+.ins-leg span{display:flex;align-items:center;gap:.45rem;font-size:.76rem;font-weight:800;color:var(--text)}
+.ins-leg i{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+.ins-leg b{margin-left:auto;font-weight:900;font-variant-numeric:tabular-nums}
+.ins-leg small{width:2.6rem;text-align:right;font-size:.68rem;font-weight:700;color:var(--text3);font-variant-numeric:tabular-nums}
+
+.ins-foot{margin:1rem .2rem 0;font-size:.68rem;font-weight:600;color:var(--text3);text-align:center;line-height:1.45;text-wrap:balance}
+.ins-state{padding:1.6rem 1rem .6rem}
+.ins-state .em-icon .icon{width:2.2rem;height:2.2rem;color:var(--text3)}
+.ins-retry{flex:none;margin-top:.9rem;padding:.55rem 1.4rem}
+
+/* Account: 7 / 30 days toggle, top posts */
+.ins-seg{display:flex;gap:4px;padding:4px;margin-top:.2rem;border-radius:14px;background:var(--cream-2);border:2px solid var(--text)}
+.ins-seg button{flex:1;padding:.45rem .5rem;border-radius:10px;background:transparent;border:0;font-family:var(--font-display);font-weight:800;font-size:.82rem;color:var(--text2);cursor:pointer}
+.ins-seg button.on{background:var(--primary);color:var(--cream);box-shadow:1.5px 1.5px 0 var(--primary-3)}
+.ins-tops{display:flex;flex-direction:column;gap:6px}
+.ins-topp{display:flex;align-items:center;gap:.65rem;width:100%;padding:.5rem .6rem;text-align:left;border-radius:14px;background:var(--white);border:2px solid var(--text);box-shadow:2px 2px 0 var(--text);cursor:pointer;color:var(--text)}
+.ins-topp:active{transform:translate(1px,1px);box-shadow:1px 1px 0 var(--text)}
+.ins-topp .ins-thumb{width:40px;height:40px}
+.ins-topp-txt{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.ins-topp-txt b{font-weight:900;font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ins-topp-txt span{font-size:.7rem;font-weight:700;color:var(--text3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ins-chev{font-size:1.4rem;font-weight:900;color:var(--text3);line-height:1}
+.ins-none{margin:0;padding:.9rem;border-radius:14px;border:1.5px dashed var(--line-2);font-size:.78rem;font-weight:700;color:var(--text3);text-align:center}
+
+/* Profile tab: account insights button — top-LEFT: a 4th slot on the right
+   would sit on the centred avatar at phone widths. */
+.settings-gear.settings-gear-4{right:auto;left:.9rem}
+
+@media (prefers-reduced-motion: reduce){
+  .ins-sheet,.ins-backdrop,.ins-bar{transition:none}
+}

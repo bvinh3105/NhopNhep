@@ -69,10 +69,27 @@ function boot() {
   // Deep-link handler: ?q=<pb_id> auto-opens the community detail
   // modal for that quán. Used by the "Sao chép link" button in the
   // detail modal so shared links land on the right screen.
+  // ?checkin=<id> (the check-in viewer's "Chia sẻ") opens that check-in
+  // in the viewer. Once handled, the param is dropped from the address
+  // bar (history.replaceState, other params and history state kept) so a
+  // reload doesn't re-open the post and count the link view again — but
+  // only once it's done with: after a network error the link stays, so a
+  // reload can retry.
+  const dropUrlParam = (name) => {
+    try {
+      const u = new URL(location.href);
+      u.searchParams.delete(name);
+      history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+    } catch (_) {}
+  };
   const urlQ = new URLSearchParams(location.search).get('q');
   if (urlQ) {
     // Delay slightly so all controllers/modals are ready to render.
-    setTimeout(() => SavedListModal.openFromLink(urlQ), 400);
+    setTimeout(async () => { if (await SavedListModal.openFromLink(urlQ)) dropUrlParam('q'); }, 400);
+  }
+  const urlCheckin = new URLSearchParams(location.search).get('checkin');
+  if (urlCheckin) {
+    setTimeout(async () => { if (await CheckinViewerCtrl.openFromLink(urlCheckin)) dropUrlParam('checkin'); }, 400);
   }
 
   // Group Session invite: ?join=<session_id> from "Sao chép link mời".

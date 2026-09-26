@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2728">
+<link rel="stylesheet" href="css/styles.css?v=2731">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -610,6 +610,7 @@
   <button class="settings-gear" id="settingsGearBtn" type="button" data-i18n="profile.settings" data-i18n-attr="title" title="Cài đặt"><svg class="icon" width="20" height="20"><use href="#ic-action-settings"></use></svg></button>
   <button class="settings-gear settings-gear-2" id="savedListBtn" type="button" data-i18n="saved.openTitle" data-i18n-attr="title" title="Quán đã lưu"><svg class="icon" width="20" height="20"><use href="#ic-action-bookmark"></use></svg></button>
   <button class="settings-gear settings-gear-3" id="savedTripsBtn" type="button" data-i18n="savedTrip.openTitle" data-i18n-attr="title" title="Lộ trình đã lưu"><svg class="icon" width="20" height="20"><use href="#ic-map-saved-route"></use></svg></button>
+  <button class="settings-gear settings-gear-4 hidden" id="insightsBtn" type="button" data-i18n="ins.openAccount" data-i18n-attr="title" title="Thống kê tài khoản"><svg class="icon" width="20" height="20"><use href="#ic-action-stats"></use></svg></button>
   <div class="profile-scroll">
     <!-- Quán community section — the community profile header (avatar,
          name, 3 social stats) is rendered inline into #myRestaurantList
@@ -1561,19 +1562,37 @@
 </div>
 
 <!-- Toast -->
+<!-- Thống kê — InsightsSheet (js/insights-sheet.js). Its own layer above the
+     check-in viewer and the diary; deliberately not a .modal-overlay (see
+     the header comment in that file). -->
+<div class="ins-ov" id="insOv" hidden>
+  <div class="ins-backdrop" id="insBackdrop"></div>
+  <div class="ins-sheet" id="insSheet" role="dialog" aria-modal="true" aria-labelledby="insTitle" tabindex="-1">
+    <div class="ins-grab" id="insGrab"><div class="modal-handle"></div></div>
+    <div class="ins-top" id="insTop">
+      <button type="button" class="ins-ic off" id="insBack" data-i18n="ins.back" data-i18n-attr="aria-label" aria-label="Quay lại">‹</button>
+      <h2 class="modal-title ins-title" id="insTitle"></h2>
+      <button type="button" class="ins-ic" id="insClose" data-i18n="ins.close" data-i18n-attr="aria-label" aria-label="Đóng"><svg class="icon" width="20" height="20"><use href="#ic-action-close"></use></svg></button>
+    </div>
+    <div class="ins-body" id="insBody"></div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
 <script src="js/security.js?v=2672"></script>
-<script src="js/i18n.js?v=2728"></script>
+<script src="js/i18n.js?v=2731"></script>
 <script src="js/utils.js?v=2710"></script>
 <script src="js/state.js?v=2672"></script>
 <script src="js/poi.js?v=2724"></script>
 <script src="js/geocoder.js?v=2672"></script>
 <script src="js/gemini.js?v=2672"></script>
 <script src="js/community.js?v=2720"></script>
+<script src="js/insights.js?v=2730"></script>
+<script src="js/insights-sheet.js?v=2731"></script>
 <script src="js/push.js?v=2672"></script>
 <script src="js/analytics.js?v=2672"></script>
 <script src="js/map.js?v=2720"></script>
@@ -1591,8 +1610,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2729"></script>
-<script src="js/app.js?v=2720"></script>
+<script src="js/controllers.js?v=2731"></script>
+<script src="js/app.js?v=2731"></script>
 
 </body>
 </html>
