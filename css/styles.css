@@ -2965,6 +2965,10 @@ body.map-full .tabbar{transform:translateY(105%)}
 .ci-viewer-tap{
   position:absolute;top:0;bottom:0;z-index:10;
   background:transparent;border:0;padding:0;cursor:pointer;
+  /* The swipe is ours: without this the browser claims a horizontal drag
+     (pointercancel, or Chrome's swipe-to-go-back) and the viewer never
+     sees the pointerup that decides next/previous. */
+  touch-action:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
 }
 .ci-viewer-tap-prev{left:0;width:30%}
 .ci-viewer-tap-next{right:0;width:70%}

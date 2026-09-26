@@ -8712,7 +8712,10 @@ const CheckinViewerCtrl = {
       const dx = e.clientX - this._dragStartX, dy = e.clientY - this._dragStartY;
       this._dragStartX = null;
       const isSwipe = Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.3;
-      if (isSwipe) { if (dx < 0) this._next(); else this._prev(); }
+      // Same direction as the diary: finger moves right → the next
+      // check-in, left → the previous one (the tap zones are unchanged:
+      // left edge = previous, right = next).
+      if (isSwipe) { if (dx > 0) this._next(); else this._prev(); }
       else { if (this._dragZone === 'prev') this._prev(); else this._next(); }
     });
 
