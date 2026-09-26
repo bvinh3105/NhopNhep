@@ -173,9 +173,12 @@ function countElements(text) {
 function raceForNonEmpty(promises) {
   return new Promise((resolve, reject) => {
     let remaining = promises.length;
-    let partial = null, empty = null;
+    let partial = null, empty = null, cleanEmpty = 0;
     const errors = [];
     const settle = () => {
+      // Two mirrors agreeing on a clean empty list = no quán mapped here;
+      // don't keep the user waiting on the slowest one (up to 25 s).
+      if (!partial && empty && cleanEmpty >= 2) return resolve(empty);
       if (remaining > 0) return;
       if (partial) resolve(partial);
       else if (empty) resolve(empty);
@@ -187,7 +190,7 @@ function raceForNonEmpty(promises) {
         const n = countElements(result.text);
         if (n > 0 && !result.partial) return resolve(result);
         if (n > 0) { if (!partial) partial = result; }
-        else if (!empty) empty = result;
+        else { if (!empty) empty = result; if (!result.partial) cleanEmpty++; }
         settle();
       }).catch(e => {
         remaining--;

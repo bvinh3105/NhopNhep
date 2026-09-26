@@ -20,13 +20,20 @@ const POI = {
   // server-side, and each endpoint here gave up after 8 s. Measured
   // 2026-09-26 at Duy Tân (Cầu Giấy) through the proxy, named places:
   // 1 km 78 · 2 km 276 · 5 km 980 (was capped to ~166 / ~162), 98–376 KB,
-  // 1–11 s. Now: 25 s server budget, only a high safety cap, the client
-  // waits long enough, and keeps the NEAREST MAX_ITEMS for rendering.
+  // 1–11 s. Now: 25 s server budget, only a high safety cap, and the
+  // client waits long enough. The list comes back sorted nearest-first;
+  // HomeCtrl._doScan caps it at MAX_ITEMS for rendering AFTER its
+  // category / dish / rating filters (capping here dropped the outer ring
+  // of a filtered 5 km search).
   QUERY_TIMEOUT_S: 25,
   OUTPUT_CAP: 3000,
   FETCH_TIMEOUT_MS: 27000,
   MAX_ITEMS: 500,
-  lastFailed: false, // true when every endpoint failed on the last fetch (the scan toasts differ)
+  // Last fetch: lastFailed = no map answer at all (network / every mirror
+  // down); lastDegraded = no COMPLETE answer (failed, or only a cut-short
+  // one). A clean empty answer (an area with no mapped quán) is neither.
+  lastFailed: false,
+  lastDegraded: false,
 
   _cacheKey(lat, lng, radius) {
     return `${lat.toFixed(3)}_${lng.toFixed(3)}_${radius}`;
@@ -133,6 +140,7 @@ out center ${this.OUTPUT_CAP};`;
     const cached = this._cache.get(key);
     if (cached && (Date.now() - cached.ts) < this.CACHE_TTL) {
       console.log('[POI] cache hit', key, cached.items.length);
+      this.lastFailed = false; this.lastDegraded = false;
       return cached.items;
     }
 
@@ -166,7 +174,7 @@ out center ${this.OUTPUT_CAP};`;
     console.log('[POI] fetching concurrently from', endpoints.length, 'endpoints…');
 
     const abortControllers = endpoints.map(() => new AbortController());
-    let partial = null;
+    let partial = null, sawCleanEmpty = false;
     const promises = endpoints.map((ep, i) => {
       return new Promise(async (resolve, reject) => {
         const timeout = setTimeout(() => {
@@ -180,8 +188,10 @@ out center ${this.OUTPUT_CAP};`;
             fetchOpts.headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
           }
           const res = await fetch(ep.url, fetchOpts);
-          clearTimeout(timeout);
           if (!res.ok) throw new Error('HTTP ' + res.status);
+          // The timer keeps running through the body download (100 KB–1 MB
+          // now): a connection that stalls mid-body must still time out,
+          // or the scan overlay would hang with nothing to release it.
           const data = await res.json();
           // An Overpass "runtime error" (timeout / memory) comes back as
           // HTTP 200 with a remark and a partial or empty list — keep it
@@ -192,20 +202,28 @@ out center ${this.OUTPUT_CAP};`;
           } else if (data.elements && data.elements.length > 0) {
             resolve({ url: ep.url, elements: data.elements, index: i });
           } else {
+            const runtimeErr = data.remark && /runtime error/i.test(data.remark);
+            if (Array.isArray(data.elements) && !runtimeErr) {
+              sawCleanEmpty = true;
+              // The proxy already raced 3 mirrors preferring a non-empty
+              // answer — a clean empty from it means "no quán mapped here":
+              // settle now instead of waiting out the slowest endpoint.
+              if (ep.url === this.PROXY || ep.url === this.DEPLOYED_PROXY) return resolve({ url: ep.url, elements: [], index: i });
+            }
             reject(new Error('No elements from ' + ep.url));
           }
         } catch (e) {
-          clearTimeout(timeout);
           reject(e);
+        } finally {
+          clearTimeout(timeout);
         }
       });
     });
 
-    // Nearest first, capped — a dense 5 km circle holds ~1000 named places.
+    // Nearest first (the render cap is applied after filtering, in _doScan).
     const nearest = (elements) => this._parse(elements)
       .map(it => ({ it, d: haversine(lat, lng, it.lat, it.lng) }))
       .sort((a, b) => a.d - b.d)
-      .slice(0, this.MAX_ITEMS)
       .map(x => x.it);
 
     try {
@@ -213,8 +231,8 @@ out center ${this.OUTPUT_CAP};`;
       console.log('[POI] winner:', fastest.url);
       abortControllers.forEach((ctrl, i) => { if (i !== fastest.index) ctrl.abort(); });
       const items = nearest(fastest.elements);
-      this._cache.set(key, { ts: Date.now(), items });
-      this.lastFailed = false;
+      if (items.length) this._cache.set(key, { ts: Date.now(), items });
+      this.lastFailed = false; this.lastDegraded = false;
       console.log('[POI] fetched', items.length, 'items');
       return items;
     } catch (e) {
@@ -224,11 +242,13 @@ out center ${this.OUTPUT_CAP};`;
       if (partial) {
         // Better a partial list than none — but don't cache it.
         console.warn('[POI] only a partial answer came back:\n  ' + detail);
-        this.lastFailed = false;
+        this.lastFailed = false; this.lastDegraded = true;
         return nearest(partial.elements);
       }
-      console.error('[POI] All endpoints failed:\n  ' + detail);
-      this.lastFailed = true;
+      // Every endpoint said "no elements" cleanly → an area with no mapped
+      // quán, not a connection problem.
+      this.lastFailed = !sawCleanEmpty; this.lastDegraded = !sawCleanEmpty;
+      if (this.lastFailed) console.error('[POI] All endpoints failed:\n  ' + detail);
       return [];
     }
   },

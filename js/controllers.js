@@ -455,8 +455,13 @@ const HomeCtrl = {
       source = raceResult.source;
     }
 
+    // No complete map answer (every endpoint failed, or only a cut-short
+    // list, possibly filled in by Gemini): show what we have, say the map
+    // didn't fully load, and don't keep it — the next scan tries again.
+    const mapDegraded = State.activeSrcs.has('osm') && (POI.lastFailed || POI.lastDegraded);
+
     // Cache the result
-    if (items.length) this._scanCache.set(ck, { items, source, ts: Date.now() });
+    if (items.length && !mapDegraded) this._scanCache.set(ck, { items, source, ts: Date.now() });
 
     State.osmRestaurants = items;
     State.lastScanSource = source;
@@ -478,18 +483,17 @@ const HomeCtrl = {
     // Users just use the app: nothing here mentions AI keys or quotas
     // (Vinh, 2026-09-26). The quota flag is still consumed so it resets.
     if (typeof Gemini !== 'undefined' && Gemini.consumeQuotaHitFlag) Gemini.consumeQuotaHitFlag();
-    if (items.length) {
-      showToast(source === 'gemini'
-        ? I18N.t('toast.foundN', { n: items.length })
-        : I18N.t('toast.foundNPlain', { n: items.length }), 2200);
-    }
+    // "Tìm thấy N quán" counts what the list actually shows (after the
+    // filters and the render cap), so _doScan() says it.
+    this._foundToast = items.length && !mapDegraded ? source : null;
     // "Nothing found" vs "couldn't load" is reported by _doScan(), which
     // knows whether community / "Của tôi" still filled the list — two
     // toasts here used to overwrite each other ("mạng chậm" → "thử tăng
     // bán kính", the wrong advice when the map simply didn't load).
-    this._mapFailed = State.activeSrcs.has('osm') && !items.length && POI.lastFailed;
+    this._mapFailed = mapDegraded;
     this._doScan();
     this._mapFailed = false;
+    this._foundToast = null;
   },
 
   _srcOf(r) {
@@ -678,6 +682,7 @@ const HomeCtrl = {
         MapHome.showRestaurants([]);
         ResultsCtrl.show();
         this._updateBadge();
+        if (this._mapFailed) showToast(I18N.t('toast.scanNetFail'), 3500);
         return;
       }
       let hint = I18N.t('hint.tryRadiusOrGps');
@@ -689,6 +694,9 @@ const HomeCtrl = {
     }
 
     results.sort((a,b) => a._dist - b._dist);
+    // Render cap AFTER the source / category / rating / radius / dish
+    // filters, so a filtered 5 km search still reaches the outer ring.
+    if (results.length > POI.MAX_ITEMS) results.length = POI.MAX_ITEMS;
     for (let i = 0; i < results.length-1; i += 3) {
       if (Math.random() < 0.5) [results[i], results[i+1]] = [results[i+1], results[i]];
     }
@@ -705,6 +713,9 @@ const HomeCtrl = {
     // Only community / "Của tôi" quán made it in — say the map didn't load
     // rather than let a short list pass for everything nearby.
     if (this._mapFailed) showToast(I18N.t('toast.scanNetFail'), 3500);
+    else if (this._foundToast) showToast(this._foundToast === 'gemini'
+      ? I18N.t('toast.foundN', { n: results.length })
+      : I18N.t('toast.foundNPlain', { n: results.length }), 2200);
   },
 
   // ── Random dish pick ────────────────────────────────────────────────
