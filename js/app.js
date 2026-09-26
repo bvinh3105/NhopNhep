@@ -112,6 +112,15 @@ function boot() {
     try { sessionStorage.setItem('nhopnhep_ref', urlRef); } catch (_) {}
   }
 
+  // Resume a guest check-in draft: already logged in (from a previous
+  // visit) and a draft is still sitting there — closed the app mid-signup,
+  // came back later. The freshly-logged-in-just-now case is handled by
+  // CommunityCtrl._submitAuth() instead. Same 400ms delay as the deep-link
+  // handlers above, for the same reason (let every controller finish init).
+  if (Community.isLoggedIn() && CheckinCtrl._hasPendingDraft()) {
+    setTimeout(() => CheckinCtrl._rehydrateDraft(), 400);
+  }
+
   // Fire-and-forget one app_open event per page load. Skipped on
   // localhost by Analytics itself so dev noise doesn't hit prod stats.
   if (typeof Analytics !== 'undefined') Analytics.boot();

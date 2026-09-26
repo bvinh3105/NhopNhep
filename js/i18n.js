@@ -269,9 +269,8 @@ const I18N = {
       'err.imageUnreadable': 'Không đọc được ảnh',
       'err.serverGeneric': 'Lỗi server — thử lại sau',
       // ── Check-in ("chụp NGAY" tab) ──
-      'checkin.signInTitle': 'Đăng nhập để check-in',
-      'checkin.signInSub': 'Check-in là nhật ký cá nhân của bạn — đăng nhập ở tab Cộng đồng để bắt đầu.',
-      'checkin.goSignIn': 'Đăng nhập ngay',
+      'checkin.needLoginToSave': '📸 Ảnh đã lưu — đăng nhập để đăng check-in này nhé',
+      'checkin.draftRestoredToast': '✨ Đã khôi phục ảnh check-in, bấm Gửi để đăng',
       'checkin.noPermTitle': 'Chưa mở được camera',
       'checkin.noPermSub': 'Bạn cần cho phép Nhóp Nhép dùng camera để check-in. Bấm 🔒 cạnh URL để bật lại quyền.',
       'checkin.needHttpsTitle': 'Cần kết nối bảo mật',
@@ -955,9 +954,8 @@ const I18N = {
       'err.imageUnreadable': "Couldn't read the image",
       'err.serverGeneric': 'Server error — please try again',
       // ── Check-in ──
-      'checkin.signInTitle': 'Sign in to check in',
-      'checkin.signInSub': 'Check-ins are your personal diary — sign in from the Community tab to start.',
-      'checkin.goSignIn': 'Sign in now',
+      'checkin.needLoginToSave': "📸 Photo saved — sign in to post this check-in",
+      'checkin.draftRestoredToast': '✨ Check-in photo restored — tap Gửi to post it',
       'checkin.noPermTitle': "Camera didn't open",
       'checkin.noPermSub': 'Allow Nhóp Nhép to use the camera to check in. Tap 🔒 next to the URL to re-grant permission.',
       'checkin.needHttpsTitle': 'Secure connection required',

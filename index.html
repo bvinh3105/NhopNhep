@@ -769,14 +769,6 @@
      (CheckinCtrl decides which layer to reveal on tab enter).
 ═══════════════════════════════════════════════ -->
 <div id="checkinScreen" class="screen hidden">
-  <!-- Signed-out prompt — takes over the tab when Community.isLoggedIn() is false. -->
-  <div class="checkin-signin hidden" id="checkinSignInWrap">
-    <div class="coming-soon-ico"><svg class="icon" width="40" height="40"><use href="#ic-nav-checkin"></use></svg></div>
-    <div class="coming-soon-title" data-i18n="checkin.signInTitle">Đăng nhập để check-in</div>
-    <p class="coming-soon-sub" data-i18n="checkin.signInSub">Check-in là nhật ký cá nhân của bạn — đăng nhập ở tab Cộng đồng để bắt đầu.</p>
-    <button class="cat-chip active" id="checkinGoSignIn" data-i18n="checkin.goSignIn" type="button" style="margin-top:.8rem">Đăng nhập ngay</button>
-  </div>
-
   <!-- No-permission fallback shown when getUserMedia is denied/unavailable. -->
   <div class="checkin-noperm hidden" id="checkinNoPerm">
     <div class="coming-soon-ico"><svg class="icon" width="40" height="40"><use href="#ic-nav-checkin"></use></svg></div>
@@ -1584,7 +1576,7 @@
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
 <script src="js/security.js?v=2672"></script>
-<script src="js/i18n.js?v=2732"></script>
+<script src="js/i18n.js?v=2733"></script>
 <script src="js/utils.js?v=2710"></script>
 <script src="js/state.js?v=2672"></script>
 <script src="js/poi.js?v=2724"></script>
@@ -1610,8 +1602,8 @@
   </div>
 </div>
 
-<script src="js/controllers.js?v=2732"></script>
-<script src="js/app.js?v=2732"></script>
+<script src="js/controllers.js?v=2733"></script>
+<script src="js/app.js?v=2733"></script>
 
 </body>
 </html>

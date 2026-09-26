@@ -3593,6 +3593,22 @@ const CommunityCtrl = {
     this._renderAuthMode();
   },
 
+  // Opens the sign-in/register form directly (as if the user had already
+  // tapped the "Đăng nhập" header button) — used by CheckinCtrl._submit()
+  // so a guest lands straight in the form instead of the browse-first
+  // Cộng đồng screen plus one more tap.
+  showAuthPrompt(mode = 'login') {
+    // Switch FIRST — TabNav.switchTo('community') calls render(), which
+    // unconditionally shows communityMain/hides communityAuth (the normal
+    // "just opened this tab" state). Doing it after would instantly undo
+    // the override below.
+    TabNav.switchTo('community');
+    document.getElementById('communityAuth').classList.remove('hidden');
+    document.getElementById('communityMain').classList.add('hidden');
+    this._mode = mode === 'register' ? 'register' : 'login';
+    this._renderAuthMode();
+  },
+
   // Không còn UI đổi địa chỉ server trong app nữa (ẩn khỏi người dùng
   // thường) — cần đổi thì gõ thẳng `Community.BASE_URL = '...'` trong
   // console devtools, setter đã có sẵn lưu vào localStorage.
@@ -3770,6 +3786,9 @@ const CommunityCtrl = {
     if (this._mode === 'register') { try { sessionStorage.removeItem('nhopnhep_ref'); } catch (_) {} }
     AvatarCtrl.repairSync();
     this.render();
+    if (typeof CheckinCtrl !== 'undefined' && CheckinCtrl._hasPendingDraft()) {
+      CheckinCtrl._rehydrateDraft();
+    }
   },
 
   // Cap for anonymous browse-first preview. Small enough to feel like
@@ -6047,6 +6066,10 @@ const CheckinCtrl = {
   _selected: null,         // {id, name, lat, lng, emoji, source}
   _captured: null,         // { blob: Blob, dataUrl: string } — the pending photo
   _pickerCandidates: [],
+  // Guest draft (see _stashDraft()/_rehydrateDraft() below).
+  DRAFT_KEY: 'checkin_pending_draft',
+  DRAFT_TTL: 2 * 3600 * 1000,   // 2h — a check-in is tied to a place/moment; older is stale
+  _draftDbPromise: null,
 
   // "Món ăn nào cũng lên hình đẹp" — a small, universal food-flattering
   // grade tuned for GOOD lighting (this doesn't try to rescue underlit
@@ -6081,7 +6104,6 @@ const CheckinCtrl = {
     this._wireZoom();
     document.getElementById('checkinShutterBtn').addEventListener('click', () => this._tapShutter());
     document.getElementById('checkinRetryCam').addEventListener('click', () => this._startStream());
-    document.getElementById('checkinGoSignIn').addEventListener('click', () => TabNav.switchTo('community'));
 
     // Star rating pills — both the live camera pill and the preview pill
     // wire the same way; picking a star sets data-rating on the container.
@@ -6136,15 +6158,9 @@ const CheckinCtrl = {
     document.getElementById('checkinPreview').classList.add('hidden');
     this._captured = null;
 
-    if (!Community.isLoggedIn()) {
-      document.getElementById('checkinSignInWrap').classList.remove('hidden');
-      document.getElementById('checkinNoPerm').classList.add('hidden');
-      document.getElementById('checkinVideo').classList.add('hidden');
-      this._toggleChrome(false);
-      return;
-    }
-
-    document.getElementById('checkinSignInWrap').classList.add('hidden');
+    // Guests can shoot/rate/write a note the same as anyone — an account
+    // is only needed at the final "Gửi" tap (see _submit()), which stashes
+    // the draft and sends them to sign in instead of posting silently.
     this._toggleChrome(true);
     this._refreshQuan();
     this._startStream();
@@ -6808,6 +6824,25 @@ const CheckinCtrl = {
       showToast(I18N.t('checkin.captureErr'));
       return;
     }
+
+    // Guest: let them shoot/rate/write freely, but posting needs an
+    // account. Stash exactly what they typed (not the restaurantId/Name/
+    // Lat/Lng inferred above — _rehydrateDraft() re-runs that same
+    // inference through this same _submit() on the real "Gửi" tap, so
+    // there's only one place this logic has to be right), then open the
+    // sign-in form. _submitAuth() calls _rehydrateDraft() once they're in
+    // to bring this sheet right back — never auto-posted, so a shared
+    // device logging into a different account doesn't silently upload
+    // the previous person's photo.
+    if (!Community.isLoggedIn()) {
+      await this._stashDraft({ dataUrl: this._captured.dataUrl, blob: photoBlob, rating, note, isShared, shareLocation, typedAddr, selected: this._selected });
+      btn.disabled = false;
+      if (spanEl) spanEl.textContent = originalLabel;
+      if (typeof Analytics !== 'undefined') Analytics.track('checkin_guest_deferred', {});
+      showToast(I18N.t('checkin.needLoginToSave'));
+      CommunityCtrl.showAuthPrompt('register');
+      return;
+    }
     const r = await Community.createCheckin({
       restaurantId,
       restaurantName,
@@ -6859,6 +6894,106 @@ const CheckinCtrl = {
     // Reset for the next check-in
     this._retake();
     this._setStars(document.getElementById('checkinStars'), 0);
+    this._clearDraft();
+  },
+
+  // ── Guest draft (lưu bền qua đăng nhập/đăng ký) ─────────────────────
+  // IndexedDB for the photo (mirrors CommunityAddModal._db()/_idb() —
+  // same shape, its own DB/store so this doesn't share cleanup lifecycle
+  // with the "add quán" draft) + localStorage for everything else.
+  _dbDraft() {
+    if (this._draftDbPromise) return this._draftDbPromise;
+    this._draftDbPromise = new Promise((resolve) => {
+      let req;
+      try { req = indexedDB.open('nhopnhep_checkin_draft', 1); }
+      catch (_) { return resolve(null); }
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains('photo')) db.createObjectStore('photo');
+      };
+      req.onerror = () => resolve(null);
+      req.onblocked = () => resolve(null);
+      req.onsuccess = () => resolve(req.result);
+    });
+    return this._draftDbPromise;
+  },
+
+  // Mọi lỗi IndexedDB (tab ẩn danh, quota, trình duyệt chặn) đều trả null
+  // chứ không throw — phần chữ của bản nháp phải sống độc lập với ảnh.
+  async _idbDraft(mode, fn) {
+    const db = await this._dbDraft();
+    if (!db) return null;
+    return new Promise((resolve) => {
+      try {
+        const op = fn(db.transaction('photo', mode).objectStore('photo'));
+        if (!op) return resolve(null);
+        op.onsuccess = () => resolve(op.result);
+        op.onerror = () => resolve(null);
+      } catch (_) { resolve(null); }
+    });
+  },
+
+  async _stashDraft({ dataUrl, blob, rating, note, isShared, shareLocation, typedAddr, selected }) {
+    await this._idbDraft('readwrite', s => s.put(blob, 'current'));
+    try {
+      localStorage.setItem(this.DRAFT_KEY, JSON.stringify({
+        v: 1, at: Date.now(),
+        dataUrl, rating, note, isShared, shareLocation, typedAddr, selected,
+      }));
+    } catch (_) { /* quota / private mode — the draft is best-effort only */ }
+  },
+
+  // Cheap check (localStorage only) for the two callers that just need to
+  // know whether to bother rehydrating at all — mirrors
+  // CommunityAddModal._loadDraft()'s TTL check.
+  _hasPendingDraft() {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(this.DRAFT_KEY) || 'null'); } catch (_) { return false; }
+    if (!d || d.v !== 1 || !d.at) return false;
+    if (Date.now() - d.at > this.DRAFT_TTL) { this._clearDraft(); return false; }
+    return true;
+  },
+
+  // Puts a stashed draft back into the SAME preview sheet _tapShutter()
+  // opens (rating pill, caption, address, both toggles, quán pick), then
+  // waits for the user's own "Gửi" tap — _submit() re-derives the
+  // restaurant/coords from _selected/typedAddr exactly like a fresh photo.
+  // Called both right after signing in (CommunityCtrl._submitAuth()) and
+  // on boot if the user was already logged in and a draft is still there
+  // (closed the app mid-signup, reopened later).
+  async _rehydrateDraft() {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(this.DRAFT_KEY) || 'null'); } catch (_) {}
+    if (!d || d.v !== 1 || !d.at || Date.now() - d.at > this.DRAFT_TTL) { this._clearDraft(); return; }
+    const blob = await this._idbDraft('readonly', s => s.get('current'));
+    if (!blob) { this._clearDraft(); return; }   // photo lost — nothing usable to resume
+
+    // Switch tabs FIRST: enter() resets _captured and hides the preview,
+    // so anything set beforehand would be wiped the instant the tab opens.
+    TabNav.switchTo('checkin');
+    this._captured = { blob, blobPromise: Promise.resolve(blob), dataUrl: d.dataUrl };
+    this._selected = d.selected || null;
+
+    this._setStars(document.getElementById('checkinPreviewStars'), d.rating || 0);
+    document.getElementById('checkinPreviewPhoto').src = d.dataUrl;
+    document.getElementById('checkinCaption').value = d.note || '';
+    const addrEl = document.getElementById('checkinAddress');
+    if (addrEl) addrEl.value = d.typedAddr || '';
+    document.getElementById('checkinShareTog').classList.toggle('on', d.isShared !== false);
+    document.getElementById('checkinLocTog').classList.toggle('on', d.shareLocation !== false);
+    this._resetSubTabs();
+    document.getElementById('checkinPreview').classList.remove('hidden');
+    document.querySelector('.tabbar')?.classList.add('checkin-hidden');
+
+    // The persisted draft stays until _submit() actually succeeds —
+    // closing the tab again before tapping "Gửi" resumes right back here
+    // instead of losing the photo a second time.
+    showToast(I18N.t('checkin.draftRestoredToast'));
+  },
+
+  _clearDraft() {
+    try { localStorage.removeItem(this.DRAFT_KEY); } catch (_) {}
+    this._idbDraft('readwrite', s => s.delete('current'));
   },
 
   _openDiary() { NhatKyCtrl.open(); },
