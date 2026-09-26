@@ -18,7 +18,9 @@ const MIRRORS = [
   'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
 ];
 
-const PER_MIRROR_TIMEOUT_MS = 12000;
+// Dense 2–5 km searches take 6–11 s on the mirrors (js/poi.js asks
+// Overpass for up to 25 s); a 12 s cut here dropped them to "no quán".
+const PER_MIRROR_TIMEOUT_MS = 25000;
 // Overpass mirrors reject requests without a User-Agent (returns 406).
 // Cloudflare Workers' fetch() doesn't set one by default.
 const UA = 'NhopNhep/1.0 (+https://nhopnhep.pages.dev)';
@@ -115,7 +117,10 @@ export async function onRequest(context) {
       if (!text.includes('"elements"')) {
         throw new Error(`${url} → non-JSON response`);
       }
-      return { url, text, contentType: res.headers.get('content-type') || 'application/json' };
+      // Overpass reports a query timeout / memory limit as HTTP 200 with a
+      // "runtime error" remark and a partial or empty list.
+      const partial = /"remark"\s*:\s*"[^"]*runtime error/i.test(text);
+      return { url, text, partial, contentType: res.headers.get('content-type') || 'application/json' };
     }).catch(e => {
       clearTimeout(timer);
       throw e;
@@ -124,6 +129,7 @@ export async function onRequest(context) {
 
   try {
     const winner = await raceForNonEmpty(attempts);
+    const complete = !winner.partial && countElements(winner.text) > 0;
     const resp = new Response(winner.text, {
       status: 200,
       headers: {
@@ -132,10 +138,13 @@ export async function onRequest(context) {
         'X-Overpass-Mirror': winner.url,
         'X-Cache': 'MISS',
         'X-Element-Count': String(countElements(winner.text)),
-        'Cache-Control': `public, max-age=${EDGE_CACHE_TTL}`,
+        'X-Overpass-Partial': winner.partial ? '1' : '0',
+        'Cache-Control': complete ? `public, max-age=${EDGE_CACHE_TTL}` : 'no-store',
       },
     });
-    context.waitUntil(cache.put(cacheKey, resp.clone()));
+    // Never cache an empty or cut-short answer: for the next 5 minutes
+    // every nearby scan would be served "no quán" from the edge.
+    if (complete) context.waitUntil(cache.put(cacheKey, resp.clone()));
     return resp;
   } catch (e) {
     const reasons = (e.errors || [e]).map(x => x?.message || String(x)).join(' | ');
@@ -157,30 +166,33 @@ function countElements(text) {
   return matches ? matches.length : 0;
 }
 
-// Prefer any response with elements. Fall back to the fastest response
-// (even if empty) if all mirrors return empty; reject only when every
-// mirror errors out. Non-empty short-circuits — we don't wait for the rest.
+// Prefer a complete non-empty response (short-circuits — we don't wait
+// for the rest). Otherwise, once every mirror has answered: a partial
+// (Overpass runtime error) non-empty one, then an empty one; reject only
+// when every mirror errors out.
 function raceForNonEmpty(promises) {
   return new Promise((resolve, reject) => {
     let remaining = promises.length;
-    let fallback = null;
+    let partial = null, empty = null;
     const errors = [];
+    const settle = () => {
+      if (remaining > 0) return;
+      if (partial) resolve(partial);
+      else if (empty) resolve(empty);
+      else reject({ errors });
+    };
     promises.forEach(p => {
       p.then(result => {
         remaining--;
-        if (countElements(result.text) > 0) {
-          resolve(result);
-        } else {
-          if (!fallback) fallback = result;
-          if (remaining === 0) resolve(fallback);
-        }
+        const n = countElements(result.text);
+        if (n > 0 && !result.partial) return resolve(result);
+        if (n > 0) { if (!partial) partial = result; }
+        else if (!empty) empty = result;
+        settle();
       }).catch(e => {
         remaining--;
         errors.push(e);
-        if (remaining === 0) {
-          if (fallback) resolve(fallback);
-          else reject({ errors });
-        }
+        settle();
       });
     });
   });

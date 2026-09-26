@@ -429,28 +429,24 @@ const HomeCtrl = {
         const merged = [...g, ...oMatched];
         raceResult = { items: merged, source: merged.length ? (g.length ? 'gemini' : 'osm') : 'none' };
       } else {
-        // ── GENERAL SEARCH: race both, first non-empty wins (fastest UX)
-        // BUG-FIX 2026-09-16: when Gemini isn't configured, geminiP is
-        // `Promise.resolve([])` above — a microtask, so its `.then(finish)`
-        // fires BEFORE osmP has a chance to resolve. With total=1 (osm-only
-        // mode), finished (1) >= total (1) tripped instantly and the race
-        // resolved empty, silently killing every scan for users without a
-        // Gemini key (banner "Không tìm thấy quán" even in Cầu Giấy).
-        // Only attach `.then` to providers actually in play.
-        raceResult = await new Promise(resolve => {
-          let done = false;
-          let finished = 0;
-          const total = useGemini ? 2 : 1;
-          const finish = (it, src) => {
-            finished++;
-            if (done) return;
-            if (it.length) { done = true; resolve({ items: it, source: src }); }
-            else if (finished >= total) { done = true; resolve({ items: [], source: 'none' }); }
-          };
-          if (useGemini) geminiP.then(r => finish(r, 'gemini'));
-          osmP.then(r => finish(r, 'osm'));
-          setTimeout(() => { if (!done) { done = true; resolve({ items: [], source: 'none' }); } }, 20000);
-        });
+        // ── GENERAL SEARCH: OSM is the complete source (every mapped quán
+        // in the circle); Gemini (≤ 20 AI-recalled places) only fills in.
+        // This used to be a race — first non-empty answer won — so as soon
+        // as OSM was the slower one (always at 2–5 km), a 20-place Gemini
+        // list replaced hundreds of real ones: a BIGGER radius showed
+        // FEWER quán. Now: take OSM, merge whatever Gemini has by then (plus
+        // a short grace), and use Gemini alone only when OSM came back empty.
+        const wait = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r([]), ms))]);
+        const o = await osmP;
+        if (o.length) {
+          const g = useGemini ? await wait(geminiP, 1500) : [];
+          const oNames = new Set(o.map(r => this._strip(r.name)));
+          const extra = g.filter(r => !oNames.has(this._strip(r.name)));
+          raceResult = { items: [...o, ...extra], source: 'osm' };
+        } else {
+          const g = useGemini ? await wait(geminiP, 15000) : [];
+          raceResult = { items: g, source: g.length ? 'gemini' : 'none' };
+        }
       }
 
       clearInterval(statusTick);
@@ -479,26 +475,21 @@ const HomeCtrl = {
     }
 
     // ── Toast kết quả ───────────────────────────────────────────────────
-    // Quota vừa hết ở lượt quét NÀY → báo ngay, bất kể OSM có tìm được gì
-    // hay không (chỉ 1 lần/ngày — consumeQuotaHitFlag() tự reset ở những
-    // lượt quét sau, xem gemini.js).
-    const justHitQuota = typeof Gemini !== 'undefined' && Gemini.consumeQuotaHitFlag && Gemini.consumeQuotaHitFlag();
-    if (justHitQuota) {
-      showToast(I18N.t('toast.geminiQuotaHit'), 4000);
-    } else if (items.length) {
+    // Users just use the app: nothing here mentions AI keys or quotas
+    // (Vinh, 2026-09-26). The quota flag is still consumed so it resets.
+    if (typeof Gemini !== 'undefined' && Gemini.consumeQuotaHitFlag) Gemini.consumeQuotaHitFlag();
+    if (items.length) {
       showToast(source === 'gemini'
         ? I18N.t('toast.foundN', { n: items.length })
         : I18N.t('toast.foundNPlain', { n: items.length }), 2200);
-    } else if (State.activeSrcs.has('osm')) {
-      // Nothing came back from either source. Only show "chưa có key" when
-      // there truly isn't one — a key that's just on cooldown or past its
-      // daily quota for today still HAS a key, so that message would be
-      // misleading (isConfigured() alone can't tell these apart).
-      const hasNoKey = typeof Gemini === 'undefined' || (!Gemini.userKey && !Gemini.defaultKey);
-      showToast(I18N.t(hasNoKey ? 'toast.noGeminiKey' : 'toast.noResults'), hasNoKey ? 4000 : 3500);
     }
-
+    // "Nothing found" vs "couldn't load" is reported by _doScan(), which
+    // knows whether community / "Của tôi" still filled the list — two
+    // toasts here used to overwrite each other ("mạng chậm" → "thử tăng
+    // bán kính", the wrong advice when the map simply didn't load).
+    this._mapFailed = State.activeSrcs.has('osm') && !items.length && POI.lastFailed;
     this._doScan();
+    this._mapFailed = false;
   },
 
   _srcOf(r) {
@@ -691,7 +682,8 @@ const HomeCtrl = {
       }
       let hint = I18N.t('hint.tryRadiusOrGps');
       if (!State.activeSrcs.has('osm')) hint = I18N.t('hint.enableOsm');
-      showToast(I18N.t('toast.noResultsHint', { hint }));
+      // Every map endpoint failed: a connection problem, not "no quán here".
+      showToast(this._mapFailed ? I18N.t('toast.scanNetFail') : I18N.t('toast.noResultsHint', { hint }), 3500);
       MapHome.showRestaurants([]);
       return;
     }
@@ -710,6 +702,9 @@ const HomeCtrl = {
 
     ResultsCtrl.show();
     this._updateBadge();
+    // Only community / "Của tôi" quán made it in — say the map didn't load
+    // rather than let a short list pass for everything nearby.
+    if (this._mapFailed) showToast(I18N.t('toast.scanNetFail'), 3500);
   },
 
   // ── Random dish pick ────────────────────────────────────────────────

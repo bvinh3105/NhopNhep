@@ -9,22 +9,38 @@ const POI = {
   // Works on Cloudflare Pages (functions/api/overpass.js) and Netlify
   // (netlify.toml redirects /api/overpass to the Netlify function).
   PROXY: '/api/overpass',
+  // localhost has no Pages Functions, and the public mirrors throttle/406
+  // direct browser traffic — local dev also asks the deployed proxy (CORS *).
+  DEPLOYED_PROXY: 'https://nhopnhep.pages.dev/api/overpass',
   _cache: new Map(),
   CACHE_TTL: 5 * 60 * 1000,
+  // A bigger radius used to come back with FEWER quán. Three limits stacked:
+  // `out center 200` returned 200 ARBITRARY elements (Overpass id order,
+  // not distance), the query's [timeout:10] killed dense 2–5 km searches
+  // server-side, and each endpoint here gave up after 8 s. Measured
+  // 2026-09-26 at Duy Tân (Cầu Giấy) through the proxy, named places:
+  // 1 km 78 · 2 km 276 · 5 km 980 (was capped to ~166 / ~162), 98–376 KB,
+  // 1–11 s. Now: 25 s server budget, only a high safety cap, the client
+  // waits long enough, and keeps the NEAREST MAX_ITEMS for rendering.
+  QUERY_TIMEOUT_S: 25,
+  OUTPUT_CAP: 3000,
+  FETCH_TIMEOUT_MS: 27000,
+  MAX_ITEMS: 500,
+  lastFailed: false, // true when every endpoint failed on the last fetch (the scan toasts differ)
 
   _cacheKey(lat, lng, radius) {
     return `${lat.toFixed(3)}_${lng.toFixed(3)}_${radius}`;
   },
 
   _query(lat, lng, radius) {
-    return `[out:json][timeout:10];
+    return `[out:json][timeout:${this.QUERY_TIMEOUT_S}];
 (
   node["amenity"~"^(restaurant|cafe|fast_food|food_court|ice_cream|bar|pub|bbq|biergarten|canteen)$"](around:${radius},${lat},${lng});
   way["amenity"~"^(restaurant|cafe|fast_food|food_court|ice_cream|bar|pub|bbq|biergarten|canteen)$"](around:${radius},${lat},${lng});
   node["shop"~"^(bakery|beverages|coffee|confectionery|pastry|deli|greengrocer|dairy)$"](around:${radius},${lat},${lng});
   way["shop"~"^(bakery|beverages|coffee|confectionery|pastry|deli)$"](around:${radius},${lat},${lng});
 );
-out center 200;`;
+out center ${this.OUTPUT_CAP};`;
   },
 
   _mapCategory(tags) {
@@ -134,6 +150,7 @@ out center 200;`;
 
     if (isLocal) {
       endpoints.push({ url: this.DIRECT, method: 'POST', body: queryParam });
+      endpoints.push({ url: this.DEPLOYED_PROXY, method: 'POST', body: queryParam });
     } else {
       endpoints.push({ url: this.PROXY, method: 'POST', body: queryParam });
     }
@@ -149,12 +166,13 @@ out center 200;`;
     console.log('[POI] fetching concurrently from', endpoints.length, 'endpoints…');
 
     const abortControllers = endpoints.map(() => new AbortController());
+    let partial = null;
     const promises = endpoints.map((ep, i) => {
       return new Promise(async (resolve, reject) => {
         const timeout = setTimeout(() => {
           abortControllers[i].abort();
           reject(new Error('timeout: ' + ep.url));
-        }, 8000);
+        }, this.FETCH_TIMEOUT_MS);
         try {
           const fetchOpts = { method: ep.method, signal: abortControllers[i].signal };
           if (ep.body) {
@@ -165,7 +183,13 @@ out center 200;`;
           clearTimeout(timeout);
           if (!res.ok) throw new Error('HTTP ' + res.status);
           const data = await res.json();
-          if (data.elements && data.elements.length > 0) {
+          // An Overpass "runtime error" (timeout / memory) comes back as
+          // HTTP 200 with a remark and a partial or empty list — keep it
+          // only as a last resort, never let it beat a complete answer.
+          if (data.remark && /runtime error/i.test(data.remark) && data.elements && data.elements.length) {
+            partial = partial || { url: ep.url, elements: data.elements, index: i };
+            reject(new Error('partial (' + data.remark.slice(0, 60) + ') from ' + ep.url));
+          } else if (data.elements && data.elements.length > 0) {
             resolve({ url: ep.url, elements: data.elements, index: i });
           } else {
             reject(new Error('No elements from ' + ep.url));
@@ -177,19 +201,34 @@ out center 200;`;
       });
     });
 
+    // Nearest first, capped — a dense 5 km circle holds ~1000 named places.
+    const nearest = (elements) => this._parse(elements)
+      .map(it => ({ it, d: haversine(lat, lng, it.lat, it.lng) }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, this.MAX_ITEMS)
+      .map(x => x.it);
+
     try {
       const fastest = await Promise.any(promises);
       console.log('[POI] winner:', fastest.url);
       abortControllers.forEach((ctrl, i) => { if (i !== fastest.index) ctrl.abort(); });
-      const items = this._parse(fastest.elements);
+      const items = nearest(fastest.elements);
       this._cache.set(key, { ts: Date.now(), items });
+      this.lastFailed = false;
       console.log('[POI] fetched', items.length, 'items');
       return items;
     } catch (e) {
       const detail = e.errors
         ? e.errors.map((x, i) => `${endpoints[i].url} → ${x?.message || x}`).join('\n  ')
         : (e?.message || e);
+      if (partial) {
+        // Better a partial list than none — but don't cache it.
+        console.warn('[POI] only a partial answer came back:\n  ' + detail);
+        this.lastFailed = false;
+        return nearest(partial.elements);
+      }
       console.error('[POI] All endpoints failed:\n  ' + detail);
+      this.lastFailed = true;
       return [];
     }
   },
