@@ -6234,36 +6234,30 @@ const CheckinCtrl = {
     }
   },
 
+  // Every place the app knows near the user: the last scan's pool (OSM,
+  // Gemini, community — see allRestaurants()) plus "Của tôi". The picker
+  // and the GPS auto-pick used to read State.results and
+  // ProfileCtrl._loadedList, neither of which is ever assigned, so the
+  // camera always said "Chưa có quán nào quanh đây" and never auto-picked
+  // — even right after a scan listing hundreds of quán. Community quán
+  // keep their PocketBase id (so the check-in links to the quán); the old
+  // mapping dropped it (`r.id > 1e13 ? ''` is true for community ids too).
+  _candidatePool() {
+    const seen = new Set(), pool = [];
+    (typeof allRestaurants === 'function' ? allRestaurants() : []).forEach(r => {
+      if (!r || !r.name) return;
+      const source = r._community ? 'community' : r._gemini ? 'gemini' : r.id >= 1e13 ? 'osm' : 'mine';
+      const k = `${r.name}::${source}`;
+      if (seen.has(k)) return;
+      seen.add(k);
+      pool.push({ id: r._community && r._pb ? r._pb.id : '', name: r.name, lat: r.lat ?? null, lng: r.lng ?? null, source });
+    });
+    return pool;
+  },
+
   _findClosest() {
     const lat = State.userLat, lng = State.userLng;
-    const pool = [];
-    // Community posts the user has authored (in Profile's list) —
-    // ProfileCtrl._loadedList caches these; if not yet loaded, skip.
-    const myR = ProfileCtrl && ProfileCtrl._loadedList || [];
-    myR.forEach(r => {
-      if (r && r.lat != null && r.lng != null) {
-        pool.push({
-          id: r.id,
-          name: r.name,
-          lat: r.lat, lng: r.lng,
-          emoji: (CATEGORIES[r.category] && CATEGORIES[r.category].icon) ? '' : '',  // svgIcon can't be inlined in emoji field; empty is fine
-          source: 'community',
-        });
-      }
-    });
-    // Recent scan results (Home tab already fetched them) — good for OSM
-    // places the user is currently near.
-    (State.results || []).slice(0, 40).forEach(r => {
-      if (r && r.lat != null && r.lng != null && r.name) {
-        pool.push({
-          id: r.id > 1e13 ? '' : (r._pb && r._pb.id) || '',
-          name: r.name,
-          lat: r.lat, lng: r.lng,
-          emoji: '',
-          source: r._community ? 'community' : (r._gemini ? 'gemini' : 'osm'),
-        });
-      }
-    });
+    const pool = this._candidatePool().filter(p => p.lat != null && p.lng != null);
     // Only auto-pick a quán the user is plausibly AT: a live GPS fix
     // (State._locKind 'gps' — not the Hà Nội sample point, IP geo, a cached
     // or a typed Home location) with a quán within AUTO_PICK_M; otherwise
@@ -6290,27 +6284,8 @@ const CheckinCtrl = {
       (this._selected && this._selected.source === 'freeform') ? this._selected.name : '';
     const list = document.getElementById('checkinPickerList');
     const lat = State.userLat, lng = State.userLng;
-    // Rebuild the candidate pool same as _findClosest but keep the whole list.
-    const pool = [];
-    const myR = ProfileCtrl && ProfileCtrl._loadedList || [];
-    myR.forEach(r => {
-      if (r && r.name) pool.push({ id: r.id, name: r.name, lat: r.lat, lng: r.lng, source: 'community' });
-    });
-    (State.results || []).slice(0, 40).forEach(r => {
-      if (r && r.name) pool.push({
-        id: r.id > 1e13 ? '' : ((r._pb && r._pb.id) || ''),
-        name: r.name, lat: r.lat, lng: r.lng,
-        source: r._community ? 'community' : (r._gemini ? 'gemini' : 'osm'),
-      });
-    });
-    // Dedup by name+source — same quán can appear both in my posts and
-    // in the results feed if I scanned my own restaurant.
-    const seen = new Set();
-    const deduped = pool.filter(p => {
-      const k = `${p.name}::${p.source}`;
-      if (seen.has(k)) return false;
-      seen.add(k); return true;
-    });
+    // Same pool as _findClosest (already de-duplicated), the whole list.
+    const deduped = this._candidatePool();
     // Distance-sort if we have GPS.
     if (lat != null && lng != null) {
       deduped.forEach(p => {
@@ -6332,7 +6307,7 @@ const CheckinCtrl = {
         <button class="checkin-picker-item" data-idx="${i}" type="button">
           <div class="checkin-picker-body">
             <div class="checkin-picker-name">${escapeHtml(p.name)}</div>
-            <div class="checkin-picker-meta">${p.dist ? `<span>${p.dist}</span>` : ''}<span>${p.source === 'community' ? 'Cộng đồng' : (p.source === 'gemini' ? 'AI' : 'OSM')}</span></div>
+            <div class="checkin-picker-meta">${p.dist ? `<span>${p.dist}</span>` : ''}<span>${p.source === 'community' ? 'Cộng đồng' : p.source === 'gemini' ? 'AI' : p.source === 'mine' ? 'Của tôi' : 'OSM'}</span></div>
           </div>
           ${this._selected && this._selected.name === p.name ? '<span class="checkin-picker-tag">Đang chọn</span>' : ''}
         </button>
