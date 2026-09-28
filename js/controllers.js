@@ -4176,6 +4176,7 @@ const CommunityDetailModal = {
       ${r.description ? `<div class="detail-desc">${escapeHtml(r.description)}</div>` : ''}
       ${(tagsHtml || hashHtml) ? `<div class="comm-r-chips" style="margin-bottom:.6rem">${tagsHtml}${hashHtml}</div>` : ''}
       ${addressHtml}
+      ${typeof CtbtGame !== 'undefined' ? CtbtGame.quanHtml(r) : ''}
       <div id="cdmLinkedGroup"></div>
       <div class="comm-r-footer" style="border-top:1.5px dashed var(--line-2);margin-top:.9rem;padding-top:.7rem">
         ${footerHtml}
@@ -4192,6 +4193,7 @@ const CommunityDetailModal = {
     `;
     const body = document.getElementById('communityDetailBody');
     wireCarousels(body);
+    if (typeof CtbtGame !== 'undefined') CtbtGame.wireQuan(r, body);
     this._loadLinkedGroup(r);
     this._loadComments(r);
     if (isOwner) {
@@ -9464,6 +9466,7 @@ const CheckinViewerCtrl = {
     capEl.textContent = rec.note || '';
     capEl.classList.toggle('hidden', !rec.note);
     document.getElementById('ciViewerLoc').textContent = rec.restaurant_name || '—';
+    if (typeof CtbtGame !== 'undefined') CtbtGame.renderViewerBadge(rec);
 
     // Options menu — owner (Xóa/Ẩn khỏi bạn bè/Thống kê) vs viewer
     // (Báo cáo/Ẩn bài này).
@@ -9540,7 +9543,8 @@ const CheckinViewerCtrl = {
     const isOwn = Community.currentUser && rec.user === Community.currentUser.id;
     const wrap = document.getElementById('ciViewerActions');
     const liked = this._liked.has(rec.id), saved = this._saved.has(rec.id);
-    const hasCoords = rec.restaurant_lat != null && rec.restaurant_lng != null;
+    const hasCoords = rec.restaurant_lat != null && rec.restaurant_lng != null &&
+      !(typeof CtbtGame !== 'undefined' && CtbtGame.isGameCheckin(rec));
 
     const likeBtn = isOwn ? '' : `
       <button class="ci-viewer-act like ${liked ? 'on' : ''}" id="ciViewerLikeBtn" type="button">

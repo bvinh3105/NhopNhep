@@ -3580,3 +3580,38 @@ body.map-full .tabbar{transform:translateY(105%)}
 @media (prefers-reduced-motion: reduce){
   .ins-sheet,.ins-backdrop,.ins-bar{transition:none}
 }
+
+/* Game Cơm Tấm Bà Thảo (js/ctbt.js) — nhãn trên viewer, trang quán, banner */
+.ci-viewer-game{
+  align-self:flex-start;border:1.5px solid rgba(255,214,140,.7);border-radius:999px;
+  background:rgba(120,53,15,.72);color:#FFE7B8;font:inherit;font-size:.74rem;font-weight:900;
+  padding:6px 12px;cursor:pointer;
+}
+.ci-viewer-game.hidden{display:none}
+.ctbt-quan{margin:.7rem 0 .2rem;display:flex;flex-direction:column;gap:.55rem}
+.ctbt-play{
+  width:100%;height:44px;border-radius:14px;border:2px solid var(--primary,#C2410C);
+  background:linear-gradient(180deg,#FDE68A,#F59E0B);color:#451A03;font:inherit;font-weight:900;font-size:.9rem;cursor:pointer;
+}
+.ctbt-play:active{transform:scale(.98)}
+.ctbt-strip-title{font-size:.8rem;font-weight:900;color:var(--text2)}
+.ctbt-strip{display:flex;gap:.5rem;overflow-x:auto;padding-bottom:.2rem;scrollbar-width:none}
+.ctbt-strip::-webkit-scrollbar{display:none}
+.ctbt-thumb{
+  flex:0 0 76px;height:76px;border-radius:14px;border:2px solid var(--line-2,#E8D9C0);
+  background:var(--cream-2,#F6EBD9) center/cover no-repeat;cursor:pointer;padding:0;
+}
+.ctbt-strip-empty{font-size:.78rem;font-weight:700;color:var(--text2);padding:.3rem 0}
+.ctbt-banner{
+  display:flex;align-items:center;gap:.7rem;margin:0 0 .8rem;padding:.7rem .8rem;
+  border:2px dashed var(--primary-2,#F59E0B);border-radius:16px;background:#FFF7E6;
+}
+.ctbt-banner.hidden{display:none}
+.ctbt-banner-ico{font-size:1.8rem;line-height:1}
+.ctbt-banner-text{flex:1;min-width:0}
+.ctbt-banner-title{font-weight:900;font-size:.88rem;color:var(--text,#2A1810)}
+.ctbt-banner-sub{font-size:.74rem;font-weight:700;color:var(--text2);line-height:1.35;margin-top:2px}
+.ctbt-banner-btn{
+  flex-shrink:0;border:none;border-radius:999px;padding:.5rem .9rem;background:var(--primary,#C2410C);
+  color:#fff;font:inherit;font-weight:900;font-size:.8rem;cursor:pointer;
+}

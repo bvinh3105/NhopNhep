@@ -704,6 +704,15 @@
         <div class="psec-head">
           <div class="psec-title" data-i18n="community.restaurants">Quán <em>cộng đồng</em></div>
         </div>
+        <!-- Game Cơm Tấm Bà Thảo (js/ctbt.js) -->
+        <div class="ctbt-banner hidden" id="ctbtBanner">
+          <div class="ctbt-banner-ico">🍚</div>
+          <div class="ctbt-banner-text">
+            <div class="ctbt-banner-title" data-i18n="ctbt.bannerTitle">Chơi thử: Cơm Tấm Bà Thảo</div>
+            <div class="ctbt-banner-sub" data-i18n="ctbt.bannerSub">Đứng quầy cơm tấm Sài Gòn — nướng sườn, bày đĩa, thối tiền. Check-in của Bà Thảo hiện ngay trên Nhóp Nhép!</div>
+          </div>
+          <button class="ctbt-banner-btn" id="ctbtBannerBtn" type="button" data-i18n="ctbt.bannerBtn">Chơi 🎮</button>
+        </div>
         <div class="form-group hidden" id="communitySearchGroup">
           <input class="form-input" id="communitySearchInput" type="text" data-i18n="community.searchPlaceholder" data-i18n-attr="placeholder" placeholder="🔎 Tìm theo tên, thẻ, hashtag…" autocomplete="off">
         </div>
@@ -1031,6 +1040,7 @@
 
     <div class="ci-viewer-foot">
       <div class="ci-viewer-caption hidden" id="ciViewerCaption"></div>
+      <button class="ci-viewer-game hidden" id="ciViewerGame" type="button" data-i18n="ctbt.badge">🎮 Từ game Cơm Tấm Bà Thảo · Chơi thử ↗</button>
       <div class="ci-viewer-loc">
         <svg class="icon"><use href="#ic-action-pin-static"></use></svg>
         <span id="ciViewerLoc">—</span>
@@ -1602,6 +1612,7 @@
   </div>
 </div>
 
+<script src="js/ctbt.js?v=2736"></script>
 <script src="js/controllers.js?v=2736"></script>
 <script src="js/app.js?v=2735"></script>
 
