@@ -31,7 +31,7 @@
 //
 // Tunnel URL — same watchdog-patched constant as every other Function.
 
-const PB_URL = 'https://contractor-relevance-combo-all.trycloudflare.com';
+const PB_URL = 'https://hydraulic-accommodations-investigators-vid.trycloudflare.com';
 const VAPID_PUBLIC_KEY = 'BPSe1NDXoXEtvYH86qYexkNLS9gii_oBUNqDCzRO9ENmKZ2BsAXHsU1c3cDTXgzu-BqFKIPK0UHTgF76VpKXTLY';
 const VAPID_SUBJECT = 'mailto:bachvinhtran@gmail.com'; // required by RFC 8292 — contact for push-service abuse reports
 
