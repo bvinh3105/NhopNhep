@@ -11,8 +11,8 @@ const CtbtGame = {
   // id quán "Cơm Tấm Bà Thảo" trên PocketBase — điền sau khi tạo quán trên server
   QUAN_ID: 'i99wc0ypelhuxqj',
   STRIP_MAX: 12,
-  // Tạm đóng lối vào game (2026-09-29, game đang nâng cấp asset): ẩn banner, nút Chơi thử, nhãn 🎮.
-  // Dải check-in từ game ở trang quán vẫn hiện. Mở lại: đổi thành true.
+  // Tạm đóng lối vào game (2026-09-29, game đang nâng cấp asset): banner, nút Chơi thử, nhãn 🎮 vẫn hiện,
+  // bấm vào chỉ báo "đang cập nhật". Mở lại: đổi thành true.
   PLAY_OPEN: false,
 
   url(src) {
@@ -23,7 +23,7 @@ const CtbtGame = {
   },
 
   open(src) {
-    if (!this.PLAY_OPEN) return;
+    if (!this.PLAY_OPEN) { showToast(I18N.t('ctbt.updating'), 3000); return; }
     if (typeof Analytics !== 'undefined') Analytics.track('game_open', { src: src || '' });
     window.open(this.url(src), '_blank', 'noopener');
   },
@@ -39,7 +39,6 @@ const CtbtGame = {
   },
 
   init() {
-    if (!this.PLAY_OPEN) return;
     const banner = document.getElementById('ctbtBanner');
     if (banner) {
       banner.classList.remove('hidden');
@@ -51,7 +50,7 @@ const CtbtGame = {
   renderViewerBadge(rec) {
     const el = document.getElementById('ciViewerGame');
     if (!el) return;
-    const on = this.PLAY_OPEN && this.isGameCheckin(rec);
+    const on = this.isGameCheckin(rec);
     el.classList.toggle('hidden', !on);
     if (on && !el.dataset.wired) {
       el.dataset.wired = '1';
@@ -68,7 +67,7 @@ const CtbtGame = {
     if (!this.isGameQuan(r)) return '';
     return `
       <div class="ctbt-quan">
-        ${this.PLAY_OPEN ? `<button class="ctbt-play" id="ctbtPlayBtn" type="button">🎮 ${I18N.t('ctbt.play')}</button>` : ''}
+        <button class="ctbt-play" id="ctbtPlayBtn" type="button">🎮 ${I18N.t('ctbt.play')}</button>
         <div class="ctbt-strip-title">${I18N.t('ctbt.stripTitle')}</div>
         <div class="ctbt-strip" id="ctbtStrip"><div class="ctbt-strip-empty">${I18N.t('ctbt.stripLoading')}</div></div>
       </div>`;
