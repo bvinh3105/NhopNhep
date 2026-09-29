@@ -50,6 +50,7 @@
   --safe-top:env(safe-area-inset-top,0px);
   --tab-h:64px;
   --ribbon-h:var(--safe-top); /* tên biến giữ nguyên (dùng ở .screen/#toast) dù ribbon đã bỏ — khỏi phải sửa mọi nơi dùng */
+  --iab-h:48px;
 
   --font-display:'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   --font-body:'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
@@ -1341,14 +1342,16 @@ body.map-full .tabbar{transform:translateY(105%)}
 /* Nút "Đăng quán" — to hơn hẳn + nền đỏ đặc (Vinh 2026-09-21: khó bấm/khó
    thấy vì trước chỉ là icon mảnh trong suốt). Có nền riêng nên không cần
    ăn theo màu chữ sáng/tối của header nữa — luôn rõ bất kể đang đè lên
-   ảnh hay đoạn nền trắng. */
-#communityAddBtn{
+   ảnh hay đoạn nền trắng. Nút "Đăng nhập" của khách dùng chung kiểu
+   (Vinh 2026-09-29): cùng 1 chỗ, đăng nhập xong thành nút Đăng quán. */
+#communityAddBtn,#communityGuestSignIn{
   width:42px;height:42px;font-size:1.25rem;
   background:var(--primary);color:var(--cream);
   box-shadow:0 3px 10px rgba(20,10,5,.35);filter:none;
 }
-#communityAddBtn:active{background:var(--primary-2)}
-.comm-subtabs.on-light #communityAddBtn{color:var(--cream);filter:none}
+#communityAddBtn:active,#communityGuestSignIn:active{background:var(--primary-2)}
+.comm-subtabs.on-light #communityAddBtn,
+.comm-subtabs.on-light #communityGuestSignIn{color:var(--cream);filter:none}
 .comm-hdr-spacer{visibility:hidden;pointer-events:none}
 .comm-subtabs-center{flex:1;display:flex;align-items:center;justify-content:center;gap:1.3rem}
 .comm-subtab{
@@ -1468,6 +1471,8 @@ body.map-full .tabbar{transform:translateY(105%)}
   font-size:.92rem;letter-spacing:.3px;transition:all .12s;
 }
 .empty-my-r .em-cta:active{transform:translate(1px,1px);box-shadow:1.5px 1.5px 0 var(--text)}
+.empty-my-r .em-auth-row{display:flex;justify-content:center;gap:.6rem;flex-wrap:wrap}
+.empty-my-r .em-cta-alt{background:var(--white);color:var(--text)}
 
 /* Data Management */
 .data-actions{ display:flex;gap:.5rem;margin-top:.6rem; }
@@ -3614,4 +3619,26 @@ body.map-full .tabbar{transform:translateY(105%)}
 .ctbt-banner-btn{
   flex-shrink:0;border:none;border-radius:999px;padding:.5rem .9rem;background:var(--primary,#C2410C);
   color:#fff;font:inherit;font-weight:900;font-size:.8rem;cursor:pointer;
+}
+
+/* Banner "Mở bằng Safari/Chrome" (InAppBanner, js/app.js) — chỉ trong trình
+   duyệt nhúng của app. html.iab-on đẩy --ribbon-h xuống đúng bằng chiều cao
+   banner nên mọi .screen và #toast tự nhường chỗ, không che nội dung. */
+:root.iab-on{--ribbon-h:calc(var(--safe-top) + var(--iab-h))}
+.iab-banner{
+  position:fixed;top:0;left:0;right:0;z-index:120;
+  height:calc(var(--safe-top) + var(--iab-h));padding:var(--safe-top) .35rem 0 .75rem;
+  display:flex;align-items:center;gap:.45rem;
+  background:var(--text);color:var(--cream);
+}
+.iab-text{flex:1;min-width:0;font-size:.74rem;font-weight:700;line-height:1.25}
+.iab-btn{
+  flex-shrink:0;border:none;border-radius:999px;padding:.42rem .8rem;
+  background:var(--primary);color:var(--cream);
+  font-family:var(--font-display);font-weight:900;font-size:.76rem;cursor:pointer;
+}
+.iab-btn:active{background:var(--primary-2)}
+.iab-x{
+  flex-shrink:0;width:32px;height:32px;border:none;background:none;color:var(--cream);
+  display:flex;align-items:center;justify-content:center;opacity:.75;cursor:pointer;
 }

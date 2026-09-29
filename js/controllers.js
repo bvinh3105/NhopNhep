@@ -2820,7 +2820,13 @@ const ProfileCtrl = {
         <div class="em-icon">${svgIcon('status-draft')}</div>
         <div class="em-msg">${I18N.t('em.notLoggedIn')}</div>
         <div class="em-sub">${I18N.t('em.signInToSeeYours')}</div>
+        <div class="em-auth-row">
+          <button class="em-cta" type="button" data-auth="login">${I18N.t('community.signIn')}</button>
+          <button class="em-cta em-cta-alt" type="button" data-auth="register">${I18N.t('community.register')}</button>
+        </div>
       </div>`;
+      list.querySelectorAll('[data-auth]').forEach(b => b.addEventListener('click', () =>
+        CommunityCtrl.showAuthPrompt(b.dataset.auth, { returnTo: 'profile' })));
       return;
     }
     list.innerHTML = `<div class="empty-my-r"><div class="em-icon">${svgIcon('status-loading')}</div><div class="em-msg">${I18N.t('em.loading')}</div></div>`;
@@ -3578,6 +3584,7 @@ const CommunityCtrl = {
     document.getElementById('communityGuestSignIn')?.addEventListener('click', () => {
       document.getElementById('communityAuth').classList.remove('hidden');
       document.getElementById('communityMain').classList.add('hidden');
+      this._returnTab = null;
       this._mode = 'login';
       this._renderAuthMode();
       document.getElementById('cAuthEmail')?.focus();
@@ -3585,6 +3592,7 @@ const CommunityCtrl = {
 
     // "Xem quán trước" link in auth form → back to browse-first view
     document.getElementById('communityAuthBack')?.addEventListener('click', () => {
+      this._returnTab = null;
       document.getElementById('communityAuth').classList.add('hidden');
       document.getElementById('communityMain').classList.remove('hidden');
     });
@@ -3597,7 +3605,11 @@ const CommunityCtrl = {
   // tapped the "Đăng nhập" header button) — used by CheckinCtrl._submit()
   // so a guest lands straight in the form instead of the browse-first
   // Cộng đồng screen plus one more tap.
-  showAuthPrompt(mode = 'login') {
+  // returnTo: tab to go back to after a successful sign-in (the Cá nhân
+  // buttons pass 'profile', so the user lands on their own profile).
+  _returnTab: null,
+  showAuthPrompt(mode = 'login', { returnTo = null } = {}) {
+    this._returnTab = returnTo;
     // Switch FIRST — TabNav.switchTo('community') calls render(), which
     // unconditionally shows communityMain/hides communityAuth (the normal
     // "just opened this tab" state). Doing it after would instantly undo
@@ -3785,9 +3797,13 @@ const CommunityCtrl = {
     // session doesn't wrongly re-attribute a second, unrelated account.
     if (this._mode === 'register') { try { sessionStorage.removeItem('nhopnhep_ref'); } catch (_) {} }
     AvatarCtrl.repairSync();
+    const back = this._returnTab;
+    this._returnTab = null;
     this.render();
     if (typeof CheckinCtrl !== 'undefined' && CheckinCtrl._hasPendingDraft()) {
       CheckinCtrl._rehydrateDraft();
+    } else if (back) {
+      TabNav.switchTo(back);
     }
   },
 

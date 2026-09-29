@@ -104,8 +104,17 @@ const GPS = {
     this.stopTracking();
   },
 
-  silentFix() {
+  // Chỉ lấy vị trí ngầm khi quyền ĐÃ được cấp từ trước: gọi lúc quyền còn
+  // "prompt" sẽ bật hộp xin quyền ngay khi vừa mở app, mà khách mới (phần
+  // lớn tới từ link Threads) chưa muốn cấp GPS. Không có Permissions API
+  // (iOS < 16, nhiều webview) thì bỏ qua — đã có vị trí lưu lần trước /
+  // đoán theo IP (/api/geo) / chọn tay; GPS chỉ hỏi khi bấm nút định vị.
+  async silentFix() {
     if (!navigator.geolocation || !this.isSecure()) return;
+    try {
+      const perm = await navigator.permissions?.query({ name: 'geolocation' });
+      if (perm?.state !== 'granted') return;
+    } catch (_) { return; }
     navigator.geolocation.getCurrentPosition(
       pos => {
         const {latitude:lat, longitude:lng, accuracy} = pos.coords;

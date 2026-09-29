@@ -34,8 +34,98 @@ function wireScrollMasks() {
   }, { passive: true });
 }
 
+// Banner "Mở bằng Safari/Chrome": gần như mọi lượt vào tới từ link trong
+// Threads, mà trình duyệt nhúng của app không cài PWA được, hay văng đăng
+// nhập và chặn/khó cấp GPS. Chỉ hiện trong webview của app; tắt thì thôi
+// cả phiên. Android + app Meta nhận link intent:// để bật thẳng Chrome;
+// còn lại (iOS không có cách mở Safari từ webview) thì chép link để dán.
+const InAppBanner = {
+  KEY: 'nn_iab_dismissed',
+  APPS: [
+    [/Barcelona/i, 'Threads'],
+    [/Instagram/i, 'Instagram'],
+    [/FBAN|FBAV|FB_IAB|FBIOS/i, 'Facebook'],
+    [/Zalo/i, 'Zalo'],
+    [/musical_ly|BytedanceWebview|TikTok/i, 'TikTok'],
+    [/\bLine\//i, 'LINE'],
+  ],
+  INTENT_APPS: ['Threads', 'Instagram', 'Facebook'],
+  _app: null,
+  _android: false,
+
+  // Tên app, 'webview' nếu là webview lạ, null nếu là trình duyệt thật.
+  detect() {
+    const ua = navigator.userAgent || '';
+    for (const [re, name] of this.APPS) if (re.test(ua)) return name;
+    if (navigator.standalone === true || window.matchMedia?.('(display-mode: standalone)').matches) return null;
+    if (/Android/.test(ua) && /; wv\)/.test(ua)) return 'webview';
+    if (/iPhone|iPad|iPod/.test(ua) && !/Safari\//.test(ua)) return 'webview';
+    return null;
+  },
+
+  init() {
+    const app = this.detect();
+    if (!app) return;
+    try { if (sessionStorage.getItem(this.KEY)) return; } catch (_) {}
+    this._app = app;
+    this._android = /Android/.test(navigator.userAgent || '');
+    this.render();
+    document.getElementById('iabBanner').classList.remove('hidden');
+    document.documentElement.classList.add('iab-on');
+    document.getElementById('iabOpen').addEventListener('click', () => this.open());
+    document.getElementById('iabClose').addEventListener('click', () => this.dismiss());
+    document.addEventListener('i18n:changed', () => this.render());
+    if (typeof Analytics !== 'undefined') Analytics.track('iab_banner', { app });
+  },
+
+  _browser() { return this._android ? 'Chrome' : 'Safari'; },
+  _canIntent() { return this._android && this.INTENT_APPS.includes(this._app); },
+
+  render() {
+    const browser = this._browser();
+    document.getElementById('iabText').textContent = this._app === 'webview'
+      ? I18N.t('iab.textGeneric', { browser })
+      : I18N.t('iab.text', { app: this._app, browser });
+    document.getElementById('iabOpen').textContent = this._canIntent()
+      ? I18N.t('iab.open', { browser }) : I18N.t('iab.copy');
+  },
+
+  open() {
+    const intent = this._canIntent();
+    if (typeof Analytics !== 'undefined') Analytics.track('iab_open', { app: this._app, how: intent ? 'intent' : 'copy' });
+    if (!intent) { this._copy(); return; }
+    location.href = `intent://${location.host}${location.pathname}${location.search}#Intent;scheme=https;end`;
+    // App không chịu mở Chrome → trang vẫn đang hiện: chép link để tự dán.
+    setTimeout(() => { if (document.visibilityState === 'visible') this._copy(); }, 1500);
+  },
+
+  async _copy() {
+    const url = location.href;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch (_) {
+      const ta = document.createElement('textarea');
+      ta.value = url; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand('copy'); } catch (_) {}
+      ta.remove();
+      if (!ok) { showToast(I18N.t('toast.linkCopyFail')); return; }
+    }
+    showToast(I18N.t('iab.copied', { browser: this._browser() }), 5000);
+  },
+
+  dismiss() {
+    try { sessionStorage.setItem(this.KEY, '1'); } catch (_) {}
+    document.getElementById('iabBanner').classList.add('hidden');
+    document.documentElement.classList.remove('iab-on');
+    setTimeout(() => State.mainMap?.invalidateSize(), 60);
+  },
+};
+
 function boot() {
   I18N.init(); // trước tiên — mọi chữ tĩnh trong HTML phải đúng ngôn ngữ ngay từ lần vẽ đầu
+  InAppBanner.init(); // sớm: đổi --ribbon-h trước khi các màn/bản đồ đo kích thước
   Storage.load();
   DropdownPosition.init();
   TabNav.init();
