@@ -2,6 +2,26 @@
 
 Tài liệu bàn giao cho phiên Claude phụ trách Nhóp Nhép (frontend + PocketBase). Viết ngày 2026-09-29.
 
+## Checklist nhanh (2026-09-29) — code 2 bên đã xong, chỉ còn việc thủ công này
+
+Code "chụp xong → gửi lên Nhóp Nhép" đã đầy đủ ở cả game (`nhopnhep.js`, đã push live)
+và Nhóp Nhép (nhánh `game-checkin`, đưa lên master 2026-09-29) — xem chi tiết từng bước ở §1-4 dưới.
+Chỉ còn các việc **chủ app tự làm** (cần Admin UI / Cloudflare / secrets):
+
+- [x] 1. User "Bà Thảo" — id **`p1b99ipcit1kskm`** (chủ app tạo, 2026-09-29)
+- [x] 2. Quán "Cơm Tấm Bà Thảo" — id **`i99wc0ypelhuxqj`**, `visibility=public`, `created_by` = Bà Thảo (đã kiểm tra qua API)
+- [x] 3. Turnstile: đã thêm `bvinh3105.github.io` vào widget "NhopNhep Registration Guard" — site key giữ nguyên `0x4AAAAAAEvamwVLTYTX0-jM`, không cần `GAME_TURNSTILE_SECRET`
+- [x] 4. Env Production: `NN_GAME_BOT_USER=p1b99ipcit1kskm`, `NN_GAME_QUAN=i99wc0ypelhuxqj` (Text); `PB_ADMIN_EMAIL`/`PB_ADMIN_PASSWORD` (Secret) — 2 biến này **trước đó không có trên Production** (nên `notify-follow.js` cũng chưa từng chạy được), chủ app đã tạo superuser riêng cho Function và thêm 2026-09-29. Lưu ý: biến mới trên Pages chỉ có hiệu lực từ **lần deploy kế tiếp**.
+- [x] 5. Server thật: đã chép 2 file + restart riêng `pocketbase.exe` (2026-09-29). Server thật mới có tới `1790000007` nên **0400 lên trước 0110** — xem cảnh báo ở mục 0110 trong `STAGED_CHANGES.md`.
+- [x] 6. Watchdog: đã thêm `game-checkin.js` vào cả 2 script (chỉ log cảnh báo cho tới khi nhánh merge)
+
+**Code đã điền:** `QUAN_ID` trong `js/ctbt.js`; `quanId` + `refCode` + `turnstileSiteKey` trong `public/js/nhopnhep.js` (chạy thử local: nút "Đăng lên Nhóp Nhép" mở, widget Turnstile hiện đúng). Tăng `?v=` cho `styles.css`/`i18n.js`/`ctbt.js`/`controllers.js`/`app.js` lên 2737 (nhánh gốc sửa 4 file này mà chưa tăng).
+
+**Còn lại (hỏi trước từng bước):**
+1. ~~Đưa nhánh lên master~~ — **đã làm 2026-09-29**: fast-forward `master` **trong thư mục `NhopNhep`** (không đổi nhánh) rồi `git push origin master`. Không push thẳng `game-checkin:master` từ worktree — watchdog push từ `NhopNhep` bằng `git push origin master` mà không pull trước, nên nếu master ở đó tụt sau origin thì lần đổi tunnel kế tiếp push sẽ bị từ chối, site trỏ tunnel chết.
+2. Commit + push repo game (deploy công khai ngay).
+3. Bật `NN_GAME_CHECKIN=on` → **Retry deployment** (Deployments → bản mới nhất), vì Pages không tự redeploy khi đổi biến → curl kiểm tra §6.
+
 ## 0. Bối cảnh (đọc trước)
 
 - Game **Cơm Tấm Bà Thảo** (https://bvinh3105.github.io/com-tam-ba-thao/, repo `bvinh3105/com-tam-ba-thao`) cho người chơi "chụp" đĩa cơm đẹp nhất cuối ngày rồi đăng lên Nhóp Nhép.
@@ -28,7 +48,7 @@ Tài liệu bàn giao cho phiên Claude phụ trách Nhóp Nhép (frontend + Poc
 
 | File | Việc |
 |---|---|
-| `functions/api/game-checkin.js` | Cổng `POST /api/game-checkin` (multipart). Đăng nhập PB bằng superuser (`PB_ADMIN_EMAIL`/`PB_ADMIN_PASSWORD`, đã có sẵn cho `notify-follow.js`) rồi tạo `checkins` với `user = NN_GAME_BOT_USER`, `restaurant = NN_GAME_QUAN`, `source = 'game'`, `is_shared = true`. |
+| `functions/api/game-checkin.js` | Cổng `POST /api/game-checkin` (multipart). Đăng nhập PB bằng superuser (`PB_ADMIN_EMAIL`/`PB_ADMIN_PASSWORD`, dùng chung với `notify-follow.js` — thực tế chưa từng được đặt trên Production cho tới 2026-09-29) rồi tạo `checkins` với `user = NN_GAME_BOT_USER`, `restaurant = NN_GAME_QUAN`, `source = 'game'`, `is_shared = true`. |
 | `js/ctbt.js` | Nhãn 🎮 trong viewer (`#ciViewerGame`), nút Chơi thử + dải ảnh ở trang quán (chỉ hiện khi `CtbtGame.QUAN_ID` khớp), banner `#ctbtBanner`. |
 | `js/controllers.js` | 4 dòng gọi `CtbtGame`: `_renderPost`, `_renderActions` (ẩn "Đi tới" với bài game), `CommunityDetailModal.open` (HTML + wire). |
 | `js/app.js`, `index.html`, `js/i18n.js`, `css/styles.css` | `CtbtGame.init()`, markup badge/banner, key `ctbt.*` vi/en, CSS. |

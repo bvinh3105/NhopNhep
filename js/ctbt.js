@@ -9,7 +9,7 @@
 const CtbtGame = {
   GAME_URL: 'https://bvinh3105.github.io/com-tam-ba-thao/',
   // id quán "Cơm Tấm Bà Thảo" trên PocketBase — điền sau khi tạo quán trên server
-  QUAN_ID: '',
+  QUAN_ID: 'i99wc0ypelhuxqj',
   STRIP_MAX: 12,
 
   url(src) {
