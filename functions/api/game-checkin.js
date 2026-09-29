@@ -24,7 +24,7 @@
 // PB_URL phải được watchdog đồng bộ như các Function khác: thêm
 // "functions\api\game-checkin.js" vào $pagesFunctionsWithPbUrl trong Bat-TOAN-BO*.ps1.
 
-const PB_URL = 'https://dolls-freight-budget-amp.trycloudflare.com';
+const PB_URL = 'https://penn-indices-cinema-anticipated.trycloudflare.com';
 
 const TURNSTILE_ACTION = 'game_checkin';
 const EXPECTED_HOSTNAMES = new Set(['bvinh3105.github.io', 'localhost', '127.0.0.1']);
