@@ -591,10 +591,12 @@ const Community = {
     return (r.ok && r.data.items[0]) || null;
   },
 
+  // votes.listRule requires login, so a direct list here always came back
+  // empty for a guest — routed through the public counts endpoint instead
+  // (see publicCounts() below) so guests see the real total too, same as
+  // logged-in viewers.
   async voteCount(restaurantId) {
-    const filter = `restaurant="${restaurantId}"`;
-    const r = await this._fetch(`/api/collections/votes/records?filter=${encodeURIComponent(filter)}&perPage=1`);
-    return r.ok ? r.data.totalItems : 0;
+    return (await this.publicCounts('quan', restaurantId)).likes;
   },
 
   // Vote/unvote toggle — unique (restaurant,user) index on the server means
@@ -1177,6 +1179,85 @@ const Community = {
   // được phép (thất bại thì _fetch trả {ok:false} bình thường).
   async deleteComment(id) {
     return this._fetch(`/api/collections/comments/records/${id}`, { method: 'DELETE' });
+  },
+
+  // ── Bình luận trên check-in — cùng khuôn với 3 hàm ở trên, khác
+  // collection (checkin_comments), rule kế thừa ĐÚNG visibility của
+  // chính check-in đó (kể cả nhánh 'game' công khai) — xem migration
+  // 1790000800_create_checkin_comments.js. Cũng tải lười, không poll.
+  async listCheckinComments(checkinId) {
+    const q = new URLSearchParams({
+      perPage: 100, sort: 'created', expand: 'user',
+      filter: `checkin="${checkinId}"`,
+    });
+    return this._fetch(`/api/collections/checkin_comments/records?${q}`);
+  },
+  async createCheckinComment(checkinId, text) {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    const body = { checkin: checkinId, user: this.currentUser.id, text: (text || '').trim() };
+    return this._fetch('/api/collections/checkin_comments/records', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+  async deleteCheckinComment(id) {
+    return this._fetch(`/api/collections/checkin_comments/records/${id}`, { method: 'DELETE' });
+  },
+
+  // ── Tổng lượt thích + bình luận — CÔNG KHAI, không cần đăng nhập (khách
+  // vãng lai cũng xem được). t: 'checkin' | 'quan'. Server tự trả 404 nếu
+  // bài đó riêng tư (không lộ chuyện bài có tồn tại hay không) — coi như
+  // {likes:0, comments:0} ở tầng hiển thị, không phải lỗi cần báo.
+  async publicCounts(t, id) {
+    const r = await this._fetch(`/api/nn/counts/${t}/${encodeURIComponent(id)}`);
+    return r.ok ? r.data : { likes: 0, comments: 0 };
+  },
+
+  // ── Nhắn tin trực tiếp 1-1 (2026-09-30) — v1: không nhóm, không xoá/rời
+  // hội thoại, không chặn người dùng (mọi ai đăng nhập nhắn được cho bất
+  // kỳ ai, giống mức mở của bình luận/vote — không cần là bạn bè trước).
+  // send()/markRead()/unreadTotal() đi qua hook (phải cập nhật cả bộ đếm
+  // "chưa đọc" cùng lúc); danh sách hội thoại + tin nhắn trong 1 hội thoại
+  // đọc THẲNG qua PocketBase — rule đã tự giới hạn đúng người trong cuộc.
+  async dmSend(toUserId, text) {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    return this._fetch('/api/dm/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to: toUserId, text: (text || '').trim() }),
+    });
+  },
+  async dmMarkRead(conversationId) {
+    return this._fetch('/api/dm/read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversation: conversationId }),
+    });
+  },
+  async dmUnreadTotal() {
+    if (!this.isLoggedIn()) return 0;
+    const r = await this._fetch('/api/dm/unread');
+    return r.ok ? (r.data.n || 0) : 0;
+  },
+  // Newest-first list of my conversations, with the OTHER side's user
+  // record expanded — the caller figures out which side is "them" and
+  // which unread_* field is mine (user_a === myId ? unread_a : unread_b).
+  async dmConversations() {
+    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    const me = this.currentUser.id;
+    const q = new URLSearchParams({
+      perPage: 50, sort: '-last_at', expand: 'user_a,user_b',
+      filter: `user_a="${me}" || user_b="${me}"`,
+    });
+    return this._fetch(`/api/collections/dm_conversations/records?${q}`);
+  },
+  async dmMessages(conversationId, { perPage = 50 } = {}) {
+    const q = new URLSearchParams({
+      perPage, sort: 'created', expand: 'sender',
+      filter: `conversation="${conversationId}"`,
+    });
+    return this._fetch(`/api/collections/dm_messages/records?${q}`);
   },
 };
 

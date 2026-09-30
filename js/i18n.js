@@ -474,6 +474,13 @@ const I18N = {
       'toast.commentEmpty': '⚠️ Gõ gì đó trước khi gửi nhé',
       'toast.commentDeleted': 'Đã xoá bình luận',
 
+      'dm.title': 'Tin nhắn',
+      'dm.message': 'Nhắn tin',
+      'dm.placeholder': 'Nhắn gì đó…',
+      'dm.empty': 'Chưa có cuộc trò chuyện nào — bấm "Nhắn tin" trên trang cá nhân của ai đó để bắt đầu',
+      'dm.emptyThread': 'Chưa có tin nhắn nào với {name} — gửi lời chào đầu tiên nhé',
+      'dm.youPrefix': 'Bạn:',
+
       'session.createBtn': '<svg class="icon" width="20" height="20"><use href="#ic-session-create"></use></svg> Tạo phiên chọn quán',
       'session.createTitle': '<svg class="icon" width="20" height="20"><use href="#ic-session-create"></use></svg> Tạo phiên chọn quán',
       'session.createSub': 'Bạn bè vote, random chọn trong nhóm được thích nhiều nhất',
@@ -1174,6 +1181,13 @@ const I18N = {
       'toast.commentNeedLogin': '⚠️ Sign in to comment',
       'toast.commentEmpty': '⚠️ Write something before sending',
       'toast.commentDeleted': 'Comment deleted',
+
+      'dm.title': 'Messages',
+      'dm.message': 'Message',
+      'dm.placeholder': 'Say something…',
+      'dm.empty': 'No conversations yet — tap "Message" on someone\'s profile to start one',
+      'dm.emptyThread': 'No messages with {name} yet — send the first one',
+      'dm.youPrefix': 'You:',
 
       'session.createBtn': '<svg class="icon" width="20" height="20"><use href="#ic-session-create"></use></svg> Start a group vote',
       'session.createTitle': '<svg class="icon" width="20" height="20"><use href="#ic-session-create"></use></svg> Start a group vote',

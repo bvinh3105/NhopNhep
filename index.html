@@ -23,7 +23,7 @@
      implicitly off the .cf-turnstile div's data-sitekey; async/defer so
      it never blocks first paint. -->
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?onload=onloadTurnstileCallback&render=explicit" async defer></script>
-<link rel="stylesheet" href="css/styles.css?v=2749">
+<link rel="stylesheet" href="css/styles.css?v=2751">
 
 <!-- ═══════════════════════════════════════════════
      Cloudflare Web Analytics — paste beacon here when Vinh sets it up
@@ -391,7 +391,7 @@
        để sẵn chỗ cho sau này. GPS bấm là kích hoạt luôn #gpsBtn thật. -->
   <div class="map-btn-cluster">
     <button class="cluster-btn" id="homeBookmarkBtn" type="button" title="Quán đã lưu"><svg class="icon" width="20" height="20"><use href="#ic-action-bookmark"></use></svg></button>
-    <button class="cluster-btn" id="homeBellBtn" type="button" title="Thông báo"><svg class="icon" width="20" height="20"><use href="#ic-social-bell"></use></svg></button>
+    <button class="cluster-btn" id="homeBellBtn" type="button" data-i18n="dm.title" data-i18n-attr="title" title="Tin nhắn"><svg class="icon" width="20" height="20"><use href="#ic-social-bell"></use></svg><span class="dm-badge" id="dmBadge"></span></button>
     <button class="cluster-btn cluster-btn-gps" id="homeGpsFloatBtn" type="button" title="Bật GPS"><svg class="icon" width="20" height="20"><use href="#ic-action-gps"></use></svg></button>
   </div>
 
@@ -1053,6 +1053,15 @@
 
     <div class="ci-viewer-foot">
       <div class="ci-viewer-caption hidden" id="ciViewerCaption"></div>
+      <!-- Public total likes/comments — visible to EVERYONE, guests
+           included (js/community.js Community.publicCounts). Filled in
+           async by CheckinViewerCtrl._renderPost(); '···' until it
+           resolves, same placeholder convention as .heart-count. -->
+      <div class="ci-viewer-counts" id="ciViewerCounts">
+        <span id="ciViewerLikesN">···</span> <span data-i18n="checkinFeed.like">Yêu thích</span>
+        <span class="ci-viewer-counts-sep">·</span>
+        <span id="ciViewerCommentsN">···</span> <span data-i18n="comment.title">Bình luận</span>
+      </div>
       <button class="ci-viewer-game hidden" id="ciViewerGame" type="button" data-i18n="ctbt.badge">🎮 Từ game Cơm Tấm Bà Thảo · Chơi thử ↗</button>
       <div class="ci-viewer-loc">
         <svg class="icon"><use href="#ic-action-pin-static"></use></svg>
@@ -1593,21 +1602,82 @@
   </div>
 </div>
 
+<!-- Bình luận check-in — CheckinCommentSheet (js/checkin-comments.js).
+     Same fixed-layer chrome as InsightsSheet (reuses .ins-* CSS verbatim —
+     it's generic bottom-sheet styling, not insights-specific), own ids so
+     the two never collide; content reuses CommunityDetailModal's plain
+     .comment-* classes (comment-row/avatar/body/meta/text/del-btn/input-
+     row), same visual language as quán comments. -->
+<div class="ins-ov" id="ccOv" hidden>
+  <div class="ins-backdrop" id="ccBackdrop"></div>
+  <div class="ins-sheet" id="ccSheet" role="dialog" aria-modal="true" aria-labelledby="ccTitle" tabindex="-1">
+    <div class="ins-grab" id="ccGrab"><div class="modal-handle"></div></div>
+    <div class="ins-top" id="ccTop">
+      <h2 class="modal-title ins-title" id="ccTitle" data-i18n="comment.title">Bình luận</h2>
+      <button type="button" class="ins-ic" id="ccClose" data-i18n="ins.close" data-i18n-attr="aria-label" aria-label="Đóng"><svg class="icon" width="20" height="20"><use href="#ic-action-close"></use></svg></button>
+    </div>
+    <div class="ins-body" id="ccBody">
+      <div class="comment-list" id="ccList"></div>
+      <div class="comment-input-row">
+        <input class="comment-input" id="ccInput" type="text" maxlength="500" data-i18n="comment.placeholder" data-i18n-attr="placeholder" placeholder="Viết bình luận…" autocomplete="off">
+        <button class="comment-send-btn" id="ccSend" type="button" data-i18n="comment.send">Gửi</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Nhắn tin — DmCtrl (js/dm.js). Own full-screen layer (z-index above
+     .modal-overlay's 200, below the check-in viewer's 300 — opened most
+     often from the bell button on Trang chủ or the "Nhắn tin" button in
+     UserQuanModal, a .modal-overlay). Two internal views toggled by JS
+     (.hidden), like NhatKyCtrl's calendar/detail split, just two levels
+     instead of many: inbox (list of conversations) and thread (one
+     conversation's messages + input). -->
+<div class="dm-root" id="dmRoot" hidden>
+  <div class="dm-backdrop" id="dmBackdrop"></div>
+  <div class="dm-sheet" id="dmSheet" role="dialog" aria-modal="true" aria-labelledby="dmInboxTitle" tabindex="-1">
+    <div class="dm-view" id="dmInboxView">
+      <div class="dm-hd">
+        <h2 class="modal-title dm-hd-title" id="dmInboxTitle" data-i18n="dm.title">Tin nhắn</h2>
+        <button type="button" class="ins-ic" id="dmCloseBtn" data-i18n="ins.close" data-i18n-attr="aria-label" aria-label="Đóng"><svg class="icon" width="20" height="20"><use href="#ic-action-close"></use></svg></button>
+      </div>
+      <div class="dm-conv-list" id="dmConvList"></div>
+    </div>
+    <div class="dm-view hidden" id="dmThreadView">
+      <div class="dm-hd">
+        <button type="button" class="ins-ic" id="dmThreadBack" data-i18n="ins.back" data-i18n-attr="aria-label" aria-label="Quay lại">‹</button>
+        <div class="dm-thread-who">
+          <div class="dm-thread-avatar" id="dmThreadAvatar"></div>
+          <div class="dm-thread-name" id="dmThreadName">—</div>
+        </div>
+        <button type="button" class="ins-ic" id="dmThreadClose" data-i18n="ins.close" data-i18n-attr="aria-label" aria-label="Đóng"><svg class="icon" width="20" height="20"><use href="#ic-action-close"></use></svg></button>
+      </div>
+      <div class="dm-msgs" id="dmMsgs"></div>
+      <div class="comment-input-row dm-input-row">
+        <input class="comment-input" id="dmInput" type="text" maxlength="2000" data-i18n="dm.placeholder" data-i18n-attr="placeholder" placeholder="Nhắn gì đó…" autocomplete="off">
+        <button class="comment-send-btn" id="dmSendBtn" type="button" data-i18n="comment.send">Gửi</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- ═══════════════════════════════════════════════
      SCRIPTS — loaded in dependency order
 ═══════════════════════════════════════════════ -->
 <script src="js/security.js?v=2672"></script>
-<script src="js/i18n.js?v=2750"></script>
+<script src="js/i18n.js?v=2751"></script>
 <script src="js/utils.js?v=2710"></script>
 <script src="js/state.js?v=2672"></script>
 <script src="js/poi.js?v=2724"></script>
 <script src="js/geocoder.js?v=2672"></script>
 <script src="js/gemini.js?v=2672"></script>
-<script src="js/community.js?v=2748"></script>
+<script src="js/community.js?v=2751"></script>
 <script src="js/insights.js?v=2730"></script>
 <script src="js/insights-sheet.js?v=2735"></script>
+<script src="js/checkin-comments.js?v=2751"></script>
+<script src="js/dm.js?v=2751"></script>
 <script src="js/push.js?v=2672"></script>
 <script src="js/analytics.js?v=2672"></script>
 <script src="js/map.js?v=2720"></script>
@@ -1626,8 +1696,8 @@
 </div>
 
 <script src="js/ctbt.js?v=2743"></script>
-<script src="js/controllers.js?v=2748"></script>
-<script src="js/app.js?v=2747"></script>
+<script src="js/controllers.js?v=2751"></script>
+<script src="js/app.js?v=2751"></script>
 
 </body>
 </html>

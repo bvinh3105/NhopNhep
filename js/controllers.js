@@ -61,7 +61,8 @@ const HomeCtrl = {
       GPS.toggle();
     });
     document.getElementById('homeBookmarkBtn').addEventListener('click', () => showToast('🚧 Tính năng đang cập nhật'));
-    document.getElementById('homeBellBtn').addEventListener('click', () => showToast('🚧 Tính năng đang cập nhật'));
+    // homeBellBtn: was a placeholder here — DmCtrl.init() wires it now
+    // (opens the Nhắn tin inbox) and owns its unread badge dot.
 
     // Dropdown "Tôi muốn ăn" — mở/đóng khi bấm pill "Loại quán" cạnh ô
     // "Tìm món/quán" (trước đây mở từ logo, đã chuyển xuống đây 2026-09-19
@@ -4982,8 +4983,16 @@ const UserQuanModal = {
       // mở cho mọi người đăng nhập (migration 1725700005) nên đọc thẳng field này
       // để biết "họ có theo dõi mình không" mà không cần thêm request nào.
       const theyFollowMe = !!(userRes.ok && (userRes.data.friends || []).includes(Community.currentUser.id));
-      followSlot.innerHTML = followBtnHtml(userId, userName || I18N.t('common.thisPerson'), following, theyFollowMe);
+      const dmName = (userRes.ok && userRes.data.name) || userName || I18N.t('common.thisPerson');
+      followSlot.innerHTML = `<div class="userquan-actions">
+        ${followBtnHtml(userId, userName || I18N.t('common.thisPerson'), following, theyFollowMe)}
+        <button type="button" class="follow-btn dm-msg-btn" id="userQuanDmBtn">${svgIcon('social-comment')} ${I18N.t('dm.message')}</button>
+      </div>`;
       wireFollowButtons(followSlot, () => CommunityCtrl._renderFriends(), { ...via, s: 'profile' });
+      document.getElementById('userQuanDmBtn').addEventListener('click', () => {
+        this.close();
+        if (typeof DmCtrl !== 'undefined') DmCtrl.openThreadWith(userId, dmName, userRes.ok ? userRes.data : null);
+      });
     }
     if (!listRes.ok) {
       body.innerHTML = `<div class="empty-comm"><div class="em-icon">${svgIcon('status-error-face')}</div><div class="em-msg">${I18N.t('em.loadFail')}</div></div>`;
@@ -9483,6 +9492,13 @@ const CheckinViewerCtrl = {
     const capEl = document.getElementById('ciViewerCaption');
     capEl.textContent = rec.note || '';
     capEl.classList.toggle('hidden', !rec.note);
+    // Public counts: reset to the "···" placeholder for the new post
+    // immediately (synchronous), then resolve the real numbers async —
+    // _refreshCounts double-checks we're still on this same post before
+    // writing, so swiping away mid-fetch can't stamp a stale count.
+    document.getElementById('ciViewerLikesN').textContent = '···';
+    document.getElementById('ciViewerCommentsN').textContent = '···';
+    this._refreshCounts(rec.id);
     document.getElementById('ciViewerLoc').textContent = rec.restaurant_name || '—';
     if (typeof CtbtGame !== 'undefined') CtbtGame.renderViewerBadge(rec);
 
@@ -9582,11 +9598,51 @@ const CheckinViewerCtrl = {
       <button class="ci-viewer-act direct ${hasCoords ? '' : 'hidden'}" id="ciViewerDirectBtn" type="button">
         <svg class="icon"><use href="#ic-map-external"></use></svg>
         <span data-i18n="checkinFeed.directions">${I18N.t('checkinFeed.directions')}</span>
+      </button>
+      <button class="ci-viewer-act" id="ciViewerCommentBtn" type="button">
+        <svg class="icon"><use href="#ic-social-comment"></use></svg>
+        <span data-i18n="comment.title">${I18N.t('comment.title')}</span>
       </button>`;
     if (!isOwn) document.getElementById('ciViewerLikeBtn').addEventListener('click', () => this._toggleLike());
     document.getElementById('ciViewerSaveBtn').addEventListener('click', () => this._toggleSave());
     document.getElementById('ciViewerShareBtn').addEventListener('click', () => this._share());
     document.getElementById('ciViewerDirectBtn').addEventListener('click', () => this._directions());
+    document.getElementById('ciViewerCommentBtn').addEventListener('click', () => this._openComments());
+  },
+
+  // Bình luận sits on top of the viewer (like Thống kê) — pause the
+  // auto-advance while it's up, resume via a fresh _renderPost() once it
+  // closes (not just restarting the timer: the progress bar's CSS fill
+  // kept running underneath, same reasoning as _stats()'s onClose). That
+  // re-render also refreshes the public counts row, in case commenting
+  // just changed the comment count.
+  _openComments() {
+    const rec = this._current();
+    if (!rec || typeof CheckinCommentSheet === 'undefined') return;
+    this._pauseAutoTimer();
+    CheckinCommentSheet.open({
+      checkinId: rec.id,
+      ownerId: rec.user,
+      onClose: () => {
+        if (this._groups && !this._suspended && document.getElementById('checkinViewer').classList.contains('show')) this._renderPost();
+      },
+    });
+  },
+
+  // Public total likes/comments — everyone, guests included (see
+  // Community.publicCounts). Async by nature; only patches the DOM if
+  // we're still looking at the SAME check-in when it resolves (swiping
+  // away mid-fetch must not stamp a stale count onto the next post).
+  _refreshCounts(checkinId) {
+    Community.publicCounts('checkin', checkinId).then(({ likes, comments }) => {
+      const rec = this._current();
+      if (!rec || rec.id !== checkinId) return;
+      const fmt = (typeof Insights !== 'undefined' && Insights.fmt) ? Insights.fmt.bind(Insights) : String;
+      const likesEl = document.getElementById('ciViewerLikesN');
+      const commentsEl = document.getElementById('ciViewerCommentsN');
+      if (likesEl) likesEl.textContent = fmt(likes);
+      if (commentsEl) commentsEl.textContent = fmt(comments);
+    });
   },
 
   _restartAutoTimer() {

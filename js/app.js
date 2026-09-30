@@ -155,6 +155,7 @@ function boot() {
   CtbtGame.init();
   NhatKyCtrl.init();
   CheckinDiscoverCtrl.init();
+  DmCtrl.init();
   wireScrollMasks();
 
   // Deep-link handler: ?q=<pb_id> auto-opens the community detail
