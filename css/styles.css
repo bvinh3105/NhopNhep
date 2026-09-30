@@ -3620,6 +3620,10 @@ body.map-full .tabbar{transform:translateY(105%)}
   flex-shrink:0;border:none;border-radius:999px;padding:.5rem .9rem;background:var(--primary,#C2410C);
   color:#fff;font:inherit;font-weight:900;font-size:.8rem;cursor:pointer;
 }
+.scan-notice{
+  font-size:.75rem;font-weight:700;color:#92400e;background:#fef3c7;
+  padding:.5rem .9rem;line-height:1.4;text-align:center;
+}
 .feedback-banner{
   display:flex;align-items:center;gap:.7rem;margin:0 0 .8rem;padding:.6rem .8rem;
   border-radius:12px;background:var(--cream-2,#F6EBD9);
