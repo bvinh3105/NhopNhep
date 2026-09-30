@@ -985,29 +985,68 @@ const Community = {
     } catch (_) { return `g_${Date.now()}`; }
   },
 
-  // Host only. candidates: [{cid, name, address, lat, lng, category,
-  // photo_url, source}] — source ∈ 'community' | 'osm' | 'gemini'.
+  // Phiên do khách tạo (host rỗng): quyền chốt phiên nằm ở host_token —
+  // chuỗi ngẫu nhiên chỉ máy tạo phiên giữ ({sessionId: token} trong
+  // localStorage, thêm 1 bản trong bộ nhớ phòng localStorage bị chặn). Gửi
+  // lúc tạo dưới khoá `host_key` (hook server chép vào trường ẩn host_token,
+  // xem pb_hooks/nn_session_host.pb.js), gửi lại qua ?host_token= khi chốt.
+  // Xoá dữ liệu trình duyệt là mất quyền chốt — cùng đánh đổi với guest_token.
+  HOST_TOKENS_KEY: 'nhopnhep_host_tokens',
+  _hostTokenMem: {},
+  _hostTokens() {
+    try { return JSON.parse(localStorage.getItem(this.HOST_TOKENS_KEY) || '{}') || {}; } catch (_) { return {}; }
+  },
+  hostTokenFor(sessionId) {
+    return this._hostTokenMem[sessionId] || this._hostTokens()[sessionId] || '';
+  },
+  _rememberHostToken(sessionId, token) {
+    this._hostTokenMem[sessionId] = token;
+    try {
+      const m = this._hostTokens();
+      m[sessionId] = token;
+      const ids = Object.keys(m);
+      ids.slice(0, Math.max(0, ids.length - 30)).forEach(id => delete m[id]);
+      localStorage.setItem(this.HOST_TOKENS_KEY, JSON.stringify(m));
+    } catch (_) {}
+  },
+  isSessionHost(session) {
+    if (!session) return false;
+    if (session.host) return this.isLoggedIn() && session.host === this.currentUser.id;
+    return !!this.hostTokenFor(session.id);
+  },
+
+  // Host (đăng nhập hoặc khách). candidates: [{cid, name, address, lat, lng,
+  // category, photo_url, source}] — source ∈ 'community' | 'osm' | 'gemini'.
   async createSession({ title = '', candidates = [], expiresInHours = 2 } = {}) {
-    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    const guest = !this.isLoggedIn();
     const body = {
-      host: this.currentUser.id,
+      host: guest ? '' : this.currentUser.id,
       title,
       candidates,
       status: 'open',
       expires_at: new Date(Date.now() + expiresInHours * 3600 * 1000).toISOString(),
     };
-    return this._fetch('/api/collections/dining_sessions/records', {
+    let token = '';
+    if (guest) {
+      const b = new Uint8Array(24);
+      crypto.getRandomValues(b);
+      token = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+      body.host_key = token;
+    }
+    const r = await this._fetch('/api/collections/dining_sessions/records', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    if (r.ok && token && r.data?.id) this._rememberHostToken(r.data.id, token);
+    return r;
   },
 
   // Public — works for host, guest, or any logged-in participant. Session
   // viewRule is fully public (see backend migration) so ?join=<id> works
   // with zero auth, same as SavedListModal's ?q=<id> deep link.
   async getSession(id) {
-    return this._fetch(`/api/collections/dining_sessions/records/${id}`);
+    return this._fetch(`/api/collections/dining_sessions/records/${encodeURIComponent(id)}`);
   },
 
   // Toàn bộ vote của CHÍNH MÌNH trong 1 session (không lọc candidate) — để
@@ -1098,8 +1137,10 @@ const Community = {
   // client-side TRƯỚC khi gọi hàm này (xem SessionVoteModal._pickWinner) —
   // đây chỉ persist kết quả để mọi người cùng thấy ở lần poll kế tiếp.
   async closeSession(sessionId, winnerCid) {
-    if (!this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
-    return this._fetch(`/api/collections/dining_sessions/records/${sessionId}`, {
+    const token = this.hostTokenFor(sessionId);
+    if (!token && !this.isLoggedIn()) return { ok: false, error: I18N.t('err.needLogin') };
+    const qs = token ? `?host_token=${encodeURIComponent(token)}` : '';
+    return this._fetch(`/api/collections/dining_sessions/records/${encodeURIComponent(sessionId)}${qs}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'closed', winner_cid: winnerCid }),

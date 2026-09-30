@@ -1320,8 +1320,8 @@ const SessionCreateModal = {
   // vì quán từ OSM/Gemini không có id PocketBase ổn định (xem community.js
   // createSession comment). cid chỉ cần duy nhất TRONG session này, nên
   // dùng luôn chỉ số vị trí cho đơn giản.
+  // Khách cũng tạo được phiên (host_token, xem Community.createSession).
   open() {
-    if (!Community.isLoggedIn()) { showToast(I18N.t('toast.sessionNeedLogin')); return; }
     const ids = [...State.selected];
     if (ids.length < 2) { showToast(I18N.t('toast.sessionNeedTwo')); return; }
 
@@ -1408,8 +1408,7 @@ const SessionVoteModal = {
     if (!id) return;
     const r = await Community.getSession(id);
     if (!r.ok || !r.data) { showToast(I18N.t('toast.sessionNotFound')); return; }
-    const isHost = Community.isLoggedIn() && r.data.host === Community.currentUser.id;
-    this._open(r.data, isHost);
+    this._open(r.data, Community.isSessionHost(r.data));
   },
 
   _open(sessionRecord, isHost) {
@@ -1474,7 +1473,7 @@ const SessionVoteModal = {
   },
 
   async _closeAndRandom() {
-    const candidates = this._session.candidates || [];
+    const candidates = Array.isArray(this._session.candidates) ? this._session.candidates : [];
     if (!candidates.length) return;
     let maxCount = 0;
     for (const c of candidates) maxCount = Math.max(maxCount, this._counts[c.cid] || 0);
@@ -1566,19 +1565,22 @@ const SessionVoteModal = {
     if (!s) return;
     const isClosed = s.status === 'closed';
     const isExpired = !isClosed && s.expires_at && new Date(s.expires_at).getTime() < Date.now();
+    // candidates do người tạo phiên gửi lên (kể cả khách ẩn danh) — không tin
+    // kiểu dữ liệu, và mọi giá trị đưa vào HTML đều phải escape.
+    const cands = Array.isArray(s.candidates) ? s.candidates : [];
 
     document.getElementById('sessionExpiredBanner').classList.toggle('hidden', !isExpired);
     document.getElementById('sessionVoteSub').textContent = isClosed
       ? I18N.t('session.subClosed')
-      : I18N.t('session.subOpen', { n: (s.candidates || []).length });
+      : I18N.t('session.subOpen', { n: cands.length });
 
     const list = document.getElementById('sessionVoteList');
-    list.innerHTML = (s.candidates || []).map(c => {
+    list.innerHTML = cands.map(c => {
       const voted = this._myVotes.has(c.cid);
       const isWinner = isClosed && s.winner_cid === c.cid;
       const count = this._counts[c.cid] || 0;
       const catIcon = (CATEGORIES[c.category] && CATEGORIES[c.category].icon) || svgIcon('cat-nhahang');
-      return `<div class="session-vote-row${voted ? ' voted' : ''}${isWinner ? ' winner' : ''}" data-cid="${c.cid}">
+      return `<div class="session-vote-row${voted ? ' voted' : ''}${isWinner ? ' winner' : ''}" data-cid="${escapeHtml(c.cid)}">
         <span class="session-vote-icon">${isWinner ? svgIcon('social-trophy') : catIcon}</span>
         <span class="session-vote-name">${escapeHtml(c.name)}</span>
         <span class="session-vote-count">${count}</span>
@@ -1588,7 +1590,7 @@ const SessionVoteModal = {
 
     const winnerBanner = document.getElementById('sessionWinnerBanner');
     if (isClosed) {
-      const winner = (s.candidates || []).find(c => c.cid === s.winner_cid);
+      const winner = cands.find(c => c.cid === s.winner_cid);
       document.getElementById('sessionWinnerName').textContent = winner ? winner.name : '';
       winnerBanner.classList.remove('hidden');
     } else {
