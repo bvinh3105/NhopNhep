@@ -3620,6 +3620,16 @@ body.map-full .tabbar{transform:translateY(105%)}
   flex-shrink:0;border:none;border-radius:999px;padding:.5rem .9rem;background:var(--primary,#C2410C);
   color:#fff;font:inherit;font-weight:900;font-size:.8rem;cursor:pointer;
 }
+.feedback-banner{
+  display:flex;align-items:center;gap:.7rem;margin:0 0 .8rem;padding:.6rem .8rem;
+  border-radius:12px;background:var(--cream-2,#F6EBD9);
+}
+.feedback-banner-text{flex:1;font-size:.78rem;font-weight:700;color:var(--text2);line-height:1.35}
+.feedback-banner-btn{
+  flex-shrink:0;border-radius:999px;padding:.4rem .85rem;background:transparent;
+  border:2px solid var(--primary,#C2410C);color:var(--primary,#C2410C);
+  font:inherit;font-weight:900;font-size:.78rem;text-decoration:none;white-space:nowrap;
+}
 
 /* Banner "Mở bằng Safari/Chrome" (InAppBanner, js/app.js) — chỉ trong trình
    duyệt nhúng của app. html.iab-on đẩy --ribbon-h xuống đúng bằng chiều cao
