@@ -10,6 +10,9 @@
    logged in without re-hitting the server.
 ═══════════════════════════════════════════════ */
 
+// Tài khoản chung "Bà Thảo" của game Cơm Tấm Bà Thảo (bài check-in cũ từ game)
+const GAME_BOT_USER = 'p1b99ipcit1kskm';
+
 const Community = {
   // Quick Tunnel URL — changes every time the tunnel process restarts (no
   // fixed domain on the free tier). Update this constant + redeploy when
@@ -915,18 +918,19 @@ const Community = {
   // Cộng đồng tab for 24h only (bubbles AND Khám phá); after that they
   // stay in the owner's diary (getMyCheckins) and still count toward a
   // quán's verified rating (getCheckinsForRestaurant) — neither is capped.
-  // Bài từ game "Cơm Tấm Bà Thảo" (source='game') đều đăng dưới 1 tài khoản
-  // chung "Bà Thảo" — nhiều người chơi cùng lúc sẽ lấp kín feed và chiếm hết
-  // suất perPage của người thật. Nên: lấy feed KHÔNG có bài game, rồi lấy
-  // riêng đúng 1 bài game mới nhất chèn vào theo thời gian. Trang quán Bà
-  // Thảo (getCheckinsForRestaurant) vẫn hiện đủ.
+  // Bài từ game "Cơm Tấm Bà Thảo" đăng dưới tài khoản chung "Bà Thảo"
+  // (GAME_BOT_USER, trước 2026-10-01) — nhiều người chơi cùng lúc sẽ lấp kín
+  // feed và chiếm hết suất perPage của người thật. Nên: lấy feed KHÔNG có bài
+  // của tài khoản chung, rồi lấy riêng đúng 1 bài mới nhất của nó chèn vào theo
+  // thời gian. Từ 2026-10-01 game đăng dưới tài khoản của chính người chơi nên
+  // các bài đó hiện như bài thường. Trang quán Bà Thảo vẫn hiện đủ.
   async listSharedCheckins({ page = 1, perPage = 30, withinHours = 24 } = {}) {
     const since = new Date(Date.now() - withinHours * 3600 * 1000).toISOString().replace('T', ' ');
     const base = `is_shared=true && created >= "${since}"`;
     const list = (filter, pg, pp) => this._fetch(`/api/collections/checkins/records?filter=${encodeURIComponent(filter)}&sort=-created&page=${pg}&perPage=${pp}&expand=user`);
     const [main, game] = await Promise.all([
-      list(`${base} && source != "game"`, page, perPage),
-      page === 1 ? list(`${base} && source = "game"`, 1, 1) : null,
+      list(`${base} && (source != "game" || user != "${GAME_BOT_USER}")`, page, perPage),
+      page === 1 ? list(`${base} && source = "game" && user = "${GAME_BOT_USER}"`, 1, 1) : null,
     ]);
     if (!main.ok) return main.status === 400 ? list(base, page, perPage) : main;   // server chưa có field source → như cũ
     const latestGame = game && game.ok && game.data && game.data.items && game.data.items[0];

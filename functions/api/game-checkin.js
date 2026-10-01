@@ -1,21 +1,25 @@
 // Cloudflare Pages Function — check-in từ game "Cơm Tấm Bà Thảo"
-// (https://com-tam-ba-thao.bachvinhtran.workers.dev/ — trước 2026-10-01 là bvinh3105.github.io) lên Nhóp Nhép, đăng dưới
-// tài khoản chung "Bà Thảo" vào quán "Cơm Tấm Bà Thảo".
+// (https://com-tam-ba-thao.bachvinhtran.workers.dev/ — trước 2026-10-01 là bvinh3105.github.io) lên Nhóp Nhép,
+// vào quán "Cơm Tấm Bà Thảo".
+// 2026-10-01: đăng dưới TÀI KHOẢN CỦA CHÍNH NGƯỜI CHƠI — game phải liên kết Nhóp Nhép trước
+// (vé liên kết do functions/api/game-link.js ký, gửi trong Authorization: Bearer <vé>).
+// Chơi game không cần tài khoản; chỉ đăng lên Nhóp Nhép mới cần. Bài cũ của tài khoản chung
+// "Bà Thảo" (NN_GAME_BOT_USER) vẫn giữ nguyên.
 //
-// Người chơi không có tài khoản Nhóp Nhép, nên Function này là cổng duy
-// nhất và phải tự chống lạm dụng:
+// Function này là cổng duy nhất từ game nên phải tự chống lạm dụng:
 //  * Tắt mặc định: chỉ chạy khi env NN_GAME_CHECKIN = 'on' (công tắc tắt khẩn cấp).
 //  * Turnstile bắt buộc (action 'game_checkin', hostname của game).
 //  * KHÔNG nhận chữ tự do: note do server dựng từ câu mẫu + số liệu đã kiểm tra.
 //  * Ảnh: chỉ WebP/JPEG, <= 400KB, đúng 1080x1440 (khung ảnh dọc 3:4 game vẽ ra).
-//  * Giới hạn: mỗi IP 3 bài/24h, toàn hệ thống NN_GAME_DAILY (mặc định 100)/24h,
+//  * Giới hạn: mỗi tài khoản 3 bài/24h, mỗi IP 6 bài/24h, toàn hệ thống NN_GAME_DAILY (mặc định 100)/24h,
 //    đếm thẳng trên PocketBase (trường ẩn game_ip = sha256 của IP) nên đúng
 //    trên mọi isolate; thêm chặn dồn dập trong isolate.
 //  * Bài game có source = 'game'; bị báo cáo 1 lần là tự ẩn (pb_hooks/nn_game_checkins.pb.js).
 //
 // Env (Cloudflare Pages → Settings → Variables):
 //   NN_GAME_CHECKIN      'on' để mở cổng
-//   NN_GAME_BOT_USER     id user "Bà Thảo" (không phải bí mật)
+//   GAME_LINK_SECRET     secret dùng chung với game-link.js + Worker game (kiểm vé liên kết)
+//   NN_GAME_BOT_USER     id user "Bà Thảo" (bài cũ; không còn dùng để đăng)
 //   NN_GAME_QUAN         id quán "Cơm Tấm Bà Thảo" (không phải bí mật)
 //   PB_ADMIN_EMAIL / PB_ADMIN_PASSWORD   superuser PB (đã có, notify-follow.js dùng chung)
 //   GAME_TURNSTILE_SECRET (hoặc dùng chung TURNSTILE_SECRET nếu thêm hostname game vào widget cũ)
@@ -38,7 +42,9 @@ const QUAN_EMOJI = '🍚';
 const MAX_PHOTO = 400 * 1024;
 const PHOTO_W = 1080;
 const PHOTO_H = 1440;
-const IP_DAILY = 3;
+const USER_DAILY = 3;
+const BOT_USER_DEFAULT = 'p1b99ipcit1kskm';   // tài khoản chung "Bà Thảo" (dự phòng khi thiếu env)
+const IP_DAILY = 6;
 const DEFAULT_DAILY = 100;
 
 const WEEKDAYS = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
@@ -76,7 +82,7 @@ function corsHeaders(origin) {
   return {
     'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   };
@@ -129,6 +135,29 @@ function imageInfo(buf) {
     }
   }
   return null;
+}
+
+// ---- vé liên kết (giữ khớp với game-link.js và worker/index.js của game) ----
+const enc = new TextEncoder();
+function b64u(bytes) {
+  let s = '';
+  new Uint8Array(bytes).forEach(b => { s += String.fromCharCode(b); });
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function b64uDecode(s) {
+  return Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+}
+async function verifyLink(header, secret) {
+  const m = /^Bearer (v1\.([A-Za-z0-9_-]{10,800})\.([A-Za-z0-9_-]{20,100}))$/.exec(header || '');
+  if (!m || !secret) return null;
+  const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const want = enc.encode(b64u(await crypto.subtle.sign('HMAC', key, enc.encode(`v1.${m[2]}`))));
+  const got = enc.encode(m[3]);
+  if (want.length !== got.length || !crypto.subtle.timingSafeEqual(want, got)) return null;
+  let p;
+  try { p = JSON.parse(new TextDecoder().decode(b64uDecode(m[2]))); } catch (_) { return null; }
+  if (!p || p.aud !== 'ctbt' || !/^[a-z0-9]{15}$/.test(p.u || '') || !(p.exp > Date.now() / 1000)) return null;
+  return { uid: p.u, name: String(p.n || '').slice(0, 40) };
 }
 
 async function sha256Hex(s) {
@@ -215,13 +244,24 @@ export async function onRequestPost(context) {
     return json(503, { ok: false, message: 'Nhóp Nhép tạm đóng cổng nhận check-in từ game.' }, origin);
   }
   const secret = env.GAME_TURNSTILE_SECRET || env.TURNSTILE_SECRET;
-  if (!env.NN_GAME_BOT_USER || !env.NN_GAME_QUAN || !secret) {
+  if (!env.NN_GAME_QUAN || !secret || (env.GAME_LINK_SECRET || '').length < 32) {
     log(500, 'not_configured');
     return json(500, { ok: false, message: 'Nhóp Nhép chưa cấu hình xong cổng check-in từ game.' }, origin);
   }
-  if (!/^[a-z0-9]{15}$/.test(env.NN_GAME_BOT_USER) || !/^[a-z0-9]{15}$/.test(env.NN_GAME_QUAN)) {
+  if (!/^[a-z0-9]{15}$/.test(env.NN_GAME_QUAN)) {
     log(500, 'bad_ids');
     return json(500, { ok: false, message: 'Nhóp Nhép chưa cấu hình xong cổng check-in từ game.' }, origin);
+  }
+
+  const link = await verifyLink(request.headers.get('Authorization'), env.GAME_LINK_SECRET);
+  if (!link) {
+    log(401, 'no_link');
+    return json(401, { ok: false, needLink: true, message: 'Cần liên kết tài khoản Nhóp Nhép trước khi đăng nha.' }, origin);
+  }
+  // Không ai đăng check-in qua nick Bà Thảo (tài khoản chung của quán)
+  if (link.uid === (env.NN_GAME_BOT_USER || BOT_USER_DEFAULT)) {
+    log(403, 'bot_account');
+    return json(403, { ok: false, needLink: true, message: 'Không đăng check-in bằng tài khoản Bà Thảo được, liên kết tài khoản của bạn nha.' }, origin);
   }
 
   const bucket = ipBucket(ip);
@@ -300,14 +340,14 @@ export async function onRequestPost(context) {
     const su = await superuser(env, signal);
     const since = pbTime(Date.now() - 24 * 3600 * 1000);
     const ipHash = (await sha256Hex(`nhopnhep-game|${bucket}`)).slice(0, 32);
-    const bot = env.NN_GAME_BOT_USER;
-    const [mine, all] = await Promise.all([
-      countCheckins(`user = "${bot}" && game_ip = "${ipHash}" && created >= "${since}"`, su, signal),
-      countCheckins(`user = "${bot}" && source = "game" && created >= "${since}"`, su, signal),
+    const [mine, fromIp, all] = await Promise.all([
+      countCheckins(`user = "${link.uid}" && source = "game" && created >= "${since}"`, su, signal),
+      countCheckins(`game_ip = "${ipHash}" && source = "game" && created >= "${since}"`, su, signal),
+      countCheckins(`source = "game" && created >= "${since}"`, su, signal),
     ]);
-    if (mine >= IP_DAILY) {
-      log(429, 'ip_daily');
-      return json(429, { ok: false, message: `Mỗi ngày chỉ đăng được ${IP_DAILY} check-in từ game thôi nha.` }, origin);
+    if (mine >= USER_DAILY || fromIp >= IP_DAILY) {
+      log(429, mine >= USER_DAILY ? 'user_daily' : 'ip_daily');
+      return json(429, { ok: false, message: `Mỗi ngày chỉ đăng được ${USER_DAILY} check-in từ game thôi nha.` }, origin);
     }
     const daily = Number(env.NN_GAME_DAILY) > 0 ? Number(env.NN_GAME_DAILY) : DEFAULT_DAILY;
     if (all >= daily) {
@@ -317,7 +357,7 @@ export async function onRequestPost(context) {
 
     const d = { weekday, served, perfect, net, netText: formatK(net), whoName: who ? WHO[who] : '' };
     const body = new FormData();
-    body.append('user', bot);
+    body.append('user', link.uid);
     body.append('restaurant', env.NN_GAME_QUAN);
     body.append('restaurant_name', QUAN_NAME);
     body.append('restaurant_emoji', QUAN_EMOJI);
