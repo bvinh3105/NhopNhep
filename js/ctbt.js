@@ -19,7 +19,7 @@ const CtbtGame = {
   STRIP_MAX: 12,
   // Tạm đóng lối vào game (2026-09-29, game đang nâng cấp asset): banner, nút Chơi thử, nhãn 🎮 vẫn hiện,
   // bấm vào chỉ báo "đang cập nhật". Mở lại: đổi thành true.
-  PLAY_OPEN: false,
+  PLAY_OPEN: true,
 
   url(src) {
     const u = new URL(this.GAME_URL);
