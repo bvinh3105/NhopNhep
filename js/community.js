@@ -915,10 +915,25 @@ const Community = {
   // Cộng đồng tab for 24h only (bubbles AND Khám phá); after that they
   // stay in the owner's diary (getMyCheckins) and still count toward a
   // quán's verified rating (getCheckinsForRestaurant) — neither is capped.
+  // Bài từ game "Cơm Tấm Bà Thảo" (source='game') đều đăng dưới 1 tài khoản
+  // chung "Bà Thảo" — nhiều người chơi cùng lúc sẽ lấp kín feed và chiếm hết
+  // suất perPage của người thật. Nên: lấy feed KHÔNG có bài game, rồi lấy
+  // riêng đúng 1 bài game mới nhất chèn vào theo thời gian. Trang quán Bà
+  // Thảo (getCheckinsForRestaurant) vẫn hiện đủ.
   async listSharedCheckins({ page = 1, perPage = 30, withinHours = 24 } = {}) {
     const since = new Date(Date.now() - withinHours * 3600 * 1000).toISOString().replace('T', ' ');
-    const filter = encodeURIComponent(`is_shared=true && created >= "${since}"`);
-    return this._fetch(`/api/collections/checkins/records?filter=${filter}&sort=-created&page=${page}&perPage=${perPage}&expand=user`);
+    const base = `is_shared=true && created >= "${since}"`;
+    const list = (filter, pg, pp) => this._fetch(`/api/collections/checkins/records?filter=${encodeURIComponent(filter)}&sort=-created&page=${pg}&perPage=${pp}&expand=user`);
+    const [main, game] = await Promise.all([
+      list(`${base} && source != "game"`, page, perPage),
+      page === 1 ? list(`${base} && source = "game"`, 1, 1) : null,
+    ]);
+    if (!main.ok) return main.status === 400 ? list(base, page, perPage) : main;   // server chưa có field source → như cũ
+    const latestGame = game && game.ok && game.data && game.data.items && game.data.items[0];
+    if (!latestGame) return main;
+    const items = [...(main.data.items || []), latestGame]
+      .sort((a, b) => new Date(b.created) - new Date(a.created));
+    return { ok: true, data: { ...main.data, items } };
   },
 
   // Delete my own check-in — server rule enforces ownership too, but the
