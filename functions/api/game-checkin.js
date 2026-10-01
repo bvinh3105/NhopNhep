@@ -1,5 +1,5 @@
 // Cloudflare Pages Function — check-in từ game "Cơm Tấm Bà Thảo"
-// (https://bvinh3105.github.io/com-tam-ba-thao/) lên Nhóp Nhép, đăng dưới
+// (https://com-tam-ba-thao.bachvinhtran.workers.dev/ — trước 2026-10-01 là bvinh3105.github.io) lên Nhóp Nhép, đăng dưới
 // tài khoản chung "Bà Thảo" vào quán "Cơm Tấm Bà Thảo".
 //
 // Người chơi không có tài khoản Nhóp Nhép, nên Function này là cổng duy
@@ -27,8 +27,9 @@
 const PB_URL = 'https://sales-themes-nevada-forth.trycloudflare.com';
 
 const TURNSTILE_ACTION = 'game_checkin';
-const EXPECTED_HOSTNAMES = new Set(['bvinh3105.github.io', 'localhost', '127.0.0.1']);
-const ALLOWED_ORIGINS = new Set(['https://bvinh3105.github.io']);
+// 2026-10-01: game chuyển sang Cloudflare Workers (repo game private, GitHub Pages tắt); giữ github.io phòng khi bật lại
+const EXPECTED_HOSTNAMES = new Set(['com-tam-ba-thao.bachvinhtran.workers.dev', 'bvinh3105.github.io', 'localhost', '127.0.0.1']);
+const ALLOWED_ORIGINS = new Set(['https://com-tam-ba-thao.bachvinhtran.workers.dev', 'https://bvinh3105.github.io']);
 const DEV_ORIGIN_RE = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/;
 const SITE = 'https://nhopnhep.pages.dev';
 
