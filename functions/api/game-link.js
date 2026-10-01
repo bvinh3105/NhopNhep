@@ -21,6 +21,8 @@ const SITE = 'https://nhopnhep.pages.dev';
 const SITE_ORIGIN_RE = /^https:\/\/([a-z0-9-]+\.)?nhopnhep\.pages\.dev$/;
 const DEV_ORIGIN_RE = /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/;
 const LINK_DAYS = 180;
+// Giai đoạn thử (2026-10-01): chỉ các tài khoản này được liên kết với game. Muốn mở cho mọi người: đặt ALLOW_EMAILS = [].
+const ALLOW_EMAILS = ['vinhkaitou@gmail.com', 'bachvinhtran@gmail.com'];
 const BOT_USER_DEFAULT = 'p1b99ipcit1kskm';   // tài khoản chung "Bà Thảo" (dự phòng khi thiếu env)
 
 function json(status, body) {
@@ -105,6 +107,11 @@ export async function onRequestPost(context) {
   if (record.id === (env.NN_GAME_BOT_USER || BOT_USER_DEFAULT)) {
     log(403, 'bot_account');
     return json(403, { ok: false, message: 'Tài khoản Bà Thảo là tài khoản chung của quán, không liên kết với game được.' });
+  }
+
+  if (ALLOW_EMAILS.length && !ALLOW_EMAILS.includes(String(record.email || '').trim().toLowerCase())) {
+    log(403, 'not_allowed');
+    return json(403, { ok: false, message: 'Liên kết game đang thử nghiệm với một số tài khoản, sắp mở cho mọi người nha.' });
   }
 
   const name = String(record.name || 'Bạn Nhóp Nhép').replace(/[<>"'`\\]/g, '').trim().slice(0, 40) || 'Bạn Nhóp Nhép';
