@@ -3814,6 +3814,32 @@ const CommunityCtrl = {
   // a taste, big enough to prove the community's alive.
   GUEST_CAP: 10,
 
+  // "Cơm Tấm Bà Thảo" (chủ tài khoản "Bà Thảo", user id dưới đây) — chỗ
+  // đặt chỗ ưu tiên, LUÔN lên đầu bảng tin bất kể khoảng cách. Ghim theo
+  // created_by (ổn định) chứ không theo tên quán (dễ gõ khác/đổi tên).
+  PINNED_OWNER_ID: 'p1b99ipcit1kskm',
+
+  // Quán gần vị trí hiện tại lên trước. State.userLat/userLng đã được
+  // app.js xác định ngay lúc mở app (cache 7 ngày → GPS im lặng → CF IP
+  // geo), nên hàm này tự nhiên "sắp xếp lại mỗi khi vào app" — chỉ cần
+  // gọi lại mỗi lần _loadList() chạy, không cần logic ngày/giờ riêng.
+  // Quán chưa có toạ độ (location rỗng) rơi xuống cuối nhóm của nó thay
+  // vì vỡ sort. Bài ghim tách riêng trước, luôn ở đầu kể cả khi chưa có
+  // vị trí người dùng (pin không phụ thuộc GPS).
+  _sortByDistance(items) {
+    const hasLoc = typeof State.userLat === 'number' && typeof State.userLng === 'number';
+    const distOf = (r) => r.location
+      ? haversine(State.userLat, State.userLng, r.location.lat, r.location.lon)
+      : Infinity;
+    const pinned = items.filter(r => r.created_by === this.PINNED_OWNER_ID);
+    const rest = items.filter(r => r.created_by !== this.PINNED_OWNER_ID);
+    if (hasLoc) {
+      pinned.sort((a, b) => distOf(a) - distOf(b));
+      rest.sort((a, b) => distOf(a) - distOf(b));
+    }
+    return [...pinned, ...rest];
+  },
+
   render() {
     const loggedIn = Community.isLoggedIn();
     // Main content shows always now — guests get the browse-first view
@@ -3923,7 +3949,10 @@ const CommunityCtrl = {
       </div>`;
       return;
     }
-    this._renderList(r.data.items, query);
+    // Bảng tin mặc định (không tìm kiếm): quán gần lên trước. searchRestaurants()
+    // đã có thứ hạng theo độ khớp từ khoá riêng (tier AND/fuzzy) — không đụng vào.
+    const items = query ? r.data.items : this._sortByDistance(r.data.items);
+    this._renderList(items, query);
 
     // Vừa vẽ xong = mọi thứ đang hiện là mới nhất → dọn pill và đặt lại
     // mốc. _liveSig=null khiến lần poll ngay sau đây chỉ lấy mốc chứ
