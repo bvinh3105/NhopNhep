@@ -23,7 +23,7 @@
 // updates log.js/register.js/error-report.js. Keep the constant name
 // identical so the watchdog's find/replace still catches this file.
 
-const PB_URL       = 'https://sales-themes-nevada-forth.trycloudflare.com';
+const PB_URL       = 'https://springs-amend-providers-indoor.trycloudflare.com';
 const COLLECTION   = 'gemini_quota';
 const DAILY_LIMIT  = 15;
 
