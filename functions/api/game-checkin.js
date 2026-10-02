@@ -28,7 +28,7 @@
 // PB_URL phải được watchdog đồng bộ như các Function khác: thêm
 // "functions\api\game-checkin.js" vào $pagesFunctionsWithPbUrl trong Bat-TOAN-BO*.ps1.
 
-const PB_URL = 'https://vocational-distinction-burner-ward.trycloudflare.com';
+const PB_URL = 'https://also-contacted-sally-historical.trycloudflare.com';
 
 const TURNSTILE_ACTION = 'game_checkin';
 // 2026-10-01: game chuyển sang Cloudflare Workers (repo game private, GitHub Pages tắt); giữ github.io phòng khi bật lại
